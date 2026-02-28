@@ -4,7 +4,32 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": [
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "DATABASE_URL",
+        "STRIPE_PUBLISHABLE_KEY",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "STRIPE_PRICE_ID_STARTER",
+        "STRIPE_PRICE_ID_PRO",
+        "STRIPE_PRICE_ID_ENTERPRISE",
+        "STRIPE_CONNECT_CLIENT_ID",
+        "RESEND_API_KEY",
+        "RESEND_FROM_EMAIL",
+        "TWILIO_ACCOUNT_SID",
+        "TWILIO_AUTH_TOKEN",
+        "TWILIO_PHONE_NUMBER",
+        "GOOGLE_MAPS_API_KEY",
+        "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY",
+        "EXPO_PROJECT_ID",
+        "ANTHROPIC_API_KEY",
+        "NEXTAUTH_SECRET",
+        "NEXTAUTH_URL"
+      ]
     },
     "dev": {
       "cache": false,
