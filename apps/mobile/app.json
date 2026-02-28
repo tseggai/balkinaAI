@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Balkina AI",
+    "slug": "balkina-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "balkina",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ai.balkina.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "package": "ai.balkina.app"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}

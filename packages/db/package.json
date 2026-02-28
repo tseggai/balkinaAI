@@ -1,0 +1,28 @@
+{
+  "name": "@balkina/db",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit",
+    "generate-types": "supabase gen types typescript --linked > src/types/database.ts"
+  },
+  "dependencies": {
+    "@balkina/config": "*",
+    "@supabase/supabase-js": "^2.43.0"
+  },
+  "devDependencies": {
+    "supabase": "^1.178.0",
+    "typescript": "^5.5.0"
+  }
+}

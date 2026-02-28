@@ -1,0 +1,29 @@
+{
+  "name": "@balkina/notifications",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@balkina/config": "*",
+    "@balkina/shared": "*",
+    "expo-server-sdk": "^3.10.0",
+    "resend": "^3.3.0",
+    "twilio": "^5.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}
