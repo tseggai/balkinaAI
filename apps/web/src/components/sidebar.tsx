@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: HomeIcon },
@@ -24,12 +23,11 @@ export function Sidebar({
   planName: string;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
 
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/auth/login');
+    window.location.href = '/auth/login';
   }
 
   return (
