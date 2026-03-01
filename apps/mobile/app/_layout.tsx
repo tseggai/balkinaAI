@@ -32,15 +32,32 @@ export default function RootLayout() {
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/welcome');
     } else if (session && inAuthGroup) {
-      router.replace('/');
+      router.replace('/(main)');
     }
   }, [session, initialized, segments, router]);
 
   return (
-    <Stack>
+    <Stack screenOptions={{ headerBackTitle: 'Back' }}>
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="chat" options={{ title: 'Book Appointment' }} />
+      <Stack.Screen name="(main)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="chat"
+        options={{
+          title: 'Book Appointment',
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#6366f1',
+          headerTitleStyle: { fontWeight: '700', fontSize: 17 },
+        }}
+      />
+      <Stack.Screen
+        name="businesses"
+        options={{
+          title: 'Browse Businesses',
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#6366f1',
+          headerTitleStyle: { fontWeight: '700', fontSize: 17 },
+        }}
+      />
     </Stack>
   );
 }
