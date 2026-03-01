@@ -1,93 +1,114 @@
 /**
  * POST /api/chat
- * AI Chatbot endpoint — streams responses from Claude with tool use.
+ * AI Chatbot endpoint — streams responses from GPT-4o-mini with function calling.
  * Accepts: { message, tenantId, sessionId, customerName?, customerPhone? }
  * Returns: streaming text/event-stream
  */
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { createAdminClient } from '@/lib/supabase/server';
 import { executeTool } from './tool-handlers';
 
 const MAX_TOOL_ROUNDS = 5;
 
-// Tool definitions scoped to a tenant's widget context
-const chatTools: Anthropic.Tool[] = [
+// Tool definitions in OpenAI function calling format
+const chatTools: OpenAI.ChatCompletionTool[] = [
   {
-    name: 'get_services',
-    description: 'List all services available at this business with pricing and duration.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {},
-      required: [],
-    },
-  },
-  {
-    name: 'get_service_details',
-    description: 'Get full details for a specific service including extras and deposit info.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        service_id: { type: 'string', description: 'UUID of the service' },
+    type: 'function',
+    function: {
+      name: 'get_services',
+      description: 'List all services available at this business with pricing and duration.',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
       },
-      required: ['service_id'],
     },
   },
   {
-    name: 'get_staff',
-    description: 'List all staff members at this business.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {},
-      required: [],
-    },
-  },
-  {
-    name: 'check_availability',
-    description: 'Check available time slots for a service on a given date. Returns available times with staff.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        service_id: { type: 'string', description: 'UUID of the service' },
-        staff_id: { type: 'string', description: 'UUID of preferred staff member (optional)' },
-        date: { type: 'string', description: 'Date to check availability for (YYYY-MM-DD)' },
+    type: 'function',
+    function: {
+      name: 'get_service_details',
+      description: 'Get full details for a specific service including extras and deposit info.',
+      parameters: {
+        type: 'object',
+        properties: {
+          service_id: { type: 'string', description: 'UUID of the service' },
+        },
+        required: ['service_id'],
       },
-      required: ['service_id', 'date'],
     },
   },
   {
-    name: 'create_booking',
-    description: 'Create an appointment booking. ONLY call this after the customer has explicitly confirmed the booking details (service, time, price) in their immediately preceding message.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        service_id: { type: 'string', description: 'UUID of the service to book' },
-        staff_id: { type: 'string', description: 'UUID of preferred staff member (optional)' },
-        start_time: { type: 'string', description: 'Appointment start time in ISO 8601 format' },
-        location_id: { type: 'string', description: 'UUID of the location (optional)' },
+    type: 'function',
+    function: {
+      name: 'get_staff',
+      description: 'List all staff members at this business.',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
       },
-      required: ['service_id', 'start_time'],
     },
   },
   {
-    name: 'cancel_appointment',
-    description: 'Cancel an existing appointment.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        appointment_id: { type: 'string', description: 'UUID of the appointment to cancel' },
+    type: 'function',
+    function: {
+      name: 'check_availability',
+      description: 'Check available time slots for a service on a given date. Returns available times with staff.',
+      parameters: {
+        type: 'object',
+        properties: {
+          service_id: { type: 'string', description: 'UUID of the service' },
+          staff_id: { type: 'string', description: 'UUID of preferred staff member (optional)' },
+          date: { type: 'string', description: 'Date to check availability for (YYYY-MM-DD)' },
+        },
+        required: ['service_id', 'date'],
       },
-      required: ['appointment_id'],
     },
   },
   {
-    name: 'get_booking_details',
-    description: 'Get details of a specific booking/appointment.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        appointment_id: { type: 'string', description: 'UUID of the appointment' },
+    type: 'function',
+    function: {
+      name: 'create_booking',
+      description: 'Create an appointment booking. ONLY call this after the customer has explicitly confirmed the booking details (service, time, price) in their immediately preceding message.',
+      parameters: {
+        type: 'object',
+        properties: {
+          service_id: { type: 'string', description: 'UUID of the service to book' },
+          staff_id: { type: 'string', description: 'UUID of preferred staff member (optional)' },
+          start_time: { type: 'string', description: 'Appointment start time in ISO 8601 format' },
+          location_id: { type: 'string', description: 'UUID of the location (optional)' },
+        },
+        required: ['service_id', 'start_time'],
       },
-      required: ['appointment_id'],
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'cancel_appointment',
+      description: 'Cancel an existing appointment.',
+      parameters: {
+        type: 'object',
+        properties: {
+          appointment_id: { type: 'string', description: 'UUID of the appointment to cancel' },
+        },
+        required: ['appointment_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_booking_details',
+      description: 'Get details of a specific booking/appointment.',
+      parameters: {
+        type: 'object',
+        properties: {
+          appointment_id: { type: 'string', description: 'UUID of the appointment' },
+        },
+        required: ['appointment_id'],
+      },
     },
   },
 ];
@@ -121,12 +142,12 @@ Today's date is ${currentDate}.
 ${customerSection}
 
 ## Booking flow
-1. Customer asks about services → use get_services tool
-2. Customer picks a service → use get_service_details for full info
-3. Customer asks about availability → use check_availability tool
-4. Customer confirms a time → summarize details and ask for confirmation
-5. Customer confirms → use create_booking tool
-6. After booking → share the confirmation details
+1. Customer asks about services -> use get_services tool
+2. Customer picks a service -> use get_service_details for full info
+3. Customer asks about availability -> use check_availability tool
+4. Customer confirms a time -> summarize details and ask for confirmation
+5. Customer confirms -> use create_booking tool
+6. After booking -> share the confirmation details
 
 ## Boundaries
 - You only help with booking appointments at ${tenantName}.
@@ -154,7 +175,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'AI service not configured' }), {
       status: 500,
@@ -237,38 +258,38 @@ export async function POST(request: Request) {
     tool_results: unknown;
   }[];
 
-  // Rebuild messages array for Claude
-  const messages: Anthropic.MessageParam[] = [];
+  // Rebuild messages array for OpenAI
+  const messages: OpenAI.ChatCompletionMessageParam[] = [];
   for (const msg of history) {
     if (msg.role === 'user') {
       messages.push({ role: 'user', content: msg.content });
     } else if (msg.role === 'assistant') {
       if (msg.tool_calls) {
-        // Assistant message with tool use
+        // Assistant message with tool calls
         const toolCalls = msg.tool_calls as { id: string; name: string; input: Record<string, unknown> }[];
-        const contentBlocks: (Anthropic.TextBlockParam | Anthropic.ToolUseBlockParam)[] = [];
-        if (msg.content) {
-          contentBlocks.push({ type: 'text', text: msg.content });
-        }
-        for (const tc of toolCalls) {
-          contentBlocks.push({
-            type: 'tool_use',
+        messages.push({
+          role: 'assistant',
+          content: msg.content || null,
+          tool_calls: toolCalls.map((tc) => ({
             id: tc.id,
-            name: tc.name,
-            input: tc.input,
-          });
-        }
-        messages.push({ role: 'assistant', content: contentBlocks });
+            type: 'function' as const,
+            function: {
+              name: tc.name,
+              arguments: JSON.stringify(tc.input),
+            },
+          })),
+        });
 
-        // Add corresponding tool results
+        // Add corresponding tool results as individual tool messages
         if (msg.tool_results) {
           const toolResults = msg.tool_results as { tool_use_id: string; content: string }[];
-          const resultBlocks: Anthropic.ToolResultBlockParam[] = toolResults.map((tr) => ({
-            type: 'tool_result' as const,
-            tool_use_id: tr.tool_use_id,
-            content: tr.content,
-          }));
-          messages.push({ role: 'user', content: resultBlocks });
+          for (const tr of toolResults) {
+            messages.push({
+              role: 'tool',
+              tool_call_id: tr.tool_use_id,
+              content: tr.content,
+            });
+          }
         }
       } else {
         messages.push({ role: 'assistant', content: msg.content });
@@ -286,8 +307,8 @@ export async function POST(request: Request) {
     content: message,
   } as never);
 
-  // 5. Stream response from Claude with tool loop
-  const anthropic = new Anthropic({ apiKey });
+  // 5. Stream response from OpenAI with tool loop
+  const openai = new OpenAI({ apiKey });
   const systemPrompt = buildWidgetSystemPrompt(
     tenant.name,
     chatSession.customer_name ?? customerName ?? null,
@@ -297,41 +318,56 @@ export async function POST(request: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      let currentMessages = [...messages];
+      let currentMessages: OpenAI.ChatCompletionMessageParam[] = [
+        { role: 'system', content: systemPrompt },
+        ...messages,
+      ];
       let toolRound = 0;
 
       try {
         while (toolRound < MAX_TOOL_ROUNDS) {
-          const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
-          const response = await anthropic.messages.create({
-            model,
+          const stream = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
             max_tokens: 4096,
-            system: systemPrompt,
             tools: chatTools,
             messages: currentMessages,
+            stream: true,
           });
 
           let textContent = '';
-          const toolUses: { id: string; name: string; input: Record<string, unknown> }[] = [];
+          const toolCalls: Map<number, { id: string; name: string; arguments: string }> = new Map();
 
-          for (const block of response.content) {
-            if (block.type === 'text') {
-              textContent += block.text;
-              // Stream text chunks as SSE
+          for await (const chunk of stream) {
+            const delta = chunk.choices[0]?.delta;
+            if (!delta) continue;
+
+            // Stream text content
+            if (delta.content) {
+              textContent += delta.content;
               controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ type: 'text', content: block.text })}\n\n`)
+                encoder.encode(`data: ${JSON.stringify({ type: 'text', content: delta.content })}\n\n`)
               );
-            } else if (block.type === 'tool_use') {
-              toolUses.push({
-                id: block.id,
-                name: block.name,
-                input: block.input as Record<string, unknown>,
-              });
+            }
+
+            // Accumulate tool call chunks
+            if (delta.tool_calls) {
+              for (const tc of delta.tool_calls) {
+                const existing = toolCalls.get(tc.index);
+                if (existing) {
+                  existing.arguments += tc.function?.arguments ?? '';
+                } else {
+                  toolCalls.set(tc.index, {
+                    id: tc.id ?? '',
+                    name: tc.function?.name ?? '',
+                    arguments: tc.function?.arguments ?? '',
+                  });
+                }
+              }
             }
           }
 
           // If no tool calls, we're done
-          if (toolUses.length === 0) {
+          if (toolCalls.size === 0) {
             // Save assistant message
             await supabase.from('chat_messages').insert({
               session_id: chatSession!.id,
@@ -345,17 +381,25 @@ export async function POST(request: Request) {
           }
 
           // Execute tool calls
+          const toolCallsList = Array.from(toolCalls.values());
           const toolResults: { tool_use_id: string; content: string }[] = [];
 
-          for (const toolUse of toolUses) {
+          for (const toolCall of toolCallsList) {
             // Stream tool call notification
             controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: 'tool_call', name: toolUse.name })}\n\n`)
+              encoder.encode(`data: ${JSON.stringify({ type: 'tool_call', name: toolCall.name })}\n\n`)
             );
 
+            let parsedInput: Record<string, unknown> = {};
+            try {
+              parsedInput = JSON.parse(toolCall.arguments) as Record<string, unknown>;
+            } catch {
+              // Empty or malformed arguments — use empty object
+            }
+
             const result = await executeTool(
-              toolUse.name,
-              toolUse.input,
+              toolCall.name,
+              parsedInput,
               supabase,
               tenantId,
               {
@@ -367,46 +411,52 @@ export async function POST(request: Request) {
             );
 
             toolResults.push({
-              tool_use_id: toolUse.id,
+              tool_use_id: toolCall.id,
               content: JSON.stringify(result),
             });
           }
 
           // Save the assistant message with tool calls and results
+          const savedToolCalls = toolCallsList.map((tc) => ({
+            id: tc.id,
+            name: tc.name,
+            input: JSON.parse(tc.arguments || '{}') as Record<string, unknown>,
+          }));
+
           await supabase.from('chat_messages').insert({
             session_id: chatSession!.id,
             role: 'assistant',
             content: textContent,
-            tool_calls: toolUses,
+            tool_calls: savedToolCalls,
             tool_results: toolResults,
           } as never);
 
-          // Build the assistant content blocks for the next round
-          const assistantContent: (Anthropic.TextBlockParam | Anthropic.ToolUseBlockParam)[] = [];
-          if (textContent) {
-            assistantContent.push({ type: 'text', text: textContent });
-          }
-          for (const tu of toolUses) {
-            assistantContent.push({
-              type: 'tool_use',
-              id: tu.id,
-              name: tu.name,
-              input: tu.input,
-            });
-          }
+          // Build assistant message with tool_calls for next round
+          const assistantMsg: OpenAI.ChatCompletionAssistantMessageParam = {
+            role: 'assistant',
+            content: textContent || null,
+            tool_calls: toolCallsList.map((tc) => ({
+              id: tc.id,
+              type: 'function' as const,
+              function: {
+                name: tc.name,
+                arguments: tc.arguments,
+              },
+            })),
+          };
 
-          // Build tool result blocks
-          const toolResultBlocks: Anthropic.ToolResultBlockParam[] = toolResults.map((tr) => ({
-            type: 'tool_result' as const,
-            tool_use_id: tr.tool_use_id,
+          // Build tool result messages
+          const toolResultMessages: OpenAI.ChatCompletionToolMessageParam[] = toolResults.map((tr) => ({
+            role: 'tool' as const,
+            tool_call_id: tr.tool_use_id,
             content: tr.content,
           }));
 
           // Append to conversation for next round
           currentMessages = [
             ...currentMessages,
-            { role: 'assistant', content: assistantContent },
-            { role: 'user', content: toolResultBlocks },
+            assistantMsg,
+            ...toolResultMessages,
           ];
 
           toolRound++;
