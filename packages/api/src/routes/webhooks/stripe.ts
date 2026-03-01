@@ -63,6 +63,41 @@ async function getPlanByPriceId(supabase: ReturnType<typeof createServerAdminCli
 }
 
 /**
+ * Handle checkout.session.completed — activate tenant from checkout metadata.
+ * This serves as a fast activation path alongside subscription.created.
+ */
+async function handleCheckoutSessionCompleted(supabase: ReturnType<typeof createServerAdminClient>, session: Stripe.Checkout.Session) {
+  if (session.mode !== 'subscription' || session.payment_status !== 'paid') return;
+
+  const customerId = typeof session.customer === 'string'
+    ? session.customer
+    : session.customer?.id;
+
+  if (!customerId) return;
+
+  const tenant = await getTenantByCustomerId(supabase, customerId);
+  if (!tenant) return;
+
+  // Already activated (e.g. by verify endpoint or subscription.created)
+  if (tenant.status === 'active') return;
+
+  const subscriptionId = typeof session.subscription === 'string'
+    ? session.subscription
+    : (session.subscription as Stripe.Subscription | null)?.id ?? null;
+
+  const planId = session.metadata?.plan_id ?? null;
+
+  await supabase
+    .from('tenants')
+    .update({
+      status: 'active' as const,
+      stripe_subscription_id: subscriptionId,
+      subscription_plan_id: planId,
+    } as never)
+    .eq('id', tenant.id);
+}
+
+/**
  * Handle customer.subscription.created — set tenant active and store subscription ID.
  */
 async function handleSubscriptionCreated(supabase: ReturnType<typeof createServerAdminClient>, subscription: Stripe.Subscription) {
@@ -224,6 +259,9 @@ stripeWebhookRouter.post('/', async (req: Request, res: Response) => {
 
   try {
     switch (event.type) {
+      case 'checkout.session.completed':
+        await handleCheckoutSessionCompleted(supabase, event.data.object as Stripe.Checkout.Session);
+        break;
       case 'customer.subscription.created':
         await handleSubscriptionCreated(supabase, event.data.object as Stripe.Subscription);
         break;

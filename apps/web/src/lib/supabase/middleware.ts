@@ -39,6 +39,7 @@ export async function updateSession(request: NextRequest) {
   const isPublicPath =
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/') ||
+    pathname.startsWith('/widget/') ||
     pathname === '/';
 
   // Redirect helper that copies Set-Cookie headers from supabaseResponse

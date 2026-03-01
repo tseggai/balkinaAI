@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
-type Tab = 'profile' | 'billing' | 'notifications';
+type Tab = 'profile' | 'billing' | 'notifications' | 'widget';
 
 interface TenantInfo {
   id: string;
@@ -80,6 +80,7 @@ export default function SettingsPage() {
     { key: 'profile', label: 'Business Profile' },
     { key: 'billing', label: 'Billing' },
     { key: 'notifications', label: 'Notifications' },
+    { key: 'widget', label: 'Chat Widget' },
   ];
 
   return (
@@ -161,6 +162,85 @@ export default function SettingsPage() {
             <NotifToggle label="Daily booking summary email" defaultChecked={false} />
           </div>
         )}
+
+        {/* Chat Widget */}
+        {tab === 'widget' && tenant && (
+          <WidgetEmbed tenantId={tenant.id} tenantName={tenant.name} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WidgetEmbed({ tenantId, tenantName }: { tenantId: string; tenantName: string }) {
+  const [copied, setCopied] = useState(false);
+  const widgetUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/widget/${tenantId}`;
+  const embedCode = `<iframe\n  src="${widgetUrl}"\n  width="400"\n  height="600"\n  style="border: none; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.12);"\n  allow="clipboard-read; clipboard-write"\n  title="${tenantName} Booking Assistant"\n></iframe>`;
+
+  function copyEmbed() {
+    navigator.clipboard.writeText(embedCode).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-sm font-medium text-gray-900">AI Booking Chat Widget</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          Embed this chat widget on your website so customers can book appointments through AI.
+        </p>
+      </div>
+
+      {/* Embed code */}
+      <div className="rounded-lg border border-gray-200 p-5">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-gray-700">Embed Code</p>
+          <button
+            onClick={copyEmbed}
+            className="rounded-lg bg-brand-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+        <pre className="mt-3 overflow-x-auto rounded-lg bg-gray-900 p-4 text-xs text-green-400">
+          {embedCode}
+        </pre>
+      </div>
+
+      {/* Direct link */}
+      <div className="rounded-lg border border-gray-200 p-5">
+        <p className="text-sm font-medium text-gray-700">Direct Link</p>
+        <p className="mt-1 text-sm text-gray-500">Share this link directly with your customers.</p>
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            readOnly
+            value={widgetUrl}
+            className="flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600"
+          />
+          <button
+            onClick={() => { navigator.clipboard.writeText(widgetUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+            className="rounded-lg border border-brand-600 px-4 py-2 text-xs font-medium text-brand-600 hover:bg-brand-50"
+          >
+            Copy
+          </button>
+        </div>
+      </div>
+
+      {/* Preview */}
+      <div className="rounded-lg border border-gray-200 p-5">
+        <p className="text-sm font-medium text-gray-700">Preview</p>
+        <p className="mt-1 mb-4 text-sm text-gray-500">This is how the chat widget will appear to your customers.</p>
+        <div className="flex justify-center">
+          <iframe
+            src={widgetUrl}
+            width="380"
+            height="500"
+            style={{ border: 'none', borderRadius: '12px', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}
+            title={`${tenantName} Booking Assistant Preview`}
+          />
+        </div>
       </div>
     </div>
   );
