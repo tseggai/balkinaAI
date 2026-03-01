@@ -23,7 +23,7 @@ export default async function DashboardLayout({
     .single();
 
   const tenant = tenantData as { name: string; subscription_plans: { name?: string } | null } | null;
-  if (!tenant) redirect('/auth/login');
+  if (!tenant) redirect('/auth/register');
 
   const planName = tenant.subscription_plans?.name ?? 'Free';
 
