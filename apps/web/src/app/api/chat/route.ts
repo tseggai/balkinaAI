@@ -302,8 +302,9 @@ export async function POST(request: Request) {
 
       try {
         while (toolRound < MAX_TOOL_ROUNDS) {
+          const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
           const response = await anthropic.messages.create({
-            model: 'claude-sonnet-4-6',
+            model,
             max_tokens: 4096,
             system: systemPrompt,
             tools: chatTools,
@@ -416,6 +417,7 @@ export async function POST(request: Request) {
         controller.close();
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+        console.error('[chat] Stream error:', errorMessage);
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ type: 'error', content: errorMessage })}\n\n`)
         );
