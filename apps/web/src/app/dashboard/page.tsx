@@ -14,7 +14,7 @@ export default async function DashboardOverview() {
     .eq('user_id', user.id)
     .single();
   const tenant = tenantData as { id: string } | null;
-  if (!tenant) redirect('/auth/login');
+  if (!tenant) redirect('/auth/register');
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();

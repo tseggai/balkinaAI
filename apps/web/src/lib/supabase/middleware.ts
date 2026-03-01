@@ -66,20 +66,24 @@ export async function updateSession(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    if (tenant) {
-      if (
-        tenant.status === 'pending_subscription' &&
-        !pathname.startsWith('/onboarding')
-      ) {
-        return redirectTo('/onboarding/select-plan');
-      }
+    if (!tenant) {
+      // User exists but has no tenant record (incomplete registration).
+      // Send them to register instead of letting pages redirect to login.
+      return redirectTo('/auth/register');
+    }
 
-      if (
-        tenant.status === 'suspended' &&
-        !pathname.startsWith('/billing')
-      ) {
-        return redirectTo('/billing/reactivate');
-      }
+    if (
+      tenant.status === 'pending_subscription' &&
+      !pathname.startsWith('/onboarding')
+    ) {
+      return redirectTo('/onboarding/select-plan');
+    }
+
+    if (
+      tenant.status === 'suspended' &&
+      !pathname.startsWith('/billing')
+    ) {
+      return redirectTo('/billing/reactivate');
     }
   }
 
