@@ -14,16 +14,16 @@ export default function WelcomeScreen() {
       <View style={styles.buttons}>
         <TouchableOpacity
           style={styles.btnPrimary}
-          onPress={() => router.push('/(auth)/phone-login')}
+          onPress={() => router.push('/(auth)/email-login')}
         >
-          <Text style={styles.btnPrimaryText}>Continue with phone</Text>
+          <Text style={styles.btnPrimaryText}>Continue with email</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.btnSecondary}
-          onPress={() => router.push('/(auth)/email-login')}
+          onPress={() => router.push('/(auth)/phone-login')}
         >
-          <Text style={styles.btnSecondaryText}>Continue with email</Text>
+          <Text style={styles.btnSecondaryText}>Continue with phone</Text>
         </TouchableOpacity>
       </View>
 
