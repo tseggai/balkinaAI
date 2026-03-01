@@ -56,7 +56,7 @@ export default function HomeScreen() {
 
     if (cats) setCategories(cats as Category[]);
 
-    // Fetch active tenants
+    // Fetch active tenants (requires RLS policy: "Active tenants are publicly readable")
     let tenantsQuery = supabase
       .from('tenants')
       .select('id, name, status, category_id, categories(name)')
@@ -112,165 +112,192 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />
-      }
-    >
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={18} color="#9ca3af" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Find a service near you"
-          placeholderTextColor="#9ca3af"
-          value={search}
-          onChangeText={setSearch}
-        />
-      </View>
-
-      {/* Category pills */}
+    <View style={styles.flex}>
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryRow}
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />
+        }
       >
-        <TouchableOpacity
-          style={[
-            styles.categoryPill,
-            !selectedCategory && styles.categoryPillActive,
-          ]}
-          onPress={() => setSelectedCategory(null)}
+        {/* Search */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={18} color="#9ca3af" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Find a service near you"
+            placeholderTextColor="#9ca3af"
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
+
+        {/* Category pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryRow}
         >
-          <Text
-            style={[
-              styles.categoryPillText,
-              !selectedCategory && styles.categoryPillTextActive,
-            ]}
-          >
-            All
-          </Text>
-        </TouchableOpacity>
-        {categories.map((cat) => (
           <TouchableOpacity
-            key={cat.id}
             style={[
               styles.categoryPill,
-              selectedCategory === cat.id && styles.categoryPillActive,
+              !selectedCategory && styles.categoryPillActive,
             ]}
-            onPress={() =>
-              setSelectedCategory(
-                selectedCategory === cat.id ? null : cat.id
-              )
-            }
+            onPress={() => setSelectedCategory(null)}
           >
             <Text
               style={[
                 styles.categoryPillText,
-                selectedCategory === cat.id && styles.categoryPillTextActive,
+                !selectedCategory && styles.categoryPillTextActive,
               ]}
             >
-              {cat.name}
+              All
             </Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Recent bookings */}
-      {recentBookings.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Bookings</Text>
-          {recentBookings.map((booking) => (
+          {categories.map((cat) => (
             <TouchableOpacity
-              key={booking.id}
-              style={styles.recentCard}
+              key={cat.id}
+              style={[
+                styles.categoryPill,
+                selectedCategory === cat.id && styles.categoryPillActive,
+              ]}
               onPress={() =>
-                router.push({ pathname: '/(main)/bookings' })
+                setSelectedCategory(
+                  selectedCategory === cat.id ? null : cat.id
+                )
               }
             >
-              <View style={styles.recentCardLeft}>
-                <Text style={styles.recentService}>
-                  {booking.services?.name ?? 'Service'}
-                </Text>
-                <Text style={styles.recentBusiness}>
-                  {booking.tenants?.name ?? 'Business'}
-                </Text>
-              </View>
-              <View style={styles.recentCardRight}>
-                <Text style={styles.recentDate}>
-                  {new Date(booking.start_time).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </Text>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    booking.status === 'confirmed'
-                      ? styles.statusConfirmed
-                      : booking.status === 'completed'
-                      ? styles.statusCompleted
-                      : styles.statusCancelled,
-                  ]}
-                >
-                  <Text style={styles.statusText}>{booking.status}</Text>
-                </View>
-              </View>
+              <Text
+                style={[
+                  styles.categoryPillText,
+                  selectedCategory === cat.id && styles.categoryPillTextActive,
+                ]}
+              >
+                {cat.name}
+              </Text>
             </TouchableOpacity>
           ))}
-        </View>
-      )}
+        </ScrollView>
 
-      {/* Featured businesses */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Featured Businesses</Text>
-        {filteredTenants.length === 0 ? (
-          <Text style={styles.emptyText}>No businesses found</Text>
-        ) : (
-          filteredTenants.map((tenant) => (
-            <TouchableOpacity
-              key={tenant.id}
-              style={styles.businessCard}
-              onPress={() =>
-                router.push({
-                  pathname: '/chat',
-                  params: { tenantId: tenant.id, tenantName: tenant.name },
-                })
-              }
-            >
-              <View style={styles.businessAvatar}>
-                <Text style={styles.businessAvatarText}>
-                  {tenant.name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.businessInfo}>
-                <Text style={styles.businessName}>{tenant.name}</Text>
-                <Text style={styles.businessCategory}>
-                  {tenant.categories?.name ?? 'Services'}
-                </Text>
-              </View>
-              <Ionicons
-                name="chatbubble-outline"
-                size={20}
-                color="#6366f1"
-              />
-            </TouchableOpacity>
-          ))
+        {/* Recent bookings */}
+        {recentBookings.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recent Bookings</Text>
+            {recentBookings.map((booking) => (
+              <TouchableOpacity
+                key={booking.id}
+                style={styles.recentCard}
+                onPress={() =>
+                  router.push({ pathname: '/(main)/bookings' })
+                }
+              >
+                <View style={styles.recentCardLeft}>
+                  <Text style={styles.recentService}>
+                    {booking.services?.name ?? 'Service'}
+                  </Text>
+                  <Text style={styles.recentBusiness}>
+                    {booking.tenants?.name ?? 'Business'}
+                  </Text>
+                </View>
+                <View style={styles.recentCardRight}>
+                  <Text style={styles.recentDate}>
+                    {new Date(booking.start_time).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      booking.status === 'confirmed'
+                        ? styles.statusConfirmed
+                        : booking.status === 'completed'
+                        ? styles.statusCompleted
+                        : styles.statusCancelled,
+                    ]}
+                  >
+                    <Text style={styles.statusText}>{booking.status}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
-      </View>
-    </ScrollView>
+
+        {/* Featured businesses */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Featured Businesses</Text>
+          {filteredTenants.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="storefront-outline" size={48} color="#d1d5db" />
+              <Text style={styles.emptyTitle}>No businesses found</Text>
+              <Text style={styles.emptySubtitle}>
+                Try a different category or use the AI assistant to find what you need.
+              </Text>
+            </View>
+          ) : (
+            filteredTenants.map((tenant) => (
+              <TouchableOpacity
+                key={tenant.id}
+                style={styles.businessCard}
+                onPress={() =>
+                  router.push({
+                    pathname: '/chat',
+                    params: { tenantId: tenant.id, tenantName: tenant.name },
+                  })
+                }
+              >
+                <View style={styles.businessAvatar}>
+                  <Text style={styles.businessAvatarText}>
+                    {tenant.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.businessInfo}>
+                  <Text style={styles.businessName}>{tenant.name}</Text>
+                  <Text style={styles.businessCategory}>
+                    {tenant.categories?.name ?? 'Services'}
+                  </Text>
+                </View>
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={20}
+                  color="#6366f1"
+                />
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Floating AI chat button — always visible as a general assistant */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() =>
+          router.push({
+            pathname: '/chat',
+            params: { tenantName: 'Balkina AI' },
+          })
+        }
+        activeOpacity={0.85}
+      >
+        <Ionicons name="chatbubbles" size={24} color="#fff" />
+        <Text style={styles.fabText}>Chat with AI</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
   },
   contentContainer: {
-    paddingBottom: 24,
+    paddingBottom: 80,
   },
   centered: {
     flex: 1,
@@ -423,10 +450,44 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginTop: 2,
   },
-  emptyText: {
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginTop: 12,
+  },
+  emptySubtitle: {
     fontSize: 14,
     color: '#9ca3af',
     textAlign: 'center',
-    paddingVertical: 24,
+    marginTop: 4,
+    lineHeight: 20,
+    paddingHorizontal: 24,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6366f1',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 28,
+    elevation: 4,
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    gap: 8,
+  },
+  fabText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
