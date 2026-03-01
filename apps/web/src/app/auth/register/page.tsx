@@ -9,7 +9,6 @@ interface Category {
   id: string;
   name: string;
   slug: string;
-  parent_id: string | null;
 }
 
 export default function RegisterPage() {
@@ -28,13 +27,9 @@ export default function RegisterPage() {
 
   useEffect(() => {
     async function loadCategories() {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('categories')
-        .select('id, name, slug, parent_id')
-        .is('parent_id', null)
-        .order('display_order');
-      if (data) setCategories(data);
+      const res = await fetch('/api/categories');
+      const json = await res.json();
+      if (json.data) setCategories(json.data);
     }
     loadCategories();
   }, []);
