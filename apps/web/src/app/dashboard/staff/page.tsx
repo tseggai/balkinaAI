@@ -69,10 +69,10 @@ export default function StaffPage() {
   }
 
   function updateDay(day: string, field: keyof DaySchedule, value: boolean | string) {
-    setSchedule((prev) => ({
-      ...prev,
-      [day]: { ...prev[day], [field]: value },
-    }));
+    setSchedule((prev) => {
+      const current = prev[day] ?? { enabled: false, start: '09:00', end: '17:00' };
+      return { ...prev, [day]: { ...current, [field]: value } };
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {

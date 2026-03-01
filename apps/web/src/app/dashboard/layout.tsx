@@ -14,16 +14,16 @@ export default async function DashboardLayout({
 
   if (!user) redirect('/auth/login');
 
-  const { data: tenant } = await supabase
+  const { data: tenantData } = await supabase
     .from('tenants')
     .select('*, subscription_plans(*)')
     .eq('user_id', user.id)
     .single();
 
+  const tenant = tenantData as { name: string; subscription_plans: { name?: string } | null } | null;
   if (!tenant) redirect('/auth/login');
 
-  const planName =
-    (tenant.subscription_plans as { name?: string } | null)?.name ?? 'Free';
+  const planName = tenant.subscription_plans?.name ?? 'Free';
 
   return (
     <div className="flex h-screen bg-gray-50">

@@ -36,7 +36,16 @@ export interface Database {
           features?: Json;
           created_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['subscription_plans']['Insert']>;
+        Update: {
+          id?: string;
+          name?: string;
+          price_monthly?: number;
+          stripe_price_id?: string | null;
+          max_staff?: number;
+          max_locations?: number;
+          features?: Json;
+          created_at?: string;
+        };
         Relationships: [];
       };
       tenants: {
@@ -52,8 +61,9 @@ export interface Database {
           stripe_account_id: string | null;
           stripe_subscription_id: string | null;
           subscription_plan_id: string | null;
-          status: 'active' | 'inactive' | 'suspended' | 'pending_subscription' | 'past_due';
+          status: 'pending_subscription' | 'active' | 'suspended' | 'past_due';
           created_at: string;
+          updated_at: string;
         };
         Insert: {
           id?: string;
@@ -67,10 +77,26 @@ export interface Database {
           stripe_account_id?: string | null;
           stripe_subscription_id?: string | null;
           subscription_plan_id?: string | null;
-          status?: 'active' | 'inactive' | 'suspended' | 'pending_subscription' | 'past_due';
+          status?: 'pending_subscription' | 'active' | 'suspended' | 'past_due';
           created_at?: string;
+          updated_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['tenants']['Insert']>;
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          owner_name?: string;
+          email?: string;
+          phone?: string | null;
+          category_id?: string | null;
+          stripe_customer_id?: string | null;
+          stripe_account_id?: string | null;
+          stripe_subscription_id?: string | null;
+          subscription_plan_id?: string | null;
+          status?: 'pending_subscription' | 'active' | 'suspended' | 'past_due';
+          created_at?: string;
+          updated_at?: string;
+        };
         Relationships: [
           {
             foreignKeyName: 'tenants_user_id_fkey';
@@ -113,7 +139,16 @@ export interface Database {
           timezone?: string;
           created_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['tenant_locations']['Insert']>;
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          name?: string;
+          address?: string;
+          lat?: number | null;
+          lng?: number | null;
+          timezone?: string;
+          created_at?: string;
+        };
         Relationships: [
           {
             foreignKeyName: 'tenant_locations_tenant_id_fkey';
@@ -142,7 +177,15 @@ export interface Database {
           availability_schedule?: Json;
           created_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['staff']['Insert']>;
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          name?: string;
+          email?: string;
+          phone?: string | null;
+          availability_schedule?: Json;
+          created_at?: string;
+        };
         Relationships: [
           {
             foreignKeyName: 'staff_tenant_id_fkey';
@@ -171,7 +214,15 @@ export interface Database {
           display_order?: number;
           created_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['categories']['Insert']>;
+        Update: {
+          id?: string;
+          parent_id?: string | null;
+          name?: string;
+          slug?: string;
+          icon_url?: string | null;
+          display_order?: number;
+          created_at?: string;
+        };
         Relationships: [
           {
             foreignKeyName: 'categories_parent_id_fkey';
@@ -206,7 +257,18 @@ export interface Database {
           deposit_amount?: number | null;
           created_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['services']['Insert']>;
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          category_id?: string | null;
+          name?: string;
+          duration_minutes?: number;
+          price?: number;
+          deposit_enabled?: boolean;
+          deposit_type?: 'fixed' | 'percentage' | null;
+          deposit_amount?: number | null;
+          created_at?: string;
+        };
         Relationships: [
           {
             foreignKeyName: 'services_tenant_id_fkey';
@@ -239,7 +301,14 @@ export interface Database {
           duration_minutes?: number;
           created_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['service_extras']['Insert']>;
+        Update: {
+          id?: string;
+          service_id?: string;
+          name?: string;
+          price?: number;
+          duration_minutes?: number;
+          created_at?: string;
+        };
         Relationships: [
           {
             foreignKeyName: 'service_extras_service_id_fkey';
@@ -268,7 +337,15 @@ export interface Database {
           location_sharing_enabled?: boolean;
           created_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['customers']['Insert']>;
+        Update: {
+          id?: string;
+          display_name?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          push_token?: string | null;
+          location_sharing_enabled?: boolean;
+          created_at?: string;
+        };
         Relationships: [
           {
             foreignKeyName: 'customers_id_fkey';
@@ -313,7 +390,23 @@ export interface Database {
           stripe_payment_intent_id?: string | null;
           created_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['appointments']['Insert']>;
+        Update: {
+          id?: string;
+          customer_id?: string;
+          tenant_id?: string;
+          service_id?: string;
+          staff_id?: string | null;
+          location_id?: string | null;
+          start_time?: string;
+          end_time?: string;
+          status?: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
+          total_price?: number;
+          deposit_paid?: boolean;
+          deposit_amount_paid?: number | null;
+          balance_due?: number | null;
+          stripe_payment_intent_id?: string | null;
+          created_at?: string;
+        };
         Relationships: [
           {
             foreignKeyName: 'appointments_customer_id_fkey';
@@ -368,7 +461,16 @@ export interface Database {
           predicted_next_date?: string | null;
           created_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['customer_behavior_profiles']['Insert']>;
+        Update: {
+          id?: string;
+          customer_id?: string;
+          tenant_id?: string;
+          service_id?: string;
+          avg_interval_days?: number | null;
+          last_booking_date?: string | null;
+          predicted_next_date?: string | null;
+          created_at?: string;
+        };
         Relationships: [
           {
             foreignKeyName: 'customer_behavior_profiles_customer_id_fkey';
@@ -413,7 +515,17 @@ export interface Database {
           usage_limit?: number | null;
           created_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['coupons']['Insert']>;
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          code?: string;
+          discount_type?: 'percentage' | 'fixed';
+          discount_value?: number;
+          expires_at?: string | null;
+          usage_count?: number;
+          usage_limit?: number | null;
+          created_at?: string;
+        };
         Relationships: [
           {
             foreignKeyName: 'coupons_tenant_id_fkey';
@@ -444,7 +556,16 @@ export interface Database {
           comment?: string | null;
           created_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['reviews']['Insert']>;
+        Update: {
+          id?: string;
+          appointment_id?: string;
+          customer_id?: string;
+          tenant_id?: string;
+          staff_id?: string | null;
+          rating?: number;
+          comment?: string | null;
+          created_at?: string;
+        };
         Relationships: [
           {
             foreignKeyName: 'reviews_appointment_id_fkey';
@@ -485,7 +606,15 @@ export interface Database {
           opened_at?: string | null;
           converted_at?: string | null;
         };
-        Update: Partial<Database['public']['Tables']['ai_nudge_log']['Insert']>;
+        Update: {
+          id?: string;
+          customer_id?: string;
+          tenant_id?: string;
+          trigger_type?: string;
+          sent_at?: string;
+          opened_at?: string | null;
+          converted_at?: string | null;
+        };
         Relationships: [
           {
             foreignKeyName: 'ai_nudge_log_customer_id_fkey';
@@ -512,7 +641,11 @@ export interface Database {
           stripe_event_id: string;
           processed_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['stripe_webhook_events']['Insert']>;
+        Update: {
+          id?: string;
+          stripe_event_id?: string;
+          processed_at?: string;
+        };
         Relationships: [];
       };
     };

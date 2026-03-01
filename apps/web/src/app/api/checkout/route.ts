@@ -24,11 +24,13 @@ export async function POST(request: Request) {
     }
 
     // Get tenant for this user
-    const { data: tenant, error: tenantError } = await supabase
+    const { data: tenantData, error: tenantError } = await supabase
       .from('tenants')
       .select('id, stripe_customer_id')
       .eq('user_id', user.id)
       .single();
+
+    const tenant = tenantData as { id: string; stripe_customer_id: string | null } | null;
 
     if (tenantError || !tenant) {
       return NextResponse.json(
