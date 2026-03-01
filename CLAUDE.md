@@ -108,7 +108,7 @@ All tables require RLS enabled. Tenant data always filtered by tenant_id.
 ## Git Workflow
 - Branch naming: feature/feature-name, fix/bug-description, chore/task-name
 - Commit messages: feat: description | fix: description | chore: description
-- Never commit directly to main. Always open a PR.
+- For bug fixes and small changes (under 50 lines changed), commit directly to main. Only create a feature branch for full phase builds. After committing directly to main, always push immediately.
 - PR must include: what changed, how tested, screenshots for any UI changes.
 - .env.local is gitignored. Never commit any credentials.
 
