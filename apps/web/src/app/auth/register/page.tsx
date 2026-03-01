@@ -44,6 +44,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      // Step 1: Create auth user
       const supabase = createClient();
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -63,41 +64,58 @@ export default function RegisterPage() {
       }
 
       if (!authData.user) {
-        setError('Registration failed. Please try again.');
+        setError('Registration failed — no user returned. Please try again.');
         setLoading(false);
         return;
       }
 
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: authData.user.id,
-          businessName: formData.businessName,
-          ownerName: formData.ownerName,
-          email: formData.email,
-          phone: formData.phone,
-          categoryId: formData.categoryId || null,
-        }),
-      });
+      // Step 2: Create tenant record + Stripe customer via API
+      let res: Response;
+      try {
+        res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: authData.user.id,
+            businessName: formData.businessName,
+            ownerName: formData.ownerName,
+            email: formData.email,
+            phone: formData.phone,
+            categoryId: formData.categoryId || null,
+          }),
+        });
+      } catch (fetchErr) {
+        const msg = fetchErr instanceof Error ? fetchErr.message : 'Network error';
+        setError(`Failed to create account: ${msg}`);
+        setLoading(false);
+        return;
+      }
 
       const result = await res.json();
 
       if (!res.ok) {
-        setError(result.error?.message ?? 'Registration failed');
+        setError(result.error?.message ?? `Registration failed (${res.status})`);
         setLoading(false);
         return;
       }
 
-      await supabase.auth.signInWithPassword({
+      // Step 3: Sign in the newly created user
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
 
+      if (signInError) {
+        // Tenant was created successfully but auto-sign-in failed — redirect to login
+        router.push('/auth/login');
+        return;
+      }
+
       router.push('/onboarding/select-plan');
       router.refresh();
-    } catch {
-      setError('An unexpected error occurred. Please try again.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Registration error: ${msg}`);
       setLoading(false);
     }
   }
