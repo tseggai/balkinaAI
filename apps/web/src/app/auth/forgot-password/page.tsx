@@ -15,20 +15,26 @@ export default function ForgotPasswordPage() {
     setError('');
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email,
-      { redirectTo: `${window.location.origin}/auth/callback?type=recovery` }
-    );
+    try {
+      const supabase = createClient();
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        email,
+        { redirectTo: `${window.location.origin}/auth/callback?type=recovery` }
+      );
 
-    if (resetError) {
-      setError(resetError.message);
+      if (resetError) {
+        setError(resetError.message);
+        setLoading(false);
+        return;
+      }
+
+      setSuccess(true);
       setLoading(false);
-      return;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Failed to send reset link: ${msg}`);
+      setLoading(false);
     }
-
-    setSuccess(true);
-    setLoading(false);
   }
 
   if (success) {
