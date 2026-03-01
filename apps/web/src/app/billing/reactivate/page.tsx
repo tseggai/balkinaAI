@@ -40,30 +40,30 @@ export default function ReactivatePage() {
   }
 
   return (
-    <div className="auth-container">
-      <div className="auth-card" style={{ textAlign: 'center' }}>
-        <h1>Account Suspended</h1>
-        <p>
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+          <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Account Suspended</h1>
+        <p className="mt-2 text-sm text-gray-500">
           Your subscription has been cancelled or suspended. Reactivate your
           account to continue using Balkina AI.
         </p>
 
-        {error && <p className="error-message">{error}</p>}
+        {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-        <button
-          className="btn btn-primary"
-          onClick={handleReactivate}
-          disabled={loading}
-          style={{ marginTop: '1rem' }}
-        >
+        <button onClick={handleReactivate} disabled={loading}
+          className="mt-6 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
           {loading ? 'Loading...' : 'Reactivate subscription'}
         </button>
 
-        <div style={{ marginTop: '1rem' }}>
-          <button className="btn btn-outline" onClick={handleSignOut}>
-            Sign out
-          </button>
-        </div>
+        <button onClick={handleSignOut}
+          className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          Sign out
+        </button>
       </div>
     </div>
   );
