@@ -172,7 +172,7 @@ export default function ChatWidgetPage() {
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId
-                    ? { ...m, content: `Sorry, something went wrong. Please try again.`, isStreaming: false }
+                    ? { ...m, content: `Sorry, something went wrong: ${event.content ?? 'Unknown error'}. Please try again.`, isStreaming: false }
                     : m
                 )
               );
