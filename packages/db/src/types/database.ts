@@ -42,24 +42,48 @@ export interface Database {
       tenants: {
         Row: {
           id: string;
+          user_id: string;
           name: string;
+          owner_name: string;
+          email: string;
+          phone: string | null;
+          category_id: string | null;
           stripe_customer_id: string | null;
           stripe_account_id: string | null;
+          stripe_subscription_id: string | null;
           subscription_plan_id: string | null;
-          status: 'active' | 'inactive' | 'suspended';
+          status: 'active' | 'inactive' | 'suspended' | 'pending_subscription' | 'past_due';
           created_at: string;
         };
         Insert: {
           id?: string;
+          user_id: string;
           name: string;
+          owner_name: string;
+          email: string;
+          phone?: string | null;
+          category_id?: string | null;
           stripe_customer_id?: string | null;
           stripe_account_id?: string | null;
+          stripe_subscription_id?: string | null;
           subscription_plan_id?: string | null;
-          status?: 'active' | 'inactive' | 'suspended';
+          status?: 'active' | 'inactive' | 'suspended' | 'pending_subscription' | 'past_due';
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['tenants']['Insert']>;
         Relationships: [
+          {
+            foreignKeyName: 'tenants_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'tenants_category_id_fkey';
+            columns: ['category_id'];
+            referencedRelation: 'categories';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'tenants_subscription_plan_id_fkey';
             columns: ['subscription_plan_id'];

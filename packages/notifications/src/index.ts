@@ -1,4 +1,11 @@
-export { resend, sendEmail, sendBookingConfirmationEmail } from './email.js';
+export {
+  resend,
+  sendEmail,
+  sendBookingConfirmationEmail,
+  sendTenantWelcomeEmail,
+  sendSubscriptionActivatedEmail,
+  sendPaymentFailedEmail,
+} from './email.js';
 export type { SendEmailParams, EmailResult } from './email.js';
 
 export { twilioClient, sendSms, sendBookingConfirmationSms, sendAppointmentReminderSms, sendOtpSms } from './sms.js';

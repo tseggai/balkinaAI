@@ -10,6 +10,11 @@ import { router } from './routes/index.js';
 const app = express();
 
 app.use(cors());
+
+// Raw body for Stripe webhook signature verification
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
+
+// JSON body for all other routes
 app.use(express.json({ limit: '1mb' }));
 
 // Health check — no auth required

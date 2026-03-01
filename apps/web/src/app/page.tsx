@@ -1,8 +1,13 @@
-export default function TenantDashboard() {
-  return (
-    <main>
-      <h1>Balkina AI — Tenant Panel</h1>
-      <p>Manage your appointments, services, and staff.</p>
-    </main>
-  );
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+
+export default async function HomePage() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect('/dashboard');
+  } else {
+    redirect('/auth/login');
+  }
 }
