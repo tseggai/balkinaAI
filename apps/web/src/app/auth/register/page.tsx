@@ -49,7 +49,6 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      // 1. Create auth user
       const supabase = createClient();
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -74,7 +73,6 @@ export default function RegisterPage() {
         return;
       }
 
-      // 2. Complete registration on server (create tenant + Stripe customer)
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,13 +94,11 @@ export default function RegisterPage() {
         return;
       }
 
-      // 3. Sign in immediately
       await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
 
-      // 4. Redirect to plan selection
       router.push('/onboarding/select-plan');
       router.refresh();
     } catch {
@@ -111,104 +107,73 @@ export default function RegisterPage() {
     }
   }
 
+  const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h1>Create your account</h1>
-        <p>Get started with Balkina AI for your business.</p>
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-8">
+      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
+        <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
+        <p className="mt-1 text-sm text-gray-500">Get started with Balkina AI for your business.</p>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="businessName">Business name</label>
-            <input
-              id="businessName"
-              type="text"
-              value={formData.businessName}
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div>
+            <label htmlFor="businessName" className="mb-1 block text-sm font-medium text-gray-700">Business name</label>
+            <input id="businessName" type="text" value={formData.businessName}
               onChange={(e) => updateField('businessName', e.target.value)}
-              placeholder="Acme Barbershop"
-              required
-            />
+              placeholder="Acme Barbershop" required className={inputClass} />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="ownerName">Owner full name</label>
-            <input
-              id="ownerName"
-              type="text"
-              value={formData.ownerName}
+          <div>
+            <label htmlFor="ownerName" className="mb-1 block text-sm font-medium text-gray-700">Owner full name</label>
+            <input id="ownerName" type="text" value={formData.ownerName}
               onChange={(e) => updateField('ownerName', e.target.value)}
-              placeholder="John Smith"
-              required
-            />
+              placeholder="John Smith" required className={inputClass} />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={formData.email}
+          <div>
+            <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+            <input id="email" type="email" value={formData.email}
               onChange={(e) => updateField('email', e.target.value)}
-              placeholder="you@business.com"
-              required
-              autoComplete="email"
-            />
+              placeholder="you@business.com" required autoComplete="email" className={inputClass} />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={formData.password}
+          <div>
+            <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">Password</label>
+            <input id="password" type="password" value={formData.password}
               onChange={(e) => updateField('password', e.target.value)}
-              placeholder="At least 8 characters"
-              required
-              minLength={8}
-              autoComplete="new-password"
-            />
+              placeholder="At least 8 characters" required minLength={8}
+              autoComplete="new-password" className={inputClass} />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="phone">Phone number</label>
-            <input
-              id="phone"
-              type="tel"
-              value={formData.phone}
+          <div>
+            <label htmlFor="phone" className="mb-1 block text-sm font-medium text-gray-700">Phone number</label>
+            <input id="phone" type="tel" value={formData.phone}
               onChange={(e) => updateField('phone', e.target.value)}
-              placeholder="+1 (555) 000-0000"
-              required
-            />
+              placeholder="+1 (555) 000-0000" required className={inputClass} />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="category">Primary business category</label>
-            <select
-              id="category"
-              value={formData.categoryId}
+          <div>
+            <label htmlFor="category" className="mb-1 block text-sm font-medium text-gray-700">Primary business category</label>
+            <select id="category" value={formData.categoryId}
               onChange={(e) => updateField('categoryId', e.target.value)}
-              required
-            >
+              required className={inputClass}>
               <option value="">Select a category</option>
               {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
           </div>
 
-          {error && <p className="error-message">{error}</p>}
+          {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <button type="submit" disabled={loading}
+            className="w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
             {loading ? 'Creating account...' : 'Create account'}
           </button>
         </form>
 
-        <div className="auth-links">
-          <span>
-            Already have an account? <Link href="/auth/login">Sign in</Link>
-          </span>
+        <div className="mt-6 text-center text-sm text-gray-500">
+          Already have an account? <Link href="/auth/login" className="text-brand-600 hover:text-brand-700">Sign in</Link>
         </div>
       </div>
     </div>
