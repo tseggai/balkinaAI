@@ -4,7 +4,7 @@ export function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error('STRIPE_SECRET_KEY is required');
   return new Stripe(key, {
-    apiVersion: '2026-02-25.clover',
+    apiVersion: '2025-01-27.acacia',
     typescript: true,
   });
 }
