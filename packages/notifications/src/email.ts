@@ -75,3 +75,88 @@ export async function sendBookingConfirmationEmail(params: {
     `,
   });
 }
+
+// ─── Tenant lifecycle emails ──────────────────────────────────────────────────
+
+/**
+ * Send welcome email to newly registered tenant.
+ */
+export async function sendTenantWelcomeEmail(params: {
+  email: string;
+  ownerName: string;
+  businessName: string;
+}): Promise<EmailResult> {
+  const { email, ownerName, businessName } = params;
+
+  return sendEmail({
+    to: email,
+    subject: `Welcome to Balkina AI, ${businessName}!`,
+    html: `
+      <h2>Welcome to Balkina AI!</h2>
+      <p>Hi ${ownerName},</p>
+      <p>Thank you for registering <strong>${businessName}</strong> on Balkina AI.</p>
+      <p>To get started, choose a subscription plan that fits your business:</p>
+      <ul>
+        <li><strong>Starter</strong> — $49/mo, up to 3 staff, 1 location</li>
+        <li><strong>Pro</strong> — $99/mo, up to 10 staff, 3 locations, SMS &amp; analytics</li>
+        <li><strong>Enterprise</strong> — $199/mo, up to 50 staff, 10 locations, white-label</li>
+      </ul>
+      <p><a href="https://balkina.ai/onboarding/select-plan">Select your plan &rarr;</a></p>
+      <p>If you have any questions, reply to this email or contact us at support@balkina.ai.</p>
+    `,
+  });
+}
+
+/**
+ * Send subscription activation confirmation email.
+ */
+export async function sendSubscriptionActivatedEmail(params: {
+  email: string;
+  ownerName: string;
+  businessName: string;
+  planName: string;
+}): Promise<EmailResult> {
+  const { email, ownerName, businessName, planName } = params;
+
+  return sendEmail({
+    to: email,
+    subject: `${businessName} — Subscription Activated!`,
+    html: `
+      <h2>Your subscription is active!</h2>
+      <p>Hi ${ownerName},</p>
+      <p>Your <strong>${planName}</strong> plan for <strong>${businessName}</strong> is now active.</p>
+      <p>Here's what you can do next:</p>
+      <ol>
+        <li>Add your services and pricing</li>
+        <li>Set up your staff members and their availability</li>
+        <li>Add your business location(s)</li>
+        <li>Start accepting AI-powered bookings from customers</li>
+      </ol>
+      <p><a href="https://balkina.ai/dashboard">Go to your dashboard &rarr;</a></p>
+    `,
+  });
+}
+
+/**
+ * Send payment failure notification email.
+ */
+export async function sendPaymentFailedEmail(params: {
+  email: string;
+  ownerName: string;
+  businessName: string;
+}): Promise<EmailResult> {
+  const { email, ownerName, businessName } = params;
+
+  return sendEmail({
+    to: email,
+    subject: `${businessName} — Payment Failed`,
+    html: `
+      <h2>Payment failed</h2>
+      <p>Hi ${ownerName},</p>
+      <p>We were unable to process your subscription payment for <strong>${businessName}</strong>.</p>
+      <p>To avoid any interruption to your service, please update your payment method as soon as possible.</p>
+      <p><a href="https://balkina.ai/billing/reactivate">Update payment method &rarr;</a></p>
+      <p>If you believe this is an error, please contact us at support@balkina.ai.</p>
+    `,
+  });
+}

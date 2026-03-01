@@ -10,7 +10,7 @@ export type Json = string | number | boolean | null | Json[] | { [key: string]: 
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export type TenantStatus = 'active' | 'inactive' | 'suspended';
+export type TenantStatus = 'active' | 'inactive' | 'suspended' | 'pending_subscription' | 'past_due';
 export type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
 export type DepositType = 'fixed' | 'percentage';
 export type DiscountType = 'percentage' | 'fixed';
@@ -31,9 +31,15 @@ export interface SubscriptionPlan {
 
 export interface Tenant {
   id: UUID;
+  user_id: UUID;
   name: string;
+  owner_name: string;
+  email: string;
+  phone: string | null;
+  category_id: UUID | null;
   stripe_customer_id: string | null;
   stripe_account_id: string | null;
+  stripe_subscription_id: string | null;
   subscription_plan_id: UUID | null;
   status: TenantStatus;
   created_at: Timestamp;

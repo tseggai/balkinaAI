@@ -7,6 +7,7 @@
  *   DELETE /appointments/:id
  */
 import { Router } from 'express';
+import { stripeWebhookRouter } from './webhooks/stripe.js';
 
 export const router = Router();
 
@@ -39,7 +40,5 @@ router.get('/tenants/:id', (_req, res) => {
   res.status(501).json({ data: null, error: { message: 'Not implemented', code: 'NOT_IMPLEMENTED' } });
 });
 
-// Stripe webhooks (signature verified inside the handler)
-router.post('/webhooks/stripe', (_req, res) => {
-  res.status(501).json({ data: null, error: { message: 'Not implemented', code: 'NOT_IMPLEMENTED' } });
-});
+// Stripe webhooks (raw body for signature verification)
+router.use('/webhooks/stripe', stripeWebhookRouter);
