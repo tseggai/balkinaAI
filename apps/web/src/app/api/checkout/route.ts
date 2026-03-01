@@ -4,7 +4,7 @@ import { getStripe, PLAN_PRICE_IDS, type PlanKey } from '@/lib/stripe';
 
 export async function POST(request: Request) {
   try {
-    const { plan } = await request.json();
+    const { plan } = await request.json() as { plan: string };
 
     if (!plan || !PLAN_PRICE_IDS[plan as PlanKey]) {
       return NextResponse.json(

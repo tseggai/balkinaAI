@@ -4,7 +4,7 @@ import { getStripe } from '@/lib/stripe';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await request.json() as { userId: string; businessName: string; ownerName: string; email: string; phone?: string; categoryId?: string };
     const { userId, businessName, ownerName, email, phone, categoryId } = body;
 
     if (!userId || !businessName || !ownerName || !email) {

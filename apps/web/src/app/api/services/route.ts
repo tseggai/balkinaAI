@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
-  const body = await request.json();
+  const body = await request.json() as { [key: string]: unknown };
   const supabase = createAdminClient();
 
   const { data, error } = await supabase
@@ -71,7 +71,7 @@ export async function PATCH(request: Request) {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
-  const body = await request.json();
+  const body = await request.json() as { id: string; extras?: { name: string; price: number; duration_minutes: number }[]; [key: string]: unknown };
   const { id, extras, ...updates } = body;
   if (!id) return NextResponse.json({ data: null, error: { message: 'Missing service id' } }, { status: 400 });
 
