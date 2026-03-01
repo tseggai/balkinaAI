@@ -6,7 +6,7 @@ async function getTenantId() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const { data: tenant } = await supabase.from('tenants').select('id').eq('user_id', user.id).single();
-  return tenant?.id ?? null;
+  return (tenant as { id: string } | null)?.id ?? null;
 }
 
 export async function GET(request: Request) {
@@ -43,14 +43,28 @@ export async function PATCH(request: Request) {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
-  const body = await request.json();
+  const body = await request.json() as {
+    id: string;
+    status?: string;
+    staff_id?: string;
+    start_time?: string;
+    end_time?: string;
+    notes?: string;
+  };
   const { id, ...updates } = body;
   if (!id) return NextResponse.json({ data: null, error: { message: 'Missing id' } }, { status: 400 });
+
+  const updateData: Record<string, string | undefined> = {};
+  if (updates.status !== undefined) updateData.status = updates.status;
+  if (updates.staff_id !== undefined) updateData.staff_id = updates.staff_id;
+  if (updates.start_time !== undefined) updateData.start_time = updates.start_time;
+  if (updates.end_time !== undefined) updateData.end_time = updates.end_time;
+  if (updates.notes !== undefined) updateData.notes = updates.notes;
 
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('appointments')
-    .update(updates)
+    .update(updateData as never)
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .select()

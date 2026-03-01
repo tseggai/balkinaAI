@@ -6,7 +6,7 @@ async function getTenantId() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const { data: tenant } = await supabase.from('tenants').select('id').eq('user_id', user.id).single();
-  return tenant?.id ?? null;
+  return (tenant as { id: string } | null)?.id ?? null;
 }
 
 export async function GET() {
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
-  const body = await request.json();
+  const body = await request.json() as { [key: string]: unknown };
   const supabase = createAdminClient();
 
   const { data, error } = await supabase
@@ -52,14 +52,14 @@ export async function PATCH(request: Request) {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
-  const body = await request.json();
+  const body = await request.json() as { id: string; [key: string]: unknown };
   const { id, ...updates } = body;
   if (!id) return NextResponse.json({ data: null, error: { message: 'Missing id' } }, { status: 400 });
 
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('coupons')
-    .update(updates)
+    .update(updates as never)
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .select()
