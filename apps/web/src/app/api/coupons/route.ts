@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       discount_value: body.discount_value,
       expires_at: body.expires_at || null,
       usage_limit: body.usage_limit || null,
-    })
+    } as never)
     .select()
     .single();
 

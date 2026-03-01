@@ -1,3 +1,15 @@
+## Non-Negotiable Build Rule
+BEFORE committing ANY code, ALWAYS run `npm run build` from the repo root and fix ALL errors until the build passes. Never commit code that fails to build. This is the most important rule in this file.
+
+If a build error occurs:
+1. Read the full error message
+2. Fix the root cause (not just the symptom)
+3. Run `npm run build` again
+4. Repeat until zero errors
+5. Only then commit and push
+
+Never use Vercel as your test environment. The build must pass locally before any push.
+
 # BALKINA AI — Claude Code Instructions
 
 ## Project Overview

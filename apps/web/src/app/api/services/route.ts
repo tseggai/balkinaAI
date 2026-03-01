@@ -46,21 +46,22 @@ export async function POST(request: Request) {
       deposit_enabled: body.deposit_enabled ?? false,
       deposit_type: body.deposit_type || null,
       deposit_amount: body.deposit_amount || null,
-    })
+    } as never)
     .select()
     .single();
 
-  if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
+  const serviceData = data as { id: string } | null;
+  if (error || !serviceData) return NextResponse.json({ data: null, error: { message: error?.message ?? 'Insert failed' } }, { status: 500 });
 
   // Insert service extras if provided
   if (body.extras && Array.isArray(body.extras) && body.extras.length > 0) {
     await supabase.from('service_extras').insert(
       body.extras.map((e: { name: string; price: number; duration_minutes: number }) => ({
-        service_id: data.id,
+        service_id: serviceData.id,
         name: e.name,
         price: e.price,
         duration_minutes: e.duration_minutes ?? 0,
-      }))
+      })) as never
     );
   }
 
@@ -97,7 +98,7 @@ export async function PATCH(request: Request) {
           name: e.name,
           price: e.price,
           duration_minutes: e.duration_minutes ?? 0,
-        }))
+        })) as never
       );
     }
   }

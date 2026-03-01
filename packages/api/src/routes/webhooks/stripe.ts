@@ -5,11 +5,15 @@
 import { type Request, type Response, Router } from 'express';
 import { stripe } from '@balkina/billing';
 import { createServerAdminClient } from '@balkina/db';
+import type { Database } from '@balkina/db';
 import {
   sendSubscriptionActivatedEmail,
   sendPaymentFailedEmail,
 } from '@balkina/notifications';
 import type Stripe from 'stripe';
+
+type TenantRow = Database['public']['Tables']['tenants']['Row'];
+type PlanRow = Database['public']['Tables']['subscription_plans']['Row'];
 
 export const stripeWebhookRouter = Router();
 
@@ -37,25 +41,25 @@ async function markEventProcessed(supabase: ReturnType<typeof createServerAdminC
 /**
  * Get tenant by Stripe customer ID.
  */
-async function getTenantByCustomerId(supabase: ReturnType<typeof createServerAdminClient>, customerId: string) {
+async function getTenantByCustomerId(supabase: ReturnType<typeof createServerAdminClient>, customerId: string): Promise<TenantRow | null> {
   const { data } = await supabase
     .from('tenants')
     .select('*')
     .eq('stripe_customer_id', customerId)
     .single();
-  return data;
+  return data as TenantRow | null;
 }
 
 /**
  * Get subscription plan by Stripe price ID.
  */
-async function getPlanByPriceId(supabase: ReturnType<typeof createServerAdminClient>, priceId: string) {
+async function getPlanByPriceId(supabase: ReturnType<typeof createServerAdminClient>, priceId: string): Promise<PlanRow | null> {
   const { data } = await supabase
     .from('subscription_plans')
     .select('*')
     .eq('stripe_price_id', priceId)
     .single();
-  return data;
+  return data as PlanRow | null;
 }
 
 /**
@@ -75,10 +79,10 @@ async function handleSubscriptionCreated(supabase: ReturnType<typeof createServe
   await supabase
     .from('tenants')
     .update({
-      status: 'active',
+      status: 'active' as const,
       stripe_subscription_id: subscription.id,
       subscription_plan_id: plan?.id ?? null,
-    })
+    } as never)
     .eq('id', tenant.id);
 
   // Send subscription confirmation email
@@ -113,7 +117,7 @@ async function handleSubscriptionUpdated(supabase: ReturnType<typeof createServe
     .update({
       subscription_plan_id: plan?.id ?? tenant.subscription_plan_id,
       stripe_subscription_id: subscription.id,
-    })
+    } as never)
     .eq('id', tenant.id);
 }
 
@@ -130,7 +134,7 @@ async function handleSubscriptionDeleted(supabase: ReturnType<typeof createServe
 
   await supabase
     .from('tenants')
-    .update({ status: 'suspended' })
+    .update({ status: 'suspended' as const } as never)
     .eq('id', tenant.id);
 }
 
@@ -149,7 +153,7 @@ async function handlePaymentFailed(supabase: ReturnType<typeof createServerAdmin
 
   await supabase
     .from('tenants')
-    .update({ status: 'past_due' })
+    .update({ status: 'past_due' as const } as never)
     .eq('id', tenant.id);
 
   // Send payment failure email
@@ -181,7 +185,7 @@ async function handleInvoicePaid(supabase: ReturnType<typeof createServerAdminCl
   if (tenant.status === 'past_due') {
     await supabase
       .from('tenants')
-      .update({ status: 'active' })
+      .update({ status: 'active' as const } as never)
       .eq('id', tenant.id);
   }
 }

@@ -58,7 +58,10 @@ export function ServiceForm({
 
   function updateExtra(index: number, field: keyof ServiceExtra, value: string | number) {
     const updated = [...extras];
-    (updated[index] as Record<string, string | number>)[field] = value;
+    const item = updated[index];
+    if (item) {
+      (item as unknown as Record<string, string | number>)[field] = value;
+    }
     setExtras(updated);
   }
 

@@ -32,10 +32,10 @@ export async function POST(request: Request) {
   const supabase = createAdminClient();
 
   // Geocode via Google Maps if address provided
-  let lat: number | null = body.lat ?? null;
-  let lng: number | null = body.lng ?? null;
+  let lat: number | null = (body.lat as number) ?? null;
+  let lng: number | null = (body.lng as number) ?? null;
   if (body.address && !lat && !lng) {
-    const coords = await geocodeAddress(body.address);
+    const coords = await geocodeAddress(body.address as string);
     if (coords) {
       lat = coords.lat;
       lng = coords.lng;
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       lat,
       lng,
       timezone: body.timezone ?? 'UTC',
-    })
+    } as never)
     .select()
     .single();
 
@@ -69,7 +69,7 @@ export async function PATCH(request: Request) {
 
   // Re-geocode if address changed
   if (updates.address && !updates.lat && !updates.lng) {
-    const coords = await geocodeAddress(updates.address);
+    const coords = await geocodeAddress(updates.address as string);
     if (coords) {
       updates.lat = coords.lat;
       updates.lng = coords.lng;
@@ -113,7 +113,7 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
     const res = await fetch(
       `https://maps.googleapis.com/maps/api/geocode/json?address=${encoded}&key=${apiKey}`
     );
-    const json = await res.json();
+    const json = await res.json() as { status: string; results?: { geometry?: { location?: { lat: number; lng: number } } }[] };
     if (json.status === 'OK' && json.results?.[0]?.geometry?.location) {
       return json.results[0].geometry.location;
     }

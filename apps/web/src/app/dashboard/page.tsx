@@ -6,11 +6,12 @@ export default async function DashboardOverview() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 
-  const { data: tenant } = await supabase
+  const { data: tenantData } = await supabase
     .from('tenants')
     .select('id')
     .eq('user_id', user.id)
     .single();
+  const tenant = tenantData as { id: string } | null;
   if (!tenant) redirect('/auth/login');
 
   const now = new Date();

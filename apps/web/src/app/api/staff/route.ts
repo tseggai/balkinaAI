@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       email: body.email,
       phone: body.phone || null,
       availability_schedule: body.availability_schedule ?? {},
-    })
+    } as never)
     .select()
     .single();
 

@@ -7,7 +7,7 @@ import { serverEnv } from '@balkina/config';
 import { PLATFORM_COMMISSION_RATE } from '@balkina/shared';
 
 export const stripe = new Stripe(serverEnv.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-06-20',
+  apiVersion: '2024-04-10',
   typescript: true,
 });
 

@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     });
 
     // Create tenant record
-    const { data: tenant, error: tenantError } = await supabase
+    const { data: tenantData, error: tenantError } = await supabase
       .from('tenants')
       .insert({
         user_id: userId,
@@ -50,16 +50,18 @@ export async function POST(request: Request) {
         phone: phone || null,
         category_id: categoryId || null,
         stripe_customer_id: stripeCustomer.id,
-        status: 'pending_subscription',
-      })
+        status: 'pending_subscription' as const,
+      } as never)
       .select()
       .single();
 
-    if (tenantError) {
+    const tenant = tenantData as { id: string } | null;
+
+    if (tenantError || !tenant) {
       // Attempt cleanup of Stripe customer on failure
       await stripe.customers.del(stripeCustomer.id).catch(() => {});
       return NextResponse.json(
-        { data: null, error: { message: tenantError.message, code: 'DB_ERROR' } },
+        { data: null, error: { message: tenantError?.message ?? 'Failed to create tenant', code: 'DB_ERROR' } },
         { status: 500 }
       );
     }

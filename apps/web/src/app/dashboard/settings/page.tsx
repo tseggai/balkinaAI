@@ -34,9 +34,10 @@ export default function SettingsPage() {
       .eq('user_id', user.id)
       .single();
 
-    if (data) {
-      setTenant(data);
-      setForm({ name: data.name, phone: data.phone ?? '' });
+    const tenantInfo = data as TenantInfo | null;
+    if (tenantInfo) {
+      setTenant(tenantInfo);
+      setForm({ name: tenantInfo.name, phone: tenantInfo.phone ?? '' });
     }
     setLoading(false);
   }, []);
@@ -52,7 +53,7 @@ export default function SettingsPage() {
     const supabase = createClient();
     const { error } = await supabase
       .from('tenants')
-      .update({ name: form.name, phone: form.phone || null })
+      .update({ name: form.name, phone: form.phone || null } as never)
       .eq('id', tenant.id);
 
     setSaving(false);

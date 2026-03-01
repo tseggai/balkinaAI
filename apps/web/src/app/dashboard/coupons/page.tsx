@@ -53,7 +53,7 @@ export default function CouponsPage() {
       code: c.code,
       discount_type: c.discount_type,
       discount_value: String(c.discount_value),
-      expires_at: c.expires_at ? c.expires_at.split('T')[0] : '',
+      expires_at: c.expires_at ? c.expires_at.split('T')[0] ?? '' : '',
       usage_limit: c.usage_limit ? String(c.usage_limit) : '',
     });
     setShowForm(true);

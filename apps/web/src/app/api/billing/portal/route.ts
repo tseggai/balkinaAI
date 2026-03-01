@@ -7,11 +7,13 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
-  const { data: tenant } = await supabase
+  const { data: tenantData } = await supabase
     .from('tenants')
     .select('stripe_customer_id')
     .eq('user_id', user.id)
     .single();
+
+  const tenant = tenantData as { stripe_customer_id: string | null } | null;
 
   if (!tenant?.stripe_customer_id) {
     return NextResponse.json(
