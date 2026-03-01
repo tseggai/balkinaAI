@@ -28,12 +28,5 @@
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
   },
-  "packageManager": "npm@10.8.1",
-  "overrides": {
-    "@balkina/mobile": {
-      "react": "19.1.0",
-      "react-native": "0.81.4",
-      "@types/react": "~19.1.0"
-    }
-  }
+  "packageManager": "npm@10.8.1"
 }
