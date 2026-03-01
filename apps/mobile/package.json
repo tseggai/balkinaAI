@@ -8,7 +8,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "lint": "eslint . --ext .ts,.tsx",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "build": "echo 'Expo apps are built via EAS Build — skipping'"
   },
   "dependencies": {
     "@balkina/shared": "*",

@@ -1,7 +1,7 @@
 /**
  * Tool execution handlers for the AI chatbot.
  * Each handler runs a Supabase query and returns a result object
- * that gets sent back to Claude as a tool_result.
+ * that gets sent back to the AI as a tool_result.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -11,6 +11,44 @@ interface ToolResult {
   success: boolean;
   data?: unknown;
   error?: string;
+}
+
+// ── Timezone helpers ────────────────────────────────────────────────────────
+
+/**
+ * Get the UTC offset in minutes for a given IANA timezone at a reference date.
+ * Positive = east of UTC (e.g. Europe/Berlin in summer = +120).
+ */
+function getTimezoneOffsetMinutes(timezone: string, refDate: Date): number {
+  const utcStr = refDate.toLocaleString('en-US', { timeZone: 'UTC' });
+  const tzStr = refDate.toLocaleString('en-US', { timeZone: timezone });
+  return (new Date(tzStr).getTime() - new Date(utcStr).getTime()) / 60000;
+}
+
+/**
+ * Convert a local date + time in a given timezone to a UTC Date.
+ * dateStr: "2024-06-15", timeStr: "09:00", timezone: "America/New_York"
+ */
+function localTimeToUTC(dateStr: string, timeStr: string, timezone: string): Date {
+  // Treat the local time as if it were UTC to get a reference point
+  const asUtc = new Date(`${dateStr}T${timeStr}:00.000Z`);
+  // Compute the timezone offset at that reference point
+  const offsetMs = getTimezoneOffsetMinutes(timezone, asUtc) * 60000;
+  // UTC = local_time - offset
+  return new Date(asUtc.getTime() - offsetMs);
+}
+
+/**
+ * Fetch the tenant's timezone from their first location, default to UTC.
+ */
+async function getTenantTimezone(supabase: AdminClient, tenantId: string): Promise<string> {
+  const { data } = await supabase
+    .from('tenant_locations')
+    .select('timezone')
+    .eq('tenant_id', tenantId)
+    .limit(1)
+    .single();
+  return (data as { timezone: string } | null)?.timezone || 'UTC';
 }
 
 // ── get_services ────────────────────────────────────────────────────────────
@@ -118,16 +156,19 @@ export async function handleCheckAvailability(
     return { success: true, data: { available_slots: [], message: 'No staff available' } };
   }
 
-  // 3. Get existing appointments for that date
-  const dayStart = `${date}T00:00:00Z`;
-  const dayEnd = `${date}T23:59:59Z`;
+  // 3. Resolve the tenant's timezone so we generate slots in local time
+  const timezone = await getTenantTimezone(supabase, tenantId);
+
+  // Query existing appointments for the entire local day (converted to UTC range)
+  const dayStartUtc = localTimeToUTC(date, '00:00', timezone).toISOString();
+  const dayEndUtc = localTimeToUTC(date, '23:59', timezone).toISOString();
 
   const { data: existingAppts } = await supabase
     .from('appointments')
     .select('staff_id, start_time, end_time')
     .eq('tenant_id', tenantId)
-    .gte('start_time', dayStart)
-    .lte('start_time', dayEnd)
+    .gte('start_time', dayStartUtc)
+    .lte('start_time', dayEndUtc)
     .in('status', ['pending', 'confirmed']);
 
   const appointments = (existingAppts ?? []) as { staff_id: string | null; start_time: string; end_time: string }[];
@@ -150,26 +191,27 @@ export async function handleCheckAvailability(
     const scheduleStartMinutes = (startParts[0] ?? 0) * 60 + (startParts[1] ?? 0);
     const scheduleEndMinutes = (endParts[0] ?? 0) * 60 + (endParts[1] ?? 0);
 
-    // Generate slots in 30-minute increments
+    // Generate slots in 30-minute increments — convert local time to UTC
     for (let minutes = scheduleStartMinutes; minutes + svc.duration_minutes <= scheduleEndMinutes; minutes += 30) {
       const slotHour = Math.floor(minutes / 60);
       const slotMin = minutes % 60;
-      const slotTime = `${date}T${String(slotHour).padStart(2, '0')}:${String(slotMin).padStart(2, '0')}:00Z`;
-      const slotEnd = new Date(new Date(slotTime).getTime() + svc.duration_minutes * 60000).toISOString();
+      const localTimeStr = `${String(slotHour).padStart(2, '0')}:${String(slotMin).padStart(2, '0')}`;
 
-      // Check for conflicts
+      // Convert the local slot time to proper UTC
+      const slotStartUtc = localTimeToUTC(date, localTimeStr, timezone);
+      const slotEndUtc = new Date(slotStartUtc.getTime() + svc.duration_minutes * 60000);
+
+      // Check for conflicts against existing appointments (all in UTC)
       const hasConflict = appointments.some((appt) => {
         if (appt.staff_id !== staff.id) return false;
         const apptStart = new Date(appt.start_time).getTime();
         const apptEnd = new Date(appt.end_time).getTime();
-        const newStart = new Date(slotTime).getTime();
-        const newEnd = new Date(slotEnd).getTime();
-        return newStart < apptEnd && newEnd > apptStart;
+        return slotStartUtc.getTime() < apptEnd && slotEndUtc.getTime() > apptStart;
       });
 
       if (!hasConflict) {
         slots.push({
-          time: slotTime,
+          time: slotStartUtc.toISOString(),
           staff_id: staff.id,
           staff_name: staff.name,
         });
@@ -214,8 +256,23 @@ export async function handleBookAppointment(
   if (!service) return { success: false, error: 'Service not found' };
   const svc = service as { duration_minutes: number; price: number; deposit_enabled: boolean; deposit_type: string | null; deposit_amount: number | null; tenant_id: string };
 
-  // 2. Calculate end time
-  const start = new Date(startTime);
+  // 2. Calculate end time — handle timezone correctly
+  //    If the AI passes a time without Z or offset (local time), convert using tenant timezone.
+  //    If it already ends with Z or has an offset, trust it as UTC/absolute.
+  let start: Date;
+  const hasTimezoneInfo = /Z$|[+-]\d{2}:\d{2}$/.test(startTime);
+  if (hasTimezoneInfo) {
+    start = new Date(startTime);
+  } else {
+    // Interpret as local time in the tenant's timezone
+    const timezone = await getTenantTimezone(supabase, tenantId);
+    const [datePart, timePart] = startTime.split('T');
+    if (datePart && timePart) {
+      start = localTimeToUTC(datePart, timePart.slice(0, 5), timezone);
+    } else {
+      start = new Date(startTime);
+    }
+  }
   const end = new Date(start.getTime() + svc.duration_minutes * 60000);
 
   // 3. Calculate deposit
