@@ -10,7 +10,7 @@ async function getTenantId() {
     .select('id')
     .eq('user_id', user.id)
     .single();
-  return tenant?.id ?? null;
+  return (tenant as { id: string } | null)?.id ?? null;
 }
 
 export async function GET() {
