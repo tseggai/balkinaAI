@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
@@ -12,7 +11,6 @@ interface Category {
 }
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [formData, setFormData] = useState({
     businessName: '',
@@ -107,12 +105,13 @@ export default function RegisterPage() {
 
       if (signInError) {
         // Tenant was created successfully but auto-sign-in failed — redirect to login
-        router.push('/auth/login');
+        window.location.href = '/auth/login';
         return;
       }
 
-      router.push('/onboarding/select-plan');
-      router.refresh();
+      // Full page navigation so the browser sends the freshly-set auth
+      // cookies with the request (avoids RSC fetch / cookie race).
+      window.location.href = '/onboarding/select-plan';
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       setError(`Registration error: ${msg}`);

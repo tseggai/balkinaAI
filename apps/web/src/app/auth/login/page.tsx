@@ -1,12 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -30,8 +28,10 @@ export default function LoginPage() {
         return;
       }
 
-      router.push('/dashboard');
-      router.refresh();
+      // Full page navigation so the browser sends the freshly-set auth
+      // cookies with the request. router.push() does an RSC fetch that
+      // can race with cookie writes and cause the middleware to miss them.
+      window.location.href = '/dashboard';
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       setError(`Login failed: ${msg}`);
