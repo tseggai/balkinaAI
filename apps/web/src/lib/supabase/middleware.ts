@@ -41,10 +41,21 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/api/') ||
     pathname === '/';
 
-  if (!user && !isPublicPath) {
+  // Redirect helper that copies Set-Cookie headers from supabaseResponse
+  // (token refreshes) onto the redirect response. Without this, redirects
+  // discard refreshed session cookies and cause an infinite loop.
+  function redirectTo(path: string) {
     const url = request.nextUrl.clone();
-    url.pathname = '/auth/login';
-    return NextResponse.redirect(url);
+    url.pathname = path;
+    const res = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      res.cookies.set(cookie.name, cookie.value);
+    });
+    return res;
+  }
+
+  if (!user && !isPublicPath) {
+    return redirectTo('/auth/login');
   }
 
   if (user && !isPublicPath) {
@@ -60,27 +71,21 @@ export async function updateSession(request: NextRequest) {
         tenant.status === 'pending_subscription' &&
         !pathname.startsWith('/onboarding')
       ) {
-        const url = request.nextUrl.clone();
-        url.pathname = '/onboarding/select-plan';
-        return NextResponse.redirect(url);
+        return redirectTo('/onboarding/select-plan');
       }
 
       if (
         tenant.status === 'suspended' &&
         !pathname.startsWith('/billing')
       ) {
-        const url = request.nextUrl.clone();
-        url.pathname = '/billing/reactivate';
-        return NextResponse.redirect(url);
+        return redirectTo('/billing/reactivate');
       }
     }
   }
 
   // Redirect authenticated users away from auth pages
   if (user && pathname.startsWith('/auth/')) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
+    return redirectTo('/dashboard');
   }
 
   return supabaseResponse;
