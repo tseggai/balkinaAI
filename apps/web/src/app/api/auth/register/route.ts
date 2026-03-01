@@ -4,7 +4,14 @@ import { getStripe } from '@/lib/stripe';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { userId: string; businessName: string; ownerName: string; email: string; phone?: string; categoryId?: string };
+    const body = await request.json() as {
+      userId: string;
+      businessName: string;
+      ownerName: string;
+      email: string;
+      phone?: string;
+      categoryId?: string;
+    };
     const { userId, businessName, ownerName, email, phone, categoryId } = body;
 
     if (!userId || !businessName || !ownerName || !email) {
@@ -31,13 +38,24 @@ export async function POST(request: Request) {
     }
 
     // Create Stripe customer
-    const stripe = getStripe();
-    const stripeCustomer = await stripe.customers.create({
-      name: businessName,
-      email,
-      phone: phone || undefined,
-      metadata: { user_id: userId },
-    });
+    let stripeCustomerId: string;
+    try {
+      const stripe = getStripe();
+      const stripeCustomer = await stripe.customers.create({
+        name: businessName,
+        email,
+        phone: phone || undefined,
+        metadata: { user_id: userId },
+      });
+      stripeCustomerId = stripeCustomer.id;
+    } catch (stripeErr) {
+      const msg = stripeErr instanceof Error ? stripeErr.message : 'Stripe error';
+      console.error('Stripe customer creation failed:', msg);
+      return NextResponse.json(
+        { data: null, error: { message: `Payment setup failed: ${msg}`, code: 'STRIPE_ERROR' } },
+        { status: 500 }
+      );
+    }
 
     // Create tenant record
     const { data: tenantData, error: tenantError } = await supabase
@@ -49,7 +67,7 @@ export async function POST(request: Request) {
         email,
         phone: phone || null,
         category_id: categoryId || null,
-        stripe_customer_id: stripeCustomer.id,
+        stripe_customer_id: stripeCustomerId,
         status: 'pending_subscription' as const,
       } as never)
       .select()
@@ -59,23 +77,23 @@ export async function POST(request: Request) {
 
     if (tenantError || !tenant) {
       // Attempt cleanup of Stripe customer on failure
-      await stripe.customers.del(stripeCustomer.id).catch(() => {});
+      try {
+        const stripe = getStripe();
+        await stripe.customers.del(stripeCustomerId);
+      } catch {
+        // Cleanup is best-effort
+      }
+      console.error('Tenant insert failed:', tenantError?.message);
       return NextResponse.json(
         { data: null, error: { message: tenantError?.message ?? 'Failed to create tenant', code: 'DB_ERROR' } },
         { status: 500 }
       );
     }
 
-    // Send welcome email via API (fire and forget)
-    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/notifications/welcome`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenantId: tenant.id, email, ownerName, businessName }),
-    }).catch(() => {});
-
     return NextResponse.json({ data: { tenantId: tenant.id }, error: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
+    console.error('Register route error:', message);
     return NextResponse.json(
       { data: null, error: { message, code: 'INTERNAL_ERROR' } },
       { status: 500 }
