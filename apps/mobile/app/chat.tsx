@@ -11,7 +11,7 @@ import {
   Animated,
   Keyboard,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 const API_BASE = 'https://balkina-ai.vercel.app';
@@ -201,6 +201,14 @@ export default function ChatScreen() {
     tenantId: string;
     tenantName: string;
   }>();
+  const navigation = useNavigation();
+
+  // Set header title to the business name
+  useEffect(() => {
+    if (tenantName) {
+      navigation.setOptions({ title: tenantName });
+    }
+  }, [tenantName, navigation]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {

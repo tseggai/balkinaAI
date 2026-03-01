@@ -19,6 +19,7 @@ export default function EmailLoginScreen() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   async function handleSignIn() {
     if (!email.trim() || !password) {
@@ -90,6 +91,46 @@ export default function EmailLoginScreen() {
     // On success, onAuthStateChange in _layout.tsx handles redirect to /(main)
   }
 
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      Alert.alert('Enter your email', 'Please type your email address above, then tap "Forgot password?" again.');
+      return;
+    }
+
+    setLoading(true);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+
+    setLoading(false);
+
+    if (error) {
+      Alert.alert('Error', error.message);
+      return;
+    }
+
+    setResetSent(true);
+  }
+
+  if (resetSent) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Check your email</Text>
+        <Text style={styles.subtitle}>
+          We sent a password reset link to{' '}
+          <Text style={styles.bold}>{email}</Text>.
+          {'\n\n'}
+          Follow the link in the email to set a new password, then come back and sign in.
+        </Text>
+        <TouchableOpacity
+          style={styles.btn}
+          onPress={() => setResetSent(false)}
+        >
+          <Text style={styles.btnText}>Back to sign in</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -110,41 +151,49 @@ export default function EmailLoginScreen() {
 
         {isSignUp && (
           <>
+            <Text style={styles.label}>Full name</Text>
             <TextInput
               style={styles.input}
               value={name}
               onChangeText={setName}
               placeholder="Full name"
+              placeholderTextColor="#9ca3af"
               autoCapitalize="words"
               autoComplete="name"
             />
 
+            <Text style={styles.label}>Phone number</Text>
             <TextInput
               style={styles.input}
               value={phone}
               onChangeText={setPhone}
               placeholder="Phone number (optional)"
+              placeholderTextColor="#9ca3af"
               keyboardType="phone-pad"
               autoComplete="tel"
             />
           </>
         )}
 
+        <Text style={styles.label}>Email address</Text>
         <TextInput
           style={styles.input}
           value={email}
           onChangeText={setEmail}
           placeholder="Email address"
+          placeholderTextColor="#9ca3af"
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
         />
 
+        <Text style={styles.label}>Password</Text>
         <TextInput
           style={styles.input}
           value={password}
           onChangeText={setPassword}
           placeholder="Password"
+          placeholderTextColor="#9ca3af"
           secureTextEntry
           autoComplete={isSignUp ? 'new-password' : 'current-password'}
         />
@@ -164,6 +213,16 @@ export default function EmailLoginScreen() {
                 : 'Sign in'}
           </Text>
         </TouchableOpacity>
+
+        {!isSignUp && (
+          <TouchableOpacity
+            style={styles.forgotBtn}
+            onPress={handleForgotPassword}
+            disabled={loading}
+          >
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={styles.switchBtn}
@@ -201,12 +260,23 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     lineHeight: 22,
   },
+  bold: {
+    fontWeight: '600',
+    color: '#111827',
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 6,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#e5e7eb',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
+    color: '#111827',
     marginBottom: 16,
   },
   btn: {
@@ -224,8 +294,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  forgotBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  forgotText: {
+    color: '#6b7280',
+    fontSize: 14,
+    fontWeight: '500',
+  },
   switchBtn: {
-    paddingVertical: 16,
+    paddingVertical: 8,
     alignItems: 'center',
   },
   switchText: {
