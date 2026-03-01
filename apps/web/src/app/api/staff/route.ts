@@ -58,7 +58,7 @@ export async function PATCH(request: Request) {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('staff')
-    .update(updates)
+    .update(updates as never)
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .select()

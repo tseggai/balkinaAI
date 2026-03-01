@@ -79,7 +79,7 @@ export async function PATCH(request: Request) {
 
   const { data, error } = await supabase
     .from('services')
-    .update(updates)
+    .update(updates as never)
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .select()
