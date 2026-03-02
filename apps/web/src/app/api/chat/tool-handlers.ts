@@ -51,6 +51,40 @@ async function getTenantTimezone(supabase: AdminClient, tenantId: string): Promi
   return (data as { timezone: string } | null)?.timezone || 'UTC';
 }
 
+// ── find_businesses ──────────────────────────────────────────────────────────
+
+export async function handleFindBusinesses(
+  supabase: AdminClient,
+  _tenantId: string,
+  input: Record<string, unknown>,
+): Promise<ToolResult> {
+  const query = (input.query as string) || '';
+
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('id, name, categories(name)')
+    .eq('status', 'active')
+    .or(`name.ilike.%${query}%`)
+    .limit(10);
+
+  if (error) return { success: false, error: error.message };
+
+  // Also search services for matching service names
+  const { data: serviceMatches } = await supabase
+    .from('services')
+    .select('tenant_id, name, price, duration_minutes, tenants(id, name)')
+    .ilike('name', `%${query}%`)
+    .limit(10);
+
+  return {
+    success: true,
+    data: {
+      businesses: data ?? [],
+      matching_services: serviceMatches ?? [],
+    },
+  };
+}
+
 // ── get_services ────────────────────────────────────────────────────────────
 
 export async function handleGetServices(
@@ -449,6 +483,8 @@ export async function executeTool(
   sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string },
 ): Promise<ToolResult> {
   switch (toolName) {
+    case 'find_businesses':
+      return handleFindBusinesses(supabase, tenantId, toolInput);
     case 'search_services':
     case 'get_services':
       return handleGetServices(supabase, tenantId, toolInput);

@@ -17,6 +17,7 @@ interface StaffMember {
   name: string;
   email: string;
   phone: string | null;
+  status: string;
   availability_schedule: WeekSchedule;
   created_at: string;
 }
@@ -30,7 +31,7 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', phone: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', status: 'active' });
   const [schedule, setSchedule] = useState<WeekSchedule>(defaultSchedule);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -42,18 +43,20 @@ export default function StaffPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchStaff(); }, [fetchStaff]);
+  useEffect(() => {
+    fetchStaff();
+  }, [fetchStaff]);
 
   function openNew() {
     setEditing(null);
-    setForm({ name: '', email: '', phone: '' });
+    setForm({ name: '', email: '', phone: '', status: 'active' });
     setSchedule(defaultSchedule);
     setShowForm(true);
   }
 
   function openEdit(s: StaffMember) {
     setEditing(s);
-    setForm({ name: s.name, email: s.email, phone: s.phone ?? '' });
+    setForm({ name: s.name, email: s.email, phone: s.phone ?? '', status: s.status ?? 'active' });
     setSchedule(
       typeof s.availability_schedule === 'object' && s.availability_schedule
         ? (s.availability_schedule as WeekSchedule)
@@ -85,6 +88,7 @@ export default function StaffPage() {
       name: form.name,
       email: form.email,
       phone: form.phone || null,
+      status: form.status,
       availability_schedule: schedule,
     };
 
@@ -118,19 +122,60 @@ export default function StaffPage() {
         <form onSubmit={handleSubmit} className="max-w-2xl space-y-5">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Full Name</label>
-            <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+            <input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
-              <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+              <input
+                type="email"
+                required
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
-              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+              <input
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+            </div>
+          </div>
+
+          {/* Status Toggle */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, status: 'active' })}
+                className={`rounded-lg px-4 py-2 text-sm font-medium ${
+                  form.status === 'active'
+                    ? 'bg-green-600 text-white'
+                    : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, status: 'inactive' })}
+                className={`rounded-lg px-4 py-2 text-sm font-medium ${
+                  form.status === 'inactive'
+                    ? 'bg-gray-600 text-white'
+                    : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                Inactive
+              </button>
             </div>
           </div>
 
@@ -143,17 +188,29 @@ export default function StaffPage() {
                 return (
                   <div key={day} className="flex items-center gap-3">
                     <label className="flex w-28 items-center gap-2">
-                      <input type="checkbox" checked={ds.enabled} onChange={(e) => updateDay(key, 'enabled', e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-brand-600" />
+                      <input
+                        type="checkbox"
+                        checked={ds.enabled}
+                        onChange={(e) => updateDay(key, 'enabled', e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                      />
                       <span className="text-sm text-gray-700">{day}</span>
                     </label>
                     {ds.enabled && (
                       <>
-                        <input type="time" value={ds.start} onChange={(e) => updateDay(key, 'start', e.target.value)}
-                          className="rounded border border-gray-300 px-2 py-1 text-sm" />
+                        <input
+                          type="time"
+                          value={ds.start}
+                          onChange={(e) => updateDay(key, 'start', e.target.value)}
+                          className="rounded border border-gray-300 px-2 py-1 text-sm"
+                        />
                         <span className="text-sm text-gray-400">to</span>
-                        <input type="time" value={ds.end} onChange={(e) => updateDay(key, 'end', e.target.value)}
-                          className="rounded border border-gray-300 px-2 py-1 text-sm" />
+                        <input
+                          type="time"
+                          value={ds.end}
+                          onChange={(e) => updateDay(key, 'end', e.target.value)}
+                          className="rounded border border-gray-300 px-2 py-1 text-sm"
+                        />
                       </>
                     )}
                   </div>
@@ -164,8 +221,11 @@ export default function StaffPage() {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <button type="submit" disabled={saving}
-            className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          >
             {saving ? 'Saving...' : editing ? 'Update' : 'Add Staff'}
           </button>
         </form>
@@ -202,6 +262,7 @@ export default function StaffPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Email</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Phone</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
               </tr>
             </thead>
@@ -211,6 +272,17 @@ export default function StaffPage() {
                   <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{s.name}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{s.email}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{s.phone ?? '—'}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm">
+                    {s.status === 'inactive' ? (
+                      <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                        Inactive
+                      </span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                        Active
+                      </span>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
                     <button onClick={() => openEdit(s)} className="mr-3 text-brand-600 hover:text-brand-800">Edit</button>
                     <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:text-red-800">Delete</button>
