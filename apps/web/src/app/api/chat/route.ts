@@ -1,8 +1,12 @@
 /**
  * POST /api/chat
  * AI Chatbot endpoint — streams responses from GPT-4o-mini with function calling.
- * Accepts: { message, tenantId, sessionId, customerName?, customerPhone? }
+ * Accepts: { message, sessionId, tenantId?, customerName?, customerPhone? }
  * Returns: streaming text/event-stream
+ *
+ * When tenantId is provided: behaves as a booking assistant for that specific business.
+ * When tenantId is omitted: behaves as Balkina AI general assistant, helping users
+ * discover businesses first via the find_businesses tool.
  */
 import OpenAI from 'openai';
 import { createAdminClient } from '@/lib/supabase/server';
@@ -10,8 +14,10 @@ import { executeTool } from './tool-handlers';
 
 const MAX_TOOL_ROUNDS = 5;
 
-// Tool definitions in OpenAI function calling format
-const chatTools: OpenAI.ChatCompletionTool[] = [
+// ── Tool definitions ─────────────────────────────────────────────────────────
+
+// Tools available when chatting with a specific tenant
+const tenantChatTools: OpenAI.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
@@ -113,7 +119,29 @@ const chatTools: OpenAI.ChatCompletionTool[] = [
   },
 ];
 
-function buildWidgetSystemPrompt(tenantName: string, customerName: string | null, currentDate: string): string {
+// Additional tool for discovery mode (no tenant)
+const findBusinessesTool: OpenAI.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'find_businesses',
+    description: 'Search for businesses by service type, category, or name. Use this when the user wants to book something but hasn\'t specified which business.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query - service type, category, or business name' },
+      },
+      required: ['query'],
+    },
+  },
+};
+
+// ── System prompts ───────────────────────────────────────────────────────────
+
+function buildTenantSystemPrompt(
+  tenantName: string,
+  customerName: string | null,
+  currentDate: string,
+): string {
   const customerSection = customerName
     ? `The customer's name is ${customerName}.`
     : 'The customer has not provided their name yet. Ask for their name and phone number before booking.';
@@ -156,9 +184,56 @@ ${customerSection}
 `;
 }
 
+function buildDiscoverySystemPrompt(
+  customerName: string | null,
+  currentDate: string,
+): string {
+  const customerSection = customerName
+    ? `The customer's name is ${customerName}.`
+    : 'The customer has not provided their name yet.';
+
+  return `You are Balkina AI — a friendly, smart booking assistant that helps customers find the right business and book appointments.
+
+Today's date is ${currentDate}.
+
+## Your role
+- Help customers find businesses that match what they're looking for.
+- When a customer describes what they need (e.g., "I need a haircut", "find me a dentist"), use the find_businesses tool to search for matching businesses and services.
+- Present the results in a clear, helpful way with business names, services, and prices.
+- Once a customer picks a business, help them explore services, check availability, and book appointments.
+- Always show the full price AND any deposit amount BEFORE booking.
+- ALWAYS ask for explicit confirmation before calling the create_booking tool.
+
+## Communication style
+- Conversational and warm, not robotic.
+- Keep responses concise — customers may be on mobile.
+- Use the customer's name when known.
+- When presenting businesses, format them nicely with names, services, and prices.
+
+## Customer info
+${customerSection}
+
+## Discovery flow
+1. Customer describes what they want -> use find_businesses tool
+2. Present matching businesses and services
+3. Customer picks a business/service -> use get_service_details for full info
+4. Customer asks about availability -> use check_availability tool
+5. Customer confirms a time -> summarize details and ask for confirmation
+6. Customer confirms -> use create_booking tool
+7. After booking -> share the confirmation details
+
+## Boundaries
+- You help with finding businesses and booking appointments on Balkina AI.
+- Do not provide medical, legal, or financial advice.
+- Do not discuss other booking platforms or competitors.
+`;
+}
+
+// ── Request handler ──────────────────────────────────────────────────────────
+
 interface ChatRequestBody {
   message: string;
-  tenantId: string;
+  tenantId?: string;
   sessionId: string;
   customerName?: string;
   customerPhone?: string;
@@ -168,8 +243,8 @@ export async function POST(request: Request) {
   const body = (await request.json()) as ChatRequestBody;
   const { message, tenantId, sessionId, customerName, customerPhone } = body;
 
-  if (!message || !tenantId || !sessionId) {
-    return new Response(JSON.stringify({ error: 'message, tenantId, and sessionId are required' }), {
+  if (!message || !sessionId) {
+    return new Response(JSON.stringify({ error: 'message and sessionId are required' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -185,19 +260,26 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
-  // 1. Verify tenant exists and is active
-  const { data: tenantData } = await supabase
-    .from('tenants')
-    .select('id, name, status')
-    .eq('id', tenantId)
-    .single();
+  // 1. Resolve tenant (optional)
+  let tenantName = 'Balkina AI';
+  let resolvedTenantId = tenantId ?? '';
 
-  const tenant = tenantData as { id: string; name: string; status: string } | null;
-  if (!tenant || tenant.status !== 'active') {
-    return new Response(JSON.stringify({ error: 'Business not found or inactive' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json' },
-    });
+  if (tenantId) {
+    const { data: tenantData } = await supabase
+      .from('tenants')
+      .select('id, name, status')
+      .eq('id', tenantId)
+      .single();
+
+    const tenant = tenantData as { id: string; name: string; status: string } | null;
+    if (!tenant || tenant.status !== 'active') {
+      return new Response(JSON.stringify({ error: 'Business not found or inactive' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    tenantName = tenant.name;
+    resolvedTenantId = tenant.id;
   }
 
   // 2. Get or create chat session
@@ -207,13 +289,18 @@ export async function POST(request: Request) {
     .eq('session_id', sessionId)
     .single();
 
-  let chatSession = existingSession as { id: string; customer_id: string | null; customer_name: string | null; customer_phone: string | null } | null;
+  let chatSession = existingSession as {
+    id: string;
+    customer_id: string | null;
+    customer_name: string | null;
+    customer_phone: string | null;
+  } | null;
 
   if (!chatSession) {
     const { data: newSession } = await supabase
       .from('chat_sessions')
       .insert({
-        tenant_id: tenantId,
+        tenant_id: tenantId ?? null,
         session_id: sessionId,
         customer_name: customerName ?? null,
         customer_phone: customerPhone ?? null,
@@ -223,7 +310,10 @@ export async function POST(request: Request) {
     chatSession = newSession as typeof chatSession;
   } else {
     // Update customer info if newly provided
-    if ((customerName && !chatSession.customer_name) || (customerPhone && !chatSession.customer_phone)) {
+    if (
+      (customerName && !chatSession.customer_name) ||
+      (customerPhone && !chatSession.customer_phone)
+    ) {
       await supabase
         .from('chat_sessions')
         .update({
@@ -266,7 +356,11 @@ export async function POST(request: Request) {
     } else if (msg.role === 'assistant') {
       if (msg.tool_calls) {
         // Assistant message with tool calls
-        const toolCalls = msg.tool_calls as { id: string; name: string; input: Record<string, unknown> }[];
+        const toolCalls = msg.tool_calls as {
+          id: string;
+          name: string;
+          input: Record<string, unknown>;
+        }[];
         messages.push({
           role: 'assistant',
           content: msg.content || null,
@@ -282,7 +376,10 @@ export async function POST(request: Request) {
 
         // Add corresponding tool results as individual tool messages
         if (msg.tool_results) {
-          const toolResults = msg.tool_results as { tool_use_id: string; content: string }[];
+          const toolResults = msg.tool_results as {
+            tool_use_id: string;
+            content: string;
+          }[];
           for (const tr of toolResults) {
             messages.push({
               role: 'tool',
@@ -307,13 +404,24 @@ export async function POST(request: Request) {
     content: message,
   } as never);
 
-  // 5. Stream response from OpenAI with tool loop
+  // 5. Build tools list and system prompt based on whether we have a tenant
+  const chatTools: OpenAI.ChatCompletionTool[] = tenantId
+    ? [...tenantChatTools]
+    : [findBusinessesTool, ...tenantChatTools];
+
+  const systemPrompt = tenantId
+    ? buildTenantSystemPrompt(
+        tenantName,
+        chatSession.customer_name ?? customerName ?? null,
+        new Date().toISOString().slice(0, 10),
+      )
+    : buildDiscoverySystemPrompt(
+        chatSession.customer_name ?? customerName ?? null,
+        new Date().toISOString().slice(0, 10),
+      );
+
+  // 6. Stream response from OpenAI with tool loop
   const openai = new OpenAI({ apiKey });
-  const systemPrompt = buildWidgetSystemPrompt(
-    tenant.name,
-    chatSession.customer_name ?? customerName ?? null,
-    new Date().toISOString().slice(0, 10),
-  );
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -326,7 +434,7 @@ export async function POST(request: Request) {
 
       try {
         while (toolRound < MAX_TOOL_ROUNDS) {
-          const stream = await openai.chat.completions.create({
+          const streamResponse = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             max_tokens: 4096,
             tools: chatTools,
@@ -335,9 +443,12 @@ export async function POST(request: Request) {
           });
 
           let textContent = '';
-          const toolCalls: Map<number, { id: string; name: string; arguments: string }> = new Map();
+          const toolCalls: Map<
+            number,
+            { id: string; name: string; arguments: string }
+          > = new Map();
 
-          for await (const chunk of stream) {
+          for await (const chunk of streamResponse) {
             const delta = chunk.choices[0]?.delta;
             if (!delta) continue;
 
@@ -345,7 +456,9 @@ export async function POST(request: Request) {
             if (delta.content) {
               textContent += delta.content;
               controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ type: 'text', content: delta.content })}\n\n`)
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: 'text', content: delta.content })}\n\n`,
+                ),
               );
             }
 
@@ -375,7 +488,9 @@ export async function POST(request: Request) {
               content: textContent,
             } as never);
 
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`),
+            );
             controller.close();
             return;
           }
@@ -387,12 +502,17 @@ export async function POST(request: Request) {
           for (const toolCall of toolCallsList) {
             // Stream tool call notification
             controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: 'tool_call', name: toolCall.name })}\n\n`)
+              encoder.encode(
+                `data: ${JSON.stringify({ type: 'tool_call', name: toolCall.name })}\n\n`,
+              ),
             );
 
             let parsedInput: Record<string, unknown> = {};
             try {
-              parsedInput = JSON.parse(toolCall.arguments) as Record<string, unknown>;
+              parsedInput = JSON.parse(toolCall.arguments) as Record<
+                string,
+                unknown
+              >;
             } catch {
               // Empty or malformed arguments — use empty object
             }
@@ -401,11 +521,13 @@ export async function POST(request: Request) {
               toolCall.name,
               parsedInput,
               supabase,
-              tenantId,
+              resolvedTenantId,
               {
                 customerId: chatSession!.customer_id,
-                customerName: chatSession!.customer_name ?? customerName ?? null,
-                customerPhone: chatSession!.customer_phone ?? customerPhone ?? null,
+                customerName:
+                  chatSession!.customer_name ?? customerName ?? null,
+                customerPhone:
+                  chatSession!.customer_phone ?? customerPhone ?? null,
                 chatSessionId: chatSession!.id,
               },
             );
@@ -420,7 +542,10 @@ export async function POST(request: Request) {
           const savedToolCalls = toolCallsList.map((tc) => ({
             id: tc.id,
             name: tc.name,
-            input: JSON.parse(tc.arguments || '{}') as Record<string, unknown>,
+            input: JSON.parse(tc.arguments || '{}') as Record<
+              string,
+              unknown
+            >,
           }));
 
           await supabase.from('chat_messages').insert({
@@ -446,11 +571,12 @@ export async function POST(request: Request) {
           };
 
           // Build tool result messages
-          const toolResultMessages: OpenAI.ChatCompletionToolMessageParam[] = toolResults.map((tr) => ({
-            role: 'tool' as const,
-            tool_call_id: tr.tool_use_id,
-            content: tr.content,
-          }));
+          const toolResultMessages: OpenAI.ChatCompletionToolMessageParam[] =
+            toolResults.map((tr) => ({
+              role: 'tool' as const,
+              tool_call_id: tr.tool_use_id,
+              content: tr.content,
+            }));
 
           // Append to conversation for next round
           currentMessages = [
@@ -463,13 +589,18 @@ export async function POST(request: Request) {
         }
 
         // Max tool rounds reached
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`),
+        );
         controller.close();
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+        const errorMessage =
+          err instanceof Error ? err.message : 'An error occurred';
         console.error('[chat] Stream error:', errorMessage);
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ type: 'error', content: errorMessage })}\n\n`)
+          encoder.encode(
+            `data: ${JSON.stringify({ type: 'error', content: errorMessage })}\n\n`,
+          ),
         );
         controller.close();
       }

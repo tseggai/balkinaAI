@@ -20,12 +20,25 @@ export async function GET() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('services')
-    .select('*, categories(name), service_extras(*)')
+    .select('*, service_extras(*), service_staff(staff_id, staff(name))')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
-  return NextResponse.json({ data, error: null });
+
+  // Map service_staff to include staff_name for easier consumption
+  const mapped = (data as Record<string, unknown>[] | null)?.map((service) => {
+    const staffArr = service.service_staff as { staff_id: string; staff: { name: string } | null }[] | null;
+    return {
+      ...service,
+      service_staff: staffArr?.map((ss) => ({
+        staff_id: ss.staff_id,
+        staff_name: ss.staff?.name ?? 'Unknown',
+      })) ?? [],
+    };
+  }) ?? [];
+
+  return NextResponse.json({ data: mapped, error: null });
 }
 
 export async function POST(request: Request) {
@@ -41,11 +54,32 @@ export async function POST(request: Request) {
       tenant_id: tenantId,
       name: body.name,
       category_id: body.category_id || null,
+      category_name: body.category_name || null,
       duration_minutes: body.duration_minutes,
       price: body.price,
       deposit_enabled: body.deposit_enabled ?? false,
       deposit_type: body.deposit_type || null,
       deposit_amount: body.deposit_amount || null,
+      image_url: body.image_url || null,
+      color: body.color || '#6366f1',
+      description: body.description || null,
+      buffer_time_before: body.buffer_time_before ?? 0,
+      buffer_time_after: body.buffer_time_after ?? 0,
+      custom_duration: body.custom_duration ?? false,
+      is_recurring: body.is_recurring ?? false,
+      capacity: body.capacity ?? 1,
+      hide_price: body.hide_price ?? false,
+      hide_duration: body.hide_duration ?? false,
+      visibility: body.visibility || 'public',
+      min_booking_lead_time: body.min_booking_lead_time ?? 0,
+      max_booking_days_ahead: body.max_booking_days_ahead ?? 0,
+      min_extras: body.min_extras ?? 0,
+      max_extras: body.max_extras ?? null,
+      booking_limit_per_customer: body.booking_limit_per_customer ?? null,
+      booking_limit_per_customer_interval: body.booking_limit_per_customer_interval || null,
+      booking_limit_per_slot: body.booking_limit_per_slot ?? null,
+      booking_limit_per_slot_interval: body.booking_limit_per_slot_interval || null,
+      timesheet: body.timesheet || null,
     } as never)
     .select()
     .single();
@@ -54,13 +88,23 @@ export async function POST(request: Request) {
   if (error || !serviceData) return NextResponse.json({ data: null, error: { message: error?.message ?? 'Insert failed' } }, { status: 500 });
 
   // Insert service extras if provided
-  if (body.extras && Array.isArray(body.extras) && body.extras.length > 0) {
+  if (body.extras && Array.isArray(body.extras) && (body.extras as unknown[]).length > 0) {
     await supabase.from('service_extras').insert(
-      body.extras.map((e: { name: string; price: number; duration_minutes: number }) => ({
+      (body.extras as { name: string; price: number; duration_minutes: number }[]).map((e) => ({
         service_id: serviceData.id,
         name: e.name,
         price: e.price,
         duration_minutes: e.duration_minutes ?? 0,
+      })) as never
+    );
+  }
+
+  // Insert service_staff if provided
+  if (body.staff && Array.isArray(body.staff) && (body.staff as unknown[]).length > 0) {
+    await supabase.from('service_staff').insert(
+      (body.staff as string[]).map((staffId) => ({
+        service_id: serviceData.id,
+        staff_id: staffId,
       })) as never
     );
   }
@@ -72,15 +116,40 @@ export async function PATCH(request: Request) {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
-  const body = await request.json() as { id: string; extras?: { name: string; price: number; duration_minutes: number }[]; [key: string]: unknown };
-  const { id, extras, ...updates } = body;
+  const body = await request.json() as { [key: string]: unknown };
+  const id = body.id as string | undefined;
   if (!id) return NextResponse.json({ data: null, error: { message: 'Missing service id' } }, { status: 400 });
+
+  const extras = body.extras as { name: string; price: number; duration_minutes: number }[] | undefined;
+  const staff = body.staff as string[] | undefined;
 
   const supabase = createAdminClient();
 
+  // Build the update object without extras, staff, and id
+  const updateFields: Record<string, unknown> = {};
+  const serviceColumns = [
+    'name', 'category_id', 'category_name', 'duration_minutes', 'price',
+    'deposit_enabled', 'deposit_type', 'deposit_amount',
+    'image_url', 'color', 'description',
+    'buffer_time_before', 'buffer_time_after',
+    'custom_duration', 'is_recurring', 'capacity',
+    'hide_price', 'hide_duration', 'visibility',
+    'min_booking_lead_time', 'max_booking_days_ahead',
+    'min_extras', 'max_extras',
+    'booking_limit_per_customer', 'booking_limit_per_customer_interval',
+    'booking_limit_per_slot', 'booking_limit_per_slot_interval',
+    'timesheet',
+  ];
+
+  for (const col of serviceColumns) {
+    if (col in body) {
+      updateFields[col] = body[col];
+    }
+  }
+
   const { data, error } = await supabase
     .from('services')
-    .update(updates as never)
+    .update(updateFields as never)
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .select()
@@ -93,11 +162,24 @@ export async function PATCH(request: Request) {
     await supabase.from('service_extras').delete().eq('service_id', id);
     if (extras.length > 0) {
       await supabase.from('service_extras').insert(
-        extras.map((e: { name: string; price: number; duration_minutes: number }) => ({
+        extras.map((e) => ({
           service_id: id,
           name: e.name,
           price: e.price,
           duration_minutes: e.duration_minutes ?? 0,
+        })) as never
+      );
+    }
+  }
+
+  // Replace staff if provided
+  if (staff && Array.isArray(staff)) {
+    await supabase.from('service_staff').delete().eq('service_id', id);
+    if (staff.length > 0) {
+      await supabase.from('service_staff').insert(
+        staff.map((staffId) => ({
+          service_id: id,
+          staff_id: staffId,
         })) as never
       );
     }

@@ -15,10 +15,10 @@ export async function GET() {
 
   const supabase = createClient();
   const { data, error } = await supabase
-    .from('tenant_locations')
-    .select('*')
+    .from('packages')
+    .select('*, package_services(*, services(name))')
     .eq('tenant_id', tenantId)
-    .order('name');
+    .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
   return NextResponse.json({ data, error: null });
@@ -31,66 +31,86 @@ export async function POST(request: Request) {
   const body = await request.json() as { [key: string]: unknown };
   const supabase = createAdminClient();
 
-  // Geocode via Google Maps if address provided
-  let lat: number | null = (body.lat as number) ?? null;
-  let lng: number | null = (body.lng as number) ?? null;
-  if (body.address && !lat && !lng) {
-    const coords = await geocodeAddress(body.address as string);
-    if (coords) {
-      lat = coords.lat;
-      lng = coords.lng;
-    }
-  }
-
   const { data, error } = await supabase
-    .from('tenant_locations')
+    .from('packages')
     .insert({
       tenant_id: tenantId,
       name: body.name,
-      address: body.address,
-      lat,
-      lng,
-      timezone: body.timezone ?? 'UTC',
-      phone: body.phone || null,
+      price: body.price ?? 0,
+      image_url: body.image_url || null,
       description: body.description || null,
-      booking_limit_enabled: body.booking_limit_enabled ?? false,
-      booking_limit_capacity: body.booking_limit_capacity ?? null,
-      booking_limit_interval: body.booking_limit_interval || null,
+      is_private: body.is_private ?? false,
+      is_active: body.is_active ?? true,
+      expiration_value: body.expiration_value ?? null,
+      expiration_unit: body.expiration_unit || null,
     } as never)
     .select()
     .single();
 
-  if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
-  return NextResponse.json({ data, error: null }, { status: 201 });
+  const packageData = data as { id: string } | null;
+  if (error || !packageData) return NextResponse.json({ data: null, error: { message: error?.message ?? 'Insert failed' } }, { status: 500 });
+
+  // Insert package_services if provided
+  const services = body.services as { service_id: string; quantity: number }[] | undefined;
+  if (services && Array.isArray(services) && services.length > 0) {
+    await supabase.from('package_services').insert(
+      services.map((s) => ({
+        package_id: packageData.id,
+        service_id: s.service_id,
+        quantity: s.quantity ?? 1,
+      })) as never
+    );
+  }
+
+  return NextResponse.json({ data: packageData, error: null }, { status: 201 });
 }
 
 export async function PATCH(request: Request) {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
-  const body = await request.json() as { id: string; [key: string]: unknown };
-  const { id, ...updates } = body;
+  const body = await request.json() as { [key: string]: unknown };
+  const id = body.id as string | undefined;
   if (!id) return NextResponse.json({ data: null, error: { message: 'Missing id' } }, { status: 400 });
 
-  // Re-geocode if address changed
-  if (updates.address && !updates.lat && !updates.lng) {
-    const coords = await geocodeAddress(updates.address as string);
-    if (coords) {
-      updates.lat = coords.lat;
-      updates.lng = coords.lng;
+  const services = body.services as { service_id: string; quantity: number }[] | undefined;
+  const supabase = createAdminClient();
+
+  const updateFields: Record<string, unknown> = {};
+  const columns = [
+    'name', 'price', 'image_url', 'description', 'is_private',
+    'is_active', 'expiration_value', 'expiration_unit',
+  ];
+  for (const col of columns) {
+    if (col in body) {
+      updateFields[col] = body[col];
     }
   }
 
-  const supabase = createAdminClient();
   const { data, error } = await supabase
-    .from('tenant_locations')
-    .update(updates as never)
+    .from('packages')
+    .update(updateFields as never)
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .select()
     .single();
 
   if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
+
+  // Replace package_services if provided
+  if (services && Array.isArray(services)) {
+    await supabase.from('package_services').delete().eq('package_id', id);
+    if (services.length > 0) {
+      await supabase.from('package_services').insert(
+        services.map((s) => ({
+          package_id: id,
+          service_id: s.service_id,
+          quantity: s.quantity ?? 1,
+        })) as never
+      );
+    }
+  }
+
   return NextResponse.json({ data, error: null });
 }
 
@@ -103,27 +123,8 @@ export async function DELETE(request: Request) {
   if (!id) return NextResponse.json({ data: null, error: { message: 'Missing id' } }, { status: 400 });
 
   const supabase = createAdminClient();
-  const { error } = await supabase.from('tenant_locations').delete().eq('id', id).eq('tenant_id', tenantId);
+  const { error } = await supabase.from('packages').delete().eq('id', id).eq('tenant_id', tenantId);
 
   if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
   return NextResponse.json({ data: { id }, error: null });
-}
-
-async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (!apiKey) return null;
-
-  try {
-    const encoded = encodeURIComponent(address);
-    const res = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encoded}&key=${apiKey}`
-    );
-    const json = await res.json() as { status: string; results?: { geometry?: { location?: { lat: number; lng: number } } }[] };
-    if (json.status === 'OK' && json.results?.[0]?.geometry?.location) {
-      return json.results[0].geometry.location;
-    }
-  } catch {
-    // Geocoding failure is non-fatal
-  }
-  return null;
 }

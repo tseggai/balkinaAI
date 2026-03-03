@@ -51,6 +51,40 @@ async function getTenantTimezone(supabase: AdminClient, tenantId: string): Promi
   return (data as { timezone: string } | null)?.timezone || 'UTC';
 }
 
+// ── find_businesses ──────────────────────────────────────────────────────────
+
+export async function handleFindBusinesses(
+  supabase: AdminClient,
+  _tenantId: string,
+  input: Record<string, unknown>,
+): Promise<ToolResult> {
+  const query = (input.query as string) || '';
+
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('id, name, categories(name)')
+    .eq('status', 'active')
+    .or(`name.ilike.%${query}%`)
+    .limit(10);
+
+  if (error) return { success: false, error: error.message };
+
+  // Also search services for matching service names
+  const { data: serviceMatches } = await supabase
+    .from('services')
+    .select('tenant_id, name, price, duration_minutes, tenants(id, name)')
+    .ilike('name', `%${query}%`)
+    .limit(10);
+
+  return {
+    success: true,
+    data: {
+      businesses: data ?? [],
+      matching_services: serviceMatches ?? [],
+    },
+  };
+}
+
 // ── get_services ────────────────────────────────────────────────────────────
 
 export async function handleGetServices(
@@ -439,6 +473,313 @@ export async function handleGetBookingDetails(
   return { success: true, data };
 }
 
+// ── get_packages ────────────────────────────────────────────────────────────
+
+export async function handleGetPackages(
+  supabase: AdminClient,
+  tenantId: string,
+  _input: Record<string, unknown>,
+): Promise<ToolResult> {
+  const { data, error } = await supabase
+    .from('packages')
+    .select('*, package_services(quantity, services(name, price, duration_minutes))')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, data: data ?? [] };
+}
+
+// ── get_loyalty_info ────────────────────────────────────────────────────────
+
+export async function handleGetLoyaltyInfo(
+  supabase: AdminClient,
+  tenantId: string,
+  input: Record<string, unknown>,
+): Promise<ToolResult> {
+  const customerId = input.customer_id as string;
+  if (!customerId) return { success: false, error: 'customer_id is required' };
+
+  // Fetch the loyalty program for this tenant
+  const { data: program, error: programErr } = await supabase
+    .from('loyalty_programs')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .limit(1)
+    .single();
+
+  if (programErr || !program) {
+    return { success: true, data: { active: false } };
+  }
+
+  const loyaltyProgram = program as {
+    id: string;
+    is_active: boolean;
+    points_per_booking: number;
+    points_to_currency_rate: number;
+    tiers: unknown;
+    minimum_redemption_points: number;
+  };
+
+  if (!loyaltyProgram.is_active) {
+    return { success: true, data: { active: false } };
+  }
+
+  // Fetch the customer's loyalty points for this tenant
+  const { data: customerPoints } = await supabase
+    .from('customer_loyalty_points')
+    .select('*')
+    .eq('customer_id', customerId)
+    .eq('tenant_id', tenantId)
+    .limit(1)
+    .single();
+
+  const pointsData = customerPoints as {
+    points_balance: number;
+    tier: string;
+    lifetime_points: number;
+  } | null;
+
+  return {
+    success: true,
+    data: {
+      active: true,
+      program: {
+        points_per_booking: loyaltyProgram.points_per_booking,
+        points_to_currency_rate: loyaltyProgram.points_to_currency_rate,
+        tiers: loyaltyProgram.tiers,
+        minimum_redemption_points: loyaltyProgram.minimum_redemption_points,
+      },
+      customer: pointsData
+        ? {
+            points_balance: pointsData.points_balance,
+            tier: pointsData.tier,
+            lifetime_points: pointsData.lifetime_points,
+          }
+        : {
+            points_balance: 0,
+            tier: null,
+            lifetime_points: 0,
+          },
+    },
+  };
+}
+
+// ── apply_coupon ────────────────────────────────────────────────────────────
+
+export async function handleApplyCoupon(
+  supabase: AdminClient,
+  tenantId: string,
+  input: Record<string, unknown>,
+): Promise<ToolResult> {
+  const couponCode = input.coupon_code as string;
+  const serviceId = input.service_id as string;
+  const totalPrice = input.total_price as number;
+
+  if (!couponCode) return { success: false, error: 'coupon_code is required' };
+  if (!serviceId) return { success: false, error: 'service_id is required' };
+  if (totalPrice == null) return { success: false, error: 'total_price is required' };
+
+  // Look up the coupon by code and tenant
+  const { data: coupon, error: couponErr } = await supabase
+    .from('coupons')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('code', couponCode)
+    .limit(1)
+    .single();
+
+  if (couponErr || !coupon) {
+    return { success: false, error: 'Coupon not found' };
+  }
+
+  const c = coupon as {
+    id: string;
+    discount_type: string;
+    discount_value: number;
+    expires_at: string | null;
+    usage_count: number;
+    usage_limit: number | null;
+  };
+
+  // Validate expiration
+  if (c.expires_at && new Date(c.expires_at) < new Date()) {
+    return { success: false, error: 'Coupon has expired' };
+  }
+
+  // Validate usage limit
+  if (c.usage_limit !== null && c.usage_count >= c.usage_limit) {
+    return { success: false, error: 'Coupon usage limit has been reached' };
+  }
+
+  // Calculate discount
+  let discountAmount: number;
+  if (c.discount_type === 'percentage') {
+    discountAmount = (totalPrice * c.discount_value) / 100;
+  } else {
+    discountAmount = c.discount_value;
+  }
+
+  // Ensure discount does not exceed total price
+  discountAmount = Math.min(discountAmount, totalPrice);
+  const finalPrice = totalPrice - discountAmount;
+
+  return {
+    success: true,
+    data: {
+      valid: true,
+      discount_amount: discountAmount,
+      final_price: finalPrice,
+      coupon_id: c.id,
+    },
+  };
+}
+
+// ── redeem_loyalty_points ───────────────────────────────────────────────────
+
+export async function handleRedeemLoyaltyPoints(
+  supabase: AdminClient,
+  tenantId: string,
+  input: Record<string, unknown>,
+): Promise<ToolResult> {
+  const customerId = input.customer_id as string;
+  const pointsToRedeem = input.points_to_redeem as number;
+  const totalPrice = input.total_price as number;
+
+  if (!customerId) return { success: false, error: 'customer_id is required' };
+  if (pointsToRedeem == null) return { success: false, error: 'points_to_redeem is required' };
+  if (totalPrice == null) return { success: false, error: 'total_price is required' };
+
+  // Fetch the loyalty program for this tenant
+  const { data: program, error: programErr } = await supabase
+    .from('loyalty_programs')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .limit(1)
+    .single();
+
+  if (programErr || !program) {
+    return { success: false, error: 'No loyalty program found for this business' };
+  }
+
+  const loyaltyProgram = program as {
+    points_to_currency_rate: number;
+    minimum_redemption_points: number;
+    is_active: boolean;
+  };
+
+  if (!loyaltyProgram.is_active) {
+    return { success: false, error: 'Loyalty program is not active' };
+  }
+
+  // Fetch the customer's loyalty points
+  const { data: customerPoints, error: pointsErr } = await supabase
+    .from('customer_loyalty_points')
+    .select('*')
+    .eq('customer_id', customerId)
+    .eq('tenant_id', tenantId)
+    .limit(1)
+    .single();
+
+  if (pointsErr || !customerPoints) {
+    return { success: false, error: 'No loyalty points found for this customer' };
+  }
+
+  const pointsData = customerPoints as { points_balance: number };
+
+  // Validate enough points
+  if (pointsData.points_balance < pointsToRedeem) {
+    return {
+      success: false,
+      error: `Insufficient points. Available: ${pointsData.points_balance}, requested: ${pointsToRedeem}`,
+    };
+  }
+
+  // Validate minimum redemption threshold
+  if (pointsToRedeem < loyaltyProgram.minimum_redemption_points) {
+    return {
+      success: false,
+      error: `Minimum redemption is ${loyaltyProgram.minimum_redemption_points} points`,
+    };
+  }
+
+  // Calculate discount (DON'T actually deduct points — that happens when booking is confirmed)
+  const discountAmount = Math.min(
+    pointsToRedeem * loyaltyProgram.points_to_currency_rate,
+    totalPrice,
+  );
+  const finalPrice = totalPrice - discountAmount;
+  const remainingPoints = pointsData.points_balance - pointsToRedeem;
+
+  return {
+    success: true,
+    data: {
+      valid: true,
+      points_used: pointsToRedeem,
+      discount_amount: discountAmount,
+      final_price: finalPrice,
+      remaining_points: remainingPoints,
+    },
+  };
+}
+
+// ── get_inventory ───────────────────────────────────────────────────────────
+
+export async function handleGetInventory(
+  supabase: AdminClient,
+  tenantId: string,
+  input: Record<string, unknown>,
+): Promise<ToolResult> {
+  const serviceId = input.service_id as string | undefined;
+
+  if (serviceId) {
+    // Fetch products linked to this service via the junction table
+    const { data, error } = await supabase
+      .from('product_services')
+      .select('products(id, name, sell_price, quantity_on_hand, display_in_booking)')
+      .eq('service_id', serviceId)
+      .eq('products.tenant_id', tenantId)
+      .eq('products.is_active', true);
+
+    if (error) return { success: false, error: error.message };
+
+    // Extract products from the nested join
+    const products = (data ?? [])
+      .map((row) => (row as { products: unknown }).products)
+      .filter(Boolean);
+
+    return { success: true, data: products };
+  }
+
+  // Fetch all active products for the tenant
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, name, sell_price, quantity_on_hand, display_in_booking')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, data: data ?? [] };
+}
+
+// ── get_custom_fields ───────────────────────────────────────────────────────
+
+export async function handleGetCustomFields(
+  supabase: AdminClient,
+  tenantId: string,
+  _input: Record<string, unknown>,
+): Promise<ToolResult> {
+  const { data, error } = await supabase
+    .from('custom_fields')
+    .select('id, name, field_type, options, is_required')
+    .eq('tenant_id', tenantId)
+    .eq('applies_to', 'appointment')
+    .order('display_order');
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, data: data ?? [] };
+}
+
 // ── Tool dispatcher ─────────────────────────────────────────────────────────
 
 export async function executeTool(
@@ -449,6 +790,8 @@ export async function executeTool(
   sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string },
 ): Promise<ToolResult> {
   switch (toolName) {
+    case 'find_businesses':
+      return handleFindBusinesses(supabase, tenantId, toolInput);
     case 'search_services':
     case 'get_services':
       return handleGetServices(supabase, tenantId, toolInput);
@@ -466,6 +809,18 @@ export async function executeTool(
     case 'get_customer_appointments':
     case 'get_booking_details':
       return handleGetBookingDetails(supabase, tenantId, toolInput);
+    case 'get_packages':
+      return handleGetPackages(supabase, tenantId, toolInput);
+    case 'get_loyalty_info':
+      return handleGetLoyaltyInfo(supabase, tenantId, toolInput);
+    case 'apply_coupon':
+      return handleApplyCoupon(supabase, tenantId, toolInput);
+    case 'redeem_loyalty_points':
+      return handleRedeemLoyaltyPoints(supabase, tenantId, toolInput);
+    case 'get_inventory':
+      return handleGetInventory(supabase, tenantId, toolInput);
+    case 'get_custom_fields':
+      return handleGetCustomFields(supabase, tenantId, toolInput);
     default:
       return { success: false, error: `Unknown tool: ${toolName}` };
   }
