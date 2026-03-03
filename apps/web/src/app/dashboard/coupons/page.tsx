@@ -153,8 +153,7 @@ export default function CouponsPage() {
     });
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     setError('');
     setSaving(true);
 
@@ -187,226 +186,6 @@ export default function CouponsPage() {
     setEditing(null);
     setSaving(false);
     fetchCoupons();
-  }
-
-  /* ── Form view ──────────────────────────────────────────────────────── */
-
-  if (showForm) {
-    return (
-      <div className="p-6 lg:p-8">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {editing ? 'Edit Coupon' : 'Create Coupon'}
-          </h1>
-          <button
-            onClick={() => setShowForm(false)}
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
-            Cancel
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="max-w-2xl space-y-5">
-          {/* Code */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Code</label>
-            <div className="flex gap-2">
-              <input
-                required
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value })}
-                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, code: generateCode() })}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-              >
-                Generate
-              </button>
-            </div>
-          </div>
-
-          {/* Discount type + value */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Discount Type</label>
-              <select
-                value={form.discount_type}
-                onChange={(e) =>
-                  setForm({ ...form, discount_type: e.target.value as 'percentage' | 'fixed' })
-                }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-              >
-                <option value="percentage">Percentage</option>
-                <option value="fixed">Fixed Amount</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                {form.discount_type === 'percentage' ? 'Discount (%)' : 'Discount ($)'}
-              </label>
-              <input
-                type="number"
-                required
-                min="0"
-                step={form.discount_type === 'percentage' ? '1' : '0.01'}
-                value={form.discount_value}
-                onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
-            </div>
-          </div>
-
-          {/* Scope */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Scope</label>
-            <div className="flex items-center gap-6">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="scope"
-                  value="per_booking"
-                  checked={form.scope === 'per_booking'}
-                  onChange={() => setForm({ ...form, scope: 'per_booking' })}
-                  className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-500"
-                />
-                <span className="text-sm text-gray-700">Per booking</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="scope"
-                  value="per_customer"
-                  checked={form.scope === 'per_customer'}
-                  onChange={() => setForm({ ...form, scope: 'per_customer' })}
-                  className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-500"
-                />
-                <span className="text-sm text-gray-700">Per customer</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Lifetime toggle + Expiry date + Usage limit */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">Expiry Date</label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-xs text-gray-500">Lifetime</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={form.is_lifetime}
-                    onClick={() => setForm({ ...form, is_lifetime: !form.is_lifetime })}
-                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
-                      form.is_lifetime ? 'bg-brand-600' : 'bg-gray-200'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        form.is_lifetime ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </label>
-              </div>
-              {form.is_lifetime ? (
-                <div className="flex h-[38px] items-center rounded-lg border border-gray-200 bg-gray-50 px-3">
-                  <span className="text-sm text-gray-400">Never expires</span>
-                </div>
-              ) : (
-                <input
-                  type="date"
-                  value={form.expires_at}
-                  onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                />
-              )}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Usage Limit</label>
-              <input
-                type="number"
-                min="1"
-                value={form.usage_limit}
-                onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
-                placeholder="Unlimited"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
-            </div>
-          </div>
-
-          {/* Applicable Services */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Applicable Services{' '}
-              <span className="font-normal text-gray-400">
-                ({form.applicable_service_ids.length === 0 ? 'All services' : `${form.applicable_service_ids.length} selected`})
-              </span>
-            </label>
-            {services.length === 0 ? (
-              <p className="text-sm text-gray-400">No services found. Create services first.</p>
-            ) : (
-              <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-200 p-3">
-                <div className="space-y-2">
-                  {services.map((s) => (
-                    <label key={s.id} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={form.applicable_service_ids.includes(s.id)}
-                        onChange={() => toggleServiceId(s.id)}
-                        className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-                      />
-                      <span className="text-sm text-gray-700">{s.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Applicable Staff */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Applicable Staff{' '}
-              <span className="font-normal text-gray-400">
-                ({form.applicable_staff_ids.length === 0 ? 'All staff' : `${form.applicable_staff_ids.length} selected`})
-              </span>
-            </label>
-            {staff.length === 0 ? (
-              <p className="text-sm text-gray-400">No staff found. Add staff members first.</p>
-            ) : (
-              <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-200 p-3">
-                <div className="space-y-2">
-                  {staff.map((s) => (
-                    <label key={s.id} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={form.applicable_staff_ids.includes(s.id)}
-                        onChange={() => toggleStaffId(s.id)}
-                        className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-                      />
-                      <span className="text-sm text-gray-700">{s.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Error + Submit */}
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : editing ? 'Update Coupon' : 'Create Coupon'}
-          </button>
-        </form>
-      </div>
-    );
   }
 
   /* ── List view ──────────────────────────────────────────────────────── */
@@ -531,6 +310,229 @@ export default function CouponsPage() {
           </table>
         )}
       </div>
+
+      {/* Slide-in Panel */}
+      {showForm && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowForm(false)} />
+          <div className="fixed right-0 top-0 z-50 flex h-full w-[480px] max-w-full flex-col bg-white shadow-2xl transition-transform duration-300">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {editing ? 'Edit Coupon' : 'Create Coupon'}
+              </h2>
+              <button
+                onClick={() => setShowForm(false)}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="space-y-5">
+                {/* Code */}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Code</label>
+                  <div className="flex gap-2">
+                    <input
+                      value={form.code}
+                      onChange={(e) => setForm({ ...form, code: e.target.value })}
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, code: generateCode() })}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                </div>
+                {/* Discount type + value */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Discount Type</label>
+                    <select
+                      value={form.discount_type}
+                      onChange={(e) => setForm({ ...form, discount_type: e.target.value as 'percentage' | 'fixed' })}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      <option value="percentage">Percentage</option>
+                      <option value="fixed">Fixed Amount</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      {form.discount_type === 'percentage' ? 'Discount (%)' : 'Discount ($)'}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step={form.discount_type === 'percentage' ? '1' : '0.01'}
+                      value={form.discount_value}
+                      onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                  </div>
+                </div>
+                {/* Scope */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Scope</label>
+                  <div className="flex items-center gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="panel-scope"
+                        value="per_booking"
+                        checked={form.scope === 'per_booking'}
+                        onChange={() => setForm({ ...form, scope: 'per_booking' })}
+                        className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      <span className="text-sm text-gray-700">Per booking</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="panel-scope"
+                        value="per_customer"
+                        checked={form.scope === 'per_customer'}
+                        onChange={() => setForm({ ...form, scope: 'per_customer' })}
+                        className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      <span className="text-sm text-gray-700">Per customer</span>
+                    </label>
+                  </div>
+                </div>
+                {/* Lifetime toggle + Expiry date + Usage limit */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <label className="block text-sm font-medium text-gray-700">Expiry Date</label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <span className="text-xs text-gray-500">Lifetime</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={form.is_lifetime}
+                          onClick={() => setForm({ ...form, is_lifetime: !form.is_lifetime })}
+                          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
+                            form.is_lifetime ? 'bg-brand-600' : 'bg-gray-200'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              form.is_lifetime ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </label>
+                    </div>
+                    {form.is_lifetime ? (
+                      <div className="flex h-[38px] items-center rounded-lg border border-gray-200 bg-gray-50 px-3">
+                        <span className="text-sm text-gray-400">Never expires</span>
+                      </div>
+                    ) : (
+                      <input
+                        type="date"
+                        value={form.expires_at}
+                        onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Usage Limit</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={form.usage_limit}
+                      onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
+                      placeholder="Unlimited"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                  </div>
+                </div>
+                {/* Applicable Services */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Applicable Services{' '}
+                    <span className="font-normal text-gray-400">
+                      ({form.applicable_service_ids.length === 0 ? 'All services' : `${form.applicable_service_ids.length} selected`})
+                    </span>
+                  </label>
+                  {services.length === 0 ? (
+                    <p className="text-sm text-gray-400">No services found.</p>
+                  ) : (
+                    <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-200 p-3">
+                      <div className="space-y-2">
+                        {services.map((s) => (
+                          <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={form.applicable_service_ids.includes(s.id)}
+                              onChange={() => toggleServiceId(s.id)}
+                              className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                            />
+                            <span className="text-sm text-gray-700">{s.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {/* Applicable Staff */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Applicable Staff{' '}
+                    <span className="font-normal text-gray-400">
+                      ({form.applicable_staff_ids.length === 0 ? 'All staff' : `${form.applicable_staff_ids.length} selected`})
+                    </span>
+                  </label>
+                  {staff.length === 0 ? (
+                    <p className="text-sm text-gray-400">No staff found.</p>
+                  ) : (
+                    <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-200 p-3">
+                      <div className="space-y-2">
+                        {staff.map((s) => (
+                          <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={form.applicable_staff_ids.includes(s.id)}
+                              onChange={() => toggleStaffId(s.id)}
+                              className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                            />
+                            <span className="text-sm text-gray-700">{s.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {error && <p className="text-sm text-red-600">{error}</p>}
+              </div>
+            </div>
+            {/* Footer */}
+            <div className="flex justify-end gap-3 border-t px-6 py-4">
+              <button
+                onClick={() => setShowForm(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={saving}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : editing ? 'Update Coupon' : 'Create Coupon'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

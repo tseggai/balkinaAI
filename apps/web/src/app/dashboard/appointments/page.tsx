@@ -478,7 +478,7 @@ export default function AppointmentsPage() {
         </div>
 
         {/* Filter bar */}
-        <div className="mt-4 flex flex-wrap items-end gap-3">
+        <div className="mt-4 flex flex-wrap gap-2 items-center">
           <div className="min-w-[200px] flex-1">
             <input
               type="text"
@@ -545,7 +545,7 @@ export default function AppointmentsPage() {
         </div>
 
         {/* Table */}
-        <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="mt-6 overflow-visible rounded-xl border border-gray-200 bg-white">
           {loading ? (
             <div className="p-12 text-center text-sm text-gray-500">Loading appointments...</div>
           ) : appointments.length === 0 ? (
@@ -556,7 +556,7 @@ export default function AppointmentsPage() {
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto overflow-y-visible">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>

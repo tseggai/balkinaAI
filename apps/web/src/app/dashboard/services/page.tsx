@@ -615,15 +615,6 @@ export default function ServicesPage() {
     fetchServices();
   }
 
-  // -- Form view --
-  if (showForm) {
-    return (
-      <div className="p-6 lg:p-8">
-        <ServiceForm service={editing} onClose={handleClose} />
-      </div>
-    );
-  }
-
   const filteredServices = search.trim()
     ? services.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()))
     : services;
@@ -804,6 +795,33 @@ export default function ServicesPage() {
           />
         )}
       </div>
+
+      {/* Slide-in Panel */}
+      {showForm && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/40" onClick={handleClose} />
+          <div className="fixed right-0 top-0 z-50 flex h-full w-full flex-col bg-white shadow-2xl transition-transform duration-300 sm:w-[50%] sm:min-w-[480px]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {editing ? 'Edit Service' : 'Add Service'}
+              </h2>
+              <button
+                onClick={handleClose}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <ServiceForm service={editing} onClose={handleClose} />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
