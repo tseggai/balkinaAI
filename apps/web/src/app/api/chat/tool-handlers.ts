@@ -73,28 +73,73 @@ export async function handleFindBusinesses(
   }
 
   // Sanitize query for use in Supabase filter (escape % and _ which are SQL wildcards)
-  const sanitized = query.replace(/%/g, '\\%').replace(/_/g, '\\_');
+  const sanitize = (s: string) => s.replace(/%/g, '\\%').replace(/_/g, '\\_');
+  const sanitized = sanitize(query);
 
-  const { data, error } = await supabase
+  // 1. Search tenants by name
+  const { data: tenantsByName } = await supabase
     .from('tenants')
     .select('id, name')
     .eq('status', 'active')
     .ilike('name', `%${sanitized}%`)
     .limit(10);
 
-  if (error) return { success: false, error: error.message };
+  // 2. Build flexible service search patterns
+  //    - Full query: "haircut" → %haircut%
+  //    - Individual words (multi-word queries): "hair salon" → %hair%, %salon%
+  //    - Compound word splits: "haircut" → %hair%cut%, %hai%rcut% (catches "Hair Cut")
+  const servicePatterns: string[] = [`name.ilike.%${sanitized}%`];
 
-  // Also search services for matching service names
+  const words = query.split(/\s+/).filter((w) => w.length >= 2);
+  if (words.length > 1) {
+    for (const w of words) {
+      servicePatterns.push(`name.ilike.%${sanitize(w)}%`);
+    }
+  }
+
+  // For single compound words (e.g. "haircut"), try splitting at each position
+  // so "haircut" generates patterns like %hair%cut% which matches "Hair Cut"
+  if (!query.includes(' ') && query.length > 4) {
+    for (let i = 3; i <= query.length - 2; i++) {
+      const left = sanitize(query.slice(0, i));
+      const right = sanitize(query.slice(i));
+      servicePatterns.push(`name.ilike.%${left}%${right}%`);
+    }
+  }
+
+  const uniquePatterns = [...new Set(servicePatterns)];
+
   const { data: serviceMatches } = await supabase
     .from('services')
-    .select('tenant_id, name, price, duration_minutes, tenants(id, name)')
-    .ilike('name', `%${sanitized}%`)
+    .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name)')
+    .or(uniquePatterns.join(','))
+    .eq('tenants.status', 'active')
+    .limit(20);
+
+  // 3. Search tenants by category (e.g. "beauty" matches "Beauty & Personal Care")
+  const { data: tenantsByCategory } = await supabase
+    .from('tenants')
+    .select('id, name, categories!inner(name)')
+    .eq('status', 'active')
+    .ilike('categories.name', `%${sanitized}%`)
     .limit(10);
+
+  // Merge all found tenants (deduplicate by id)
+  const tenantMap = new Map<string, { id: string; name: string }>();
+  for (const t of tenantsByName ?? []) {
+    tenantMap.set(t.id, t);
+  }
+  for (const s of (serviceMatches ?? []) as unknown as { tenants: { id: string; name: string } }[]) {
+    if (s.tenants) tenantMap.set(s.tenants.id, { id: s.tenants.id, name: s.tenants.name });
+  }
+  for (const t of (tenantsByCategory ?? []) as unknown as { id: string; name: string }[]) {
+    tenantMap.set(t.id, { id: t.id, name: t.name });
+  }
 
   return {
     success: true,
     data: {
-      businesses: data ?? [],
+      businesses: Array.from(tenantMap.values()),
       matching_services: serviceMatches ?? [],
     },
   };
