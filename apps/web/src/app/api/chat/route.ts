@@ -240,6 +240,7 @@ interface ChatRequestBody {
 }
 
 export async function POST(request: Request) {
+  try {
   const body = (await request.json()) as ChatRequestBody;
   const { message, tenantId, sessionId, customerName, customerPhone } = body;
 
@@ -252,7 +253,8 @@ export async function POST(request: Request) {
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'AI service not configured' }), {
+    console.error('[chat] OPENAI_API_KEY is not set. Check Vercel environment variables.');
+    return new Response(JSON.stringify({ error: 'AI service not configured. OPENAI_API_KEY is missing.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -260,16 +262,20 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
-  // 1. Resolve tenant (optional)
+  // 1. Resolve tenant (optional — null in discovery mode)
   let tenantName = 'Balkina AI';
   let resolvedTenantId = tenantId ?? '';
 
   if (tenantId) {
-    const { data: tenantData } = await supabase
+    const { data: tenantData, error: tenantErr } = await supabase
       .from('tenants')
       .select('id, name, status')
       .eq('id', tenantId)
       .single();
+
+    if (tenantErr) {
+      console.error('[chat] Tenant lookup failed:', tenantErr.message);
+    }
 
     const tenant = tenantData as { id: string; name: string; status: string } | null;
     if (!tenant || tenant.status !== 'active') {
@@ -283,31 +289,47 @@ export async function POST(request: Request) {
   }
 
   // 2. Get or create chat session
-  const { data: existingSession } = await supabase
+  const { data: existingSession, error: sessionErr } = await supabase
     .from('chat_sessions')
     .select('id, customer_id, customer_name, customer_phone')
     .eq('session_id', sessionId)
     .single();
 
-  let chatSession = existingSession as {
+  if (sessionErr && sessionErr.code !== 'PGRST116') {
+    // PGRST116 = "not found" which is expected for new sessions
+    console.error('[chat] Session lookup error:', sessionErr.message, sessionErr.code);
+  }
+
+  type ChatSession = {
     id: string;
     customer_id: string | null;
     customer_name: string | null;
     customer_phone: string | null;
-  } | null;
+  };
+
+  let chatSession = existingSession as ChatSession | null;
 
   if (!chatSession) {
-    const { data: newSession } = await supabase
+    // tenant_id can be null in discovery mode (column must be nullable — see migration 008)
+    const { data: newSession, error: insertErr } = await supabase
       .from('chat_sessions')
       .insert({
-        tenant_id: tenantId ?? null,
+        tenant_id: tenantId || null,
         session_id: sessionId,
         customer_name: customerName ?? null,
         customer_phone: customerPhone ?? null,
       } as never)
       .select('id, customer_id, customer_name, customer_phone')
       .single();
-    chatSession = newSession as typeof chatSession;
+
+    if (insertErr) {
+      console.error('[chat] Failed to create chat session:', insertErr.message, insertErr.code, insertErr.details);
+      return new Response(
+        JSON.stringify({ error: `Failed to create chat session: ${insertErr.message}` }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+    chatSession = newSession as ChatSession | null;
   } else {
     // Update customer info if newly provided
     if (
@@ -327,6 +349,7 @@ export async function POST(request: Request) {
   }
 
   if (!chatSession) {
+    console.error('[chat] chatSession is null after creation attempt');
     return new Response(JSON.stringify({ error: 'Failed to create chat session' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -596,7 +619,7 @@ export async function POST(request: Request) {
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'An error occurred';
-        console.error('[chat] Stream error:', errorMessage);
+        console.error('[chat] Stream error:', err);
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({ type: 'error', content: errorMessage })}\n\n`,
@@ -615,6 +638,15 @@ export async function POST(request: Request) {
       'Access-Control-Allow-Origin': '*',
     },
   });
+
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+    console.error('[chat] Unhandled POST error:', err);
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } },
+    );
+  }
 }
 
 // CORS preflight

@@ -241,8 +241,15 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId] = useState(() => generateId());
+  const [sessionId, setSessionId] = useState(() => generateId());
   const [customerName, setCustomerName] = useState<string | null>(null);
+
+  const resetConversation = useCallback(() => {
+    setMessages([]);
+    setInput('');
+    setIsLoading(false);
+    setSessionId(generateId());
+  }, []);
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -313,14 +320,19 @@ export default function ChatScreen() {
         });
 
         if (!res.ok) {
+          let errMsg = 'Sorry, something went wrong. Please try again.';
+          try {
+            const errBody = (await res.json()) as { error?: string };
+            if (errBody.error) {
+              errMsg = `Sorry, something went wrong: ${errBody.error}`;
+            }
+          } catch {
+            // Could not parse error body — use default message
+          }
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
-                ? {
-                    ...m,
-                    content: 'Sorry, something went wrong. Please try again.',
-                    isStreaming: false,
-                  }
+                ? { ...m, content: errMsg, isStreaming: false }
                 : m,
             ),
           );
@@ -501,6 +513,14 @@ export default function ChatScreen() {
                 onPress={() => handleChipPress('Cancel a booking')}
               />
             </View>
+
+            <TouchableOpacity
+              style={styles.startOverLink}
+              onPress={resetConversation}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.startOverText}>Start over</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Input bar */}
@@ -543,6 +563,20 @@ export default function ChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
+        {/* Chat header with reset button */}
+        <View style={styles.chatHeader}>
+          <TouchableOpacity
+            style={styles.resetBtn}
+            onPress={resetConversation}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={18} color="#6366f1" />
+            <Text style={styles.resetBtnText}>Start over</Text>
+          </TouchableOpacity>
+          <Text style={styles.chatHeaderTitle}>Balkina AI</Text>
+          <View style={styles.resetBtnPlaceholder} />
+        </View>
+
         <FlatList
           ref={flatListRef}
           data={[...messages].reverse()}
@@ -655,5 +689,41 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: {
     opacity: 0.5,
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  resetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  resetBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6366f1',
+  },
+  resetBtnPlaceholder: {
+    width: 90,
+  },
+  chatHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  startOverLink: {
+    marginTop: 16,
+  },
+  startOverText: {
+    fontSize: 13,
+    color: '#9ca3af',
+    textDecorationLine: 'underline',
   },
 });

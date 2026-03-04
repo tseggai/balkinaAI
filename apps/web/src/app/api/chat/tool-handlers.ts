@@ -58,13 +58,28 @@ export async function handleFindBusinesses(
   _tenantId: string,
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
-  const query = (input.query as string) || '';
+  const query = ((input.query as string) || '').trim();
+
+  if (!query) {
+    // Return all active businesses when no query is provided
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('id, name')
+      .eq('status', 'active')
+      .limit(10);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: { businesses: data ?? [], matching_services: [] } };
+  }
+
+  // Sanitize query for use in Supabase filter (escape % and _ which are SQL wildcards)
+  const sanitized = query.replace(/%/g, '\\%').replace(/_/g, '\\_');
 
   const { data, error } = await supabase
     .from('tenants')
-    .select('id, name, categories(name)')
+    .select('id, name')
     .eq('status', 'active')
-    .or(`name.ilike.%${query}%`)
+    .ilike('name', `%${sanitized}%`)
     .limit(10);
 
   if (error) return { success: false, error: error.message };
@@ -73,7 +88,7 @@ export async function handleFindBusinesses(
   const { data: serviceMatches } = await supabase
     .from('services')
     .select('tenant_id, name, price, duration_minutes, tenants(id, name)')
-    .ilike('name', `%${query}%`)
+    .ilike('name', `%${sanitized}%`)
     .limit(10);
 
   return {
@@ -789,39 +804,45 @@ export async function executeTool(
   tenantId: string,
   sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string },
 ): Promise<ToolResult> {
-  switch (toolName) {
-    case 'find_businesses':
-      return handleFindBusinesses(supabase, tenantId, toolInput);
-    case 'search_services':
-    case 'get_services':
-      return handleGetServices(supabase, tenantId, toolInput);
-    case 'get_service_details':
-      return handleGetServiceDetails(supabase, tenantId, toolInput);
-    case 'search_tenants':
-    case 'get_staff':
-      return handleGetStaff(supabase, tenantId, toolInput);
-    case 'check_availability':
-      return handleCheckAvailability(supabase, tenantId, toolInput);
-    case 'create_booking':
-      return handleBookAppointment(supabase, tenantId, toolInput, sessionInfo);
-    case 'cancel_appointment':
-      return handleCancelAppointment(supabase, tenantId, toolInput);
-    case 'get_customer_appointments':
-    case 'get_booking_details':
-      return handleGetBookingDetails(supabase, tenantId, toolInput);
-    case 'get_packages':
-      return handleGetPackages(supabase, tenantId, toolInput);
-    case 'get_loyalty_info':
-      return handleGetLoyaltyInfo(supabase, tenantId, toolInput);
-    case 'apply_coupon':
-      return handleApplyCoupon(supabase, tenantId, toolInput);
-    case 'redeem_loyalty_points':
-      return handleRedeemLoyaltyPoints(supabase, tenantId, toolInput);
-    case 'get_inventory':
-      return handleGetInventory(supabase, tenantId, toolInput);
-    case 'get_custom_fields':
-      return handleGetCustomFields(supabase, tenantId, toolInput);
-    default:
-      return { success: false, error: `Unknown tool: ${toolName}` };
+  try {
+    switch (toolName) {
+      case 'find_businesses':
+        return await handleFindBusinesses(supabase, tenantId, toolInput);
+      case 'search_services':
+      case 'get_services':
+        return await handleGetServices(supabase, tenantId, toolInput);
+      case 'get_service_details':
+        return await handleGetServiceDetails(supabase, tenantId, toolInput);
+      case 'search_tenants':
+      case 'get_staff':
+        return await handleGetStaff(supabase, tenantId, toolInput);
+      case 'check_availability':
+        return await handleCheckAvailability(supabase, tenantId, toolInput);
+      case 'create_booking':
+        return await handleBookAppointment(supabase, tenantId, toolInput, sessionInfo);
+      case 'cancel_appointment':
+        return await handleCancelAppointment(supabase, tenantId, toolInput);
+      case 'get_customer_appointments':
+      case 'get_booking_details':
+        return await handleGetBookingDetails(supabase, tenantId, toolInput);
+      case 'get_packages':
+        return await handleGetPackages(supabase, tenantId, toolInput);
+      case 'get_loyalty_info':
+        return await handleGetLoyaltyInfo(supabase, tenantId, toolInput);
+      case 'apply_coupon':
+        return await handleApplyCoupon(supabase, tenantId, toolInput);
+      case 'redeem_loyalty_points':
+        return await handleRedeemLoyaltyPoints(supabase, tenantId, toolInput);
+      case 'get_inventory':
+        return await handleGetInventory(supabase, tenantId, toolInput);
+      case 'get_custom_fields':
+        return await handleGetCustomFields(supabase, tenantId, toolInput);
+      default:
+        return { success: false, error: `Unknown tool: ${toolName}` };
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Tool execution failed';
+    console.error(`[chat] Tool "${toolName}" threw an error:`, err);
+    return { success: false, error: errorMessage };
   }
 }
