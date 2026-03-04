@@ -16,16 +16,22 @@ const MAX_TOOL_ROUNDS = 5;
 
 // ── Tool definitions ─────────────────────────────────────────────────────────
 
+// Shared tenant_id property — required in discovery mode so the AI can specify
+// which business it's operating on after find_businesses returns results.
+const tenantIdProp = {
+  tenant_id: { type: 'string', description: 'UUID of the business (tenant). Required when operating in discovery mode after finding a business.' },
+} as const;
+
 // Tools available when chatting with a specific tenant
 const tenantChatTools: OpenAI.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
       name: 'get_services',
-      description: 'List all services available at this business with pricing and duration.',
+      description: 'List all services available at a business with pricing and duration.',
       parameters: {
         type: 'object',
-        properties: {},
+        properties: { ...tenantIdProp },
         required: [],
       },
     },
@@ -38,6 +44,7 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
       parameters: {
         type: 'object',
         properties: {
+          ...tenantIdProp,
           service_id: { type: 'string', description: 'UUID of the service' },
         },
         required: ['service_id'],
@@ -48,10 +55,10 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_staff',
-      description: 'List all staff members at this business.',
+      description: 'List all staff members at a business.',
       parameters: {
         type: 'object',
-        properties: {},
+        properties: { ...tenantIdProp },
         required: [],
       },
     },
@@ -64,6 +71,7 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
       parameters: {
         type: 'object',
         properties: {
+          ...tenantIdProp,
           service_id: { type: 'string', description: 'UUID of the service' },
           staff_id: { type: 'string', description: 'UUID of preferred staff member (optional)' },
           date: { type: 'string', description: 'Date to check availability for (YYYY-MM-DD)' },
@@ -80,6 +88,7 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
       parameters: {
         type: 'object',
         properties: {
+          ...tenantIdProp,
           service_id: { type: 'string', description: 'UUID of the service to book' },
           staff_id: { type: 'string', description: 'UUID of preferred staff member (optional)' },
           start_time: { type: 'string', description: 'Appointment start time in ISO 8601 format' },
@@ -97,6 +106,7 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
       parameters: {
         type: 'object',
         properties: {
+          ...tenantIdProp,
           appointment_id: { type: 'string', description: 'UUID of the appointment to cancel' },
         },
         required: ['appointment_id'],
@@ -111,6 +121,7 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
       parameters: {
         type: 'object',
         properties: {
+          ...tenantIdProp,
           appointment_id: { type: 'string', description: 'UUID of the appointment' },
         },
         required: ['appointment_id'],
@@ -213,13 +224,18 @@ Today's date is ${currentDate}.
 ## Customer info
 ${customerSection}
 
+## CRITICAL: Using tenant_id
+When you call find_businesses, the results include each business's "id" (tenant_id).
+You MUST pass this tenant_id in ALL subsequent tool calls (get_services, get_service_details, get_staff, check_availability, create_booking, etc.).
+Without tenant_id, those tools cannot look up the business's data.
+
 ## Discovery flow
 1. Customer describes what they want -> use find_businesses tool
-2. Present matching businesses and services
-3. Customer picks a business/service -> use get_service_details for full info
-4. Customer asks about availability -> use check_availability tool
+2. Present matching businesses and services (remember the business id / tenant_id)
+3. Customer picks a business/service -> use get_services or get_service_details WITH tenant_id
+4. Customer asks about availability -> use check_availability WITH tenant_id
 5. Customer confirms a time -> summarize details and ask for confirmation
-6. Customer confirms -> use create_booking tool
+6. Customer confirms -> use create_booking WITH tenant_id
 7. After booking -> share the confirmation details
 
 ## Boundaries
@@ -540,11 +556,14 @@ export async function POST(request: Request) {
               // Empty or malformed arguments — use empty object
             }
 
+            // In discovery mode, the AI passes tenant_id from find_businesses results
+            const effectiveTenantId = (parsedInput.tenant_id as string) || resolvedTenantId;
+
             const result = await executeTool(
               toolCall.name,
               parsedInput,
               supabase,
-              resolvedTenantId,
+              effectiveTenantId,
               {
                 customerId: chatSession!.customer_id,
                 customerName:
