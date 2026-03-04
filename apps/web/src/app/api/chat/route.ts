@@ -135,11 +135,14 @@ const findBusinessesTool: OpenAI.ChatCompletionTool = {
   type: 'function',
   function: {
     name: 'find_businesses',
-    description: 'Search for businesses by service type, category, or name. Use this when the user wants to book something but hasn\'t specified which business.',
+    description: 'Search for businesses by service type, category, or name. Use this when the user wants to book something but hasn\'t specified which business. When the user\'s location is available, results are sorted by proximity.',
     parameters: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Search query - service type, category, or business name' },
+        latitude: { type: 'number', description: 'User latitude for proximity search (optional)' },
+        longitude: { type: 'number', description: 'User longitude for proximity search (optional)' },
+        radius_km: { type: 'number', description: 'Search radius in km (default 50)' },
       },
       required: ['query'],
     },
@@ -198,6 +201,7 @@ ${customerSection}
 function buildDiscoverySystemPrompt(
   customerName: string | null,
   currentDate: string,
+  userLocation?: { latitude: number; longitude: number } | null,
 ): string {
   const customerSection = customerName
     ? `The customer's name is ${customerName}.`
@@ -238,6 +242,9 @@ Without tenant_id, those tools cannot look up the business's data.
 6. Customer confirms -> use create_booking WITH tenant_id
 7. After booking -> share the confirmation details
 
+## Location context
+${userLocation ? `The user's current location is latitude ${userLocation.latitude}, longitude ${userLocation.longitude}. When calling find_businesses, pass these coordinates so results are sorted by proximity. Mention distance in your response when available.` : 'The user has not shared their location. You can still search for businesses, but results won\'t be sorted by proximity. If the user asks for nearby businesses, suggest they enable location access.'}
+
 ## Boundaries
 - You help with finding businesses and booking appointments on Balkina AI.
 - Do not provide medical, legal, or financial advice.
@@ -253,12 +260,14 @@ interface ChatRequestBody {
   sessionId: string;
   customerName?: string;
   customerPhone?: string;
+  userLatitude?: number;
+  userLongitude?: number;
 }
 
 export async function POST(request: Request) {
   try {
   const body = (await request.json()) as ChatRequestBody;
-  const { message, tenantId, sessionId, customerName, customerPhone } = body;
+  const { message, tenantId, sessionId, customerName, customerPhone, userLatitude, userLongitude } = body;
 
   if (!message || !sessionId) {
     return new Response(JSON.stringify({ error: 'message and sessionId are required' }), {
@@ -457,6 +466,7 @@ export async function POST(request: Request) {
     : buildDiscoverySystemPrompt(
         chatSession.customer_name ?? customerName ?? null,
         new Date().toISOString().slice(0, 10),
+        userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
       );
 
   // 6. Stream response from OpenAI with tool loop

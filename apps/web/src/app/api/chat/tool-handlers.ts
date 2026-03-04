@@ -53,12 +53,28 @@ async function getTenantTimezone(supabase: AdminClient, tenantId: string): Promi
 
 // ── find_businesses ──────────────────────────────────────────────────────────
 
+/**
+ * Haversine distance in km between two lat/lng points.
+ */
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export async function handleFindBusinesses(
   supabase: AdminClient,
   _tenantId: string,
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
   const query = ((input.query as string) || '').trim();
+  const userLat = input.latitude as number | undefined;
+  const userLng = input.longitude as number | undefined;
+  const radiusKm = (input.radius_km as number) || 50;
 
   if (!query) {
     // Return all active businesses when no query is provided
@@ -69,7 +85,39 @@ export async function handleFindBusinesses(
       .limit(10);
 
     if (error) return { success: false, error: error.message };
-    return { success: true, data: { businesses: data ?? [], matching_services: [] } };
+
+    let businesses = data ?? [];
+    let locationNote: string | undefined;
+
+    // If user location available, sort by proximity
+    if (userLat && userLng && businesses.length > 0) {
+      const tenantIds = businesses.map((b) => b.id);
+      const { data: locations } = await supabase
+        .from('tenant_locations')
+        .select('tenant_id, lat, lng')
+        .in('tenant_id', tenantIds);
+
+      if (locations && locations.length > 0) {
+        const locMap = new Map<string, { lat: number; lng: number }>();
+        for (const loc of locations as { tenant_id: string; lat: number | null; lng: number | null }[]) {
+          if (loc.lat && loc.lng && !locMap.has(loc.tenant_id)) {
+            locMap.set(loc.tenant_id, { lat: loc.lat, lng: loc.lng });
+          }
+        }
+        businesses = businesses
+          .map((b) => {
+            const loc = locMap.get(b.id);
+            const distance = loc ? haversineKm(userLat, userLng, loc.lat, loc.lng) : 9999;
+            return { ...b, distance_km: Math.round(distance * 10) / 10 };
+          })
+          .filter((b) => b.distance_km <= radiusKm)
+          .sort((a, b) => a.distance_km - b.distance_km);
+      }
+    } else {
+      locationNote = 'Showing all locations — enable location access for nearby results';
+    }
+
+    return { success: true, data: { businesses, matching_services: [], location_note: locationNote } };
   }
 
   // Sanitize query for use in Supabase filter (escape % and _ which are SQL wildcards)
@@ -136,11 +184,43 @@ export async function handleFindBusinesses(
     tenantMap.set(t.id, { id: t.id, name: t.name });
   }
 
+  let businesses: { id: string; name: string; distance_km?: number }[] = Array.from(tenantMap.values());
+  let locationNote: string | undefined;
+
+  // Sort by proximity if user location is available
+  if (userLat && userLng && businesses.length > 0) {
+    const tenantIds = businesses.map((b) => b.id);
+    const { data: locations } = await supabase
+      .from('tenant_locations')
+      .select('tenant_id, lat, lng')
+      .in('tenant_id', tenantIds);
+
+    if (locations && locations.length > 0) {
+      const locMap = new Map<string, { lat: number; lng: number }>();
+      for (const loc of locations as { tenant_id: string; lat: number | null; lng: number | null }[]) {
+        if (loc.lat && loc.lng && !locMap.has(loc.tenant_id)) {
+          locMap.set(loc.tenant_id, { lat: loc.lat, lng: loc.lng });
+        }
+      }
+      businesses = businesses
+        .map((b) => {
+          const loc = locMap.get(b.id);
+          const distance = loc ? haversineKm(userLat, userLng, loc.lat, loc.lng) : 9999;
+          return { ...b, distance_km: Math.round(distance * 10) / 10 };
+        })
+        .filter((b) => (b.distance_km ?? 9999) <= radiusKm)
+        .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
+    }
+  } else {
+    locationNote = 'Showing all locations — enable location access for nearby results';
+  }
+
   return {
     success: true,
     data: {
-      businesses: Array.from(tenantMap.values()),
+      businesses,
       matching_services: serviceMatches ?? [],
+      location_note: locationNote,
     },
   };
 }

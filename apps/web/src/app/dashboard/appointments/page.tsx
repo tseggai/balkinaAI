@@ -779,7 +779,7 @@ export default function AppointmentsPage() {
           <div className="fixed inset-0 z-40 bg-black/30" onClick={closePanel} />
 
           {/* Panel */}
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-gray-200 bg-white shadow-xl">
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
             {/* Panel header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">

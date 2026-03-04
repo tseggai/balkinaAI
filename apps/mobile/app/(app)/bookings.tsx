@@ -22,6 +22,7 @@ interface Appointment {
   total_price: number;
   services: { name: string } | null;
   staff: { name: string } | null;
+  tenant_locations: { name: string } | null;
   tenants: { name: string } | null;
 }
 
@@ -67,12 +68,68 @@ export default function BookingsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<Tab>('upcoming');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fetchAppointments = useCallback(async () => {
+    setErrorMsg(null);
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
+      setLoading(false);
+      setRefreshing(false);
+      setErrorMsg('Please sign in to view your bookings.');
+      return;
+    }
+
+    // Step 1: Find the customer_id by looking up the customers table
+    // Match by auth user id first, then by email, then by phone
+    let customerId: string | null = null;
+
+    // Try matching by id (auth user id = customers.id)
+    const { data: byId } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('id', user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (byId) {
+      customerId = byId.id;
+    }
+
+    // If not found by id, try email
+    if (!customerId && user.email) {
+      const { data: byEmail } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('email', user.email)
+        .limit(1)
+        .maybeSingle();
+
+      if (byEmail) {
+        customerId = byEmail.id;
+      }
+    }
+
+    // If not found by email, try phone
+    if (!customerId && user.phone) {
+      const { data: byPhone } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('phone', user.phone)
+        .limit(1)
+        .maybeSingle();
+
+      if (byPhone) {
+        customerId = byPhone.id;
+      }
+    }
+
+    if (!customerId) {
+      // No customer record found — show empty state
+      setAppointments([]);
       setLoading(false);
       setRefreshing(false);
       return;
@@ -84,9 +141,9 @@ export default function BookingsScreen() {
     let query = supabase
       .from('appointments')
       .select(
-        'id, start_time, end_time, status, total_price, services(name), staff(name), tenants(name)',
+        'id, start_time, end_time, status, total_price, services(name), staff(name), tenant_locations(name), tenants(name)',
       )
-      .eq('customer_id', user.id)
+      .eq('customer_id', customerId)
       .order('start_time', { ascending: isUpcoming });
 
     if (isUpcoming) {
@@ -99,8 +156,15 @@ export default function BookingsScreen() {
       );
     }
 
-    const { data } = await query.limit(50);
-    setAppointments((data as unknown as Appointment[]) ?? []);
+    const { data, error } = await query.limit(50);
+
+    if (error) {
+      setErrorMsg(`Failed to load bookings: ${error.message}`);
+      setAppointments([]);
+    } else {
+      setAppointments((data as unknown as Appointment[]) ?? []);
+    }
+
     setLoading(false);
     setRefreshing(false);
   }, [tab]);
@@ -143,6 +207,12 @@ export default function BookingsScreen() {
 
         {item.staff?.name ? (
           <Text style={styles.staffName}>with {item.staff.name}</Text>
+        ) : null}
+
+        {item.tenant_locations?.name ? (
+          <Text style={styles.locationName}>
+            at {item.tenant_locations.name}
+          </Text>
         ) : null}
 
         <View style={styles.cardFooter}>
@@ -198,6 +268,23 @@ export default function BookingsScreen() {
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#6366f1" />
+        </View>
+      ) : errorMsg ? (
+        <View style={styles.empty}>
+          <Ionicons name="alert-circle-outline" size={56} color="#ef4444" />
+          <Text style={styles.emptyTitle}>Error</Text>
+          <Text style={styles.emptySubtitle}>{errorMsg}</Text>
+          <TouchableOpacity
+            style={styles.startChatBtn}
+            onPress={() => {
+              setErrorMsg(null);
+              setLoading(true);
+              fetchAppointments();
+            }}
+          >
+            <Ionicons name="refresh" size={18} color="#fff" />
+            <Text style={styles.startChatBtnText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -326,6 +413,11 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   staffName: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 2,
+  },
+  locationName: {
     fontSize: 13,
     color: '#6b7280',
     marginBottom: 10,

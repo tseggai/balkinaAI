@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
+import * as Location from 'expo-location';
 
 const API_BASE = 'https://balkina-ai.vercel.app';
 
@@ -243,6 +244,7 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState(() => generateId());
   const [customerName, setCustomerName] = useState<string | null>(null);
+  const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const resetConversation = useCallback(() => {
     setMessages([]);
@@ -253,7 +255,7 @@ export default function ChatScreen() {
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
-  // Fetch the logged-in user's name on mount
+  // Fetch the logged-in user's name and request location on mount
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -263,6 +265,25 @@ export default function ChatScreen() {
       }
     };
     fetchUser();
+
+    // Request location permission and get coords
+    const fetchLocation = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          setUserCoords({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+          });
+        }
+      } catch {
+        // Location not available — continue without it
+      }
+    };
+    fetchLocation();
   }, []);
 
   const scrollToBottom = useCallback(() => {
@@ -305,12 +326,16 @@ export default function ChatScreen() {
       setIsLoading(true);
 
       try {
-        const body: Record<string, string> = {
+        const body: Record<string, string | number> = {
           message: trimmed,
           sessionId,
         };
         if (customerName) {
           body.customerName = customerName;
+        }
+        if (userCoords) {
+          body.userLatitude = userCoords.latitude;
+          body.userLongitude = userCoords.longitude;
         }
 
         const res = await fetch(`${API_BASE}/api/chat`, {
@@ -399,7 +424,7 @@ export default function ChatScreen() {
 
       setIsLoading(false);
     },
-    [input, isLoading, sessionId, customerName],
+    [input, isLoading, sessionId, customerName, userCoords],
   );
 
   const handleChipPress = useCallback(

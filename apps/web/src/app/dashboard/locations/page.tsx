@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -77,6 +77,8 @@ export default function LocationsPage() {
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [timezone, setTimezone] = useState('America/New_York');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
   const [bookingLimitEnabled, setBookingLimitEnabled] = useState(false);
   const [bookingLimitCapacity, setBookingLimitCapacity] = useState('1');
   const [bookingLimitInterval, setBookingLimitInterval] = useState('day');
@@ -84,6 +86,44 @@ export default function LocationsPage() {
   // General state
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Google Places autocomplete
+  const addressInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
+
+  useEffect(() => {
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) return;
+    if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).google) {
+      setMapsLoaded(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.onload = () => setMapsLoaded(true);
+    document.head.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    if (!mapsLoaded || !addressInputRef.current || autocompleteRef.current) return;
+    const ac = new google.maps.places.Autocomplete(addressInputRef.current, {
+      types: ['address'],
+      fields: ['formatted_address', 'geometry'],
+    });
+    ac.addListener('place_changed', () => {
+      const place = ac.getPlace();
+      if (place.formatted_address) {
+        setAddress(place.formatted_address);
+      }
+      if (place.geometry?.location) {
+        setLat(place.geometry.location.lat());
+        setLng(place.geometry.location.lng());
+      }
+    });
+    autocompleteRef.current = ac;
+  }, [mapsLoaded, showPanel]);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -106,10 +146,13 @@ export default function LocationsPage() {
     setAddress('');
     setPhone('');
     setTimezone('America/New_York');
+    setLat(null);
+    setLng(null);
     setBookingLimitEnabled(false);
     setBookingLimitCapacity('1');
     setBookingLimitInterval('day');
     setError('');
+    autocompleteRef.current = null;
     setShowPanel(true);
   }
 
@@ -119,11 +162,14 @@ export default function LocationsPage() {
     setAddress(loc.address);
     setPhone(loc.phone ?? '');
     setTimezone(loc.timezone);
+    setLat(loc.lat);
+    setLng(loc.lng);
     const hasLimit = loc.booking_limit_enabled ?? false;
     setBookingLimitEnabled(hasLimit);
     setBookingLimitCapacity(String(loc.booking_limit_capacity ?? 1));
     setBookingLimitInterval(loc.booking_limit_interval ?? 'day');
     setError('');
+    autocompleteRef.current = null;
     setShowPanel(true);
   }
 
@@ -151,6 +197,8 @@ export default function LocationsPage() {
       address,
       phone: phone || null,
       timezone,
+      lat: lat ?? null,
+      lng: lng ?? null,
       booking_limit_enabled: bookingLimitEnabled,
       booking_limit_capacity: bookingLimitEnabled ? Number(bookingLimitCapacity) : null,
       booking_limit_interval: bookingLimitEnabled ? bookingLimitInterval : null,
@@ -185,7 +233,7 @@ export default function LocationsPage() {
           onClick={closePanel}
         />
         {/* Panel */}
-        <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col bg-white shadow-2xl">
+        <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h2 className="text-xl font-bold text-gray-900">
@@ -219,15 +267,28 @@ export default function LocationsPage() {
               <div>
                 <label className={labelClass}>Address *</label>
                 <input
+                  ref={addressInputRef}
                   required
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="123 Main St, City, State, ZIP"
+                  placeholder="Start typing an address..."
                   className={inputClass}
+                  autoComplete="off"
                 />
-                <p className="mt-1 text-xs text-gray-400">
-                  Address will be geocoded automatically for map display.
-                </p>
+                {lat != null && lng != null && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500">
+                      Lat: {lat.toFixed(6)}, Lng: {lng.toFixed(6)}
+                    </p>
+                    {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && (
+                      <img
+                        src={`https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=400x200&markers=color:red%7C${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
+                        alt="Location preview"
+                        className="mt-2 w-full rounded-lg border border-gray-200"
+                      />
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Phone */}

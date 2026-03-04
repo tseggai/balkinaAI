@@ -254,7 +254,7 @@ export default function PackagesPage() {
       {showForm && (
         <>
           <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowForm(false)} />
-          <div className="fixed right-0 top-0 z-50 flex h-full w-[480px] max-w-full flex-col bg-white shadow-2xl transition-transform duration-300">
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
             {/* Header */}
             <div className="flex items-center justify-between border-b px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">

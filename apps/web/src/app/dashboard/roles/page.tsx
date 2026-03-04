@@ -271,7 +271,7 @@ export default function RolesPage() {
       {showPanel && (
         <>
           <div className="fixed inset-0 z-40 bg-black/30 transition-opacity" onClick={closePanel} />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col bg-white shadow-2xl">
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-xl font-bold text-gray-900">
