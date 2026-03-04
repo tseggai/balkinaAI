@@ -46,7 +46,7 @@ export async function PUT(request: Request) {
     tenant_id: tenantId,
     is_active: body.is_active ?? false,
     points_per_booking: body.points_per_booking ?? 0,
-    points_per_dollar: body.points_per_dollar ?? 0,
+    points_per_currency_unit: body.points_per_dollar ?? 0,
     redemption_rate: body.redemption_rate ?? 0,
     min_redemption_points: body.min_redemption_points ?? 0,
     points_expiry_days: body.points_expiry_days ?? 0,

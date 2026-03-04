@@ -52,7 +52,6 @@ export async function POST(request: Request) {
       lng,
       timezone: body.timezone ?? 'UTC',
       phone: body.phone || null,
-      description: body.description || null,
       booking_limit_enabled: body.booking_limit_enabled ?? false,
       booking_limit_capacity: body.booking_limit_capacity ?? null,
       booking_limit_interval: body.booking_limit_interval || null,
@@ -69,7 +68,7 @@ export async function PATCH(request: Request) {
   if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
   const body = await request.json() as { id: string; [key: string]: unknown };
-  const { id, ...updates } = body;
+  const { id, description: _desc, ...updates } = body;
   if (!id) return NextResponse.json({ data: null, error: { message: 'Missing id' } }, { status: 400 });
 
   // Re-geocode if address changed

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { ImageUpload } from '@/components/image-upload';
 
 interface ProductService {
   id?: string;
@@ -282,15 +283,11 @@ export default function InventoryPage() {
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <div className="space-y-5">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Image URL</label>
-                  <input
-                    value={form.image_url}
-                    onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-                    placeholder="https://example.com/image.jpg"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                  />
-                </div>
+                <ImageUpload
+                  value={form.image_url}
+                  onChange={(url) => setForm({ ...form, image_url: url })}
+                  label="Product Image"
+                />
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">Name *</label>
                   <input

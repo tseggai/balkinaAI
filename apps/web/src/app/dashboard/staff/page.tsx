@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { ImageUpload } from '@/components/image-upload';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -485,16 +486,12 @@ export default function StaffPage() {
           </div>
         </div>
 
-        {/* Image URL */}
-        <div>
-          <label className={labelClass}>Image URL</label>
-          <input
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://..."
-            className={inputClass}
-          />
-        </div>
+        {/* Image Upload */}
+        <ImageUpload
+          value={imageUrl}
+          onChange={setImageUrl}
+          label="Staff Photo"
+        />
 
         {/* Locations multi-select */}
         <div>
@@ -552,32 +549,24 @@ export default function StaffPage() {
         </div>
 
         {/* Active toggle */}
-        <div>
-          <label className={labelClass}>Status</label>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setIsActive(true)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium ${
-                isActive
-                  ? 'bg-green-600 text-white'
-                  : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Active
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsActive(false)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium ${
-                !isActive
-                  ? 'bg-gray-600 text-white'
-                  : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Inactive
-            </button>
+        <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Status</p>
+            <p className="text-xs text-gray-500">{isActive ? 'Active' : 'Inactive'}</p>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsActive(!isActive)}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+              isActive ? 'bg-brand-600' : 'bg-gray-200'
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                isActive ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
         </div>
       </div>
     );
