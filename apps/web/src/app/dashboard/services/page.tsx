@@ -243,11 +243,13 @@ function ActionMenu({
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (ref.current && !ref.current.contains(e.target as Node) && btnRef.current && !btnRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
@@ -257,17 +259,30 @@ function ActionMenu({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open]);
 
+  function toggle() {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, left: rect.right - 144 });
+    }
+    setOpen(!open);
+  }
+
   return (
-    <div ref={ref} className="relative inline-block">
+    <div data-action-menu className="relative inline-block">
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
       >
         <EllipsisIcon />
       </button>
       {open && (
-        <div className="absolute right-0 z-30 mt-1 w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <div
+          ref={ref}
+          className="fixed z-[9999] w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+          style={{ top: pos.top, left: pos.left }}
+        >
           <button
             type="button"
             onClick={() => { setOpen(false); onEdit(); }}
@@ -727,7 +742,14 @@ export default function ServicesPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredServices.map((s) => (
-                    <tr key={s.id} className="hover:bg-gray-50">
+                    <tr
+                      key={s.id}
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('[data-action-menu]')) return;
+                        handleEdit(s);
+                      }}
+                    >
                       {/* Image / Color dot */}
                       <td className="whitespace-nowrap px-4 py-3">
                         {s.image_url ? (
@@ -800,7 +822,7 @@ export default function ServicesPage() {
       {showForm && (
         <>
           <div className="fixed inset-0 z-40 bg-black/40" onClick={handleClose} />
-          <div className="fixed right-0 top-0 z-50 flex h-full w-full flex-col bg-white shadow-2xl transition-transform duration-300 sm:w-[50%] sm:min-w-[480px]">
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
             {/* Header */}
             <div className="flex items-center justify-between border-b px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -816,7 +838,7 @@ export default function ServicesPage() {
               </button>
             </div>
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 overflow-hidden px-6 py-4">
               <ServiceForm service={editing} onClose={handleClose} />
             </div>
           </div>

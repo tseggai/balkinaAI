@@ -76,7 +76,7 @@ const PRESET_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#
 
 const DURATION_OPTIONS = [5, 10, 15, 20, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 420, 480];
 
-const BUFFER_OPTIONS = [0, 5, 10, 15, 30, 45, 60];
+const BUFFER_OPTIONS = [0, 5, 10, 15, 20, 30, 45, 60];
 
 const CAPACITY_OPTIONS = [
   { value: 1, label: '1 (Individual)' },
@@ -132,8 +132,7 @@ export function ServiceForm({
   const [depositType, setDepositType] = useState<'fixed' | 'percentage'>(service?.deposit_type ?? 'fixed');
   const [depositAmount, setDepositAmount] = useState(String(service?.deposit_amount ?? ''));
   const [duration, setDuration] = useState(String(service?.duration_minutes ?? 60));
-  const [bufferBefore, setBufferBefore] = useState(String(service?.buffer_time_before ?? 0));
-  const [bufferAfter, setBufferAfter] = useState(String(service?.buffer_time_after ?? 0));
+  const [bufferTime, setBufferTime] = useState(String(Math.max(service?.buffer_time_before ?? 0, service?.buffer_time_after ?? 0)));
   const [customDuration, setCustomDuration] = useState(service?.custom_duration ?? false);
   const [capacity, setCapacity] = useState(String(service?.capacity ?? 1));
   const [hidePrice, setHidePrice] = useState(service?.hide_price ?? false);
@@ -195,8 +194,20 @@ export function ServiceForm({
   const [recurringCount, setRecurringCount] = useState('1');
 
   // --- Custom duration state ---
-  const [customDurationMin, setCustomDurationMin] = useState('');
-  const [customDurationMax, setCustomDurationMax] = useState('');
+  interface CustomDurationOption {
+    label: string;
+    duration: number;
+    price: number;
+    deposit: number;
+    deposit_type: 'fixed' | 'percentage';
+  }
+  const [customDurationTitle, setCustomDurationTitle] = useState('');
+  const [customDurationShowLabels, setCustomDurationShowLabels] = useState(true);
+  const [customDurations, setCustomDurations] = useState<CustomDurationOption[]>(
+    (service as unknown as Record<string, unknown>)?.custom_durations
+      ? ((service as unknown as Record<string, unknown>).custom_durations as CustomDurationOption[])
+      : []
+  );
 
   // --- General ---
   const [saving, setSaving] = useState(false);
@@ -284,9 +295,10 @@ export function ServiceForm({
       deposit_enabled: depositEnabled,
       deposit_type: depositEnabled ? depositType : null,
       deposit_amount: depositEnabled ? Number(depositAmount) : null,
-      buffer_time_before: Number(bufferBefore),
-      buffer_time_after: Number(bufferAfter),
+      buffer_time_before: Number(bufferTime),
+      buffer_time_after: Number(bufferTime),
       custom_duration: customDuration,
+      custom_durations: customDuration ? customDurations : [],
       is_recurring: isRecurring,
       capacity: Number(capacity),
       hide_price: hidePrice,
@@ -522,28 +534,17 @@ export function ServiceForm({
           </select>
         </div>
 
-        {/* Buffer Times */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>Buffer Time Before</label>
-            <select value={bufferBefore} onChange={(e) => setBufferBefore(e.target.value)} className={selectClass}>
-              {BUFFER_OPTIONS.map((b) => (
-                <option key={b} value={b}>
-                  {b === 0 ? 'None' : `${b} min`}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className={labelClass}>Buffer Time After</label>
-            <select value={bufferAfter} onChange={(e) => setBufferAfter(e.target.value)} className={selectClass}>
-              {BUFFER_OPTIONS.map((b) => (
-                <option key={b} value={b}>
-                  {b === 0 ? 'None' : `${b} min`}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Buffer Time */}
+        <div>
+          <label className={labelClass}>Buffer Between Services</label>
+          <select value={bufferTime} onChange={(e) => setBufferTime(e.target.value)} className={selectClass}>
+            {BUFFER_OPTIONS.map((b) => (
+              <option key={b} value={b}>
+                {b === 0 ? 'None' : `${b} min`}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-400">Time gap before and after this service</p>
         </div>
 
         {/* Custom Duration Toggle */}
@@ -557,33 +558,128 @@ export function ServiceForm({
             />
             <span className="text-sm font-medium text-gray-700">Allow Custom Duration</span>
           </label>
-          <p className="ml-6 mt-0.5 text-xs text-gray-400">Let customers choose a duration within a range</p>
+          <p className="ml-6 mt-0.5 text-xs text-gray-400">Let customers choose from predefined duration options</p>
           {customDuration && (
-            <div className="mt-3 grid grid-cols-2 gap-4">
+            <div className="mt-4 space-y-4">
+              {/* Title */}
               <div>
-                <label className={labelClass}>Min Duration (min)</label>
+                <label className={labelClass}>Section Title</label>
                 <input
-                  type="number"
-                  min="5"
-                  step="5"
-                  value={customDurationMin}
-                  onChange={(e) => setCustomDurationMin(e.target.value)}
-                  placeholder="e.g. 15"
+                  value={customDurationTitle}
+                  onChange={(e) => setCustomDurationTitle(e.target.value)}
+                  placeholder="e.g. Choose your session length"
                   className={inputClass}
                 />
               </div>
-              <div>
-                <label className={labelClass}>Max Duration (min)</label>
+
+              {/* Show Labels toggle */}
+              <label className="flex items-center gap-2">
                 <input
-                  type="number"
-                  min="5"
-                  step="5"
-                  value={customDurationMax}
-                  onChange={(e) => setCustomDurationMax(e.target.value)}
-                  placeholder="e.g. 120"
-                  className={inputClass}
+                  type="checkbox"
+                  checked={customDurationShowLabels}
+                  onChange={(e) => setCustomDurationShowLabels(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-brand-600"
                 />
-              </div>
+                <span className="text-sm text-gray-700">Show option labels to customers</span>
+              </label>
+
+              {/* Duration Options Table */}
+              {customDurations.length > 0 && (
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Label</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Duration (min)</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Price ($)</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Deposit</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Type</th>
+                        <th className="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {customDurations.map((opt, i) => {
+                        function updateField(field: string, value: string | number) {
+                          setCustomDurations((prev) => prev.map((item, j) =>
+                            j === i ? { ...item, [field]: value } : item
+                          ));
+                        }
+                        return (
+                        <tr key={i}>
+                          <td className="px-3 py-2">
+                            <input
+                              value={opt.label}
+                              onChange={(e) => updateField('label', e.target.value)}
+                              placeholder="e.g. Quick"
+                              className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min="5"
+                              step="5"
+                              value={opt.duration || ''}
+                              onChange={(e) => updateField('duration', Number(e.target.value))}
+                              className="w-20 rounded border border-gray-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={opt.price || ''}
+                              onChange={(e) => updateField('price', Number(e.target.value))}
+                              className="w-20 rounded border border-gray-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={opt.deposit || ''}
+                              onChange={(e) => updateField('deposit', Number(e.target.value))}
+                              className="w-20 rounded border border-gray-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              value={opt.deposit_type}
+                              onChange={(e) => updateField('deposit_type', e.target.value)}
+                              className="rounded border border-gray-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline-none"
+                            >
+                              <option value="fixed">Fixed</option>
+                              <option value="percentage">%</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setCustomDurations(customDurations.filter((_, j) => j !== i))}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setCustomDurations([...customDurations, { label: '', duration: 30, price: 0, deposit: 0, deposit_type: 'fixed' }])}
+                className="rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-brand-600 hover:border-brand-400 hover:text-brand-700"
+              >
+                + Add Duration Option
+              </button>
             </div>
           )}
         </div>
@@ -1073,19 +1169,9 @@ export function ServiceForm({
   }
 
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {service?.id ? 'Edit Service' : 'New Service'}
-        </h1>
-        <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">
-          Cancel
-        </button>
-      </div>
-
+    <form onSubmit={handleSubmit} className="flex h-full flex-col">
       {/* Tabs */}
-      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-gray-200">
+      <div className="flex gap-1 overflow-x-auto border-b border-gray-200 px-1">
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -1102,29 +1188,31 @@ export function ServiceForm({
         ))}
       </div>
 
-      {/* Tab Content */}
-      <form onSubmit={handleSubmit} className="max-w-2xl">
-        {renderActiveTab()}
-
-        {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-
-        <div className="mt-6 flex gap-3 border-t border-gray-200 pt-6">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : service?.id ? 'Update Service' : 'Create Service'}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-300 px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
+      {/* Scrollable Tab Content */}
+      <div className="flex-1 overflow-y-auto px-1 py-5">
+        <div className="max-w-2xl">
+          {renderActiveTab()}
+          {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
         </div>
-      </form>
-    </div>
+      </div>
+
+      {/* Fixed Footer */}
+      <div className="flex gap-3 border-t border-gray-200 px-1 py-4">
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : service?.id ? 'Update Service' : 'Create Service'}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg border border-gray-300 px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
