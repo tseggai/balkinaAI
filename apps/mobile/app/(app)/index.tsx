@@ -340,99 +340,31 @@ export default function ChatScreen() {
           return;
         }
 
-        const reader = res.body?.getReader();
-        if (!reader) {
-          setIsLoading(false);
-          return;
-        }
-
-        const decoder = new TextDecoder();
+        // React Native's fetch does not support ReadableStream, so we
+        // read the full response body as text and parse SSE events from it.
+        const text = await res.text();
         let fullText = '';
-        let buffer = '';
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        const lines = text.split('\n');
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
 
-          buffer += decoder.decode(value, { stream: true });
+          try {
+            const event = JSON.parse(jsonStr) as {
+              type: string;
+              content?: string;
+              name?: string;
+            };
 
-          // Process complete SSE lines from the buffer
-          const lines = buffer.split('\n');
-          // Keep the last (possibly incomplete) line in the buffer
-          buffer = lines.pop() ?? '';
-
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            const jsonStr = line.slice(6).trim();
-            if (!jsonStr) continue;
-
-            try {
-              const event = JSON.parse(jsonStr) as {
-                type: string;
-                content?: string;
-                name?: string;
-              };
-
-              if (event.type === 'text') {
-                fullText += event.content ?? '';
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantId
-                      ? { ...m, content: fullText, isStreaming: true }
-                      : m,
-                  ),
-                );
-              } else if (event.type === 'tool_call') {
-                if (!fullText) {
-                  const toolLabel =
-                    event.name?.replace(/_/g, ' ') ?? 'info';
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantId
-                        ? { ...m, content: `Looking up ${toolLabel}...` }
-                        : m,
-                    ),
-                  );
-                }
-              } else if (event.type === 'done' || event.type === 'error') {
-                if (event.type === 'error' && event.content) {
-                  fullText = `Sorry, something went wrong: ${event.content}`;
-                }
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantId
-                      ? {
-                          ...m,
-                          content:
-                            fullText ||
-                            "I couldn't process that. Please try again.",
-                          isStreaming: false,
-                        }
-                      : m,
-                  ),
-                );
-              }
-            } catch {
-              // skip malformed JSON chunks
+            if (event.type === 'text') {
+              fullText += event.content ?? '';
+            } else if (event.type === 'error' && event.content) {
+              fullText = `Sorry, something went wrong: ${event.content}`;
             }
-          }
-        }
-
-        // Process any remaining data in the buffer
-        if (buffer.startsWith('data: ')) {
-          const jsonStr = buffer.slice(6).trim();
-          if (jsonStr) {
-            try {
-              const event = JSON.parse(jsonStr) as {
-                type: string;
-                content?: string;
-              };
-              if (event.type === 'text') {
-                fullText += event.content ?? '';
-              }
-            } catch {
-              // skip malformed final chunk
-            }
+          } catch {
+            // skip malformed JSON chunks
           }
         }
 
