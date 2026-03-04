@@ -1,17 +1,107 @@
 -- =============================================================================
--- Migration 007 (Clean): Phase 6 — Full Feature Parity
--- Custom fields, packages, loyalty, inventory, roles, enhanced services/staff/locations
+-- Migration 007 (Clean): Migrations 006 + 007 Combined
+-- Includes: robust services (006), custom fields, packages, loyalty,
+--           inventory, roles, enhanced services/staff/locations (007)
 --
 -- Safe to run in one shot in Supabase SQL Editor.
+-- Verified against live DB: migrations 001-005 + 008 are already applied.
+-- This file covers everything from 006 and 007.
+--
 -- All policies use DO/EXCEPTION blocks because PostgreSQL does NOT support
 -- CREATE POLICY IF NOT EXISTS.
 -- =============================================================================
 
+
 -- =============================================
--- SECTION 1: CREATE TABLES (dependency order)
+-- SECTION 1: ALTER EXISTING TABLES — ADD COLUMNS
+-- (Must come before creating tables that reference these columns)
 -- =============================================
 
--- ── Custom fields for appointments ──────────────────────────────────────────
+-- ── Extended service columns (from 006) ─────────────────────────────────────
+
+ALTER TABLE services ADD COLUMN IF NOT EXISTS image_url text;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS color text DEFAULT '#6366f1';
+ALTER TABLE services ADD COLUMN IF NOT EXISTS buffer_time_before integer DEFAULT 0;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS buffer_time_after integer DEFAULT 0;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS custom_duration boolean DEFAULT false;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS is_recurring boolean DEFAULT false;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS capacity integer DEFAULT 1;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS hide_price boolean DEFAULT false;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS hide_duration boolean DEFAULT false;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS visibility text DEFAULT 'public';
+ALTER TABLE services ADD COLUMN IF NOT EXISTS min_booking_lead_time integer DEFAULT 0;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS max_booking_days_ahead integer DEFAULT 60;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS min_extras integer DEFAULT 0;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS max_extras integer;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS booking_limit_per_customer integer;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS booking_limit_per_customer_interval text;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS booking_limit_per_slot integer;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS booking_limit_per_slot_interval text;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS category_name text;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS description text;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS timesheet jsonb;
+
+-- ── Extended service columns (from 007) ─────────────────────────────────────
+-- Note: deposit_enabled, deposit_type, deposit_amount already exist from 001.
+-- ADD COLUMN IF NOT EXISTS is safe — no-ops if column already present.
+
+ALTER TABLE services ADD COLUMN IF NOT EXISTS deposit_enabled boolean DEFAULT false;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS deposit_amount numeric(10,2);
+ALTER TABLE services ADD COLUMN IF NOT EXISTS deposit_type text DEFAULT 'fixed';
+ALTER TABLE services ADD COLUMN IF NOT EXISTS recurring_type text;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS recurring_frequency integer DEFAULT 1;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS capacity_type text DEFAULT 'alone';
+ALTER TABLE services ADD COLUMN IF NOT EXISTS max_capacity integer DEFAULT 1;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS bring_friend boolean DEFAULT false;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS service_category text;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS service_subcategory text;
+
+-- ── Extended staff columns (from 006) ───────────────────────────────────────
+
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS image_url text;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS status text DEFAULT 'active';
+
+-- ── Extended staff columns (from 007) ───────────────────────────────────────
+
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS profession text;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS notes text;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS booking_limit_capacity integer;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS booking_limit_interval text;
+
+-- ── Location booking limiter (from 007) ─────────────────────────────────────
+
+ALTER TABLE tenant_locations ADD COLUMN IF NOT EXISTS booking_limit_enabled boolean DEFAULT false;
+ALTER TABLE tenant_locations ADD COLUMN IF NOT EXISTS booking_limit_capacity integer;
+ALTER TABLE tenant_locations ADD COLUMN IF NOT EXISTS booking_limit_interval text;
+
+
+-- =============================================
+-- SECTION 2: CREATE TABLES (dependency order)
+-- =============================================
+
+-- ── Service-staff junction table (from 006) ─────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS service_staff (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  service_id uuid REFERENCES services(id) ON DELETE CASCADE,
+  staff_id uuid REFERENCES staff(id) ON DELETE CASCADE,
+  UNIQUE(service_id, staff_id)
+);
+
+-- ── Service special days (from 006) ─────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS service_special_days (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  service_id uuid REFERENCES services(id) ON DELETE CASCADE,
+  date date NOT NULL,
+  start_time time,
+  end_time time,
+  is_day_off boolean DEFAULT false,
+  breaks jsonb DEFAULT '[]'
+);
+
+-- ── Custom fields for appointments (from 007) ──────────────────────────────
 
 CREATE TABLE IF NOT EXISTS custom_fields (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -33,7 +123,7 @@ CREATE TABLE IF NOT EXISTS appointment_custom_field_values (
   created_at timestamptz DEFAULT now()
 );
 
--- ── Staff holidays ──────────────────────────────────────────────────────────
+-- ── Staff holidays (from 007) ───────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS staff_holidays (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -43,7 +133,7 @@ CREATE TABLE IF NOT EXISTS staff_holidays (
   created_at timestamptz DEFAULT now()
 );
 
--- ── Packages ────────────────────────────────────────────────────────────────
+-- ── Packages (from 007) ─────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS packages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -81,7 +171,7 @@ CREATE TABLE IF NOT EXISTS customer_packages (
   created_at timestamptz DEFAULT now()
 );
 
--- ── Loyalty program ─────────────────────────────────────────────────────────
+-- ── Loyalty program (from 007) ──────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS loyalty_programs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -131,7 +221,7 @@ CREATE TABLE IF NOT EXISTS loyalty_transactions (
   created_at timestamptz DEFAULT now()
 );
 
--- ── Product inventory ───────────────────────────────────────────────────────
+-- ── Product inventory (from 007) ────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS products (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -158,7 +248,7 @@ CREATE TABLE IF NOT EXISTS product_services (
   UNIQUE(product_id, service_id)
 );
 
--- ── User roles and permissions ──────────────────────────────────────────────
+-- ── User roles and permissions (from 007) ───────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS staff_roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -188,49 +278,27 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 
 
 -- =============================================
--- SECTION 2: ALTER TABLE — ADD COLUMNS
+-- SECTION 3: ALTER NEWLY CREATED TABLES
+-- (service_staff needs extra columns from 007)
 -- =============================================
-
--- ── Service enhancements (columns NOT already in 001 or 006) ────────────────
--- Note: deposit_enabled, deposit_type, deposit_amount exist from 001.
--- ADD COLUMN IF NOT EXISTS is safe — no-ops if column already present.
-
-ALTER TABLE services ADD COLUMN IF NOT EXISTS deposit_enabled boolean DEFAULT false;
-ALTER TABLE services ADD COLUMN IF NOT EXISTS deposit_amount numeric(10,2);
-ALTER TABLE services ADD COLUMN IF NOT EXISTS deposit_type text DEFAULT 'fixed';
-ALTER TABLE services ADD COLUMN IF NOT EXISTS recurring_type text;
-ALTER TABLE services ADD COLUMN IF NOT EXISTS recurring_frequency integer DEFAULT 1;
-ALTER TABLE services ADD COLUMN IF NOT EXISTS capacity_type text DEFAULT 'alone';
-ALTER TABLE services ADD COLUMN IF NOT EXISTS max_capacity integer DEFAULT 1;
-ALTER TABLE services ADD COLUMN IF NOT EXISTS bring_friend boolean DEFAULT false;
-ALTER TABLE services ADD COLUMN IF NOT EXISTS service_category text;
-ALTER TABLE services ADD COLUMN IF NOT EXISTS service_subcategory text;
-
--- ── Service-staff pricing columns ───────────────────────────────────────────
 
 ALTER TABLE service_staff ADD COLUMN IF NOT EXISTS custom_price numeric(10,2);
 ALTER TABLE service_staff ADD COLUMN IF NOT EXISTS custom_deposit numeric(10,2);
 ALTER TABLE service_staff ADD COLUMN IF NOT EXISTS deposit_type text DEFAULT 'fixed';
 
--- ── Staff enhancements ──────────────────────────────────────────────────────
-
-ALTER TABLE staff ADD COLUMN IF NOT EXISTS profession text;
-ALTER TABLE staff ADD COLUMN IF NOT EXISTS notes text;
-ALTER TABLE staff ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
-ALTER TABLE staff ADD COLUMN IF NOT EXISTS booking_limit_capacity integer;
-ALTER TABLE staff ADD COLUMN IF NOT EXISTS booking_limit_interval text;
-
--- ── Location booking limiter ────────────────────────────────────────────────
-
-ALTER TABLE tenant_locations ADD COLUMN IF NOT EXISTS booking_limit_enabled boolean DEFAULT false;
-ALTER TABLE tenant_locations ADD COLUMN IF NOT EXISTS booking_limit_capacity integer;
-ALTER TABLE tenant_locations ADD COLUMN IF NOT EXISTS booking_limit_interval text;
-
 
 -- =============================================
--- SECTION 3: INDEXES
+-- SECTION 4: INDEXES
 -- =============================================
 
+-- From 006
+CREATE INDEX IF NOT EXISTS idx_service_staff_service ON service_staff(service_id);
+CREATE INDEX IF NOT EXISTS idx_service_staff_staff ON service_staff(staff_id);
+CREATE INDEX IF NOT EXISTS idx_service_special_days_service ON service_special_days(service_id);
+CREATE INDEX IF NOT EXISTS idx_service_special_days_date ON service_special_days(date);
+CREATE INDEX IF NOT EXISTS idx_services_visibility ON services(visibility);
+
+-- From 007
 CREATE INDEX IF NOT EXISTS idx_custom_fields_tenant ON custom_fields(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_appointment_cfv_appt ON appointment_custom_field_values(appointment_id);
 CREATE INDEX IF NOT EXISTS idx_staff_holidays_staff ON staff_holidays(staff_id);
@@ -252,9 +320,14 @@ CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON role_permissions(role_id
 
 
 -- =============================================
--- SECTION 4: ENABLE ROW LEVEL SECURITY
+-- SECTION 5: ENABLE ROW LEVEL SECURITY
 -- =============================================
 
+-- From 006
+ALTER TABLE service_staff ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_special_days ENABLE ROW LEVEL SECURITY;
+
+-- From 007
 ALTER TABLE custom_fields ENABLE ROW LEVEL SECURITY;
 ALTER TABLE appointment_custom_field_values ENABLE ROW LEVEL SECURITY;
 ALTER TABLE staff_holidays ENABLE ROW LEVEL SECURITY;
@@ -273,12 +346,44 @@ ALTER TABLE role_permissions ENABLE ROW LEVEL SECURITY;
 
 
 -- =============================================
--- SECTION 5: RLS POLICIES
+-- SECTION 6: RLS POLICIES
 -- PostgreSQL does NOT support CREATE POLICY IF NOT EXISTS.
 -- We use DO/EXCEPTION blocks to safely handle duplicates.
 -- =============================================
 
--- ── Tenant-scoped tables (direct tenant_id) ─────────────────────────────────
+-- ── From 006: service_staff policy ──────────────────────────────────────────
+
+DO $$ BEGIN
+  CREATE POLICY "Tenant can manage service_staff"
+    ON service_staff FOR ALL TO authenticated
+    USING (
+      EXISTS (
+        SELECT 1 FROM services s
+        JOIN tenants t ON t.id = s.tenant_id
+        WHERE s.id = service_staff.service_id
+          AND t.user_id = auth.uid()
+      )
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- ── From 006: service_special_days policy ───────────────────────────────────
+
+DO $$ BEGIN
+  CREATE POLICY "Tenant can manage service_special_days"
+    ON service_special_days FOR ALL TO authenticated
+    USING (
+      EXISTS (
+        SELECT 1 FROM services s
+        JOIN tenants t ON t.id = s.tenant_id
+        WHERE s.id = service_special_days.service_id
+          AND t.user_id = auth.uid()
+      )
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- ── From 007: Tenant-scoped tables (direct tenant_id) ───────────────────────
 
 DO $$ BEGIN
   CREATE POLICY "Tenant manages custom_fields"
@@ -336,7 +441,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ── Junction/child table policies (via parent FK) ───────────────────────────
+-- ── From 007: Junction/child table policies (via parent FK) ─────────────────
 
 DO $$ BEGIN
   CREATE POLICY "Tenant manages appointment_custom_field_values"
@@ -404,5 +509,5 @@ END $$;
 
 -- =============================================
 -- DONE. All tables, columns, indexes, RLS, and
--- policies for Phase 6 are now in place.
+-- policies from migrations 006 + 007 are now applied.
 -- =============================================
