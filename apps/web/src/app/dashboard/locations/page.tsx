@@ -49,7 +49,6 @@ interface Location {
   lat: number | null;
   lng: number | null;
   timezone: string;
-  description: string | null;
   booking_limit_enabled: boolean;
   booking_limit_capacity: number | null;
   booking_limit_interval: string | null;
@@ -78,7 +77,6 @@ export default function LocationsPage() {
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [timezone, setTimezone] = useState('America/New_York');
-  const [description, setDescription] = useState('');
   const [bookingLimitEnabled, setBookingLimitEnabled] = useState(false);
   const [bookingLimitCapacity, setBookingLimitCapacity] = useState('1');
   const [bookingLimitInterval, setBookingLimitInterval] = useState('day');
@@ -108,7 +106,6 @@ export default function LocationsPage() {
     setAddress('');
     setPhone('');
     setTimezone('America/New_York');
-    setDescription('');
     setBookingLimitEnabled(false);
     setBookingLimitCapacity('1');
     setBookingLimitInterval('day');
@@ -122,7 +119,6 @@ export default function LocationsPage() {
     setAddress(loc.address);
     setPhone(loc.phone ?? '');
     setTimezone(loc.timezone);
-    setDescription(loc.description ?? '');
     const hasLimit = loc.booking_limit_enabled ?? false;
     setBookingLimitEnabled(hasLimit);
     setBookingLimitCapacity(String(loc.booking_limit_capacity ?? 1));
@@ -155,7 +151,6 @@ export default function LocationsPage() {
       address,
       phone: phone || null,
       timezone,
-      description: description || null,
       booking_limit_enabled: bookingLimitEnabled,
       booking_limit_capacity: bookingLimitEnabled ? Number(bookingLimitCapacity) : null,
       booking_limit_interval: bookingLimitEnabled ? bookingLimitInterval : null,
@@ -260,18 +255,6 @@ export default function LocationsPage() {
                     </option>
                   ))}
                 </select>
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className={labelClass}>Description</label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  placeholder="Brief description of this location..."
-                  className={inputClass}
-                />
               </div>
 
               {/* Booking Limiter */}

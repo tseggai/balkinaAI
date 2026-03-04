@@ -91,7 +91,7 @@ export default function LoyaltyPage() {
         id: p.id as string | undefined,
         is_active: (p.is_active as boolean) ?? false,
         points_per_booking: (p.points_per_booking as number) ?? 0,
-        points_per_dollar: (p.points_per_dollar as number) ?? 0,
+        points_per_dollar: (p.points_per_currency_unit as number ?? p.points_per_dollar as number) ?? 0,
         redemption_rate: (p.redemption_rate as number) ?? 0,
         min_redemption_points: (p.min_redemption_points as number) ?? 0,
         points_expiry_days: (p.points_expiry_days as number) ?? 0,

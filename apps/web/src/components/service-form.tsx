@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 interface ServiceExtra {
   id?: string;
@@ -185,22 +185,50 @@ export function ServiceForm({
     service?.booking_limit_per_slot_interval ?? 'day'
   );
 
+  // --- Category state ---
+  const [allCategories, setAllCategories] = useState<string[]>([]);
+  const [addingNewCategory, setAddingNewCategory] = useState(false);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+
+  // --- Recurring state ---
+  const [recurringInterval, setRecurringInterval] = useState('week');
+  const [recurringCount, setRecurringCount] = useState('1');
+
+  // --- Custom duration state ---
+  const [customDurationMin, setCustomDurationMin] = useState('');
+  const [customDurationMax, setCustomDurationMax] = useState('');
+
   // --- General ---
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Fetch staff list on mount
-  useEffect(() => {
+  // Fetch staff and categories on mount
+  const fetchInitialData = useCallback(() => {
     fetch('/api/staff')
       .then((res) => res.json())
       .then((json) => {
         const data = json.data as StaffOption[] | null;
         setAllStaff(data ?? []);
       })
-      .catch(() => {
-        // silently fail
-      });
+      .catch(() => {});
+
+    fetch('/api/services')
+      .then((res) => res.json())
+      .then((json) => {
+        const services = (json.data ?? []) as { category_name: string | null }[];
+        const cats = [...new Set(
+          services
+            .map((s) => s.category_name)
+            .filter((c): c is string => c != null && c.trim() !== '')
+        )].sort();
+        setAllCategories(cats);
+      })
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   // --- Helpers ---
   function toggleStaff(staffId: string, staffName: string) {
@@ -311,15 +339,63 @@ export function ServiceForm({
           <input required value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
         </div>
 
-        {/* Category Name */}
+        {/* Category */}
         <div>
-          <label className={labelClass}>Category Name</label>
-          <input
-            value={categoryName}
-            onChange={(e) => setCategoryName(e.target.value)}
-            placeholder="e.g. Haircuts, Massages, Nails..."
-            className={inputClass}
-          />
+          <label className={labelClass}>Category</label>
+          {addingNewCategory ? (
+            <div className="flex gap-2">
+              <input
+                value={newCategoryInput}
+                onChange={(e) => setNewCategoryInput(e.target.value)}
+                placeholder="Enter new category name..."
+                className={inputClass}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (newCategoryInput.trim()) {
+                    setCategoryName(newCategoryInput.trim());
+                    if (!allCategories.includes(newCategoryInput.trim())) {
+                      setAllCategories((prev) => [...prev, newCategoryInput.trim()].sort());
+                    }
+                  }
+                  setAddingNewCategory(false);
+                  setNewCategoryInput('');
+                }}
+                className="whitespace-nowrap rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAddingNewCategory(false); setNewCategoryInput(''); }}
+                className="whitespace-nowrap rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <select
+                value={categoryName}
+                onChange={(e) => {
+                  if (e.target.value === '__new__') {
+                    setAddingNewCategory(true);
+                  } else {
+                    setCategoryName(e.target.value);
+                  }
+                }}
+                className={selectClass}
+              >
+                <option value="">Select a category...</option>
+                {allCategories.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+                <option value="__new__">+ Add new category</option>
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Description */}
@@ -471,15 +547,46 @@ export function ServiceForm({
         </div>
 
         {/* Custom Duration Toggle */}
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={customDuration}
-            onChange={(e) => setCustomDuration(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-brand-600"
-          />
-          <span className="text-sm font-medium text-gray-700">Custom Duration</span>
-        </label>
+        <div className="rounded-lg border border-gray-200 p-4">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={customDuration}
+              onChange={(e) => setCustomDuration(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-brand-600"
+            />
+            <span className="text-sm font-medium text-gray-700">Allow Custom Duration</span>
+          </label>
+          <p className="ml-6 mt-0.5 text-xs text-gray-400">Let customers choose a duration within a range</p>
+          {customDuration && (
+            <div className="mt-3 grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Min Duration (min)</label>
+                <input
+                  type="number"
+                  min="5"
+                  step="5"
+                  value={customDurationMin}
+                  onChange={(e) => setCustomDurationMin(e.target.value)}
+                  placeholder="e.g. 15"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Max Duration (min)</label>
+                <input
+                  type="number"
+                  min="5"
+                  step="5"
+                  value={customDurationMax}
+                  onChange={(e) => setCustomDurationMax(e.target.value)}
+                  placeholder="e.g. 120"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Capacity */}
         <div>
@@ -502,7 +609,7 @@ export function ServiceForm({
               onChange={(e) => setHidePrice(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300 text-brand-600"
             />
-            <span className="text-sm font-medium text-gray-700">Hide Price</span>
+            <span className="text-sm font-medium text-gray-700">Hide price on the booking page</span>
           </label>
           <label className="flex items-center gap-2">
             <input
@@ -511,8 +618,12 @@ export function ServiceForm({
               onChange={(e) => setHideDuration(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300 text-brand-600"
             />
-            <span className="text-sm font-medium text-gray-700">Hide Duration</span>
+            <span className="text-sm font-medium text-gray-700">Hide duration on the booking page</span>
           </label>
+        </div>
+
+        {/* Recurring Service */}
+        <div className="rounded-lg border border-gray-200 p-4">
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -520,8 +631,35 @@ export function ServiceForm({
               onChange={(e) => setIsRecurring(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300 text-brand-600"
             />
-            <span className="text-sm font-medium text-gray-700">Is Recurring</span>
+            <span className="text-sm font-medium text-gray-700">Recurring Service</span>
           </label>
+          <p className="ml-6 mt-0.5 text-xs text-gray-400">Automatically rebook this service at a regular interval</p>
+          {isRecurring && (
+            <div className="mt-3 flex items-center gap-3">
+              <div>
+                <label className={labelClass}>Every</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={recurringCount}
+                  onChange={(e) => setRecurringCount(e.target.value)}
+                  className={`${inputClass} w-20`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Interval</label>
+                <select
+                  value={recurringInterval}
+                  onChange={(e) => setRecurringInterval(e.target.value)}
+                  className={selectClass}
+                >
+                  <option value="day">Day(s)</option>
+                  <option value="week">Week(s)</option>
+                  <option value="month">Month(s)</option>
+                </select>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

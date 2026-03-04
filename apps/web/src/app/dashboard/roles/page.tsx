@@ -44,6 +44,15 @@ interface StaffOption {
   name: string;
 }
 
+type PermField = 'can_view' | 'can_add' | 'can_edit' | 'can_delete';
+const PERM_FIELDS: PermField[] = ['can_view', 'can_add', 'can_edit', 'can_delete'];
+const PERM_LABELS: Record<PermField, string> = {
+  can_view: 'View',
+  can_add: 'Add',
+  can_edit: 'Edit',
+  can_delete: 'Delete',
+};
+
 function buildDefaultPermissions(): Permission[] {
   return MODULES.map((m) => ({
     module: m,
@@ -58,7 +67,7 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [staffList, setStaffList] = useState<StaffOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
   const [editing, setEditing] = useState<Role | null>(null);
   const [form, setForm] = useState({ name: '', notes: '' });
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
@@ -89,7 +98,8 @@ export default function RolesPage() {
     setForm({ name: '', notes: '' });
     setSelectedStaff([]);
     setPermissions(buildDefaultPermissions());
-    setShowForm(true);
+    setError('');
+    setShowPanel(true);
   }
 
   function openEdit(role: Role) {
@@ -97,7 +107,6 @@ export default function RolesPage() {
     setForm({ name: role.name, notes: role.notes ?? '' });
     setSelectedStaff((role.staff_role_assignments ?? []).map((a) => a.staff_id));
 
-    // Merge existing permissions with default
     const existing = role.role_permissions ?? [];
     const merged = MODULES.map((m) => {
       const found = existing.find((p) => p.module === m);
@@ -105,7 +114,13 @@ export default function RolesPage() {
       return { module: m, can_view: false, can_add: false, can_edit: false, can_delete: false };
     });
     setPermissions(merged);
-    setShowForm(true);
+    setError('');
+    setShowPanel(true);
+  }
+
+  function closePanel() {
+    setShowPanel(false);
+    setEditing(null);
   }
 
   function toggleStaff(staffId: string) {
@@ -114,9 +129,42 @@ export default function RolesPage() {
     );
   }
 
-  function updatePermission(module: ModuleName, field: keyof Omit<Permission, 'module'>, value: boolean) {
+  function updatePermission(module: ModuleName, field: PermField, value: boolean) {
     setPermissions((prev) =>
       prev.map((p) => (p.module === module ? { ...p, [field]: value } : p))
+    );
+  }
+
+  function toggleAllForModule(module: ModuleName) {
+    setPermissions((prev) => {
+      const current = prev.find((p) => p.module === module);
+      if (!current) return prev;
+      const allChecked = PERM_FIELDS.every((f) => current[f]);
+      return prev.map((p) =>
+        p.module === module
+          ? { ...p, can_view: !allChecked, can_add: !allChecked, can_edit: !allChecked, can_delete: !allChecked }
+          : p
+      );
+    });
+  }
+
+  function toggleColumnAll(field: PermField) {
+    const allChecked = permissions.every((p) => p[field]);
+    setPermissions((prev) =>
+      prev.map((p) => ({ ...p, [field]: !allChecked }))
+    );
+  }
+
+  function toggleSelectAll() {
+    const allChecked = permissions.every((p) => PERM_FIELDS.every((f) => p[f]));
+    setPermissions((prev) =>
+      prev.map((p) => ({
+        ...p,
+        can_view: !allChecked,
+        can_add: !allChecked,
+        can_edit: !allChecked,
+        can_delete: !allChecked,
+      }))
     );
   }
 
@@ -153,134 +201,14 @@ export default function RolesPage() {
 
     const json = await res.json();
     if (!res.ok) { setError(json.error?.message ?? 'Failed to save'); setSaving(false); return; }
-    setShowForm(false);
-    setEditing(null);
+    closePanel();
     setSaving(false);
     fetchRoles();
   }
 
-  if (showForm) {
-    return (
-      <div className="p-6 lg:p-8">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">{editing ? 'Edit Role' : 'New Role'}</h1>
-          <button onClick={() => setShowForm(false)} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
-        </div>
-        <form onSubmit={handleSubmit} className="max-w-4xl space-y-6">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Role Name *</label>
-            <input
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full max-w-md rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-          </div>
-
-          {/* Staff Selection */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Assigned Staff</label>
-            {staffList.length === 0 ? (
-              <p className="text-sm text-gray-500">No staff members available.</p>
-            ) : (
-              <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-3">
-                {staffList.map((s) => (
-                  <label key={s.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={selectedStaff.includes(s.id)}
-                      onChange={() => toggleStaff(s.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                    />
-                    <span className="text-sm text-gray-700">{s.name}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
-            <textarea
-              rows={2}
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              className="w-full max-w-md rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-          </div>
-
-          {/* Permissions Matrix */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Permissions</label>
-            <div className="overflow-x-auto rounded-lg border border-gray-200">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Module</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">View</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Add</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Edit</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Delete</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {permissions.map((perm) => (
-                    <tr key={perm.module} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-4 py-2 text-sm font-medium capitalize text-gray-700">
-                        {perm.module}
-                      </td>
-                      <td className="px-4 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={perm.can_view}
-                          onChange={(e) => updatePermission(perm.module, 'can_view', e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={perm.can_add}
-                          onChange={(e) => updatePermission(perm.module, 'can_add', e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={perm.can_edit}
-                          onChange={(e) => updatePermission(perm.module, 'can_edit', e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={perm.can_delete}
-                          onChange={(e) => updatePermission(perm.module, 'can_delete', e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : editing ? 'Update Role' : 'Create Role'}
-          </button>
-        </form>
-      </div>
-    );
-  }
+  const inputClass =
+    'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const labelClass = 'mb-1 block text-sm font-medium text-gray-700';
 
   return (
     <div className="p-6 lg:p-8">
@@ -338,6 +266,164 @@ export default function RolesPage() {
           </div>
         )}
       </div>
+
+      {/* Slide-in Panel */}
+      {showPanel && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30 transition-opacity" onClick={closePanel} />
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col bg-white shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-xl font-bold text-gray-900">
+                {editing ? 'Edit Role' : 'New Role'}
+              </h2>
+              <button
+                onClick={closePanel}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
+              <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+                {/* Role Name */}
+                <div>
+                  <label className={labelClass}>Role Name *</label>
+                  <input
+                    required
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className={inputClass}
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className={labelClass}>Notes</label>
+                  <textarea
+                    rows={2}
+                    value={form.notes}
+                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                    className={inputClass}
+                  />
+                </div>
+
+                {/* Staff Selection */}
+                <div>
+                  <label className={labelClass}>Assigned Staff</label>
+                  {staffList.length === 0 ? (
+                    <p className="text-sm text-gray-500">No staff members available.</p>
+                  ) : (
+                    <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-3">
+                      {staffList.map((s) => (
+                        <label key={s.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-gray-50">
+                          <input
+                            type="checkbox"
+                            checked={selectedStaff.includes(s.id)}
+                            onChange={() => toggleStaff(s.id)}
+                            className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                          />
+                          <span className="text-sm text-gray-700">{s.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Permissions Matrix */}
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <label className="text-sm font-medium text-gray-700">Permissions</label>
+                    <button
+                      type="button"
+                      onClick={toggleSelectAll}
+                      className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                    >
+                      {permissions.every((p) => PERM_FIELDS.every((f) => p[f])) ? 'Deselect All' : 'Select All'}
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Module</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">All</th>
+                          {PERM_FIELDS.map((field) => (
+                            <th key={field} className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">
+                              <button
+                                type="button"
+                                onClick={() => toggleColumnAll(field)}
+                                className="hover:text-brand-600"
+                                title={`Toggle all ${PERM_LABELS[field]}`}
+                              >
+                                {PERM_LABELS[field]}
+                              </button>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {permissions.map((perm) => {
+                          const allRowChecked = PERM_FIELDS.every((f) => perm[f]);
+                          return (
+                            <tr key={perm.module} className="hover:bg-gray-50">
+                              <td className="whitespace-nowrap px-4 py-2 text-sm font-medium capitalize text-gray-700">
+                                {perm.module}
+                              </td>
+                              <td className="px-4 py-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={allRowChecked}
+                                  onChange={() => toggleAllForModule(perm.module)}
+                                  className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                                />
+                              </td>
+                              {PERM_FIELDS.map((field) => (
+                                <td key={field} className="px-4 py-2 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={perm[field]}
+                                    onChange={(e) => updatePermission(perm.module, field, e.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                                  />
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {error && <p className="text-sm text-red-600">{error}</p>}
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : editing ? 'Update Role' : 'Create Role'}
+                </button>
+                <button
+                  type="button"
+                  onClick={closePanel}
+                  className="rounded-lg border border-gray-300 px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
     </div>
   );
 }
