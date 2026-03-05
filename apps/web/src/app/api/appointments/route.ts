@@ -171,6 +171,22 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = createAdminClient();
+
+  // Check if status is changing to 'completed' so we can decrement inventory
+  let shouldDecrementInventory = false;
+  if (updateFields.status === 'completed') {
+    // Fetch the current appointment to check if status is actually changing
+    const { data: current } = await supabase
+      .from('appointments')
+      .select('status, service_id')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .single();
+    if (current && (current as { status: string }).status !== 'completed') {
+      shouldDecrementInventory = true;
+    }
+  }
+
   const { data, error } = await supabase
     .from('appointments')
     .update(updateFields as never)
@@ -180,6 +196,46 @@ export async function PATCH(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
+
+  // Auto-decrement inventory when appointment is completed
+  if (shouldDecrementInventory && data) {
+    const appt = data as { service_id: string };
+    if (appt.service_id) {
+      // Find all products linked to this service
+      const { data: linkedProducts } = await supabase
+        .from('product_services')
+        .select('product_id, quantity_per_service')
+        .eq('service_id', appt.service_id);
+
+      if (linkedProducts && linkedProducts.length > 0) {
+        for (const link of linkedProducts as { product_id: string; quantity_per_service: number }[]) {
+          // Decrement quantity_on_hand (never below 0)
+          await supabase.rpc('decrement_product_quantity', {
+            p_product_id: link.product_id,
+            p_amount: link.quantity_per_service ?? 1,
+          }).then(async (res) => {
+            // If RPC doesn't exist, fall back to manual update
+            if (res.error) {
+              const { data: product } = await supabase
+                .from('products')
+                .select('quantity_on_hand')
+                .eq('id', link.product_id)
+                .single();
+              if (product) {
+                const current = (product as { quantity_on_hand: number }).quantity_on_hand;
+                const newQty = Math.max(0, current - (link.quantity_per_service ?? 1));
+                await supabase
+                  .from('products')
+                  .update({ quantity_on_hand: newQty } as never)
+                  .eq('id', link.product_id);
+              }
+            }
+          });
+        }
+      }
+    }
+  }
+
   return NextResponse.json({ data, error: null });
 }
 

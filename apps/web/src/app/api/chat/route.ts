@@ -134,6 +134,18 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'get_packages',
+      description: 'List available service packages (bundled services at a discounted price). Packages let customers purchase multiple services together.',
+      parameters: {
+        type: 'object',
+        properties: { ...tenantIdProp },
+        required: [],
+      },
+    },
+  },
 ];
 
 // Additional tool for discovery mode (no tenant)
@@ -211,6 +223,10 @@ ${customerSection}
 5. Customer confirms -> use create_booking tool
 6. After booking -> share the confirmation details
 
+## Packages
+- When a customer asks about deals, bundles, or packages, use the get_packages tool to show available service packages.
+- Packages bundle multiple services together at a discounted price. Present them clearly with included services and pricing.
+
 ## Viewing & cancelling appointments
 - When a customer asks about their appointments ("my appointments", "my bookings"), use get_booking_details with their customer_id, email, or phone. This returns ALL upcoming appointments. Present them as a numbered list.
 - When a customer wants to cancel, use cancel_appointment with their customer identifier (no appointment_id). This lists all cancellable appointments. Present the list and ask which one to cancel. Then call cancel_appointment again with the chosen appointment_id.
@@ -280,6 +296,10 @@ Without tenant_id, those tools cannot look up the business's data.
 5. Customer confirms a time -> summarize details and ask for confirmation
 6. Customer confirms -> use create_booking WITH tenant_id
 7. After booking -> share the confirmation details
+
+## Packages
+- When a customer asks about deals, bundles, or packages, use the get_packages tool WITH tenant_id to show available service packages.
+- Packages bundle multiple services together at a discounted price.
 
 ## Viewing & cancelling appointments
 - When a customer asks about their appointments ("my appointments", "my bookings"), use get_booking_details with their customer_id, email, or phone. This returns ALL upcoming appointments across all businesses. Present them as a numbered list.

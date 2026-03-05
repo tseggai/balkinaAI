@@ -40,6 +40,10 @@ export async function POST(request: Request) {
       discount_value: body.discount_value,
       expires_at: body.expires_at || null,
       usage_limit: body.usage_limit || null,
+      is_lifetime: body.is_lifetime ?? false,
+      scope: body.scope ?? 'per_booking',
+      applicable_service_ids: body.applicable_service_ids ?? null,
+      applicable_staff_ids: body.applicable_staff_ids ?? null,
     } as never)
     .select()
     .single();
