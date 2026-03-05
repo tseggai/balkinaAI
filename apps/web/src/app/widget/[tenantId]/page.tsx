@@ -57,12 +57,12 @@ export default function ChatWidgetPage() {
         }
         const json = (await res.json()) as { data: TenantInfo };
         setTenant(json.data);
-        // Add welcome message
+        // Add concise welcome message with quick-action buttons
         setMessages([
           {
             id: 'welcome',
             role: 'assistant',
-            content: `Hi there! Welcome to ${json.data.name}. I'm your booking assistant. How can I help you today? You can ask about our services, check availability, or book an appointment.`,
+            content: `Hi! Welcome to ${json.data.name}. What would you like to do?\n\n[[button:Book Appointment]] [[button:View Services]] [[button:My Appointments]]`,
           },
         ]);
       } catch {
@@ -73,9 +73,9 @@ export default function ChatWidgetPage() {
     fetchTenant();
   }, [tenantId]);
 
-  // Send message
-  const sendMessage = useCallback(async () => {
-    const trimmed = input.trim();
+  // Send message (can be called from input or button click)
+  const sendMessage = useCallback(async (messageText?: string) => {
+    const trimmed = (messageText ?? input).trim();
     if (!trimmed || isLoading) return;
 
     const userMsg: ChatMessage = {
@@ -85,7 +85,7 @@ export default function ChatWidgetPage() {
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setInput('');
+    if (!messageText) setInput('');
     setIsLoading(true);
 
     // Add placeholder for assistant reply
@@ -154,7 +154,6 @@ export default function ChatWidgetPage() {
                 )
               );
             } else if (event.type === 'tool_call') {
-              // Show tool call indicator
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId
@@ -199,6 +198,12 @@ export default function ChatWidgetPage() {
 
     setIsLoading(false);
   }, [input, isLoading, tenantId, sessionId, customerName, customerPhone]);
+
+  // Handle button click — send the label as a user message
+  const handleButtonClick = useCallback((label: string) => {
+    if (isLoading) return;
+    sendMessage(label);
+  }, [isLoading, sendMessage]);
 
   // Handle key press
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -292,7 +297,12 @@ export default function ChatWidgetPage() {
                   : 'bg-white text-gray-800 shadow-sm border border-gray-100'
               }`}
             >
-              <MessageContent content={msg.content} isStreaming={msg.isStreaming} />
+              <MessageContent
+                content={msg.content}
+                isStreaming={msg.isStreaming}
+                onButtonClick={handleButtonClick}
+                isUserMessage={msg.role === 'user'}
+              />
             </div>
           </div>
         ))}
@@ -314,7 +324,7 @@ export default function ChatWidgetPage() {
             style={{ maxHeight: '120px' }}
           />
           <button
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             disabled={isLoading || !input.trim()}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
           >
@@ -335,9 +345,41 @@ export default function ChatWidgetPage() {
   );
 }
 
-// ── MessageContent component with basic markdown ────────────────────────────
+// ── Button parsing helper ────────────────────────────────────────────────────
 
-function MessageContent({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
+const BUTTON_REGEX = /\[\[button:(.*?)\]\]/g;
+
+function parseContentWithButtons(content: string): { textParts: string[]; buttons: string[] } {
+  const buttons: string[] = [];
+  const textParts = content.split(BUTTON_REGEX);
+
+  // split alternates: text, captured group, text, captured group...
+  // Even indices are text, odd indices are button labels
+  const cleanTextParts: string[] = [];
+  for (let i = 0; i < textParts.length; i++) {
+    if (i % 2 === 0) {
+      cleanTextParts.push(textParts[i] ?? '');
+    } else {
+      buttons.push(textParts[i] ?? '');
+    }
+  }
+
+  return { textParts: cleanTextParts, buttons };
+}
+
+// ── MessageContent component with buttons and basic markdown ─────────────────
+
+function MessageContent({
+  content,
+  isStreaming,
+  onButtonClick,
+  isUserMessage,
+}: {
+  content: string;
+  isStreaming?: boolean;
+  onButtonClick: (label: string) => void;
+  isUserMessage: boolean;
+}) {
   if (!content && isStreaming) {
     return (
       <div className="flex items-center gap-1.5">
@@ -348,14 +390,41 @@ function MessageContent({ content, isStreaming }: { content: string; isStreaming
     );
   }
 
-  // Basic markdown: bold, line breaks
-  const formatted = content
+  // For user messages, just show plain text (no button parsing)
+  if (isUserMessage) {
+    const formatted = content
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br />');
+    return <span dangerouslySetInnerHTML={{ __html: formatted }} />;
+  }
+
+  // Parse buttons from assistant messages
+  const { textParts, buttons } = parseContentWithButtons(content);
+
+  // Reconstruct the text without button markup
+  const textOnly = textParts.join('').trim();
+  const formatted = textOnly
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br />');
 
   return (
-    <span
-      dangerouslySetInnerHTML={{ __html: formatted }}
-    />
+    <div>
+      {textOnly && (
+        <span dangerouslySetInnerHTML={{ __html: formatted }} />
+      )}
+      {buttons.length > 0 && !isStreaming && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {buttons.map((label, i) => (
+            <button
+              key={`${label}-${i}`}
+              onClick={() => onButtonClick(label)}
+              className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors active:bg-indigo-200"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
