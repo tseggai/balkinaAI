@@ -191,8 +191,8 @@ const bubbleStyles = StyleSheet.create({
     borderBottomLeftRadius: 4,
   },
   text: {
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 23,
   },
   textUser: {
     color: '#fff',
@@ -230,7 +230,7 @@ const chipStyles = StyleSheet.create({
     marginBottom: 8,
   },
   chipText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '500',
     color: '#6366f1',
   },
@@ -595,13 +595,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   greeting: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '700',
     color: '#111827',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 17,
+    fontSize: 18,
     color: '#6b7280',
     marginBottom: 32,
   },
@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    fontSize: 15,
+    fontSize: 16,
     color: '#111827',
     borderWidth: 1,
     borderColor: '#e5e7eb',

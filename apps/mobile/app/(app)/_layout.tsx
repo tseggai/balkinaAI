@@ -11,11 +11,12 @@ export default function AppTabsLayout() {
           backgroundColor: '#fff',
           borderTopColor: '#e5e7eb',
           borderTopWidth: 1,
-          paddingBottom: 4,
-          height: 56,
+          paddingBottom: 10,
+          paddingTop: 5,
+          height: 70,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: '600',
         },
         headerStyle: {
@@ -37,8 +38,8 @@ export default function AppTabsLayout() {
         options={{
           title: 'Chat',
           headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubbles-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="chatbubbles-outline" size={26} color={color} />
           ),
         }}
       />
@@ -46,8 +47,8 @@ export default function AppTabsLayout() {
         name="bookings"
         options={{
           title: 'Bookings',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="calendar-outline" size={26} color={color} />
           ),
         }}
       />
@@ -55,8 +56,8 @@ export default function AppTabsLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="person-outline" size={26} color={color} />
           ),
         }}
       />

@@ -51,7 +51,6 @@ export async function POST(request: Request) {
       lat,
       lng,
       timezone: body.timezone ?? 'UTC',
-      phone: body.phone || null,
       booking_limit_enabled: body.booking_limit_enabled ?? false,
       booking_limit_capacity: body.booking_limit_capacity ?? null,
       booking_limit_interval: body.booking_limit_interval || null,

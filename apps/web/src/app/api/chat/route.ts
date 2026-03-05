@@ -102,14 +102,17 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'cancel_appointment',
-      description: 'Cancel an existing appointment.',
+      description: 'Cancel an existing appointment. If no appointment_id is provided, returns a list of all cancellable appointments for the customer so you can ask which one to cancel.',
       parameters: {
         type: 'object',
         properties: {
           ...tenantIdProp,
-          appointment_id: { type: 'string', description: 'UUID of the appointment to cancel' },
+          appointment_id: { type: 'string', description: 'UUID of the appointment to cancel. If omitted, lists all cancellable appointments.' },
+          customer_id: { type: 'string', description: 'UUID of the customer (optional, used to find their appointments)' },
+          customer_email: { type: 'string', description: 'Email of the customer (optional, used to find their appointments)' },
+          customer_phone: { type: 'string', description: 'Phone of the customer (optional, used to find their appointments)' },
         },
-        required: ['appointment_id'],
+        required: [],
       },
     },
   },
@@ -117,14 +120,17 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_booking_details',
-      description: 'Get details of a specific booking/appointment.',
+      description: 'Get details of a booking. If appointment_id is provided, returns that specific booking. If customer_id/email/phone is provided instead, returns ALL upcoming appointments for that customer.',
       parameters: {
         type: 'object',
         properties: {
           ...tenantIdProp,
-          appointment_id: { type: 'string', description: 'UUID of the appointment' },
+          appointment_id: { type: 'string', description: 'UUID of a specific appointment (optional)' },
+          customer_id: { type: 'string', description: 'UUID of the customer to list all upcoming appointments (optional)' },
+          customer_email: { type: 'string', description: 'Email of the customer (optional)' },
+          customer_phone: { type: 'string', description: 'Phone of the customer (optional)' },
         },
-        required: ['appointment_id'],
+        required: [],
       },
     },
   },
@@ -191,6 +197,11 @@ ${customerSection}
 5. Customer confirms -> use create_booking tool
 6. After booking -> share the confirmation details
 
+## Viewing & cancelling appointments
+- When a customer asks about their appointments ("my appointments", "my bookings"), use get_booking_details with their customer_id, email, or phone. This returns ALL upcoming appointments. Present them as a numbered list.
+- When a customer wants to cancel, use cancel_appointment with their customer identifier (no appointment_id). This lists all cancellable appointments. Present the list and ask which one to cancel. Then call cancel_appointment again with the chosen appointment_id.
+- NEVER ask the customer for an appointment ID. Always fetch the list first and let them choose by number or description.
+
 ## Boundaries
 - You only help with booking appointments at ${tenantName}.
 - Do not provide medical, legal, or financial advice.
@@ -241,6 +252,11 @@ Without tenant_id, those tools cannot look up the business's data.
 5. Customer confirms a time -> summarize details and ask for confirmation
 6. Customer confirms -> use create_booking WITH tenant_id
 7. After booking -> share the confirmation details
+
+## Viewing & cancelling appointments
+- When a customer asks about their appointments ("my appointments", "my bookings"), use get_booking_details with their customer_id, email, or phone. This returns ALL upcoming appointments across all businesses. Present them as a numbered list.
+- When a customer wants to cancel, use cancel_appointment with their customer identifier (no appointment_id). This lists all cancellable appointments. Present the list and ask which one to cancel. Then call cancel_appointment again with the chosen appointment_id.
+- NEVER ask the customer for an appointment ID. Always fetch the list first and let them choose by number or description.
 
 ## Location context
 ${userLocation ? `The user's current location is latitude ${userLocation.latitude}, longitude ${userLocation.longitude}. When calling find_businesses, pass these coordinates so results are sorted by proximity. Mention distance in your response when available.` : 'The user has not shared their location. You can still search for businesses, but results won\'t be sorted by proximity. If the user asks for nearby businesses, suggest they enable location access.'}
