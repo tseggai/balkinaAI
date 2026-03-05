@@ -95,7 +95,6 @@ function defaultSchedule(): WeekSchedule {
 
 const inputClass =
   'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-const labelClass = 'mb-1 block text-sm font-medium text-gray-700';
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -495,10 +494,10 @@ export default function StaffPage() {
 
           {/* First Name + Last Name */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="group flex items-center gap-3">
-              <label className="shrink-0 text-sm font-medium text-gray-700 w-20">First Name *</label>
+            <div className="group flex items-center gap-4">
+              <span className="w-32 shrink-0 text-sm font-medium text-gray-700">First Name *</span>
               <div className="relative flex-1">
-                <span className="block w-full rounded-lg border border-transparent px-3 py-2 text-sm text-gray-900 group-hover:hidden">
+                <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
                   {firstName || '\u2014'}
                 </span>
                 <input
@@ -506,48 +505,48 @@ export default function StaffPage() {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="First Name *"
-                  className={`${inputClass} hidden group-hover:block`}
+                  className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
                 />
               </div>
             </div>
-            <div className="group flex items-center gap-3">
-              <label className="shrink-0 text-sm font-medium text-gray-700 w-20">Last Name</label>
+            <div className="group flex items-center gap-4">
+              <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Last Name</span>
               <div className="relative flex-1">
-                <span className="block w-full rounded-lg border border-transparent px-3 py-2 text-sm text-gray-900 group-hover:hidden">
+                <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
                   {lastName || '\u2014'}
                 </span>
                 <input
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Last Name"
-                  className={`${inputClass} hidden group-hover:block`}
+                  className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
                 />
               </div>
             </div>
           </div>
 
           {/* Profession */}
-          <div className="group flex items-center gap-3">
-            <label className="shrink-0 text-sm font-medium text-gray-700 w-24">Profession</label>
+          <div className="group flex items-center gap-4">
+            <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Profession</span>
             <div className="relative flex-1">
-              <span className="block w-full rounded-lg border border-transparent px-3 py-2 text-sm text-gray-900 group-hover:hidden">
+              <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
                 {profession || '\u2014'}
               </span>
               <input
                 value={profession}
                 onChange={(e) => setProfession(e.target.value)}
                 placeholder="e.g. Hair Stylist, Massage Therapist..."
-                className={`${inputClass} hidden group-hover:block`}
+                className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
               />
             </div>
           </div>
 
           {/* Email + Phone */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="group flex items-center gap-3">
-              <label className="shrink-0 text-sm font-medium text-gray-700 w-14">Email *</label>
+            <div className="group flex items-center gap-4">
+              <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Email *</span>
               <div className="relative flex-1">
-                <span className="block w-full rounded-lg border border-transparent px-3 py-2 text-sm text-gray-900 group-hover:hidden">
+                <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
                   {email || '\u2014'}
                 </span>
                 <input
@@ -556,29 +555,29 @@ export default function StaffPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Email *"
-                  className={`${inputClass} hidden group-hover:block`}
+                  className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
                 />
               </div>
             </div>
-            <div className="group flex items-center gap-3">
-              <label className="shrink-0 text-sm font-medium text-gray-700 w-14">Phone</label>
+            <div className="group flex items-center gap-4">
+              <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Phone</span>
               <div className="relative flex-1">
-                <span className="block w-full rounded-lg border border-transparent px-3 py-2 text-sm text-gray-900 group-hover:hidden">
+                <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
                   {phone || '\u2014'}
                 </span>
                 <input
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="Phone"
-                  className={`${inputClass} hidden group-hover:block`}
+                  className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
                 />
               </div>
             </div>
           </div>
 
           {/* Locations multi-select */}
-          <div className="flex gap-3">
-            <label className="shrink-0 text-sm font-medium text-gray-700 w-24 pt-2">Locations</label>
+          <div className="flex gap-4">
+            <span className="w-32 shrink-0 text-sm font-medium text-gray-700 pt-2">Locations</span>
             <div className="flex-1">
               {allLocations.length === 0 ? (
                 <p className="text-sm text-gray-400">No locations available. Add locations first.</p>
@@ -601,8 +600,8 @@ export default function StaffPage() {
           </div>
 
           {/* Services multi-select */}
-          <div className="flex gap-3">
-            <label className="shrink-0 text-sm font-medium text-gray-700 w-24 pt-2">Services</label>
+          <div className="flex gap-4">
+            <span className="w-32 shrink-0 text-sm font-medium text-gray-700 pt-2">Services</span>
             <div className="flex-1">
               {allServices.length === 0 ? (
                 <p className="text-sm text-gray-400">No services available. Add services first.</p>
@@ -625,10 +624,10 @@ export default function StaffPage() {
           </div>
 
           {/* Notes */}
-          <div className="group flex gap-3">
-            <label className="shrink-0 text-sm font-medium text-gray-700 w-24 pt-2">Notes</label>
+          <div className="group flex gap-4">
+            <span className="w-32 shrink-0 text-sm font-medium text-gray-700 pt-2">Notes</span>
             <div className="relative flex-1">
-              <span className="block w-full rounded-lg border border-transparent px-3 py-2 text-sm text-gray-900 whitespace-pre-wrap group-hover:hidden">
+              <span className="block px-3 py-2 text-sm text-gray-900 whitespace-pre-wrap group-hover:invisible">
                 {notes || '\u2014'}
               </span>
               <textarea
@@ -636,7 +635,7 @@ export default function StaffPage() {
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
                 placeholder="Notes"
-                className={`${inputClass} hidden group-hover:block`}
+                className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
               />
             </div>
           </div>
@@ -916,11 +915,11 @@ export default function StaffPage() {
         {/* Add special day */}
         <div className="flex items-end gap-3">
           <div>
-            <label className={labelClass}>Date</label>
             <input
               type="date"
               value={newSpecialDate}
               onChange={(e) => setNewSpecialDate(e.target.value)}
+              placeholder="Date"
               className={inputClass}
             />
           </div>
@@ -1060,11 +1059,11 @@ export default function StaffPage() {
         {/* Add holiday */}
         <div className="flex items-end gap-3">
           <div>
-            <label className={labelClass}>Date</label>
             <input
               type="date"
               value={newHolidayDate}
               onChange={(e) => setNewHolidayDate(e.target.value)}
+              placeholder="Date"
               className={inputClass}
             />
           </div>
@@ -1127,17 +1126,16 @@ export default function StaffPage() {
           {bookingLimitEnabled && (
             <div className="mt-3 flex items-center gap-3">
               <div>
-                <label className={labelClass}>Capacity</label>
                 <input
                   type="number"
                   min="1"
                   value={bookingLimitCapacity}
                   onChange={(e) => setBookingLimitCapacity(e.target.value)}
+                  placeholder="Capacity"
                   className={`${inputClass} w-24`}
                 />
               </div>
               <div>
-                <label className={labelClass}>Per</label>
                 <select
                   value={bookingLimitInterval}
                   onChange={(e) => setBookingLimitInterval(e.target.value)}

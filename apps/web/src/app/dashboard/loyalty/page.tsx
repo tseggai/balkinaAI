@@ -447,55 +447,61 @@ export default function LoyaltyPage() {
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Points Earning</h3>
                   {isEditing ? (
                     <div className="space-y-3">
-                      <div className="group flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
-                        <span className="text-sm text-gray-600">Points per Booking</span>
-                        <div className="relative">
-                          <span className="text-sm font-medium text-gray-900 group-hover:hidden">{form.points_per_booking}</span>
+                      <div className="group flex items-center gap-4">
+                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Pts / Booking</span>
+                        <div className="relative flex-1">
+                          <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                            {form.points_per_booking || '\u2014'}
+                          </span>
                           <input
                             type="number"
                             min="0"
                             value={form.points_per_booking}
                             onChange={(e) => setForm({ ...form, points_per_booking: Number(e.target.value) || 0 })}
-                            className="hidden w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:block"
+                            className="invisible absolute inset-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
                           />
                         </div>
                       </div>
-                      <div className="group flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
-                        <span className="text-sm text-gray-600">Points per $1 Spent</span>
-                        <div className="relative">
-                          <span className="text-sm font-medium text-gray-900 group-hover:hidden">{form.points_per_dollar}</span>
+                      <div className="group flex items-center gap-4">
+                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Pts / $1 Spent</span>
+                        <div className="relative flex-1">
+                          <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                            {form.points_per_dollar || '\u2014'}
+                          </span>
                           <input
                             type="number"
                             min="0"
                             step="0.1"
                             value={form.points_per_dollar}
                             onChange={(e) => setForm({ ...form, points_per_dollar: Number(e.target.value) || 0 })}
-                            className="hidden w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:block"
+                            className="invisible absolute inset-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
                           />
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-4">
+                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Pts / Booking</span>
                         <input
                           type="number"
                           min="0"
                           value={form.points_per_booking}
                           onChange={(e) => setForm({ ...form, points_per_booking: Number(e.target.value) || 0 })}
-                          placeholder="Points per Booking"
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          placeholder="0"
+                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                       </div>
-                      <div>
+                      <div className="flex items-center gap-4">
+                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Pts / $1 Spent</span>
                         <input
                           type="number"
                           min="0"
                           step="0.1"
                           value={form.points_per_dollar}
                           onChange={(e) => setForm({ ...form, points_per_dollar: Number(e.target.value) || 0 })}
-                          placeholder="Points per $1 Spent"
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          placeholder="0"
+                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                       </div>
                     </div>
@@ -560,53 +566,59 @@ export default function LoyaltyPage() {
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Redemption</h3>
                   {isEditing ? (
                     <div className="space-y-3">
-                      <div className="group flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
-                        <span className="text-sm text-gray-600">Conversion Rate (pts to $1)</span>
-                        <div className="relative">
-                          <span className="text-sm font-medium text-gray-900 group-hover:hidden">{form.redemption_rate}</span>
+                      <div className="group flex items-center gap-4">
+                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Pts to $1</span>
+                        <div className="relative flex-1">
+                          <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                            {form.redemption_rate || '\u2014'}
+                          </span>
                           <input
                             type="number"
                             min="0"
                             value={form.redemption_rate}
                             onChange={(e) => setForm({ ...form, redemption_rate: Number(e.target.value) || 0 })}
-                            className="hidden w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:block"
+                            className="invisible absolute inset-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
                           />
                         </div>
                       </div>
-                      <div className="group flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
-                        <span className="text-sm text-gray-600">Min Redemption Threshold</span>
-                        <div className="relative">
-                          <span className="text-sm font-medium text-gray-900 group-hover:hidden">{form.min_redemption_points}</span>
+                      <div className="group flex items-center gap-4">
+                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Min Threshold</span>
+                        <div className="relative flex-1">
+                          <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                            {form.min_redemption_points || '\u2014'}
+                          </span>
                           <input
                             type="number"
                             min="0"
                             value={form.min_redemption_points}
                             onChange={(e) => setForm({ ...form, min_redemption_points: Number(e.target.value) || 0 })}
-                            className="hidden w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:block"
+                            className="invisible absolute inset-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
                           />
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-4">
+                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Pts to $1</span>
                         <input
                           type="number"
                           min="0"
                           value={form.redemption_rate}
                           onChange={(e) => setForm({ ...form, redemption_rate: Number(e.target.value) || 0 })}
-                          placeholder="Conversion Rate (pts to $1)"
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          placeholder="0"
+                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                       </div>
-                      <div>
+                      <div className="flex items-center gap-4">
+                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Min Threshold</span>
                         <input
                           type="number"
                           min="0"
                           value={form.min_redemption_points}
                           onChange={(e) => setForm({ ...form, min_redemption_points: Number(e.target.value) || 0 })}
-                          placeholder="Min Redemption Threshold"
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          placeholder="0"
+                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                       </div>
                     </div>
@@ -679,10 +691,10 @@ export default function LoyaltyPage() {
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Points Expiry</h3>
                   {isEditing ? (
-                    <div className="group flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
-                      <span className="text-sm text-gray-600">Expiry Days (0 = never)</span>
-                      <div className="relative">
-                        <span className="text-sm font-medium text-gray-900 group-hover:hidden">
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Expiry Days</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
                           {form.points_expiry_days > 0 ? `${form.points_expiry_days} days` : 'Never'}
                         </span>
                         <input
@@ -690,19 +702,21 @@ export default function LoyaltyPage() {
                           min="0"
                           value={form.points_expiry_days}
                           onChange={(e) => setForm({ ...form, points_expiry_days: Number(e.target.value) || 0 })}
-                          className="hidden w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:block"
+                          placeholder="0 = never"
+                          className="invisible absolute inset-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
                         />
                       </div>
                     </div>
                   ) : (
-                    <div>
+                    <div className="flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Expiry Days</span>
                       <input
                         type="number"
                         min="0"
                         value={form.points_expiry_days}
                         onChange={(e) => setForm({ ...form, points_expiry_days: Number(e.target.value) || 0 })}
-                        placeholder="Expiry Days (0 = never)"
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        placeholder="0 = never"
+                        className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       />
                     </div>
                   )}

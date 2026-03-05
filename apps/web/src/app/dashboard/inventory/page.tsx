@@ -326,87 +326,95 @@ export default function InventoryPage() {
                 {editing ? (
                   /* ===== EDIT MODE: horizontal label-value with hover-to-edit ===== */
                   <>
-                    <div className="group flex items-center justify-between gap-4">
-                      <label className="shrink-0 text-sm font-medium text-gray-700">Name *</label>
-                      <div className="flex-1">
-                        <span className="block text-sm text-gray-900 group-hover:hidden">{form.name || '\u2014'}</span>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Name *</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.name || '\u2014'}
+                        </span>
                         <input
                           value={form.name}
                           onChange={(e) => setForm({ ...form, name: e.target.value })}
-                          className={`${inputClass} hidden group-hover:block`}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="group flex items-center justify-between gap-4">
-                        <label className="shrink-0 text-sm font-medium text-gray-700">Qty on Hand</label>
-                        <div className="flex-1">
-                          <span className="block text-right text-sm text-gray-900 group-hover:hidden">{form.quantity_on_hand || '0'}</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={form.quantity_on_hand}
-                            onChange={(e) => setForm({ ...form, quantity_on_hand: e.target.value })}
-                            className={`${inputClass} hidden group-hover:block`}
-                          />
-                        </div>
-                      </div>
-                      <div className="group flex items-center justify-between gap-4">
-                        <label className="shrink-0 text-sm font-medium text-gray-700">Min Qty</label>
-                        <div className="flex-1">
-                          <span className="block text-right text-sm text-gray-900 group-hover:hidden">{form.min_order_quantity || '0'}</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={form.min_order_quantity}
-                            onChange={(e) => setForm({ ...form, min_order_quantity: e.target.value })}
-                            className={`${inputClass} hidden group-hover:block`}
-                          />
-                        </div>
-                      </div>
-                      <div className="group flex items-center justify-between gap-4">
-                        <label className="shrink-0 text-sm font-medium text-gray-700">Max Qty</label>
-                        <div className="flex-1">
-                          <span className="block text-right text-sm text-gray-900 group-hover:hidden">{form.max_order_quantity || 'Unlimited'}</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={form.max_order_quantity}
-                            onChange={(e) => setForm({ ...form, max_order_quantity: e.target.value })}
-                            placeholder="Unlimited"
-                            className={`${inputClass} hidden group-hover:block`}
-                          />
-                        </div>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Qty on Hand</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.quantity_on_hand || '0'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.quantity_on_hand}
+                          onChange={(e) => setForm({ ...form, quantity_on_hand: e.target.value })}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="group flex items-center justify-between gap-4">
-                        <label className="shrink-0 text-sm font-medium text-gray-700">Purchase Price ($)</label>
-                        <div className="flex-1">
-                          <span className="block text-right text-sm text-gray-900 group-hover:hidden">{form.purchase_price || '0.00'}</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={form.purchase_price}
-                            onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
-                            className={`${inputClass} hidden group-hover:block`}
-                          />
-                        </div>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Min Qty</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.min_order_quantity || '0'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.min_order_quantity}
+                          onChange={(e) => setForm({ ...form, min_order_quantity: e.target.value })}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
                       </div>
-                      <div className="group flex items-center justify-between gap-4">
-                        <label className="shrink-0 text-sm font-medium text-gray-700">Sell Price ($)</label>
-                        <div className="flex-1">
-                          <span className="block text-right text-sm text-gray-900 group-hover:hidden">{form.sell_price || '0.00'}</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={form.sell_price}
-                            onChange={(e) => setForm({ ...form, sell_price: e.target.value })}
-                            className={`${inputClass} hidden group-hover:block`}
-                          />
-                        </div>
+                    </div>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Max Qty</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.max_order_quantity || 'Unlimited'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.max_order_quantity}
+                          onChange={(e) => setForm({ ...form, max_order_quantity: e.target.value })}
+                          placeholder="Unlimited"
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
+                      </div>
+                    </div>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Purchase Price ($)</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.purchase_price || '0.00'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.purchase_price}
+                          onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
+                      </div>
+                    </div>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Sell Price ($)</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.sell_price || '0.00'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.sell_price}
+                          onChange={(e) => setForm({ ...form, sell_price: e.target.value })}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
                       </div>
                     </div>
                     {/* Linked Services */}
@@ -474,15 +482,17 @@ export default function InventoryPage() {
                       </label>
                     </div>
                     {/* Description */}
-                    <div className="group flex items-start justify-between gap-4">
-                      <label className="shrink-0 pt-2 text-sm font-medium text-gray-700">Description</label>
-                      <div className="flex-1">
-                        <span className="block whitespace-pre-wrap text-sm text-gray-900 group-hover:hidden">{form.description || '\u2014'}</span>
+                    <div className="group flex items-start gap-4">
+                      <span className="w-32 shrink-0 pt-2 text-sm font-medium text-gray-700">Description</span>
+                      <div className="relative flex-1">
+                        <span className="block whitespace-pre-wrap px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.description || '\u2014'}
+                        </span>
                         <textarea
                           rows={3}
                           value={form.description}
                           onChange={(e) => setForm({ ...form, description: e.target.value })}
-                          className={`${inputClass} hidden group-hover:block`}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
                         />
                       </div>
                     </div>

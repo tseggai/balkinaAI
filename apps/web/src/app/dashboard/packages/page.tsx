@@ -475,115 +475,113 @@ export default function PackagesPage() {
                   onChange={(url) => setForm({ ...form, image_url: url })}
                   label="Package Image"
                 />
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Name — edit on hover */}
-                  <div className="group">
-                    <label className="mb-1 block text-xs font-medium text-gray-500">Name</label>
-                    <div className="relative">
-                      <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                        {form.name || '--'}
-                      </span>
-                      <input
-                        value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })}
-                        placeholder="Name *"
-                        className="absolute inset-0 w-full rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm opacity-0 focus:border-brand-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:border-gray-300 group-hover:opacity-100"
-                      />
-                    </div>
-                  </div>
-                  {/* Price — edit on hover */}
-                  <div className="group">
-                    <label className="mb-1 block text-xs font-medium text-gray-500">Price ($)</label>
-                    <div className="relative">
-                      <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                        {form.price ? `$${Number(form.price).toFixed(2)}` : '--'}
-                      </span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={form.price}
-                        onChange={(e) => setForm({ ...form, price: e.target.value })}
-                        placeholder="Price ($)"
-                        className="absolute inset-0 w-full rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm opacity-0 focus:border-brand-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:border-gray-300 group-hover:opacity-100"
-                      />
-                    </div>
-                  </div>
-                </div>
-                {/* Expiration */}
-                <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
+                {/* Name */}
+                <div className="group flex items-center gap-4">
+                  <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Name</span>
+                  <div className="relative flex-1">
+                    <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                      {form.name || '\u2014'}
+                    </span>
                     <input
-                      type="checkbox"
-                      checked={form.has_expiration}
-                      onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      placeholder="Name *"
+                      className="invisible absolute inset-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
                     />
-                    Has Expiration
-                  </label>
-                  {form.has_expiration && (
-                    <div className="flex gap-3">
-                      <div className="group relative w-32">
-                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                          {form.expiration_value || '--'}
-                        </span>
-                        <input
-                          type="number"
-                          min="1"
-                          value={form.expiration_value}
-                          onChange={(e) => setForm({ ...form, expiration_value: e.target.value })}
-                          placeholder="Value"
-                          className="absolute inset-0 w-full rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm opacity-0 focus:border-brand-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:border-gray-300 group-hover:opacity-100"
-                        />
-                      </div>
-                      <select
-                        value={form.expiration_unit}
-                        onChange={(e) => setForm({ ...form, expiration_unit: e.target.value })}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      >
-                        <option value="days">Days</option>
-                        <option value="weeks">Weeks</option>
-                        <option value="months">Months</option>
-                        <option value="years">Years</option>
-                      </select>
-                    </div>
-                  )}
+                  </div>
                 </div>
-                {/* Active toggle */}
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                  />
-                  Active
-                </label>
-                {/* Private toggle */}
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={form.is_private}
-                    onChange={(e) => setForm({ ...form, is_private: e.target.checked })}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                  />
-                  Private package
-                </label>
-                {/* Description — edit on hover */}
-                <div className="group">
-                  <label className="mb-1 block text-xs font-medium text-gray-500">Description</label>
-                  <div className="relative">
+                {/* Price */}
+                <div className="group flex items-center gap-4">
+                  <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Price ($)</span>
+                  <div className="relative flex-1">
+                    <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                      {form.price ? `$${Number(form.price).toFixed(2)}` : '\u2014'}
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.price}
+                      onChange={(e) => setForm({ ...form, price: e.target.value })}
+                      placeholder="Price ($)"
+                      className="invisible absolute inset-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
+                    />
+                  </div>
+                </div>
+                {/* Description */}
+                <div className="group flex items-start gap-4">
+                  <span className="w-32 shrink-0 pt-2 text-sm font-medium text-gray-700">Description</span>
+                  <div className="relative flex-1">
                     <span className="block min-h-[4rem] whitespace-pre-wrap px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                      {form.description || '--'}
+                      {form.description || '\u2014'}
                     </span>
                     <textarea
                       rows={3}
                       value={form.description}
                       onChange={(e) => setForm({ ...form, description: e.target.value })}
                       placeholder="Description"
-                      className="absolute inset-0 w-full rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm opacity-0 focus:border-brand-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:border-gray-300 group-hover:opacity-100"
+                      className="invisible absolute inset-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
                     />
                   </div>
+                </div>
+                {/* Expiration */}
+                <div className="group flex items-center gap-4">
+                  <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Expiration</span>
+                  <div className="flex flex-1 items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={form.has_expiration}
+                      onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                    />
+                    {form.has_expiration && (
+                      <>
+                        <div className="group/exp relative w-24">
+                          <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover/exp:invisible">
+                            {form.expiration_value || '\u2014'}
+                          </span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={form.expiration_value}
+                            onChange={(e) => setForm({ ...form, expiration_value: e.target.value })}
+                            placeholder="Value"
+                            className="invisible absolute inset-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover/exp:visible"
+                          />
+                        </div>
+                        <select
+                          value={form.expiration_unit}
+                          onChange={(e) => setForm({ ...form, expiration_unit: e.target.value })}
+                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                          <option value="days">Days</option>
+                          <option value="weeks">Weeks</option>
+                          <option value="months">Months</option>
+                          <option value="years">Years</option>
+                        </select>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {/* Active toggle */}
+                <div className="flex items-center gap-4">
+                  <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Active</span>
+                  <input
+                    type="checkbox"
+                    checked={form.is_active}
+                    onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                  />
+                </div>
+                {/* Private toggle */}
+                <div className="flex items-center gap-4">
+                  <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Private</span>
+                  <input
+                    type="checkbox"
+                    checked={form.is_private}
+                    onChange={(e) => setForm({ ...form, is_private: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                  />
                 </div>
                 {/* Services */}
                 <div>

@@ -28,7 +28,6 @@ interface Location {
 
 const inputClass =
   'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-const labelClass = 'mb-1 block text-sm font-medium text-gray-700';
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -283,17 +282,20 @@ export default function LocationsPage() {
               {/* Name */}
               <div>
                 {isEdit ? (
-                  <div className="group">
-                    <p className="rounded-lg px-3 py-2 text-sm text-gray-900 group-hover:hidden">
-                      {name || <span className="text-gray-400">No name</span>}
-                    </p>
-                    <input
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Location Name *"
-                      className={`${inputClass} hidden group-hover:block`}
-                    />
+                  <div className="group flex items-center gap-4">
+                    <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Name</span>
+                    <div className="relative flex-1">
+                      <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                        {name || '\u2014'}
+                      </span>
+                      <input
+                        required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Location Name *"
+                        className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                      />
+                    </div>
                   </div>
                 ) : (
                   <input
@@ -309,19 +311,22 @@ export default function LocationsPage() {
               {/* Address — Google Places Autocomplete */}
               <div>
                 {isEdit ? (
-                  <div className="group">
-                    <p className="rounded-lg px-3 py-2 text-sm text-gray-900 group-hover:hidden">
-                      {address || <span className="text-gray-400">No address</span>}
-                    </p>
-                    <input
-                      ref={addressInputRef}
-                      required
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder="Start typing an address... *"
-                      className={`${inputClass} hidden group-hover:block`}
-                      autoComplete="off"
-                    />
+                  <div className="group flex items-center gap-4">
+                    <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Address</span>
+                    <div className="relative flex-1">
+                      <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                        {address || '\u2014'}
+                      </span>
+                      <input
+                        ref={addressInputRef}
+                        required
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="Start typing an address... *"
+                        className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        autoComplete="off"
+                      />
+                    </div>
                   </div>
                 ) : (
                   <input
@@ -353,7 +358,6 @@ export default function LocationsPage() {
 
               {/* Location Photo Upload */}
               <div>
-                <label className={labelClass}>Location Photo</label>
                 <div className="flex items-center gap-3">
                   <label className="cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
                     {uploading ? 'Uploading...' : 'Upload Photo'}
@@ -406,17 +410,20 @@ export default function LocationsPage() {
               {/* Phone */}
               <div>
                 {isEdit ? (
-                  <div className="group">
-                    <p className="rounded-lg px-3 py-2 text-sm text-gray-900 group-hover:hidden">
-                      {phone || <span className="text-gray-400">No phone</span>}
-                    </p>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="Phone (+1 (555) 123-4567)"
-                      className={`${inputClass} hidden group-hover:block`}
-                    />
+                  <div className="group flex items-center gap-4">
+                    <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Phone</span>
+                    <div className="relative flex-1">
+                      <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                        {phone || '\u2014'}
+                      </span>
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="Phone (+1 (555) 123-4567)"
+                        className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                      />
+                    </div>
                   </div>
                 ) : (
                   <input
@@ -432,17 +439,20 @@ export default function LocationsPage() {
               {/* Description */}
               <div>
                 {isEdit ? (
-                  <div className="group">
-                    <p className="rounded-lg px-3 py-2 text-sm text-gray-900 group-hover:hidden">
-                      {description || <span className="text-gray-400">No description</span>}
-                    </p>
-                    <textarea
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      rows={3}
-                      placeholder="Brief description of this location..."
-                      className={`${inputClass} hidden group-hover:block`}
-                    />
+                  <div className="group flex items-start gap-4">
+                    <span className="w-32 shrink-0 pt-2 text-sm font-medium text-gray-700">Description</span>
+                    <div className="relative flex-1">
+                      <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                        {description || '\u2014'}
+                      </span>
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        rows={3}
+                        placeholder="Brief description of this location..."
+                        className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                      />
+                    </div>
                   </div>
                 ) : (
                   <textarea
@@ -481,17 +491,16 @@ export default function LocationsPage() {
                 {bookingLimitEnabled && (
                   <div className="mt-3 flex items-center gap-3">
                     <div>
-                      <label className={labelClass}>Capacity</label>
                       <input
                         type="number"
                         min="1"
                         value={bookingLimitCapacity}
                         onChange={(e) => setBookingLimitCapacity(e.target.value)}
+                        placeholder="Capacity"
                         className={`${inputClass} w-24`}
                       />
                     </div>
                     <div>
-                      <label className={labelClass}>Per</label>
                       <select
                         value={bookingLimitInterval}
                         onChange={(e) => setBookingLimitInterval(e.target.value)}
