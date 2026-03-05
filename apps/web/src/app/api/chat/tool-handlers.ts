@@ -578,19 +578,59 @@ export async function handleCancelAppointment(
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
   const appointmentId = input.appointment_id as string;
-  if (!appointmentId) return { success: false, error: 'appointment_id is required' };
+  const customerId = input.customer_id as string | undefined;
+  const customerPhone = input.customer_phone as string | undefined;
+  const customerEmail = input.customer_email as string | undefined;
 
-  const { data, error } = await supabase
+  // If an appointment_id is given, cancel it directly
+  if (appointmentId) {
+    const { data, error } = await supabase
+      .from('appointments')
+      .update({ status: 'cancelled' } as never)
+      .eq('id', appointmentId)
+      .in('status', ['pending', 'confirmed'])
+      .select('id, status')
+      .single();
+
+    if (error) return { success: false, error: error.message };
+    if (!data) return { success: false, error: 'Appointment not found or already cancelled/completed' };
+    return { success: true, data };
+  }
+
+  // Otherwise, list all cancellable appointments for this customer
+  let resolvedCustomerId = customerId;
+  if (!resolvedCustomerId && (customerPhone || customerEmail)) {
+    let query = supabase.from('customers').select('id');
+    if (customerEmail) query = query.eq('email', customerEmail);
+    else if (customerPhone) query = query.eq('phone', customerPhone);
+    const { data: cust } = await query.limit(1).single();
+    resolvedCustomerId = (cust as { id: string } | null)?.id;
+  }
+
+  if (!resolvedCustomerId) {
+    return { success: false, error: 'Please provide appointment_id, customer_id, customer_email, or customer_phone to identify the appointment.' };
+  }
+
+  const { data: appointments, error } = await supabase
     .from('appointments')
-    .update({ status: 'cancelled' } as never)
-    .eq('id', appointmentId)
+    .select('id, start_time, end_time, status, services(name, price), staff(name), tenant_locations(name), tenants(name)')
+    .eq('customer_id', resolvedCustomerId)
     .in('status', ['pending', 'confirmed'])
-    .select('id, status')
-    .single();
+    .gte('start_time', new Date().toISOString())
+    .order('start_time', { ascending: true });
 
   if (error) return { success: false, error: error.message };
-  if (!data) return { success: false, error: 'Appointment not found or already cancelled/completed' };
-  return { success: true, data };
+  if (!appointments || appointments.length === 0) {
+    return { success: true, data: { message: 'No upcoming cancellable appointments found.', appointments: [] } };
+  }
+
+  return {
+    success: true,
+    data: {
+      message: `Found ${appointments.length} cancellable appointment(s). Ask the customer which one to cancel, then call cancel_appointment with the appointment_id.`,
+      appointments,
+    },
+  };
 }
 
 // ── get_booking_details ─────────────────────────────────────────────────────
@@ -600,17 +640,51 @@ export async function handleGetBookingDetails(
   _tenantId: string,
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
-  const appointmentId = input.appointment_id as string;
-  if (!appointmentId) return { success: false, error: 'appointment_id is required' };
+  const appointmentId = input.appointment_id as string | undefined;
+  const customerId = input.customer_id as string | undefined;
+  const customerPhone = input.customer_phone as string | undefined;
+  const customerEmail = input.customer_email as string | undefined;
 
-  const { data, error } = await supabase
+  // If an appointment_id is given, fetch that single appointment
+  if (appointmentId) {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('*, services(name, duration_minutes, price), staff(name), tenant_locations(name, address), tenants(name)')
+      .eq('id', appointmentId)
+      .single();
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data };
+  }
+
+  // Otherwise, fetch ALL upcoming appointments for the customer
+  let resolvedCustomerId = customerId;
+  if (!resolvedCustomerId && (customerPhone || customerEmail)) {
+    let query = supabase.from('customers').select('id');
+    if (customerEmail) query = query.eq('email', customerEmail);
+    else if (customerPhone) query = query.eq('phone', customerPhone);
+    const { data: cust } = await query.limit(1).single();
+    resolvedCustomerId = (cust as { id: string } | null)?.id;
+  }
+
+  if (!resolvedCustomerId) {
+    return { success: false, error: 'Please provide appointment_id, customer_id, customer_email, or customer_phone.' };
+  }
+
+  const { data: appointments, error } = await supabase
     .from('appointments')
-    .select('*, services(name, duration_minutes, price), staff(name), tenant_locations(name, address)')
-    .eq('id', appointmentId)
-    .single();
+    .select('id, start_time, end_time, status, total_price, services(name, duration_minutes, price), staff(name), tenant_locations(name, address), tenants(name)')
+    .eq('customer_id', resolvedCustomerId)
+    .gte('start_time', new Date().toISOString())
+    .in('status', ['pending', 'confirmed'])
+    .order('start_time', { ascending: true });
 
   if (error) return { success: false, error: error.message };
-  return { success: true, data };
+  if (!appointments || appointments.length === 0) {
+    return { success: true, data: { message: 'No upcoming appointments found.', appointments: [] } };
+  }
+
+  return { success: true, data: { appointments } };
 }
 
 // ── get_packages ────────────────────────────────────────────────────────────

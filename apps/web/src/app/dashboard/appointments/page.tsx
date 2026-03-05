@@ -106,7 +106,7 @@ const statusConfig: Record<AppointmentStatus, { bg: string; text: string; dot: s
   emergency:   { bg: 'bg-rose-50',    text: 'text-rose-700',    dot: 'bg-rose-500',    label: 'Emergency' },
 };
 
-const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm h-9 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -406,9 +406,16 @@ export default function AppointmentsPage() {
     fetchAppointments();
   }
 
-  function handleFilter() {
+  const hasActiveFilters = search || statusFilter || staffFilter || serviceFilter || dateFrom || dateTo;
+
+  function clearFilters() {
+    setSearch('');
+    setStatusFilter('');
+    setStaffFilter('');
+    setServiceFilter('');
+    setDateFrom('');
+    setDateTo('');
     setPage(1);
-    fetchAppointments();
   }
 
   function handleExportCSV() {
@@ -488,24 +495,20 @@ export default function AppointmentsPage() {
               className={inputClass}
             />
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">From</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">To</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className={inputClass}
-            />
-          </div>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className={inputClass + ' w-auto'}
+            title="From date"
+          />
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className={inputClass + ' w-auto'}
+            title="To date"
+          />
           <select
             value={serviceFilter}
             onChange={(e) => setServiceFilter(e.target.value)}
@@ -536,12 +539,14 @@ export default function AppointmentsPage() {
               <option key={s} value={s}>{statusConfig[s].label}</option>
             ))}
           </select>
-          <button
-            onClick={handleFilter}
-            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-          >
-            Filter
-          </button>
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="h-9 rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
 
         {/* Table */}

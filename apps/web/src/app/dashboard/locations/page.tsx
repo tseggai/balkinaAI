@@ -4,39 +4,6 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const TIMEZONES = [
-  'UTC',
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Anchorage',
-  'America/Toronto',
-  'America/Vancouver',
-  'America/Sao_Paulo',
-  'America/Argentina/Buenos_Aires',
-  'America/Mexico_City',
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'Europe/Madrid',
-  'Europe/Rome',
-  'Europe/Amsterdam',
-  'Europe/Moscow',
-  'Europe/Istanbul',
-  'Asia/Dubai',
-  'Asia/Kolkata',
-  'Asia/Shanghai',
-  'Asia/Tokyo',
-  'Asia/Seoul',
-  'Asia/Singapore',
-  'Asia/Bangkok',
-  'Australia/Sydney',
-  'Australia/Melbourne',
-  'Pacific/Auckland',
-  'Pacific/Honolulu',
-];
-
 const INTERVAL_OPTIONS = ['hour', 'day', 'week', 'month'];
 
 // ── Interfaces ─────────────────────────────────────────────────────────────────
@@ -45,7 +12,6 @@ interface Location {
   id: string;
   name: string;
   address: string;
-  phone: string | null;
   lat: number | null;
   lng: number | null;
   timezone: string;
@@ -75,8 +41,8 @@ export default function LocationsPage() {
   // Form state
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
-  const [phone, setPhone] = useState('');
-  const [timezone, setTimezone] = useState('America/New_York');
+  const [timezone, setTimezone] = useState('');
+  const [detectingTimezone, setDetectingTimezone] = useState(false);
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [bookingLimitEnabled, setBookingLimitEnabled] = useState(false);
@@ -112,14 +78,34 @@ export default function LocationsPage() {
       types: ['address'],
       fields: ['formatted_address', 'geometry'],
     });
-    ac.addListener('place_changed', () => {
+    ac.addListener('place_changed', async () => {
       const place = ac.getPlace();
       if (place.formatted_address) {
         setAddress(place.formatted_address);
       }
       if (place.geometry?.location) {
-        setLat(place.geometry.location.lat());
-        setLng(place.geometry.location.lng());
+        const newLat = place.geometry.location.lat();
+        const newLng = place.geometry.location.lng();
+        setLat(newLat);
+        setLng(newLng);
+        // Auto-detect timezone via Google Maps Timezone API
+        setDetectingTimezone(true);
+        try {
+          const timestamp = Math.floor(Date.now() / 1000);
+          const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+          if (apiKey) {
+            const tzRes = await fetch(
+              `https://maps.googleapis.com/maps/api/timezone/json?location=${newLat},${newLng}&timestamp=${timestamp}&key=${apiKey}`
+            );
+            const tzJson = await tzRes.json() as { status: string; timeZoneId?: string };
+            if (tzJson.status === 'OK' && tzJson.timeZoneId) {
+              setTimezone(tzJson.timeZoneId);
+            }
+          }
+        } catch {
+          // Timezone detection failure — non-fatal
+        }
+        setDetectingTimezone(false);
       }
     });
     autocompleteRef.current = ac;
@@ -144,8 +130,7 @@ export default function LocationsPage() {
     setEditing(null);
     setName('');
     setAddress('');
-    setPhone('');
-    setTimezone('America/New_York');
+    setTimezone('');
     setLat(null);
     setLng(null);
     setBookingLimitEnabled(false);
@@ -160,8 +145,7 @@ export default function LocationsPage() {
     setEditing(loc);
     setName(loc.name);
     setAddress(loc.address);
-    setPhone(loc.phone ?? '');
-    setTimezone(loc.timezone);
+    setTimezone(loc.timezone ?? '');
     setLat(loc.lat);
     setLng(loc.lng);
     const hasLimit = loc.booking_limit_enabled ?? false;
@@ -195,8 +179,7 @@ export default function LocationsPage() {
       id: editing?.id,
       name,
       address,
-      phone: phone || null,
-      timezone,
+      timezone: timezone || 'UTC',
       lat: lat ?? null,
       lng: lng ?? null,
       booking_limit_enabled: bookingLimitEnabled,
@@ -291,32 +274,15 @@ export default function LocationsPage() {
                 )}
               </div>
 
-              {/* Phone */}
-              <div>
-                <label className={labelClass}>Phone</label>
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+1 (555) 000-0000"
-                  className={inputClass}
-                />
-              </div>
-
-              {/* Timezone */}
-              <div>
-                <label className={labelClass}>Timezone</label>
-                <select
-                  value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                  className={inputClass}
-                >
-                  {TIMEZONES.map((tz) => (
-                    <option key={tz} value={tz}>
-                      {tz}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Timezone (auto-detected) */}
+              {(timezone || detectingTimezone) && (
+                <div>
+                  <label className={labelClass}>Timezone</label>
+                  <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                    {detectingTimezone ? 'Detecting timezone...' : timezone}
+                  </p>
+                </div>
+              )}
 
               {/* Booking Limiter */}
               <div className="rounded-lg border border-gray-200 p-4">
@@ -432,9 +398,6 @@ export default function LocationsPage() {
                     Address
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                    Phone
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
                     Timezone
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
@@ -453,10 +416,7 @@ export default function LocationsPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{loc.address}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
-                      {loc.phone ?? '\u2014'}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
-                      {loc.timezone}
+                      {loc.timezone || '\u2014'}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm">
                       {loc.booking_limit_enabled ? (

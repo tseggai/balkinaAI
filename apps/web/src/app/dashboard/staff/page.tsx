@@ -110,7 +110,8 @@ export default function StaffPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('details');
 
   // Details tab state
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [profession, setProfession] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -139,6 +140,9 @@ export default function StaffPage() {
   // Dropdowns data
   const [allLocations, setAllLocations] = useState<LocationOption[]>([]);
   const [allServices, setAllServices] = useState<ServiceOption[]>([]);
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // General state
   const [saving, setSaving] = useState(false);
@@ -186,7 +190,8 @@ export default function StaffPage() {
   function openNew() {
     setEditing(null);
     setActiveTab('details');
-    setName('');
+    setFirstName('');
+    setLastName('');
     setProfession('');
     setEmail('');
     setPhone('');
@@ -208,7 +213,9 @@ export default function StaffPage() {
   function openEdit(s: StaffMember) {
     setEditing(s);
     setActiveTab('details');
-    setName(s.name);
+    const nameParts = (s.name || '').trim().split(/\s+/);
+    setFirstName(nameParts[0] ?? '');
+    setLastName(nameParts.slice(1).join(' '));
     setProfession(s.profession ?? '');
     setEmail(s.email);
     setPhone(s.phone ?? '');
@@ -270,6 +277,39 @@ export default function StaffPage() {
     fetchStaff();
   }
 
+  async function handleToggleActive(s: StaffMember) {
+    const newActive = !s.is_active;
+    await fetch('/api/staff', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: s.id, is_active: newActive }),
+    });
+    fetchStaff();
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === staff.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(staff.map((s) => s.id)));
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function getInitials(name: string): string {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
+    return (parts[0]![0] ?? '?').toUpperCase();
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -277,9 +317,10 @@ export default function StaffPage() {
 
     const isEdit = Boolean(editing?.id);
 
+    const combinedName = `${firstName.trim()} ${lastName.trim()}`.trim();
     const body: Record<string, unknown> = {
       id: isEdit ? editing?.id : undefined,
-      name,
+      name: combinedName,
       email,
       phone: phone || null,
       profession: profession || null,
@@ -442,15 +483,32 @@ export default function StaffPage() {
   function renderDetailsTab() {
     return (
       <div className="space-y-5">
-        {/* Name */}
-        <div>
-          <label className={labelClass}>Full Name *</label>
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={inputClass}
-          />
+        {/* Image Upload — top of form */}
+        <ImageUpload
+          value={imageUrl}
+          onChange={setImageUrl}
+          label="Staff Photo"
+        />
+
+        {/* First Name + Last Name */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>First Name *</label>
+            <input
+              required
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Last Name</label>
+            <input
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className={inputClass}
+            />
+          </div>
         </div>
 
         {/* Profession */}
@@ -485,13 +543,6 @@ export default function StaffPage() {
             />
           </div>
         </div>
-
-        {/* Image Upload */}
-        <ImageUpload
-          value={imageUrl}
-          onChange={setImageUrl}
-          label="Staff Photo"
-        />
 
         {/* Locations multi-select */}
         <div>
@@ -1037,11 +1088,20 @@ export default function StaffPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="w-10 px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size === staff.length && staff.length > 0}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                    />
+                  </th>
+                  <th className="w-14 px-3 py-3 text-left text-xs font-medium uppercase text-gray-500">Photo</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Phone</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Profession</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Active</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Services</th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
                 </tr>
@@ -1049,6 +1109,23 @@ export default function StaffPage() {
               <tbody className="divide-y divide-gray-100">
                 {staff.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(s.id)}
+                        onChange={() => toggleSelect(s.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                      />
+                    </td>
+                    <td className="px-3 py-3">
+                      {s.image_url ? (
+                        <img src={s.image_url} alt={s.name} className="h-10 w-10 rounded-full object-cover" />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+                          {getInitials(s.name)}
+                        </div>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
                       {s.name}
                     </td>
@@ -1059,16 +1136,20 @@ export default function StaffPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                       {s.profession ?? '\u2014'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm">
-                      {s.status === 'inactive' || s.is_active === false ? (
-                        <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                          Inactive
-                        </span>
-                      ) : (
-                        <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                          Active
-                        </span>
-                      )}
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleActive(s)}
+                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                          s.is_active !== false ? 'bg-brand-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                            s.is_active !== false ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                       {s.services_count}

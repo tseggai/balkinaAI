@@ -185,9 +185,10 @@ export function ServiceForm({
   );
 
   // --- Category state ---
-  const [allCategories, setAllCategories] = useState<string[]>([]);
+  const [allCategories, setAllCategories] = useState<{ id: string; name: string }[]>([]);
   const [addingNewCategory, setAddingNewCategory] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
 
   // --- Recurring state ---
   const [recurringInterval, setRecurringInterval] = useState('week');
@@ -223,16 +224,11 @@ export function ServiceForm({
       })
       .catch(() => {});
 
-    fetch('/api/services')
+    fetch('/api/tenant-categories')
       .then((res) => res.json())
       .then((json) => {
-        const services = (json.data ?? []) as { category_name: string | null }[];
-        const cats = [...new Set(
-          services
-            .map((s) => s.category_name)
-            .filter((c): c is string => c != null && c.trim() !== '')
-        )].sort();
-        setAllCategories(cats);
+        const cats = (json.data ?? []) as { id: string; name: string }[];
+        setAllCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
       })
       .catch(() => {});
   }, []);
@@ -365,19 +361,35 @@ export function ServiceForm({
               />
               <button
                 type="button"
-                onClick={() => {
-                  if (newCategoryInput.trim()) {
-                    setCategoryName(newCategoryInput.trim());
-                    if (!allCategories.includes(newCategoryInput.trim())) {
-                      setAllCategories((prev) => [...prev, newCategoryInput.trim()].sort());
+                disabled={savingCategory}
+                onClick={async () => {
+                  const trimmed = newCategoryInput.trim();
+                  if (!trimmed) return;
+                  setSavingCategory(true);
+                  try {
+                    const res = await fetch('/api/tenant-categories', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name: trimmed }),
+                    });
+                    if (res.ok) {
+                      setCategoryName(trimmed);
+                      // Refresh categories list
+                      const catRes = await fetch('/api/tenant-categories');
+                      const catJson = await catRes.json();
+                      const cats = (catJson.data ?? []) as { id: string; name: string }[];
+                      setAllCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
                     }
+                  } catch {
+                    // ignore
                   }
+                  setSavingCategory(false);
                   setAddingNewCategory(false);
                   setNewCategoryInput('');
                 }}
-                className="whitespace-nowrap rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700"
+                className="whitespace-nowrap rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                Add
+                {savingCategory ? 'Saving...' : 'Add'}
               </button>
               <button
                 type="button"
@@ -402,7 +414,7 @@ export function ServiceForm({
               >
                 <option value="">Select a category...</option>
                 {allCategories.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
+                  <option key={cat.id} value={cat.name}>{cat.name}</option>
                 ))}
                 <option value="__new__">+ Add new category</option>
               </select>
