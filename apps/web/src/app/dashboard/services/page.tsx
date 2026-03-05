@@ -447,7 +447,7 @@ function DiagramView({
               {/* Category Header */}
               <div
                 className="mb-4 rounded-xl px-5 py-3 shadow-sm"
-                style={{ backgroundColor: group.color, minWidth: 220 }}
+                style={{ backgroundColor: group.color, minWidth: 288 }}
               >
                 <h3 className="text-base font-bold text-white drop-shadow-sm">
                   {group.category}
@@ -512,7 +512,7 @@ function DiagramServiceCard({
   onDelete: () => void;
 }) {
   return (
-    <div className="group relative w-56 rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
+    <div className="group relative w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
       {/* Action buttons (visible on hover) */}
       <div className="absolute -right-1 -top-1 hidden gap-0.5 group-hover:flex">
         <button
@@ -547,7 +547,7 @@ function DiagramServiceCard({
           className="h-3 w-3 flex-shrink-0 rounded-full"
           style={{ backgroundColor: service.color || '#6366f1' }}
         />
-        <span className="truncate text-sm font-semibold text-gray-900">{service.name}</span>
+        <span className="line-clamp-2 text-sm font-semibold leading-tight text-gray-900">{service.name}</span>
       </div>
 
       {/* Price & Duration */}

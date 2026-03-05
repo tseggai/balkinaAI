@@ -84,19 +84,33 @@ export default function BookingsScreen() {
     }
 
     // Step 1: Find the customer_id by looking up the customers table
-    // Match by auth user id first, then by email, then by phone
+    // Match by user_id first (set when booking via chat), then by id, email, phone
     let customerId: string | null = null;
 
-    // Try matching by id (auth user id = customers.id)
-    const { data: byId } = await supabase
+    // Try matching by user_id (linked authenticated user)
+    const { data: byUserId } = await supabase
       .from('customers')
       .select('id')
-      .eq('id', user.id)
+      .eq('user_id', user.id)
       .limit(1)
       .maybeSingle();
 
-    if (byId) {
-      customerId = byId.id;
+    if (byUserId) {
+      customerId = byUserId.id;
+    }
+
+    // Try matching by id (auth user id = customers.id)
+    if (!customerId) {
+      const { data: byId } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (byId) {
+        customerId = byId.id;
+      }
     }
 
     // If not found by id, try email

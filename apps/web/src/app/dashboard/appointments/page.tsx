@@ -47,6 +47,8 @@ interface ServiceItem {
   name: string;
   duration_minutes: number;
   price: number;
+  service_category?: string | null;
+  category_name?: string | null;
   service_extras?: ServiceExtra[];
 }
 
@@ -486,33 +488,31 @@ export default function AppointmentsPage() {
 
         {/* Filter bar */}
         <div className="mt-4 flex flex-wrap gap-2 items-center">
-          <div className="min-w-[200px] flex-1">
-            <input
-              type="text"
-              placeholder="Search by customer name or email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className={inputClass}
-            />
-          </div>
+          <input
+            type="text"
+            placeholder="Search customer..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-48 rounded-lg border border-gray-300 px-3 py-1.5 text-sm h-9 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
           <input
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className={inputClass + ' w-auto'}
+            className="w-36 rounded-lg border border-gray-300 px-3 py-1.5 text-sm h-9 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             title="From date"
           />
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className={inputClass + ' w-auto'}
+            className="w-36 rounded-lg border border-gray-300 px-3 py-1.5 text-sm h-9 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             title="To date"
           />
           <select
             value={serviceFilter}
             onChange={(e) => setServiceFilter(e.target.value)}
-            className={inputClass + ' w-auto min-w-[140px]'}
+            className="w-36 rounded-lg border border-gray-300 px-3 py-1.5 text-sm h-9 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           >
             <option value="">All Services</option>
             {serviceList.map((s) => (
@@ -522,7 +522,7 @@ export default function AppointmentsPage() {
           <select
             value={staffFilter}
             onChange={(e) => setStaffFilter(e.target.value)}
-            className={inputClass + ' w-auto min-w-[140px]'}
+            className="w-36 rounded-lg border border-gray-300 px-3 py-1.5 text-sm h-9 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           >
             <option value="">All Staff</option>
             {staffList.map((s) => (
@@ -532,7 +532,7 @@ export default function AppointmentsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className={inputClass + ' w-auto min-w-[140px]'}
+            className="w-32 rounded-lg border border-gray-300 px-3 py-1.5 text-sm h-9 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           >
             <option value="">All Statuses</option>
             {STATUS_OPTIONS.map((s) => (
@@ -544,7 +544,7 @@ export default function AppointmentsPage() {
               onClick={clearFilters}
               className="h-9 rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
             >
-              Clear filters
+              Clear
             </button>
           )}
         </div>
@@ -855,9 +855,23 @@ export default function AppointmentsPage() {
                       required
                     >
                       <option value="">Select service...</option>
-                      {serviceList.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name} — ${s.price.toFixed(2)}</option>
-                      ))}
+                      {(() => {
+                        const grouped = new Map<string, ServiceItem[]>();
+                        for (const s of serviceList) {
+                          const cat = s.service_category || s.category_name || 'Uncategorized';
+                          if (!grouped.has(cat)) grouped.set(cat, []);
+                          grouped.get(cat)!.push(s);
+                        }
+                        return Array.from(grouped.entries()).map(([cat, svcs]) => (
+                          <optgroup key={cat} label={cat}>
+                            {svcs.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name} (${s.price.toFixed(2)}, {s.duration_minutes} min)
+                              </option>
+                            ))}
+                          </optgroup>
+                        ));
+                      })()}
                     </select>
                   </div>
 

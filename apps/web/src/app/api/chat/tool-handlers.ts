@@ -409,7 +409,7 @@ export async function handleBookAppointment(
   supabase: AdminClient,
   tenantId: string,
   input: Record<string, unknown>,
-  sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string },
+  sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string; userId: string | null },
 ): Promise<ToolResult> {
   const serviceId = input.service_id as string;
   const startTime = input.start_time as string;
@@ -460,6 +460,19 @@ export async function handleBookAppointment(
   // 4. Create or find customer record
   let customerId = sessionInfo.customerId;
 
+  // Try to find existing customer by user_id (authenticated mobile user)
+  if (!customerId && sessionInfo.userId) {
+    const { data: byUserId } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('user_id', sessionInfo.userId)
+      .limit(1)
+      .maybeSingle();
+    if (byUserId) {
+      customerId = (byUserId as { id: string }).id;
+    }
+  }
+
   if (!customerId && sessionInfo.customerPhone) {
     // Try to find existing customer by phone
     const { data: existingCustomer } = await supabase
@@ -498,6 +511,7 @@ export async function handleBookAppointment(
       display_name: sessionInfo.customerName,
       phone: sessionInfo.customerPhone,
       email: null,
+      user_id: sessionInfo.userId ?? null,
     } as never);
   }
 
@@ -576,6 +590,7 @@ export async function handleCancelAppointment(
   supabase: AdminClient,
   _tenantId: string,
   input: Record<string, unknown>,
+  sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string; userId: string | null },
 ): Promise<ToolResult> {
   const appointmentId = input.appointment_id as string;
   const customerId = input.customer_id as string | undefined;
@@ -598,11 +613,24 @@ export async function handleCancelAppointment(
   }
 
   // Otherwise, list all cancellable appointments for this customer
-  let resolvedCustomerId = customerId;
-  if (!resolvedCustomerId && (customerPhone || customerEmail)) {
+  let resolvedCustomerId = customerId ?? sessionInfo.customerId ?? undefined;
+
+  // Try user_id lookup first (authenticated mobile user)
+  if (!resolvedCustomerId && sessionInfo.userId) {
+    const { data: byUserId } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('user_id', sessionInfo.userId)
+      .limit(1)
+      .maybeSingle();
+    if (byUserId) resolvedCustomerId = (byUserId as { id: string }).id;
+  }
+
+  if (!resolvedCustomerId && (customerPhone || customerEmail || sessionInfo.customerPhone)) {
     let query = supabase.from('customers').select('id');
     if (customerEmail) query = query.eq('email', customerEmail);
     else if (customerPhone) query = query.eq('phone', customerPhone);
+    else if (sessionInfo.customerPhone) query = query.eq('phone', sessionInfo.customerPhone);
     const { data: cust } = await query.limit(1).single();
     resolvedCustomerId = (cust as { id: string } | null)?.id;
   }
@@ -639,6 +667,7 @@ export async function handleGetBookingDetails(
   supabase: AdminClient,
   _tenantId: string,
   input: Record<string, unknown>,
+  sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string; userId: string | null },
 ): Promise<ToolResult> {
   const appointmentId = input.appointment_id as string | undefined;
   const customerId = input.customer_id as string | undefined;
@@ -658,11 +687,24 @@ export async function handleGetBookingDetails(
   }
 
   // Otherwise, fetch ALL upcoming appointments for the customer
-  let resolvedCustomerId = customerId;
-  if (!resolvedCustomerId && (customerPhone || customerEmail)) {
+  let resolvedCustomerId = customerId ?? sessionInfo.customerId ?? undefined;
+
+  // Try user_id lookup first (authenticated mobile user)
+  if (!resolvedCustomerId && sessionInfo.userId) {
+    const { data: byUserId } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('user_id', sessionInfo.userId)
+      .limit(1)
+      .maybeSingle();
+    if (byUserId) resolvedCustomerId = (byUserId as { id: string }).id;
+  }
+
+  if (!resolvedCustomerId && (customerPhone || customerEmail || sessionInfo.customerPhone)) {
     let query = supabase.from('customers').select('id');
     if (customerEmail) query = query.eq('email', customerEmail);
     else if (customerPhone) query = query.eq('phone', customerPhone);
+    else if (sessionInfo.customerPhone) query = query.eq('phone', sessionInfo.customerPhone);
     const { data: cust } = await query.limit(1).single();
     resolvedCustomerId = (cust as { id: string } | null)?.id;
   }
@@ -1001,7 +1043,7 @@ export async function executeTool(
   toolInput: Record<string, unknown>,
   supabase: AdminClient,
   tenantId: string,
-  sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string },
+  sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string; userId: string | null },
 ): Promise<ToolResult> {
   try {
     switch (toolName) {
@@ -1020,10 +1062,10 @@ export async function executeTool(
       case 'create_booking':
         return await handleBookAppointment(supabase, tenantId, toolInput, sessionInfo);
       case 'cancel_appointment':
-        return await handleCancelAppointment(supabase, tenantId, toolInput);
+        return await handleCancelAppointment(supabase, tenantId, toolInput, sessionInfo);
       case 'get_customer_appointments':
       case 'get_booking_details':
-        return await handleGetBookingDetails(supabase, tenantId, toolInput);
+        return await handleGetBookingDetails(supabase, tenantId, toolInput, sessionInfo);
       case 'get_packages':
         return await handleGetPackages(supabase, tenantId, toolInput);
       case 'get_loyalty_info':

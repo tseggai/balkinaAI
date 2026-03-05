@@ -15,6 +15,9 @@ interface Location {
   lat: number | null;
   lng: number | null;
   timezone: string;
+  phone: string | null;
+  description: string | null;
+  image_url: string | null;
   booking_limit_enabled: boolean;
   booking_limit_capacity: number | null;
   booking_limit_interval: string | null;
@@ -48,14 +51,17 @@ export default function LocationsPage() {
   const [bookingLimitEnabled, setBookingLimitEnabled] = useState(false);
   const [bookingLimitCapacity, setBookingLimitCapacity] = useState('1');
   const [bookingLimitInterval, setBookingLimitInterval] = useState('day');
+  const [phone, setPhone] = useState('');
+  const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
 
   // General state
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   // Google Places autocomplete
-  const addressInputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const addressContainerRef = useRef<HTMLDivElement>(null);
+  const autocompleteElRef = useRef<HTMLElement | null>(null);
   const [mapsLoaded, setMapsLoaded] = useState(false);
 
   useEffect(() => {
@@ -66,26 +72,36 @@ export default function LocationsPage() {
       return;
     }
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
     script.async = true;
     script.onload = () => setMapsLoaded(true);
     document.head.appendChild(script);
   }, []);
 
   useEffect(() => {
-    if (!mapsLoaded || !addressInputRef.current || autocompleteRef.current) return;
-    const ac = new google.maps.places.Autocomplete(addressInputRef.current, {
-      types: ['address'],
-      fields: ['formatted_address', 'geometry'],
-    });
-    ac.addListener('place_changed', async () => {
-      const place = ac.getPlace();
-      if (place.formatted_address) {
-        setAddress(place.formatted_address);
+    if (!mapsLoaded || !addressContainerRef.current || autocompleteElRef.current) return;
+    // Use the new PlaceAutocompleteElement (web component)
+    const placeAutocomplete = new (google.maps.places as unknown as { PlaceAutocompleteElement: new (opts: { types?: string[]; componentRestrictions?: { country: string } }) => HTMLElement & { addEventListener: (event: string, handler: (e: unknown) => void) => void } }).PlaceAutocompleteElement({});
+    // Style the element to match our form inputs
+    placeAutocomplete.style.cssText = 'width:100%;';
+    addressContainerRef.current.innerHTML = '';
+    addressContainerRef.current.appendChild(placeAutocomplete);
+    autocompleteElRef.current = placeAutocomplete;
+
+    placeAutocomplete.addEventListener('gmp-placeselect', async (event: unknown) => {
+      const e = event as { place?: { displayName?: string; formattedAddress?: string; location?: { lat: () => number; lng: () => number }; fetchFields?: (opts: { fields: string[] }) => Promise<void> } };
+      const place = e.place;
+      if (!place) return;
+      // Fetch full place details if needed
+      if (place.fetchFields) {
+        await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
       }
-      if (place.geometry?.location) {
-        const newLat = place.geometry.location.lat();
-        const newLng = place.geometry.location.lng();
+      if (place.formattedAddress) {
+        setAddress(place.formattedAddress);
+      }
+      if (place.location) {
+        const newLat = place.location.lat();
+        const newLng = place.location.lng();
         setLat(newLat);
         setLng(newLng);
         // Auto-detect timezone via Google Maps Timezone API
@@ -108,7 +124,6 @@ export default function LocationsPage() {
         setDetectingTimezone(false);
       }
     });
-    autocompleteRef.current = ac;
   }, [mapsLoaded, showPanel]);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -133,11 +148,14 @@ export default function LocationsPage() {
     setTimezone('');
     setLat(null);
     setLng(null);
+    setPhone('');
+    setDescription('');
+    setImageUrl('');
     setBookingLimitEnabled(false);
     setBookingLimitCapacity('1');
     setBookingLimitInterval('day');
     setError('');
-    autocompleteRef.current = null;
+    autocompleteElRef.current = null;
     setShowPanel(true);
   }
 
@@ -148,12 +166,15 @@ export default function LocationsPage() {
     setTimezone(loc.timezone ?? '');
     setLat(loc.lat);
     setLng(loc.lng);
+    setPhone(loc.phone ?? '');
+    setDescription(loc.description ?? '');
+    setImageUrl(loc.image_url ?? '');
     const hasLimit = loc.booking_limit_enabled ?? false;
     setBookingLimitEnabled(hasLimit);
     setBookingLimitCapacity(String(loc.booking_limit_capacity ?? 1));
     setBookingLimitInterval(loc.booking_limit_interval ?? 'day');
     setError('');
-    autocompleteRef.current = null;
+    autocompleteElRef.current = null;
     setShowPanel(true);
   }
 
@@ -182,6 +203,9 @@ export default function LocationsPage() {
       timezone: timezone || 'UTC',
       lat: lat ?? null,
       lng: lng ?? null,
+      phone: phone || null,
+      description: description || null,
+      image_url: imageUrl || null,
       booking_limit_enabled: bookingLimitEnabled,
       booking_limit_capacity: bookingLimitEnabled ? Number(bookingLimitCapacity) : null,
       booking_limit_interval: bookingLimitEnabled ? bookingLimitInterval : null,
@@ -235,6 +259,24 @@ export default function LocationsPage() {
           {/* Body */}
           <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
             <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+              {/* Image URL */}
+              <div>
+                <label className={labelClass}>Image URL</label>
+                <input
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                  className={inputClass}
+                />
+                {imageUrl && (
+                  <img
+                    src={imageUrl}
+                    alt="Location"
+                    className="mt-2 h-32 w-full rounded-lg border border-gray-200 object-cover"
+                  />
+                )}
+              </div>
+
               {/* Name */}
               <div>
                 <label className={labelClass}>Location Name *</label>
@@ -246,18 +288,46 @@ export default function LocationsPage() {
                 />
               </div>
 
-              {/* Address */}
+              {/* Phone */}
+              <div>
+                <label className={labelClass}>Phone</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+1 (555) 123-4567"
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className={labelClass}>Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Brief description of this location..."
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Address — PlaceAutocompleteElement */}
               <div>
                 <label className={labelClass}>Address *</label>
-                <input
-                  ref={addressInputRef}
-                  required
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Start typing an address..."
-                  className={inputClass}
-                  autoComplete="off"
-                />
+                <div ref={addressContainerRef} className="w-full" />
+                {/* Fallback manual input if Maps API not loaded */}
+                {!mapsLoaded && (
+                  <input
+                    required
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Start typing an address..."
+                    className={inputClass}
+                    autoComplete="off"
+                  />
+                )}
+                {address && <p className="mt-1 text-xs text-gray-500">{address}</p>}
                 {lat != null && lng != null && (
                   <div className="mt-2">
                     <p className="text-xs text-gray-500">
@@ -398,6 +468,9 @@ export default function LocationsPage() {
                     Address
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                    Phone
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
                     Timezone
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
@@ -415,6 +488,9 @@ export default function LocationsPage() {
                       {loc.name}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{loc.address}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
+                      {loc.phone || '\u2014'}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                       {loc.timezone || '\u2014'}
                     </td>
