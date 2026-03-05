@@ -276,6 +276,7 @@ interface ChatRequestBody {
   sessionId: string;
   customerName?: string;
   customerPhone?: string;
+  userId?: string;
   userLatitude?: number;
   userLongitude?: number;
 }
@@ -283,7 +284,7 @@ interface ChatRequestBody {
 export async function POST(request: Request) {
   try {
   const body = (await request.json()) as ChatRequestBody;
-  const { message, tenantId, sessionId, customerName, customerPhone, userLatitude, userLongitude } = body;
+  const { message, tenantId, sessionId, customerName, customerPhone, userId, userLatitude, userLongitude } = body;
 
   if (!message || !sessionId) {
     return new Response(JSON.stringify({ error: 'message and sessionId are required' }), {
@@ -597,6 +598,7 @@ export async function POST(request: Request) {
                 customerPhone:
                   chatSession!.customer_phone ?? customerPhone ?? null,
                 chatSessionId: chatSession!.id,
+                userId: userId ?? null,
               },
             );
 
