@@ -160,11 +160,25 @@ const findBusinessesTool: OpenAI.ChatCompletionTool = {
 function buildTenantSystemPrompt(
   tenantName: string,
   customerName: string | null,
+  customerPhone: string | null,
+  customerEmail: string | null,
+  userId: string | null,
   currentDate: string,
 ): string {
-  const customerSection = customerName
-    ? `The customer's name is ${customerName}.`
-    : 'The customer has not provided their name yet. Ask for their name and phone number before booking.';
+  let customerSection: string;
+  if (userId) {
+    // Authenticated user — we already have their info, do NOT ask again
+    const parts = [`This customer is authenticated (user ID: ${userId}).`];
+    if (customerName) parts.push(`Name: ${customerName}.`);
+    if (customerPhone) parts.push(`Phone: ${customerPhone}.`);
+    if (customerEmail) parts.push(`Email: ${customerEmail}.`);
+    parts.push('You already have their personal information — do NOT ask for their name, phone, or email. Proceed directly with booking when they confirm.');
+    customerSection = parts.join(' ');
+  } else if (customerName) {
+    customerSection = `The customer's name is ${customerName}.`;
+  } else {
+    customerSection = 'The customer has not provided their name yet. Ask for their name and phone number before booking.';
+  }
 
   return `You are the booking assistant for "${tenantName}" — a friendly, efficient AI that helps customers discover services and book appointments through Balkina AI.
 
@@ -201,6 +215,7 @@ ${customerSection}
 - When a customer asks about their appointments ("my appointments", "my bookings"), use get_booking_details with their customer_id, email, or phone. This returns ALL upcoming appointments. Present them as a numbered list.
 - When a customer wants to cancel, use cancel_appointment with their customer identifier (no appointment_id). This lists all cancellable appointments. Present the list and ask which one to cancel. Then call cancel_appointment again with the chosen appointment_id.
 - NEVER ask the customer for an appointment ID. Always fetch the list first and let them choose by number or description.
+- IMPORTANT: If the customer is authenticated (you have their info above), call get_booking_details or cancel_appointment immediately with their email/phone. Do NOT ask them for their name, email, or phone — you already have it.
 
 ## Boundaries
 - You only help with booking appointments at ${tenantName}.
@@ -211,12 +226,25 @@ ${customerSection}
 
 function buildDiscoverySystemPrompt(
   customerName: string | null,
+  customerPhone: string | null,
+  customerEmail: string | null,
+  userId: string | null,
   currentDate: string,
   userLocation?: { latitude: number; longitude: number } | null,
 ): string {
-  const customerSection = customerName
-    ? `The customer's name is ${customerName}.`
-    : 'The customer has not provided their name yet.';
+  let customerSection: string;
+  if (userId) {
+    const parts = [`This customer is authenticated (user ID: ${userId}).`];
+    if (customerName) parts.push(`Name: ${customerName}.`);
+    if (customerPhone) parts.push(`Phone: ${customerPhone}.`);
+    if (customerEmail) parts.push(`Email: ${customerEmail}.`);
+    parts.push('You already have their personal information — do NOT ask for their name, phone, or email. Proceed directly with booking when they confirm.');
+    customerSection = parts.join(' ');
+  } else if (customerName) {
+    customerSection = `The customer's name is ${customerName}.`;
+  } else {
+    customerSection = 'The customer has not provided their name yet.';
+  }
 
   return `You are Balkina AI — a friendly, smart booking assistant that helps customers find the right business and book appointments.
 
@@ -257,6 +285,7 @@ Without tenant_id, those tools cannot look up the business's data.
 - When a customer asks about their appointments ("my appointments", "my bookings"), use get_booking_details with their customer_id, email, or phone. This returns ALL upcoming appointments across all businesses. Present them as a numbered list.
 - When a customer wants to cancel, use cancel_appointment with their customer identifier (no appointment_id). This lists all cancellable appointments. Present the list and ask which one to cancel. Then call cancel_appointment again with the chosen appointment_id.
 - NEVER ask the customer for an appointment ID. Always fetch the list first and let them choose by number or description.
+- IMPORTANT: If the customer is authenticated (you have their info above), call get_booking_details or cancel_appointment immediately with their email/phone. Do NOT ask them for their name, email, or phone — you already have it.
 
 ## Location context
 ${userLocation ? `The user's current location is latitude ${userLocation.latitude}, longitude ${userLocation.longitude}. When calling find_businesses, pass these coordinates so results are sorted by proximity. Mention distance in your response when available.` : 'The user has not shared their location. You can still search for businesses, but results won\'t be sorted by proximity. If the user asks for nearby businesses, suggest they enable location access.'}
@@ -276,6 +305,7 @@ interface ChatRequestBody {
   sessionId: string;
   customerName?: string;
   customerPhone?: string;
+  customerEmail?: string;
   userId?: string;
   userLatitude?: number;
   userLongitude?: number;
@@ -284,7 +314,7 @@ interface ChatRequestBody {
 export async function POST(request: Request) {
   try {
   const body = (await request.json()) as ChatRequestBody;
-  const { message, tenantId, sessionId, customerName, customerPhone, userId, userLatitude, userLongitude } = body;
+  const { message, tenantId, sessionId, customerName, customerPhone, customerEmail, userId, userLatitude, userLongitude } = body;
 
   if (!message || !sessionId) {
     return new Response(JSON.stringify({ error: 'message and sessionId are required' }), {
@@ -474,14 +504,25 @@ export async function POST(request: Request) {
     ? [...tenantChatTools]
     : [findBusinessesTool, ...tenantChatTools];
 
+  const resolvedName = chatSession.customer_name ?? customerName ?? null;
+  const resolvedPhone = chatSession.customer_phone ?? customerPhone ?? null;
+  const resolvedEmail = customerEmail ?? null;
+  const resolvedUserId = userId ?? null;
+
   const systemPrompt = tenantId
     ? buildTenantSystemPrompt(
         tenantName,
-        chatSession.customer_name ?? customerName ?? null,
+        resolvedName,
+        resolvedPhone,
+        resolvedEmail,
+        resolvedUserId,
         new Date().toISOString().slice(0, 10),
       )
     : buildDiscoverySystemPrompt(
-        chatSession.customer_name ?? customerName ?? null,
+        resolvedName,
+        resolvedPhone,
+        resolvedEmail,
+        resolvedUserId,
         new Date().toISOString().slice(0, 10),
         userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
       );

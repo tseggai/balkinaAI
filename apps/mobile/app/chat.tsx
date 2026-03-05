@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '@/lib/supabase';
 
 const API_BASE = 'https://balkina-ai.vercel.app';
 
@@ -220,8 +221,27 @@ export default function ChatScreen() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId] = useState(generateSessionId);
+  const [customerName, setCustomerName] = useState<string | null>(null);
+  const [customerPhone, setCustomerPhone] = useState<string | null>(null);
+  const [customerEmail, setCustomerEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const flatListRef = useRef<FlatList>(null);
+
+  // Fetch authenticated user info on mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const meta = user.user_metadata as { display_name?: string; phone?: string } | undefined;
+        setCustomerName(meta?.display_name ?? user.email ?? null);
+        setCustomerPhone(meta?.phone ?? user.phone ?? null);
+        setCustomerEmail(user.email ?? null);
+        setUserId(user.id);
+      }
+    };
+    fetchUser();
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -258,14 +278,20 @@ export default function ChatScreen() {
     setIsLoading(true);
 
     try {
+      const body: Record<string, string> = {
+        message: trimmed,
+        tenantId,
+        sessionId,
+      };
+      if (customerName) body.customerName = customerName;
+      if (customerPhone) body.customerPhone = customerPhone;
+      if (customerEmail) body.customerEmail = customerEmail;
+      if (userId) body.userId = userId;
+
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: trimmed,
-          tenantId,
-          sessionId,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -363,7 +389,7 @@ export default function ChatScreen() {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, tenantId, sessionId]);
+  }, [input, isLoading, tenantId, sessionId, customerName, customerPhone, customerEmail, userId]);
 
   return (
     <KeyboardAvoidingView

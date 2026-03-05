@@ -244,6 +244,9 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState(() => generateId());
   const [customerName, setCustomerName] = useState<string | null>(null);
+  const [customerPhone, setCustomerPhone] = useState<string | null>(null);
+  const [customerEmail, setCustomerEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const resetConversation = useCallback(() => {
@@ -260,8 +263,11 @@ export default function ChatScreen() {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const meta = user.user_metadata as { display_name?: string } | undefined;
+        const meta = user.user_metadata as { display_name?: string; phone?: string } | undefined;
         setCustomerName(meta?.display_name ?? user.email ?? null);
+        setCustomerPhone(meta?.phone ?? user.phone ?? null);
+        setCustomerEmail(user.email ?? null);
+        setUserId(user.id);
       }
     };
     fetchUser();
@@ -332,6 +338,15 @@ export default function ChatScreen() {
         };
         if (customerName) {
           body.customerName = customerName;
+        }
+        if (customerPhone) {
+          body.customerPhone = customerPhone;
+        }
+        if (customerEmail) {
+          body.customerEmail = customerEmail;
+        }
+        if (userId) {
+          body.userId = userId;
         }
         if (userCoords) {
           body.userLatitude = userCoords.latitude;
@@ -424,7 +439,7 @@ export default function ChatScreen() {
 
       setIsLoading(false);
     },
-    [input, isLoading, sessionId, customerName, userCoords],
+    [input, isLoading, sessionId, customerName, customerPhone, customerEmail, userId, userCoords],
   );
 
   const handleChipPress = useCallback(
