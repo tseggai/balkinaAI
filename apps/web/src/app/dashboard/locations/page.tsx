@@ -55,73 +55,74 @@ export default function LocationsPage() {
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
 
+  const [uploading, setUploading] = useState(false);
+
   // General state
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   // Google Places autocomplete
-  const addressContainerRef = useRef<HTMLDivElement>(null);
-  const autocompleteElRef = useRef<HTMLElement | null>(null);
+  const addressInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [mapsLoaded, setMapsLoaded] = useState(false);
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) return;
-    if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).google) {
+    const g = window as unknown as { google?: { maps?: unknown } };
+    if (g.google?.maps) {
       setMapsLoaded(true);
       return;
     }
+    const existing = document.querySelector('script[src*="maps.googleapis.com"]');
+    if (existing) {
+      existing.addEventListener('load', () => setMapsLoaded(true));
+      return;
+    }
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
     script.async = true;
     script.onload = () => setMapsLoaded(true);
     document.head.appendChild(script);
   }, []);
 
   useEffect(() => {
-    if (!mapsLoaded || !addressContainerRef.current || autocompleteElRef.current) return;
-    // Use the new PlaceAutocompleteElement (web component)
-    const placeAutocomplete = new (google.maps.places as unknown as { PlaceAutocompleteElement: new (opts: { types?: string[]; componentRestrictions?: { country: string } }) => HTMLElement & { addEventListener: (event: string, handler: (e: unknown) => void) => void } }).PlaceAutocompleteElement({});
-    // Style the element to match our form inputs
-    placeAutocomplete.style.cssText = 'width:100%;';
-    addressContainerRef.current.innerHTML = '';
-    addressContainerRef.current.appendChild(placeAutocomplete);
-    autocompleteElRef.current = placeAutocomplete;
+    if (!mapsLoaded || !showPanel || !addressInputRef.current || autocompleteRef.current) return;
+    const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
+      types: ['address'],
+    });
+    autocompleteRef.current = autocomplete;
 
-    placeAutocomplete.addEventListener('gmp-placeselect', async (event: unknown) => {
-      const e = event as { place?: { displayName?: string; formattedAddress?: string; location?: { lat: () => number; lng: () => number }; fetchFields?: (opts: { fields: string[] }) => Promise<void> } };
-      const place = e.place;
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
       if (!place) return;
-      // Fetch full place details if needed
-      if (place.fetchFields) {
-        await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+      if (place.formatted_address) {
+        setAddress(place.formatted_address);
       }
-      if (place.formattedAddress) {
-        setAddress(place.formattedAddress);
-      }
-      if (place.location) {
-        const newLat = place.location.lat();
-        const newLng = place.location.lng();
+      if (place.geometry?.location) {
+        const newLat = place.geometry.location.lat();
+        const newLng = place.geometry.location.lng();
         setLat(newLat);
         setLng(newLng);
         // Auto-detect timezone via Google Maps Timezone API
         setDetectingTimezone(true);
-        try {
+        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+        if (apiKey) {
           const timestamp = Math.floor(Date.now() / 1000);
-          const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-          if (apiKey) {
-            const tzRes = await fetch(
-              `https://maps.googleapis.com/maps/api/timezone/json?location=${newLat},${newLng}&timestamp=${timestamp}&key=${apiKey}`
-            );
-            const tzJson = await tzRes.json() as { status: string; timeZoneId?: string };
-            if (tzJson.status === 'OK' && tzJson.timeZoneId) {
-              setTimezone(tzJson.timeZoneId);
-            }
-          }
-        } catch {
-          // Timezone detection failure — non-fatal
+          fetch(
+            `https://maps.googleapis.com/maps/api/timezone/json?location=${newLat},${newLng}&timestamp=${timestamp}&key=${apiKey}`
+          )
+            .then((r) => r.json())
+            .then((tzJson: { status: string; timeZoneId?: string }) => {
+              if (tzJson.status === 'OK' && tzJson.timeZoneId) {
+                setTimezone(tzJson.timeZoneId);
+              }
+            })
+            .catch(() => {})
+            .finally(() => setDetectingTimezone(false));
+        } else {
+          setDetectingTimezone(false);
         }
-        setDetectingTimezone(false);
       }
     });
   }, [mapsLoaded, showPanel]);
@@ -155,7 +156,7 @@ export default function LocationsPage() {
     setBookingLimitCapacity('1');
     setBookingLimitInterval('day');
     setError('');
-    autocompleteElRef.current = null;
+    autocompleteRef.current = null;
     setShowPanel(true);
   }
 
@@ -174,7 +175,7 @@ export default function LocationsPage() {
     setBookingLimitCapacity(String(loc.booking_limit_capacity ?? 1));
     setBookingLimitInterval(loc.booking_limit_interval ?? 'day');
     setError('');
-    autocompleteElRef.current = null;
+    autocompleteRef.current = null;
     setShowPanel(true);
   }
 
@@ -259,24 +260,6 @@ export default function LocationsPage() {
           {/* Body */}
           <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
             <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-              {/* Image URL */}
-              <div>
-                <label className={labelClass}>Image URL</label>
-                <input
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://example.com/image.jpg"
-                  className={inputClass}
-                />
-                {imageUrl && (
-                  <img
-                    src={imageUrl}
-                    alt="Location"
-                    className="mt-2 h-32 w-full rounded-lg border border-gray-200 object-cover"
-                  />
-                )}
-              </div>
-
               {/* Name */}
               <div>
                 <label className={labelClass}>Location Name *</label>
@@ -286,6 +269,87 @@ export default function LocationsPage() {
                   onChange={(e) => setName(e.target.value)}
                   className={inputClass}
                 />
+              </div>
+
+              {/* Address — Google Places Autocomplete */}
+              <div>
+                <label className={labelClass}>Address *</label>
+                <input
+                  ref={addressInputRef}
+                  required
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Start typing an address..."
+                  className={inputClass}
+                  autoComplete="off"
+                />
+                {address && <p className="mt-1 text-xs text-gray-500">{address}</p>}
+                {lat != null && lng != null && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500">
+                      Lat: {lat.toFixed(6)}, Lng: {lng.toFixed(6)}
+                    </p>
+                    {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && (
+                      <img
+                        src={`https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=400x200&markers=color:red%7C${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
+                        alt="Location preview"
+                        className="mt-2 w-full rounded-lg border border-gray-200"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Location Photo Upload */}
+              <div>
+                <label className={labelClass}>Location Photo</label>
+                <div className="flex items-center gap-3">
+                  <label className="cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    {uploading ? 'Uploading...' : 'Upload Photo'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploading(true);
+                        try {
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                          const json = await res.json();
+                          if (res.ok && json.url) {
+                            setImageUrl(json.url);
+                          } else {
+                            setError(json.error || 'Upload failed');
+                          }
+                        } catch {
+                          setError('Upload failed');
+                        }
+                        setUploading(false);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  {imageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setImageUrl('')}
+                      className="text-sm text-red-600 hover:text-red-800"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {imageUrl && (
+                  <img
+                    src={imageUrl}
+                    alt="Location"
+                    className="mt-2 h-32 w-full rounded-lg border border-gray-200 object-cover"
+                  />
+                )}
               </div>
 
               {/* Phone */}
@@ -310,38 +374,6 @@ export default function LocationsPage() {
                   placeholder="Brief description of this location..."
                   className={inputClass}
                 />
-              </div>
-
-              {/* Address — PlaceAutocompleteElement */}
-              <div>
-                <label className={labelClass}>Address *</label>
-                <div ref={addressContainerRef} className="w-full" />
-                {/* Fallback manual input if Maps API not loaded */}
-                {!mapsLoaded && (
-                  <input
-                    required
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Start typing an address..."
-                    className={inputClass}
-                    autoComplete="off"
-                  />
-                )}
-                {address && <p className="mt-1 text-xs text-gray-500">{address}</p>}
-                {lat != null && lng != null && (
-                  <div className="mt-2">
-                    <p className="text-xs text-gray-500">
-                      Lat: {lat.toFixed(6)}, Lng: {lng.toFixed(6)}
-                    </p>
-                    {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && (
-                      <img
-                        src={`https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=400x200&markers=color:red%7C${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
-                        alt="Location preview"
-                        className="mt-2 w-full rounded-lg border border-gray-200"
-                      />
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Timezone (auto-detected) */}

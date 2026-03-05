@@ -440,36 +440,91 @@ function DiagramView({
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: 'top left',
           }}
-          className="inline-flex gap-8 p-10"
+          className="inline-flex gap-16 p-10"
         >
-          {categoryTree.map((group) => (
-            <div key={group.category} className="flex-shrink-0">
-              {/* Category Header */}
-              <div
-                className="mb-4 rounded-xl px-5 py-3 shadow-sm"
-                style={{ backgroundColor: group.color, minWidth: 288 }}
-              >
-                <h3 className="text-base font-bold text-white drop-shadow-sm">
-                  {group.category}
-                </h3>
-                <p className="mt-0.5 text-xs font-medium text-white/80">
-                  {Array.from(group.subcategories.values()).reduce((acc, arr) => acc + arr.length, 0)} service{Array.from(group.subcategories.values()).reduce((acc, arr) => acc + arr.length, 0) !== 1 ? 's' : ''}
-                </p>
-              </div>
+          {categoryTree.map((group) => {
+            const totalServices = Array.from(group.subcategories.values()).reduce((acc, arr) => acc + arr.length, 0);
+            const subcatEntries = Array.from(group.subcategories.entries());
+            const hasSubcategories = subcatEntries.some(([subcat]) => subcat !== '');
 
-              {/* Subcategory Groups */}
-              <div className="space-y-4">
-                {Array.from(group.subcategories.entries()).map(([subcat, svcs]) => (
-                  <div key={subcat || '__none__'}>
-                    {subcat && (
-                      <div className="mb-2 rounded-lg px-3 py-1.5" style={{ backgroundColor: group.color + '22' }}>
-                        <span className="text-xs font-semibold" style={{ color: group.color }}>
-                          {subcat}
-                        </span>
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      {svcs.map((s) => (
+            return (
+              <div key={group.category} className="flex flex-col items-center flex-shrink-0">
+                {/* Category Node (Root) */}
+                <div
+                  className="rounded-xl px-6 py-3 shadow-md"
+                  style={{ backgroundColor: group.color, minWidth: 200 }}
+                >
+                  <h3 className="text-center text-base font-bold text-white drop-shadow-sm">
+                    {group.category}
+                  </h3>
+                  <p className="mt-0.5 text-center text-xs font-medium text-white/80">
+                    {totalServices} service{totalServices !== 1 ? 's' : ''}
+                  </p>
+                </div>
+
+                {/* Vertical connector from category */}
+                <div className="w-0.5 h-6" style={{ backgroundColor: group.color }} />
+
+                {/* Subcategory level */}
+                {hasSubcategories ? (
+                  <div className="flex flex-col items-center">
+                    {/* Horizontal connector bar */}
+                    <div className="h-0.5 self-stretch" style={{ backgroundColor: group.color + '55', minWidth: subcatEntries.length * 320 }} />
+
+                    <div className="flex gap-10">
+                      {subcatEntries.map(([subcat, svcs]) => (
+                        <div key={subcat || '__none__'} className="flex flex-col items-center">
+                          {/* Vertical connector to subcategory */}
+                          <div className="w-0.5 h-4" style={{ backgroundColor: group.color + '55' }} />
+
+                          {/* Subcategory Node */}
+                          {subcat ? (
+                            <div
+                              className="mb-1 rounded-lg border-2 px-4 py-2 bg-white shadow-sm"
+                              style={{ borderColor: group.color, minWidth: 160 }}
+                            >
+                              <span className="block text-center text-sm font-semibold" style={{ color: group.color }}>
+                                {subcat}
+                              </span>
+                              <span className="block text-center text-[10px] text-gray-400">
+                                {svcs.length} service{svcs.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          ) : (
+                            <div
+                              className="mb-1 rounded-lg border-2 border-dashed px-4 py-2 bg-gray-50 shadow-sm"
+                              style={{ borderColor: group.color + '55', minWidth: 160 }}
+                            >
+                              <span className="block text-center text-sm font-medium text-gray-400">
+                                No subcategory
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Vertical connector to services */}
+                          <div className="w-0.5 h-3" style={{ backgroundColor: group.color + '33' }} />
+
+                          {/* Service Cards */}
+                          <div className="space-y-2">
+                            {svcs.map((s) => (
+                              <DiagramServiceCard
+                                key={s.id}
+                                service={s}
+                                onEdit={() => onEdit(s)}
+                                onDuplicate={() => onDuplicate(s)}
+                                onDelete={() => onDelete(s.id)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  /* No subcategories — services directly under category */
+                  <div className="space-y-2">
+                    {subcatEntries.map(([, svcs]) =>
+                      svcs.map((s) => (
                         <DiagramServiceCard
                           key={s.id}
                           service={s}
@@ -477,13 +532,13 @@ function DiagramView({
                           onDuplicate={() => onDuplicate(s)}
                           onDelete={() => onDelete(s.id)}
                         />
-                      ))}
-                    </div>
+                      ))
+                    )}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {services.length === 0 && (
             <div className="flex h-40 w-80 items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-white">

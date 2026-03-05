@@ -155,13 +155,24 @@ export default function CouponsPage() {
 
   async function handleSubmit() {
     setError('');
+
+    const discountNum = Number(form.discount_value);
+    if (!discountNum || discountNum <= 0) {
+      setError('Discount value must be greater than 0');
+      return;
+    }
+    if (form.discount_type === 'percentage' && discountNum > 100) {
+      setError('Percentage discount cannot exceed 100%');
+      return;
+    }
+
     setSaving(true);
 
     const body: Record<string, unknown> = {
       id: editing?.id,
       code: form.code.toUpperCase(),
       discount_type: form.discount_type,
-      discount_value: Number(form.discount_value),
+      discount_value: discountNum,
       expires_at: form.is_lifetime ? null : form.expires_at ? new Date(form.expires_at).toISOString() : null,
       usage_limit: form.usage_limit ? Number(form.usage_limit) : null,
       is_lifetime: form.is_lifetime,
