@@ -35,6 +35,7 @@ export default function PackagesPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Package | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [form, setForm] = useState({
     name: '',
     price: '',
@@ -125,6 +126,8 @@ export default function PackagesPage() {
   async function handleDelete(id: string) {
     if (!confirm('Delete this package?')) return;
     await fetch(`/api/packages?id=${id}`, { method: 'DELETE' });
+    setShowForm(false);
+    setEditing(null);
     fetchPackages();
   }
 
@@ -168,6 +171,23 @@ export default function PackagesPage() {
     fetchPackages();
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
+    );
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.length === packages.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(packages.map((p) => p.id));
+    }
+  }
+
+  const isAddMode = showForm && !editing;
+  const isEditMode = showForm && !!editing;
+
   return (
     <div className="p-6 lg:p-8">
       <div className="flex items-center justify-between">
@@ -197,18 +217,37 @@ export default function PackagesPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.length === packages.length && packages.length > 0}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Image</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Price</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Expiration</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Services</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Active</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {packages.map((pkg) => (
-                  <tr key={pkg.id} className="hover:bg-gray-50">
+                  <tr
+                    key={pkg.id}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => openEdit(pkg)}
+                  >
+                    <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(pkg.id)}
+                        onChange={() => toggleSelect(pkg.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                      />
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       {pkg.image_url ? (
                         <img src={pkg.image_url} alt={pkg.name} className="h-8 w-8 rounded object-cover" />
@@ -224,7 +263,7 @@ export default function PackagesPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                       {pkg.package_services?.length ?? 0}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">
+                    <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleToggleActive(pkg)}
                         className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
@@ -238,10 +277,6 @@ export default function PackagesPage() {
                         />
                       </button>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
-                      <button onClick={() => openEdit(pkg)} className="mr-3 text-brand-600 hover:text-brand-800">Edit</button>
-                      <button onClick={() => handleDelete(pkg.id)} className="text-red-600 hover:text-red-800">Delete</button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -250,16 +285,14 @@ export default function PackagesPage() {
         )}
       </div>
 
-      {/* Slide-in Panel */}
-      {showForm && (
+      {/* Slide-in Panel — Add Mode */}
+      {isAddMode && (
         <>
           <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowForm(false)} />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]">
             {/* Header */}
             <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {editing ? 'Edit Package' : 'New Package'}
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900">New Package</h2>
               <button
                 onClick={() => setShowForm(false)}
                 className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
@@ -279,21 +312,21 @@ export default function PackagesPage() {
                 />
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Name *</label>
                     <input
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      placeholder="Name *"
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Price ($)</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={form.price}
                       onChange={(e) => setForm({ ...form, price: e.target.value })}
+                      placeholder="Price ($)"
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                   </div>
@@ -344,17 +377,16 @@ export default function PackagesPage() {
                 </label>
                 {/* Description */}
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
                   <textarea
                     rows={3}
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    placeholder="Description"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                   />
                 </div>
                 {/* Services */}
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Services</label>
                   <div className="flex gap-2">
                     <select
                       value={addServiceId}
@@ -411,8 +443,217 @@ export default function PackagesPage() {
                 disabled={saving}
                 className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                {saving ? 'Saving...' : editing ? 'Update Package' : 'Create Package'}
+                {saving ? 'Saving...' : 'Create Package'}
               </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Slide-in Panel — Edit Mode */}
+      {isEditMode && editing && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowForm(false)} />
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h2 className="text-lg font-semibold text-gray-900">Edit Package</h2>
+              <button
+                onClick={() => setShowForm(false)}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="space-y-5">
+                <ImageUpload
+                  value={form.image_url}
+                  onChange={(url) => setForm({ ...form, image_url: url })}
+                  label="Package Image"
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Name — edit on hover */}
+                  <div className="group">
+                    <label className="mb-1 block text-xs font-medium text-gray-500">Name</label>
+                    <div className="relative">
+                      <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                        {form.name || '--'}
+                      </span>
+                      <input
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        placeholder="Name *"
+                        className="absolute inset-0 w-full rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm opacity-0 focus:border-brand-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:border-gray-300 group-hover:opacity-100"
+                      />
+                    </div>
+                  </div>
+                  {/* Price — edit on hover */}
+                  <div className="group">
+                    <label className="mb-1 block text-xs font-medium text-gray-500">Price ($)</label>
+                    <div className="relative">
+                      <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                        {form.price ? `$${Number(form.price).toFixed(2)}` : '--'}
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.price}
+                        onChange={(e) => setForm({ ...form, price: e.target.value })}
+                        placeholder="Price ($)"
+                        className="absolute inset-0 w-full rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm opacity-0 focus:border-brand-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:border-gray-300 group-hover:opacity-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+                {/* Expiration */}
+                <div>
+                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.has_expiration}
+                      onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                    />
+                    Has Expiration
+                  </label>
+                  {form.has_expiration && (
+                    <div className="flex gap-3">
+                      <div className="group relative w-32">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.expiration_value || '--'}
+                        </span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={form.expiration_value}
+                          onChange={(e) => setForm({ ...form, expiration_value: e.target.value })}
+                          placeholder="Value"
+                          className="absolute inset-0 w-full rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm opacity-0 focus:border-brand-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:border-gray-300 group-hover:opacity-100"
+                        />
+                      </div>
+                      <select
+                        value={form.expiration_unit}
+                        onChange={(e) => setForm({ ...form, expiration_unit: e.target.value })}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="days">Days</option>
+                        <option value="weeks">Weeks</option>
+                        <option value="months">Months</option>
+                        <option value="years">Years</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+                {/* Active toggle */}
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.is_active}
+                    onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                  />
+                  Active
+                </label>
+                {/* Private toggle */}
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.is_private}
+                    onChange={(e) => setForm({ ...form, is_private: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                  />
+                  Private package
+                </label>
+                {/* Description — edit on hover */}
+                <div className="group">
+                  <label className="mb-1 block text-xs font-medium text-gray-500">Description</label>
+                  <div className="relative">
+                    <span className="block min-h-[4rem] whitespace-pre-wrap px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                      {form.description || '--'}
+                    </span>
+                    <textarea
+                      rows={3}
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      placeholder="Description"
+                      className="absolute inset-0 w-full rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm opacity-0 focus:border-brand-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:border-gray-300 group-hover:opacity-100"
+                    />
+                  </div>
+                </div>
+                {/* Services */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Services</label>
+                  <div className="flex gap-2">
+                    <select
+                      value={addServiceId}
+                      onChange={(e) => setAddServiceId(e.target.value)}
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      <option value="">Select a service</option>
+                      {services
+                        .filter((s) => !formServices.some((fs) => fs.service_id === s.id))
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                    </select>
+                    <input
+                      type="number"
+                      min="1"
+                      value={addServiceQty}
+                      onChange={(e) => setAddServiceQty(e.target.value)}
+                      className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      placeholder="Qty"
+                    />
+                    <button
+                      type="button"
+                      onClick={addServiceToList}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {formServices.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {formServices.map((fs) => (
+                        <div key={fs.service_id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                          <span className="text-sm text-gray-700">{getServiceName(fs.service_id)} x{fs.quantity}</span>
+                          <button type="button" onClick={() => removeServiceFromList(fs.service_id)} className="text-sm text-red-600 hover:text-red-800">Remove</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {error && <p className="text-sm text-red-600">{error}</p>}
+              </div>
+            </div>
+            {/* Footer */}
+            <div className="flex items-center border-t px-6 py-4">
+              <button
+                onClick={() => handleDelete(editing.id)}
+                className="mr-auto rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+              >
+                Delete
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={saving}
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Update Package'}
+                </button>
+              </div>
             </div>
           </div>
         </>

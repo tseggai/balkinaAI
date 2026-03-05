@@ -89,31 +89,40 @@ export async function handleFindBusinesses(
     let businesses = data ?? [];
     let locationNote: string | undefined;
 
+    // Fetch locations with addresses for all businesses
+    const tenantIdsAll = businesses.map((b) => b.id);
+    const { data: locationsAll } = tenantIdsAll.length > 0
+      ? await supabase
+          .from('tenant_locations')
+          .select('tenant_id, name, address, lat, lng')
+          .in('tenant_id', tenantIdsAll)
+      : { data: [] };
+
+    const locAllMap = new Map<string, { name: string; address: string; lat: number | null; lng: number | null }[]>();
+    for (const loc of (locationsAll ?? []) as { tenant_id: string; name: string; address: string; lat: number | null; lng: number | null }[]) {
+      const existing = locAllMap.get(loc.tenant_id) ?? [];
+      existing.push({ name: loc.name, address: loc.address, lat: loc.lat, lng: loc.lng });
+      locAllMap.set(loc.tenant_id, existing);
+    }
+
     // If user location available, sort by proximity
     if (userLat && userLng && businesses.length > 0) {
-      const tenantIds = businesses.map((b) => b.id);
-      const { data: locations } = await supabase
-        .from('tenant_locations')
-        .select('tenant_id, lat, lng')
-        .in('tenant_id', tenantIds);
-
-      if (locations && locations.length > 0) {
-        const locMap = new Map<string, { lat: number; lng: number }>();
-        for (const loc of locations as { tenant_id: string; lat: number | null; lng: number | null }[]) {
-          if (loc.lat && loc.lng && !locMap.has(loc.tenant_id)) {
-            locMap.set(loc.tenant_id, { lat: loc.lat, lng: loc.lng });
-          }
+      const locMap = new Map<string, { lat: number; lng: number }>();
+      for (const loc of (locationsAll ?? []) as { tenant_id: string; lat: number | null; lng: number | null }[]) {
+        if (loc.lat && loc.lng && !locMap.has(loc.tenant_id)) {
+          locMap.set(loc.tenant_id, { lat: loc.lat, lng: loc.lng });
         }
-        businesses = businesses
-          .map((b) => {
-            const loc = locMap.get(b.id);
-            const distance = loc ? haversineKm(userLat, userLng, loc.lat, loc.lng) : 9999;
-            return { ...b, distance_km: Math.round(distance * 10) / 10 };
-          })
-          .filter((b) => b.distance_km <= radiusKm)
-          .sort((a, b) => a.distance_km - b.distance_km);
       }
+      businesses = businesses
+        .map((b) => {
+          const loc = locMap.get(b.id);
+          const distance = loc ? haversineKm(userLat, userLng, loc.lat, loc.lng) : 9999;
+          return { ...b, distance_km: Math.round(distance * 10) / 10, locations: locAllMap.get(b.id) ?? [] };
+        })
+        .filter((b) => b.distance_km <= radiusKm)
+        .sort((a, b) => a.distance_km - b.distance_km);
     } else {
+      businesses = businesses.map((b) => ({ ...b, locations: locAllMap.get(b.id) ?? [] }));
       locationNote = 'Showing all locations — enable location access for nearby results';
     }
 
@@ -184,34 +193,43 @@ export async function handleFindBusinesses(
     tenantMap.set(t.id, { id: t.id, name: t.name });
   }
 
-  let businesses: { id: string; name: string; distance_km?: number }[] = Array.from(tenantMap.values());
+  let businesses: { id: string; name: string; distance_km?: number; locations?: { name: string; address: string; lat: number | null; lng: number | null }[] }[] = Array.from(tenantMap.values());
   let locationNote: string | undefined;
+
+  // Fetch locations with addresses for all businesses
+  const bizIds = businesses.map((b) => b.id);
+  const { data: bizLocations } = bizIds.length > 0
+    ? await supabase
+        .from('tenant_locations')
+        .select('tenant_id, name, address, lat, lng')
+        .in('tenant_id', bizIds)
+    : { data: [] };
+
+  const bizLocMap = new Map<string, { name: string; address: string; lat: number | null; lng: number | null }[]>();
+  for (const loc of (bizLocations ?? []) as { tenant_id: string; name: string; address: string; lat: number | null; lng: number | null }[]) {
+    const existing = bizLocMap.get(loc.tenant_id) ?? [];
+    existing.push({ name: loc.name, address: loc.address, lat: loc.lat, lng: loc.lng });
+    bizLocMap.set(loc.tenant_id, existing);
+  }
 
   // Sort by proximity if user location is available
   if (userLat && userLng && businesses.length > 0) {
-    const tenantIds = businesses.map((b) => b.id);
-    const { data: locations } = await supabase
-      .from('tenant_locations')
-      .select('tenant_id, lat, lng')
-      .in('tenant_id', tenantIds);
-
-    if (locations && locations.length > 0) {
-      const locMap = new Map<string, { lat: number; lng: number }>();
-      for (const loc of locations as { tenant_id: string; lat: number | null; lng: number | null }[]) {
-        if (loc.lat && loc.lng && !locMap.has(loc.tenant_id)) {
-          locMap.set(loc.tenant_id, { lat: loc.lat, lng: loc.lng });
-        }
+    const locMap = new Map<string, { lat: number; lng: number }>();
+    for (const loc of (bizLocations ?? []) as { tenant_id: string; lat: number | null; lng: number | null }[]) {
+      if (loc.lat && loc.lng && !locMap.has(loc.tenant_id)) {
+        locMap.set(loc.tenant_id, { lat: loc.lat, lng: loc.lng });
       }
-      businesses = businesses
-        .map((b) => {
-          const loc = locMap.get(b.id);
-          const distance = loc ? haversineKm(userLat, userLng, loc.lat, loc.lng) : 9999;
-          return { ...b, distance_km: Math.round(distance * 10) / 10 };
-        })
-        .filter((b) => (b.distance_km ?? 9999) <= radiusKm)
-        .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
     }
+    businesses = businesses
+      .map((b) => {
+        const loc = locMap.get(b.id);
+        const distance = loc ? haversineKm(userLat, userLng, loc.lat, loc.lng) : 9999;
+        return { ...b, distance_km: Math.round(distance * 10) / 10, locations: bizLocMap.get(b.id) ?? [] };
+      })
+      .filter((b) => (b.distance_km ?? 9999) <= radiusKm)
+      .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
   } else {
+    businesses = businesses.map((b) => ({ ...b, locations: bizLocMap.get(b.id) ?? [] }));
     locationNote = 'Showing all locations — enable location access for nearby results';
   }
 
@@ -223,6 +241,23 @@ export async function handleFindBusinesses(
       location_note: locationNote,
     },
   };
+}
+
+// ── get_locations ───────────────────────────────────────────────────────────
+
+export async function handleGetLocations(
+  supabase: AdminClient,
+  tenantId: string,
+  _input: Record<string, unknown>,
+): Promise<ToolResult> {
+  const { data, error } = await supabase
+    .from('tenant_locations')
+    .select('id, name, address, lat, lng, timezone')
+    .eq('tenant_id', tenantId)
+    .order('name');
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, data: data ?? [] };
 }
 
 // ── get_services ────────────────────────────────────────────────────────────
@@ -1068,6 +1103,8 @@ export async function executeTool(
         return await handleGetBookingDetails(supabase, tenantId, toolInput, sessionInfo);
       case 'get_packages':
         return await handleGetPackages(supabase, tenantId, toolInput);
+      case 'get_locations':
+        return await handleGetLocations(supabase, tenantId, toolInput);
       case 'get_loyalty_info':
         return await handleGetLoyaltyInfo(supabase, tenantId, toolInput);
       case 'apply_coupon':

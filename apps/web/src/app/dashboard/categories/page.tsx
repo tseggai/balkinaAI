@@ -21,6 +21,7 @@ export default function CategoriesPage() {
   const [form, setForm] = useState({ name: '', color: '#6366f1', parent_id: '', description: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const fetchCategories = useCallback(async () => {
     const res = await fetch('/api/tenant-categories');
@@ -60,6 +61,7 @@ export default function CategoriesPage() {
   async function handleDelete(id: string) {
     if (!confirm('Delete this category?')) return;
     await fetch(`/api/tenant-categories?id=${id}`, { method: 'DELETE' });
+    closePanel();
     fetchCategories();
   }
 
@@ -89,10 +91,23 @@ export default function CategoriesPage() {
     fetchCategories();
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    );
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.length === categories.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(categories.map((c) => c.id));
+    }
+  }
+
   const parentOptions = categories.filter((c) => c.id !== editing?.id && !c.parent_id);
 
   const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-  const labelClass = 'mb-1 block text-sm font-medium text-gray-700';
 
   return (
     <div className="p-6 lg:p-8">
@@ -123,18 +138,40 @@ export default function CategoriesPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.length === categories.length && categories.length > 0}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Color</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Parent</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Services</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {categories.map((cat) => {
                   const parent = categories.find((c) => c.id === cat.parent_id);
                   return (
-                    <tr key={cat.id} className="hover:bg-gray-50">
+                    <tr
+                      key={cat.id}
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => openEdit(cat)}
+                    >
+                      <td
+                        className="whitespace-nowrap px-4 py-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(cat.id)}
+                          onChange={() => toggleSelect(cat.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                        />
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div
                           className="h-4 w-4 rounded-full"
@@ -146,10 +183,6 @@ export default function CategoriesPage() {
                         {parent?.name ?? '\u2014'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{cat.services_count}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
-                        <button onClick={() => openEdit(cat)} className="mr-3 text-brand-600 hover:text-brand-800">Edit</button>
-                        <button onClick={() => handleDelete(cat.id)} className="text-red-600 hover:text-red-800">Delete</button>
-                      </td>
                     </tr>
                   );
                 })}
@@ -163,7 +196,7 @@ export default function CategoriesPage() {
       {showPanel && (
         <>
           <div className="fixed inset-0 z-40 bg-black/30" onClick={closePanel} />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-xl font-bold text-gray-900">
                 {editing ? 'Edit Category' : 'New Category'}
@@ -177,62 +210,146 @@ export default function CategoriesPage() {
 
             <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
               <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-                <div>
-                  <label className={labelClass}>Category Name *</label>
-                  <input
-                    required
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="e.g. Haircuts, Massages, Nails..."
-                    className={inputClass}
-                  />
-                </div>
-
-                <div>
-                  <label className={labelClass}>Color</label>
-                  <div className="flex items-center gap-3">
-                    {PRESET_COLORS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setForm({ ...form, color: c })}
-                        className={`h-8 w-8 rounded-full border-2 transition-all ${
-                          form.color === c ? 'border-gray-900 scale-110' : 'border-transparent'
-                        }`}
-                        style={{ backgroundColor: c }}
+                {/* --- ADD MODE: placeholders instead of labels --- */}
+                {!editing && (
+                  <>
+                    <div>
+                      <input
+                        required
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        placeholder="Category Name *"
+                        className={inputClass}
                       />
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                <div>
-                  <label className={labelClass}>Parent Category</label>
-                  <select
-                    value={form.parent_id}
-                    onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
-                    className={inputClass}
-                  >
-                    <option value="">None (top-level)</option>
-                    {parentOptions.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
+                    <div>
+                      <div className="flex items-center gap-3">
+                        {PRESET_COLORS.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setForm({ ...form, color: c })}
+                            className={`h-8 w-8 rounded-full border-2 transition-all ${
+                              form.color === c ? 'border-gray-900 scale-110' : 'border-transparent'
+                            }`}
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                    </div>
 
-                <div>
-                  <label className={labelClass}>Description</label>
-                  <textarea
-                    rows={3}
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    className={inputClass}
-                  />
-                </div>
+                    <div>
+                      <select
+                        value={form.parent_id}
+                        onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
+                        className={inputClass}
+                      >
+                        <option value="">Parent Category (none)</option>
+                        {parentOptions.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <textarea
+                        rows={3}
+                        value={form.description}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        placeholder="Description"
+                        className={inputClass}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* --- EDIT MODE: horizontal label-left, hover-to-edit --- */}
+                {editing && (
+                  <>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Name *</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.name || '\u2014'}
+                        </span>
+                        <input
+                          required
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          placeholder="Category Name"
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Color</span>
+                      <div className="flex items-center gap-3">
+                        {PRESET_COLORS.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setForm({ ...form, color: c })}
+                            className={`h-8 w-8 rounded-full border-2 transition-all ${
+                              form.color === c ? 'border-gray-900 scale-110' : 'border-transparent'
+                            }`}
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Parent</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {parentOptions.find((p) => p.id === form.parent_id)?.name ?? 'None (top-level)'}
+                        </span>
+                        <select
+                          value={form.parent_id}
+                          onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        >
+                          <option value="">None (top-level)</option>
+                          {parentOptions.map((p) => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="group flex items-start gap-4">
+                      <span className="w-32 shrink-0 pt-2 text-sm font-medium text-gray-700">Description</span>
+                      <div className="relative flex-1">
+                        <span className="block whitespace-pre-wrap px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.description || '\u2014'}
+                        </span>
+                        <textarea
+                          rows={3}
+                          value={form.description}
+                          onChange={(e) => setForm({ ...form, description: e.target.value })}
+                          placeholder="Description"
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {error && <p className="text-sm text-red-600">{error}</p>}
               </div>
 
-              <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
+              <div className="flex items-center gap-3 border-t border-gray-200 px-6 py-4">
+                {editing && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(editing.id)}
+                    className="mr-auto rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                )}
                 <button
                   type="submit"
                   disabled={saving}

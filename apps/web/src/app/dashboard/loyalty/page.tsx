@@ -56,6 +56,7 @@ export default function LoyaltyPage() {
   const [services, setServices] = useState<ServiceOption[]>([]);
   const [staffList, setStaffList] = useState<StaffOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Panel state
   const [showForm, setShowForm] = useState(false);
@@ -198,6 +199,7 @@ export default function LoyaltyPage() {
       }),
     });
     setPrograms([]);
+    setShowForm(false);
   }
 
   async function handleToggleActive(index: number) {
@@ -253,6 +255,23 @@ export default function LoyaltyPage() {
     fetchData();
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
+    );
+  }
+
+  function toggleSelectAll() {
+    const allIds = programs.map((p, i) => p.id ?? String(i));
+    if (selectedIds.length === allIds.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(allIds);
+    }
+  }
+
+  const isEditing = editingIndex !== null;
+
   if (loading) {
     return (
       <div className="p-6 lg:p-8">
@@ -298,59 +317,83 @@ export default function LoyaltyPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.length === programs.length && programs.length > 0}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Program</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Pts/Booking</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Redemption Rate</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Tiers</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Expiry</th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {programs.map((prog, i) => (
-                <tr key={prog.id ?? i} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50">
-                        <svg className="h-5 w-5 text-brand-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">Loyalty Program</div>
-                        <div className="text-xs text-gray-500">
-                          {prog.points_per_dollar > 0 ? `${prog.points_per_dollar} pts/$` : ''}{prog.points_per_booking > 0 ? ` ${prog.points_per_booking} pts/booking` : ''}
+              {programs.map((prog, i) => {
+                const rowId = prog.id ?? String(i);
+                return (
+                  <tr
+                    key={rowId}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => openEdit(i)}
+                  >
+                    <td
+                      className="w-10 px-4 py-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(rowId)}
+                        onChange={() => toggleSelect(rowId)}
+                        className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                      />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50">
+                          <svg className="h-5 w-5 text-brand-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Loyalty Program</div>
+                          <div className="text-xs text-gray-500">
+                            {prog.points_per_dollar > 0 ? `${prog.points_per_dollar} pts/$` : ''}{prog.points_per_booking > 0 ? ` ${prog.points_per_booking} pts/booking` : ''}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <button
-                      onClick={() => handleToggleActive(i)}
-                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                        prog.is_active ? 'bg-brand-600' : 'bg-gray-200'
-                      }`}
+                    </td>
+                    <td
+                      className="whitespace-nowrap px-4 py-3"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                          prog.is_active ? 'translate-x-4' : 'translate-x-0'
+                      <button
+                        onClick={() => handleToggleActive(i)}
+                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                          prog.is_active ? 'bg-brand-600' : 'bg-gray-200'
                         }`}
-                      />
-                    </button>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{prog.points_per_booking}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{prog.redemption_rate} pts = $1</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{prog.tiers.length}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
-                    {prog.points_expiry_days > 0 ? `${prog.points_expiry_days} days` : 'Never'}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
-                    <button onClick={() => openEdit(i)} className="mr-3 text-brand-600 hover:text-brand-800">Edit</button>
-                    <button onClick={() => handleDelete(i)} className="text-red-600 hover:text-red-800">Delete</button>
-                  </td>
-                </tr>
-              ))}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                            prog.is_active ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{prog.points_per_booking}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{prog.redemption_rate} pts = $1</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{prog.tiers.length}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
+                      {prog.points_expiry_days > 0 ? `${prog.points_expiry_days} days` : 'Never'}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -360,11 +403,11 @@ export default function LoyaltyPage() {
       {showForm && (
         <>
           <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowForm(false)} />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
+          <div className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]`}>
             {/* Header */}
             <div className="flex items-center justify-between border-b px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
-                {editingIndex !== null ? 'Edit Loyalty Program' : 'New Loyalty Program'}
+                {isEditing ? 'Edit Loyalty Program' : 'New Loyalty Program'}
               </h2>
               <button
                 onClick={() => setShowForm(false)}
@@ -402,29 +445,61 @@ export default function LoyaltyPage() {
                 {/* Points Earning */}
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Points Earning</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-600">Points per Booking</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.points_per_booking}
-                        onChange={(e) => setForm({ ...form, points_per_booking: Number(e.target.value) || 0 })}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      />
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <div className="group flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                        <span className="text-sm text-gray-600">Points per Booking</span>
+                        <div className="relative">
+                          <span className="text-sm font-medium text-gray-900 group-hover:hidden">{form.points_per_booking}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={form.points_per_booking}
+                            onChange={(e) => setForm({ ...form, points_per_booking: Number(e.target.value) || 0 })}
+                            className="hidden w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:block"
+                          />
+                        </div>
+                      </div>
+                      <div className="group flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                        <span className="text-sm text-gray-600">Points per $1 Spent</span>
+                        <div className="relative">
+                          <span className="text-sm font-medium text-gray-900 group-hover:hidden">{form.points_per_dollar}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={form.points_per_dollar}
+                            onChange={(e) => setForm({ ...form, points_per_dollar: Number(e.target.value) || 0 })}
+                            className="hidden w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:block"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-600">Points per $1 Spent</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={form.points_per_dollar}
-                        onChange={(e) => setForm({ ...form, points_per_dollar: Number(e.target.value) || 0 })}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.points_per_booking}
+                          onChange={(e) => setForm({ ...form, points_per_booking: Number(e.target.value) || 0 })}
+                          placeholder="Points per Booking"
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={form.points_per_dollar}
+                          onChange={(e) => setForm({ ...form, points_per_dollar: Number(e.target.value) || 0 })}
+                          placeholder="Points per $1 Spent"
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Bonus Rules */}
@@ -483,28 +558,59 @@ export default function LoyaltyPage() {
                 {/* Redemption */}
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Redemption</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-600">Conversion Rate (pts to $1)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.redemption_rate}
-                        onChange={(e) => setForm({ ...form, redemption_rate: Number(e.target.value) || 0 })}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      />
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <div className="group flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                        <span className="text-sm text-gray-600">Conversion Rate (pts to $1)</span>
+                        <div className="relative">
+                          <span className="text-sm font-medium text-gray-900 group-hover:hidden">{form.redemption_rate}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={form.redemption_rate}
+                            onChange={(e) => setForm({ ...form, redemption_rate: Number(e.target.value) || 0 })}
+                            className="hidden w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:block"
+                          />
+                        </div>
+                      </div>
+                      <div className="group flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                        <span className="text-sm text-gray-600">Min Redemption Threshold</span>
+                        <div className="relative">
+                          <span className="text-sm font-medium text-gray-900 group-hover:hidden">{form.min_redemption_points}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={form.min_redemption_points}
+                            onChange={(e) => setForm({ ...form, min_redemption_points: Number(e.target.value) || 0 })}
+                            className="hidden w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:block"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-600">Min Redemption Threshold</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.min_redemption_points}
-                        onChange={(e) => setForm({ ...form, min_redemption_points: Number(e.target.value) || 0 })}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.redemption_rate}
+                          onChange={(e) => setForm({ ...form, redemption_rate: Number(e.target.value) || 0 })}
+                          placeholder="Conversion Rate (pts to $1)"
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.min_redemption_points}
+                          onChange={(e) => setForm({ ...form, min_redemption_points: Number(e.target.value) || 0 })}
+                          placeholder="Min Redemption Threshold"
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Tier System */}
@@ -572,36 +678,64 @@ export default function LoyaltyPage() {
                 {/* Expiry */}
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Points Expiry</h3>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">Expiry Days (0 = never)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={form.points_expiry_days}
-                      onChange={(e) => setForm({ ...form, points_expiry_days: Number(e.target.value) || 0 })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    />
-                  </div>
+                  {isEditing ? (
+                    <div className="group flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                      <span className="text-sm text-gray-600">Expiry Days (0 = never)</span>
+                      <div className="relative">
+                        <span className="text-sm font-medium text-gray-900 group-hover:hidden">
+                          {form.points_expiry_days > 0 ? `${form.points_expiry_days} days` : 'Never'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.points_expiry_days}
+                          onChange={(e) => setForm({ ...form, points_expiry_days: Number(e.target.value) || 0 })}
+                          className="hidden w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:block"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={form.points_expiry_days}
+                        onChange={(e) => setForm({ ...form, points_expiry_days: Number(e.target.value) || 0 })}
+                        placeholder="Expiry Days (0 = never)"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {error && <p className="text-sm text-red-600">{error}</p>}
               </div>
             </div>
             {/* Footer */}
-            <div className="flex justify-end gap-3 border-t px-6 py-4">
-              <button
-                onClick={() => setShowForm(false)}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Close
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : editingIndex !== null ? 'Update Program' : 'Create Program'}
-              </button>
+            <div className="flex items-center border-t px-6 py-4">
+              {isEditing && (
+                <button
+                  onClick={() => handleDelete(editingIndex)}
+                  className="mr-auto rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              )}
+              <div className={`flex gap-3 ${isEditing ? '' : 'ml-auto'}`}>
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  {isEditing ? 'Cancel' : 'Close'}
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : isEditing ? 'Update' : 'Create Program'}
+                </button>
+              </div>
             </div>
           </div>
         </>

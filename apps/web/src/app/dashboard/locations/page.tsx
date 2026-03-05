@@ -36,6 +36,7 @@ export default function LocationsPage() {
   // List state
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Panel state
   const [showPanel, setShowPanel] = useState(false);
@@ -140,6 +141,22 @@ export default function LocationsPage() {
     fetchLocations();
   }, [fetchLocations]);
 
+  // ── Selection helpers ────────────────────────────────────────────────────────
+
+  function toggleSelectAll() {
+    if (selectedIds.length === locations.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(locations.map((l) => l.id));
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
   // ── Panel open/close ───────────────────────────────────────────────────────
 
   function openNew() {
@@ -189,6 +206,7 @@ export default function LocationsPage() {
   async function handleDelete(id: string) {
     if (!confirm('Delete this location?')) return;
     await fetch(`/api/locations?id=${id}`, { method: 'DELETE' });
+    closePanel();
     fetchLocations();
   }
 
@@ -233,6 +251,8 @@ export default function LocationsPage() {
   // ── Slide-in Panel ─────────────────────────────────────────────────────────
 
   function renderPanel() {
+    const isEdit = !!editing;
+
     return (
       <>
         {/* Backdrop */}
@@ -241,11 +261,11 @@ export default function LocationsPage() {
           onClick={closePanel}
         />
         {/* Panel */}
-        <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
+        <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h2 className="text-xl font-bold text-gray-900">
-              {editing ? 'Edit Location' : 'Add Location'}
+              {isEdit ? 'Edit Location' : 'Add Location'}
             </h2>
             <button
               onClick={closePanel}
@@ -262,27 +282,58 @@ export default function LocationsPage() {
             <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
               {/* Name */}
               <div>
-                <label className={labelClass}>Location Name *</label>
-                <input
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={inputClass}
-                />
+                {isEdit ? (
+                  <div className="group">
+                    <p className="rounded-lg px-3 py-2 text-sm text-gray-900 group-hover:hidden">
+                      {name || <span className="text-gray-400">No name</span>}
+                    </p>
+                    <input
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Location Name *"
+                      className={`${inputClass} hidden group-hover:block`}
+                    />
+                  </div>
+                ) : (
+                  <input
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Location Name *"
+                    className={inputClass}
+                  />
+                )}
               </div>
 
               {/* Address — Google Places Autocomplete */}
               <div>
-                <label className={labelClass}>Address *</label>
-                <input
-                  ref={addressInputRef}
-                  required
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Start typing an address..."
-                  className={inputClass}
-                  autoComplete="off"
-                />
+                {isEdit ? (
+                  <div className="group">
+                    <p className="rounded-lg px-3 py-2 text-sm text-gray-900 group-hover:hidden">
+                      {address || <span className="text-gray-400">No address</span>}
+                    </p>
+                    <input
+                      ref={addressInputRef}
+                      required
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Start typing an address... *"
+                      className={`${inputClass} hidden group-hover:block`}
+                      autoComplete="off"
+                    />
+                  </div>
+                ) : (
+                  <input
+                    ref={addressInputRef}
+                    required
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Start typing an address... *"
+                    className={inputClass}
+                    autoComplete="off"
+                  />
+                )}
                 {address && <p className="mt-1 text-xs text-gray-500">{address}</p>}
                 {lat != null && lng != null && (
                   <div className="mt-2">
@@ -354,32 +405,59 @@ export default function LocationsPage() {
 
               {/* Phone */}
               <div>
-                <label className={labelClass}>Phone</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+1 (555) 123-4567"
-                  className={inputClass}
-                />
+                {isEdit ? (
+                  <div className="group">
+                    <p className="rounded-lg px-3 py-2 text-sm text-gray-900 group-hover:hidden">
+                      {phone || <span className="text-gray-400">No phone</span>}
+                    </p>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="Phone (+1 (555) 123-4567)"
+                      className={`${inputClass} hidden group-hover:block`}
+                    />
+                  </div>
+                ) : (
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Phone (+1 (555) 123-4567)"
+                    className={inputClass}
+                  />
+                )}
               </div>
 
               {/* Description */}
               <div>
-                <label className={labelClass}>Description</label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  placeholder="Brief description of this location..."
-                  className={inputClass}
-                />
+                {isEdit ? (
+                  <div className="group">
+                    <p className="rounded-lg px-3 py-2 text-sm text-gray-900 group-hover:hidden">
+                      {description || <span className="text-gray-400">No description</span>}
+                    </p>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={3}
+                      placeholder="Brief description of this location..."
+                      className={`${inputClass} hidden group-hover:block`}
+                    />
+                  </div>
+                ) : (
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                    placeholder="Brief description of this location..."
+                    className={inputClass}
+                  />
+                )}
               </div>
 
               {/* Timezone (auto-detected) */}
               {(timezone || detectingTimezone) && (
                 <div>
-                  <label className={labelClass}>Timezone</label>
                   <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
                     {detectingTimezone ? 'Detecting timezone...' : timezone}
                   </p>
@@ -435,12 +513,21 @@ export default function LocationsPage() {
 
             {/* Footer */}
             <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
+              {isEdit && (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(editing!.id)}
+                  className="mr-auto rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              )}
               <button
                 type="submit"
                 disabled={saving}
                 className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                {saving ? 'Saving...' : editing ? 'Update Location' : 'Add Location'}
+                {saving ? 'Saving...' : isEdit ? 'Update Location' : 'Add Location'}
               </button>
               <button
                 type="button"
@@ -493,6 +580,17 @@ export default function LocationsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.length === locations.length && locations.length > 0}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                    />
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                    Image
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
                     Name
                   </th>
@@ -508,14 +606,58 @@ export default function LocationsPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
                     Booking Limit
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">
-                    Actions
-                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {locations.map((loc) => (
-                  <tr key={loc.id} className="hover:bg-gray-50">
+                  <tr
+                    key={loc.id}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => openEdit(loc)}
+                  >
+                    <td
+                      className="px-4 py-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(loc.id)}
+                        onChange={() => toggleSelect(loc.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      {loc.image_url ? (
+                        <img
+                          src={loc.image_url}
+                          alt={loc.name}
+                          className="h-10 w-10 rounded-lg border border-gray-200 object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-gray-100">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5 text-gray-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.5}
+                              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.5}
+                              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
                       {loc.name}
                     </td>
@@ -536,20 +678,6 @@ export default function LocationsPage() {
                           Off
                         </span>
                       )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
-                      <button
-                        onClick={() => openEdit(loc)}
-                        className="mr-3 text-brand-600 hover:text-brand-800"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(loc.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Delete
-                      </button>
                     </td>
                   </tr>
                 ))}
