@@ -191,7 +191,10 @@ export default function InventoryPage() {
     }
   }
 
-  const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const addInputClass = 'w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const editInputClass = 'w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const addTextareaClass = 'w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const editTextareaClass = 'w-full rounded-[.3rem] border border-transparent bg-transparent px-3 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
   return (
     <div className="p-6 lg:p-8">
@@ -317,114 +320,89 @@ export default function InventoryPage() {
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-6 py-5">
               <div className="space-y-5">
-                <ImageUpload
-                  value={form.image_url}
-                  onChange={(url) => setForm({ ...form, image_url: url })}
-                  label="Product Image"
-                />
+                <div className="w-full">
+                  <ImageUpload
+                    value={form.image_url}
+                    onChange={(url) => setForm({ ...form, image_url: url })}
+                  />
+                </div>
 
                 {editing ? (
-                  /* ===== EDIT MODE: horizontal label-value with hover-to-edit ===== */
+                  /* ===== EDIT MODE: label above, transparent input, hover-to-edit ===== */
                   <>
-                    <div className="group flex items-center gap-4">
-                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Name *</span>
-                      <div className="relative flex-1">
-                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                          {form.name || '\u2014'}
-                        </span>
-                        <input
-                          value={form.name}
-                          onChange={(e) => setForm({ ...form, name: e.target.value })}
-                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                        />
-                      </div>
+                    <div className="space-y-0.5">
+                      <span className="text-xs text-gray-400">Name *</span>
+                      <input
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        className={editInputClass}
+                      />
                     </div>
-                    <div className="group flex items-center gap-4">
-                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Qty on Hand</span>
-                      <div className="relative flex-1">
-                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                          {form.quantity_on_hand || '0'}
-                        </span>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-0.5">
+                        <span className="text-xs text-gray-400">Qty on Hand</span>
                         <input
                           type="number"
                           min="0"
                           value={form.quantity_on_hand}
                           onChange={(e) => setForm({ ...form, quantity_on_hand: e.target.value })}
-                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                          className={editInputClass}
                         />
                       </div>
-                    </div>
-                    <div className="group flex items-center gap-4">
-                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Min Qty</span>
-                      <div className="relative flex-1">
-                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                          {form.min_order_quantity || '0'}
-                        </span>
+                      <div className="space-y-0.5">
+                        <span className="text-xs text-gray-400">Min Qty</span>
                         <input
                           type="number"
                           min="0"
                           value={form.min_order_quantity}
                           onChange={(e) => setForm({ ...form, min_order_quantity: e.target.value })}
-                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                          className={editInputClass}
                         />
                       </div>
                     </div>
-                    <div className="group flex items-center gap-4">
-                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Max Qty</span>
-                      <div className="relative flex-1">
-                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                          {form.max_order_quantity || 'Unlimited'}
-                        </span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={form.max_order_quantity}
-                          onChange={(e) => setForm({ ...form, max_order_quantity: e.target.value })}
-                          placeholder="Unlimited"
-                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                        />
-                      </div>
+                    <div className="space-y-0.5">
+                      <span className="text-xs text-gray-400">Max Qty</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={form.max_order_quantity}
+                        onChange={(e) => setForm({ ...form, max_order_quantity: e.target.value })}
+                        placeholder="Unlimited"
+                        className={editInputClass}
+                      />
                     </div>
-                    <div className="group flex items-center gap-4">
-                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Purchase Price ($)</span>
-                      <div className="relative flex-1">
-                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                          {form.purchase_price || '0.00'}
-                        </span>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-0.5">
+                        <span className="text-xs text-gray-400">Purchase Price ($)</span>
                         <input
                           type="number"
                           min="0"
                           step="0.01"
                           value={form.purchase_price}
                           onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
-                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                          className={editInputClass}
                         />
                       </div>
-                    </div>
-                    <div className="group flex items-center gap-4">
-                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Sell Price ($)</span>
-                      <div className="relative flex-1">
-                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                          {form.sell_price || '0.00'}
-                        </span>
+                      <div className="space-y-0.5">
+                        <span className="text-xs text-gray-400">Sell Price ($)</span>
                         <input
                           type="number"
                           min="0"
                           step="0.01"
                           value={form.sell_price}
                           onChange={(e) => setForm({ ...form, sell_price: e.target.value })}
-                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                          className={editInputClass}
                         />
                       </div>
                     </div>
                     {/* Linked Services */}
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700">Linked Services</label>
+                      <label className="mb-1 block text-xs text-gray-400">Linked Services</label>
                       <div className="flex gap-2">
                         <select
                           value={addServiceId}
                           onChange={(e) => setAddServiceId(e.target.value)}
-                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          className={`flex-1 ${editInputClass}`}
                         >
                           <option value="">Select a service</option>
                           {services
@@ -439,12 +417,12 @@ export default function InventoryPage() {
                           value={addServiceQty}
                           onChange={(e) => setAddServiceQty(e.target.value)}
                           placeholder="Qty"
-                          className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          className={`w-20 ${editInputClass}`}
                         />
                         <button
                           type="button"
                           onClick={addServiceToList}
-                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          className="rounded-[.3rem] border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
                         >
                           Add
                         </button>
@@ -452,7 +430,7 @@ export default function InventoryPage() {
                       {formServices.length > 0 && (
                         <div className="mt-3 space-y-2">
                           {formServices.map((fs) => (
-                            <div key={fs.service_id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                            <div key={fs.service_id} className="flex items-center justify-between rounded-[.3rem] border border-gray-200 px-3 py-2">
                               <span className="text-sm text-gray-700">{getServiceName(fs.service_id)} (qty: {fs.quantity_per_service})</span>
                               <button type="button" onClick={() => removeServiceFromList(fs.service_id)} className="text-sm text-red-600 hover:text-red-800">Remove</button>
                             </div>
@@ -461,32 +439,27 @@ export default function InventoryPage() {
                       )}
                     </div>
                     {/* Toggles */}
-                    <div className="flex gap-6">
-                      <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                    <div className="flex items-center">
+                      <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
                         <input type="checkbox" checked={form.display_in_booking} onChange={(e) => setForm({ ...form, display_in_booking: e.target.checked })} className="peer sr-only" />
                         <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                         Display in booking
                       </label>
-                      <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                      <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
                         <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="peer sr-only" />
                         <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                         Active
                       </label>
                     </div>
                     {/* Description */}
-                    <div className="group flex items-start gap-4">
-                      <span className="w-32 shrink-0 pt-2 text-sm font-medium text-gray-700">Description</span>
-                      <div className="relative flex-1">
-                        <span className="block whitespace-pre-wrap px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                          {form.description || '\u2014'}
-                        </span>
-                        <textarea
-                          rows={3}
-                          value={form.description}
-                          onChange={(e) => setForm({ ...form, description: e.target.value })}
-                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                        />
-                      </div>
+                    <div className="space-y-0.5">
+                      <span className="text-xs text-gray-400">Description</span>
+                      <textarea
+                        rows={3}
+                        value={form.description}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        className={editTextareaClass}
+                      />
                     </div>
                   </>
                 ) : (
@@ -497,7 +470,7 @@ export default function InventoryPage() {
                         value={form.name}
                         onChange={(e) => setForm({ ...form, name: e.target.value })}
                         placeholder="Name *"
-                        className={inputClass}
+                        className={addInputClass}
                       />
                     </div>
                     <div className="grid grid-cols-3 gap-4">
@@ -508,7 +481,7 @@ export default function InventoryPage() {
                           value={form.quantity_on_hand}
                           onChange={(e) => setForm({ ...form, quantity_on_hand: e.target.value })}
                           placeholder="Qty on Hand"
-                          className={inputClass}
+                          className={addInputClass}
                         />
                       </div>
                       <div>
@@ -518,7 +491,7 @@ export default function InventoryPage() {
                           value={form.min_order_quantity}
                           onChange={(e) => setForm({ ...form, min_order_quantity: e.target.value })}
                           placeholder="Min Qty"
-                          className={inputClass}
+                          className={addInputClass}
                         />
                       </div>
                       <div>
@@ -528,7 +501,7 @@ export default function InventoryPage() {
                           value={form.max_order_quantity}
                           onChange={(e) => setForm({ ...form, max_order_quantity: e.target.value })}
                           placeholder="Max Qty (Unlimited)"
-                          className={inputClass}
+                          className={addInputClass}
                         />
                       </div>
                     </div>
@@ -541,7 +514,7 @@ export default function InventoryPage() {
                           value={form.purchase_price}
                           onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
                           placeholder="Purchase Price ($)"
-                          className={inputClass}
+                          className={addInputClass}
                         />
                       </div>
                       <div>
@@ -552,7 +525,7 @@ export default function InventoryPage() {
                           value={form.sell_price}
                           onChange={(e) => setForm({ ...form, sell_price: e.target.value })}
                           placeholder="Sell Price ($)"
-                          className={inputClass}
+                          className={addInputClass}
                         />
                       </div>
                     </div>
@@ -562,7 +535,7 @@ export default function InventoryPage() {
                         <select
                           value={addServiceId}
                           onChange={(e) => setAddServiceId(e.target.value)}
-                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          className={`flex-1 ${addInputClass}`}
                         >
                           <option value="">Select a service to link</option>
                           {services
@@ -577,12 +550,12 @@ export default function InventoryPage() {
                           value={addServiceQty}
                           onChange={(e) => setAddServiceQty(e.target.value)}
                           placeholder="Qty"
-                          className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          className={`w-20 ${addInputClass}`}
                         />
                         <button
                           type="button"
                           onClick={addServiceToList}
-                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          className="rounded-[.3rem] border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
                         >
                           Add
                         </button>
@@ -590,7 +563,7 @@ export default function InventoryPage() {
                       {formServices.length > 0 && (
                         <div className="mt-3 space-y-2">
                           {formServices.map((fs) => (
-                            <div key={fs.service_id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                            <div key={fs.service_id} className="flex items-center justify-between rounded-[.3rem] border border-gray-200 px-3 py-2">
                               <span className="text-sm text-gray-700">{getServiceName(fs.service_id)} (qty: {fs.quantity_per_service})</span>
                               <button type="button" onClick={() => removeServiceFromList(fs.service_id)} className="text-sm text-red-600 hover:text-red-800">Remove</button>
                             </div>
@@ -599,13 +572,13 @@ export default function InventoryPage() {
                       )}
                     </div>
                     {/* Toggles */}
-                    <div className="flex gap-6">
-                      <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                    <div className="flex items-center">
+                      <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
                         <input type="checkbox" checked={form.display_in_booking} onChange={(e) => setForm({ ...form, display_in_booking: e.target.checked })} className="peer sr-only" />
                         <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                         Display in booking
                       </label>
-                      <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                      <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
                         <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="peer sr-only" />
                         <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                         Active
@@ -618,7 +591,7 @@ export default function InventoryPage() {
                         value={form.description}
                         onChange={(e) => setForm({ ...form, description: e.target.value })}
                         placeholder="Description"
-                        className={inputClass}
+                        className={addTextareaClass}
                       />
                     </div>
                   </>

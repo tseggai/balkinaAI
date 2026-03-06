@@ -202,8 +202,7 @@ export function ServiceForm({
     deposit: number;
     deposit_type: 'fixed' | 'percentage';
   }
-  const [customDurationTitle, setCustomDurationTitle] = useState('');
-  const [customDurationShowLabels, setCustomDurationShowLabels] = useState(true);
+  // Removed unused customDurationTitle and customDurationShowLabels state
   const [customDurations, setCustomDurations] = useState<CustomDurationOption[]>(
     (service as unknown as Record<string, unknown>)?.custom_durations
       ? ((service as unknown as Record<string, unknown>).custom_durations as CustomDurationOption[])
@@ -334,9 +333,14 @@ export function ServiceForm({
   // Shared field rendering helpers for edit mode (horizontal label + hover input)
   // =========================================================================
 
-  const inputClass =
-    'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-  const selectClass = inputClass;
+  const addInputClass =
+    'w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const addSelectClass = addInputClass;
+  const editInputClass =
+    'w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const editSelectClass = editInputClass;
+  const inputClass = isEditMode ? editInputClass : addInputClass;
+  const selectClass = isEditMode ? editSelectClass : addSelectClass;
 
   /** Wraps a field in horizontal label-left / value-right layout for edit mode */
   function EditField({
@@ -347,9 +351,9 @@ export function ServiceForm({
     children: React.ReactNode;
   }) {
     return (
-      <div className="group flex items-start gap-4">
-        <span className="mt-2 w-36 flex-shrink-0 text-sm font-medium text-gray-500">{label}</span>
-        <div className="flex-1">{children}</div>
+      <div className="group flex items-center gap-2">
+        <span className="w-36 flex-shrink-0 text-xs text-gray-400">{label}</span>
+        <div className="flex-1 text-sm font-medium text-gray-900">{children}</div>
       </div>
     );
   }
@@ -375,28 +379,20 @@ export function ServiceForm({
     step?: string;
   }) {
     return (
-      <div className="group/field">
-        <div className="group-hover/field:hidden flex min-h-[36px] items-center rounded-lg px-3 py-2 text-sm text-gray-900">
-          {prefix && <span className="mr-0.5 text-gray-500">{prefix}</span>}
-          {value || <span className="text-gray-400">{placeholder || 'Not set'}</span>}
-        </div>
-        <div className="hidden group-hover/field:block">
-          <div className="relative">
-            {prefix && (
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">{prefix}</span>
-            )}
-            <input
-              type={type}
-              required={required}
-              min={min}
-              step={step}
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              placeholder={placeholder}
-              className={`${inputClass}${prefix ? ' pl-7' : ''}`}
-            />
-          </div>
-        </div>
+      <div className="relative">
+        {prefix && (
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{prefix}</span>
+        )}
+        <input
+          type={type}
+          required={required}
+          min={min}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={`${editInputClass}${prefix ? ' pl-7' : ''}`}
+        />
       </div>
     );
   }
@@ -405,25 +401,17 @@ export function ServiceForm({
   function HoverSelect({
     value,
     onChange,
-    displayValue,
     children,
   }: {
     value: string;
     onChange: (v: string) => void;
-    displayValue: string;
+    displayValue?: string;
     children: React.ReactNode;
   }) {
     return (
-      <div className="group/field">
-        <div className="group-hover/field:hidden flex min-h-[36px] items-center rounded-lg px-3 py-2 text-sm text-gray-900">
-          {displayValue || <span className="text-gray-400">Not set</span>}
-        </div>
-        <div className="hidden group-hover/field:block">
-          <select value={value} onChange={(e) => onChange(e.target.value)} className={selectClass}>
-            {children}
-          </select>
-        </div>
-      </div>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={editSelectClass}>
+        {children}
+      </select>
     );
   }
 
@@ -436,10 +424,8 @@ export function ServiceForm({
     if (isEditMode) {
       return (
         <div className="space-y-4">
-          {/* Image Upload */}
-          <EditField label="Image">
-            <ImageUpload value={imageUrl} onChange={setImageUrl} label="" />
-          </EditField>
+          {/* Image Upload — full width, no label */}
+          <ImageUpload value={imageUrl} onChange={setImageUrl} label="" />
 
           {/* Name */}
           <EditField label="Service Name">
@@ -519,20 +505,13 @@ export function ServiceForm({
 
           {/* Description */}
           <EditField label="Description">
-            <div className="group/field">
-              <div className="group-hover/field:hidden flex min-h-[36px] items-center rounded-lg px-3 py-2 text-sm text-gray-900">
-                {description || <span className="text-gray-400">No description</span>}
-              </div>
-              <div className="hidden group-hover/field:block">
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  placeholder="Service description"
-                  className={inputClass}
-                />
-              </div>
-            </div>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="Service description"
+              className="w-full rounded-[.3rem] border border-transparent bg-transparent px-3 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
           </EditField>
 
           {/* Price & Capacity side by side */}
@@ -553,35 +532,40 @@ export function ServiceForm({
             </EditField>
           </div>
 
+          {/* Hide price — right below pricing */}
+          <div className="flex items-center">
+            <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2">
+              <input type="checkbox" checked={hidePrice} onChange={(e) => setHidePrice(e.target.checked)} className="peer sr-only" />
+              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+              <span className="text-sm font-medium text-gray-700">Hide price on the booking page</span>
+            </label>
+          </div>
+
           {/* Deposit */}
-          <div className="rounded-lg border border-gray-200 p-4">
-            <label className="relative inline-flex cursor-pointer items-center gap-2">
+          <div className="flex items-start">
+            <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
               <input type="checkbox" checked={depositEnabled} onChange={(e) => setDepositEnabled(e.target.checked)} className="peer sr-only" />
               <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
               <span className="text-sm font-medium text-gray-700">Enable Deposit</span>
             </label>
             {depositEnabled && (
-              <div className="mt-3 grid grid-cols-2 gap-4">
-                <EditField label="Deposit Type">
-                  <HoverSelect
-                    value={depositType}
-                    onChange={(v) => setDepositType(v as 'fixed' | 'percentage')}
-                    displayValue={depositType === 'percentage' ? 'Percentage' : 'Fixed amount'}
-                  >
-                    <option value="fixed">Fixed amount</option>
-                    <option value="percentage">Percentage</option>
-                  </HoverSelect>
-                </EditField>
-                <EditField label={depositType === 'percentage' ? 'Percentage (%)' : 'Amount ($)'}>
-                  <HoverInput
-                    type="number"
-                    min="0"
-                    step={depositType === 'percentage' ? '1' : '0.01'}
-                    value={depositAmount}
-                    onChange={setDepositAmount}
-                    placeholder="0"
-                  />
-                </EditField>
+              <div className="grid w-1/2 grid-cols-2 gap-2">
+                <HoverSelect
+                  value={depositType}
+                  onChange={(v) => setDepositType(v as 'fixed' | 'percentage')}
+                  displayValue={depositType === 'percentage' ? 'Percentage' : 'Fixed amount'}
+                >
+                  <option value="fixed">Fixed amount</option>
+                  <option value="percentage">Percentage</option>
+                </HoverSelect>
+                <HoverInput
+                  type="number"
+                  min="0"
+                  step={depositType === 'percentage' ? '1' : '0.01'}
+                  value={depositAmount}
+                  onChange={setDepositAmount}
+                  placeholder="0"
+                />
               </div>
             )}
           </div>
@@ -620,55 +604,49 @@ export function ServiceForm({
             </EditField>
           </div>
 
-          {/* Custom Duration Toggle */}
-          <div className="rounded-lg border border-gray-200 p-4">
-            <label className="relative inline-flex cursor-pointer items-center gap-2">
-              <input type="checkbox" checked={customDuration} onChange={(e) => setCustomDuration(e.target.checked)} className="peer sr-only" />
-              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-              <span className="text-sm font-medium text-gray-700">Allow Custom Duration</span>
-            </label>
-            <p className="ml-6 mt-0.5 text-xs text-gray-400">Let customers choose from predefined duration options</p>
-            {customDuration && renderCustomDurationSection()}
-          </div>
-
-          {/* Toggles Row */}
-          <div className="space-y-3">
-            <label className="relative inline-flex cursor-pointer items-center gap-2">
-              <input type="checkbox" checked={hidePrice} onChange={(e) => setHidePrice(e.target.checked)} className="peer sr-only" />
-              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-              <span className="text-sm font-medium text-gray-700">Hide price on the booking page</span>
-            </label>
-            <label className="relative inline-flex cursor-pointer items-center gap-2">
+          {/* Hide duration — right below booking duration */}
+          <div className="flex items-center">
+            <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2">
               <input type="checkbox" checked={hideDuration} onChange={(e) => setHideDuration(e.target.checked)} className="peer sr-only" />
               <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
               <span className="text-sm font-medium text-gray-700">Hide duration on the booking page</span>
             </label>
           </div>
 
+          {/* Custom Duration Toggle */}
+          <div className="flex items-start">
+            <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
+              <input type="checkbox" checked={customDuration} onChange={(e) => setCustomDuration(e.target.checked)} className="peer sr-only" />
+              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+              <span className="text-sm font-medium text-gray-700">Allow Custom Duration</span>
+            </label>
+            {customDuration && (
+              <div className="w-1/2">
+                <p className="text-xs text-gray-400">Let customers choose from predefined duration options</p>
+              </div>
+            )}
+          </div>
+          {customDuration && renderCustomDurationSection()}
+
           {/* Recurring Service */}
-          <div className="rounded-lg border border-gray-200 p-4">
-            <label className="relative inline-flex cursor-pointer items-center gap-2">
+          <div className="flex items-start">
+            <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
               <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="peer sr-only" />
               <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
               <span className="text-sm font-medium text-gray-700">Recurring Service</span>
             </label>
-            <p className="ml-6 mt-0.5 text-xs text-gray-400">Automatically rebook this service at a regular interval</p>
             {isRecurring && (
-              <div className="mt-3 flex items-center gap-3">
-                <EditField label="Every">
-                  <HoverInput type="number" min="1" value={recurringCount} onChange={setRecurringCount} />
-                </EditField>
-                <EditField label="Interval">
-                  <HoverSelect
-                    value={recurringInterval}
-                    onChange={setRecurringInterval}
-                    displayValue={recurringInterval.charAt(0).toUpperCase() + recurringInterval.slice(1) + '(s)'}
-                  >
-                    <option value="day">Day(s)</option>
-                    <option value="week">Week(s)</option>
-                    <option value="month">Month(s)</option>
-                  </HoverSelect>
-                </EditField>
+              <div className="flex w-1/2 items-center gap-2">
+                <HoverInput type="number" min="1" value={recurringCount} onChange={setRecurringCount} />
+                <HoverSelect
+                  value={recurringInterval}
+                  onChange={setRecurringInterval}
+                  displayValue={recurringInterval.charAt(0).toUpperCase() + recurringInterval.slice(1) + '(s)'}
+                >
+                  <option value="day">Day(s)</option>
+                  <option value="week">Week(s)</option>
+                  <option value="month">Month(s)</option>
+                </HoverSelect>
               </div>
             )}
           </div>
@@ -795,36 +773,41 @@ export function ServiceForm({
           </select>
         </div>
 
+        {/* Hide price — right below pricing */}
+        <div className="flex items-center">
+          <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={hidePrice} onChange={(e) => setHidePrice(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <span className="text-sm font-medium text-gray-700">Hide price on the booking page</span>
+          </label>
+        </div>
+
         {/* Deposit */}
-        <div className="rounded-lg border border-gray-200 p-4">
-          <label className="relative inline-flex cursor-pointer items-center gap-2">
+        <div className="flex items-start">
+          <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
             <input type="checkbox" checked={depositEnabled} onChange={(e) => setDepositEnabled(e.target.checked)} className="peer sr-only" />
             <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Enable Deposit</span>
           </label>
           {depositEnabled && (
-            <div className="mt-3 grid grid-cols-2 gap-4">
-              <div>
-                <select
-                  value={depositType}
-                  onChange={(e) => setDepositType(e.target.value as 'fixed' | 'percentage')}
-                  className={selectClass}
-                >
-                  <option value="fixed">Fixed amount</option>
-                  <option value="percentage">Percentage</option>
-                </select>
-              </div>
-              <div>
-                <input
-                  type="number"
-                  min="0"
-                  step={depositType === 'percentage' ? '1' : '0.01'}
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                  placeholder={depositType === 'percentage' ? 'Percentage (%)' : 'Amount ($)'}
-                  className={inputClass}
-                />
-              </div>
+            <div className="grid w-1/2 grid-cols-2 gap-2">
+              <select
+                value={depositType}
+                onChange={(e) => setDepositType(e.target.value as 'fixed' | 'percentage')}
+                className={selectClass}
+              >
+                <option value="fixed">Fixed amount</option>
+                <option value="percentage">Percentage</option>
+              </select>
+              <input
+                type="number"
+                min="0"
+                step={depositType === 'percentage' ? '1' : '0.01'}
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                placeholder={depositType === 'percentage' ? '%' : '$'}
+                className={inputClass}
+              />
             </div>
           )}
         </div>
@@ -848,62 +831,56 @@ export function ServiceForm({
           </select>
         </div>
 
-        {/* Custom Duration Toggle */}
-        <div className="rounded-lg border border-gray-200 p-4">
-          <label className="relative inline-flex cursor-pointer items-center gap-2">
-            <input type="checkbox" checked={customDuration} onChange={(e) => setCustomDuration(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-            <span className="text-sm font-medium text-gray-700">Allow Custom Duration</span>
-          </label>
-          <p className="ml-6 mt-0.5 text-xs text-gray-400">Let customers choose from predefined duration options</p>
-          {customDuration && renderCustomDurationSection()}
-        </div>
-
-        {/* Toggles Row */}
-        <div className="space-y-3">
-          <label className="relative inline-flex cursor-pointer items-center gap-2">
-            <input type="checkbox" checked={hidePrice} onChange={(e) => setHidePrice(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-            <span className="text-sm font-medium text-gray-700">Hide price on the booking page</span>
-          </label>
-          <label className="relative inline-flex cursor-pointer items-center gap-2">
+        {/* Hide duration — right below booking duration */}
+        <div className="flex items-center">
+          <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2">
             <input type="checkbox" checked={hideDuration} onChange={(e) => setHideDuration(e.target.checked)} className="peer sr-only" />
             <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Hide duration on the booking page</span>
           </label>
         </div>
 
+        {/* Custom Duration Toggle */}
+        <div className="flex items-start">
+          <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
+            <input type="checkbox" checked={customDuration} onChange={(e) => setCustomDuration(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <span className="text-sm font-medium text-gray-700">Allow Custom Duration</span>
+          </label>
+          {customDuration && (
+            <div className="w-1/2">
+              <p className="text-xs text-gray-400">Let customers choose from predefined duration options</p>
+            </div>
+          )}
+        </div>
+        {customDuration && renderCustomDurationSection()}
+
         {/* Recurring Service */}
-        <div className="rounded-lg border border-gray-200 p-4">
-          <label className="relative inline-flex cursor-pointer items-center gap-2">
+        <div className="flex items-start">
+          <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
             <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="peer sr-only" />
             <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Recurring Service</span>
           </label>
-          <p className="ml-6 mt-0.5 text-xs text-gray-400">Automatically rebook this service at a regular interval</p>
           {isRecurring && (
-            <div className="mt-3 flex items-center gap-3">
-              <div>
-                <input
-                  type="number"
-                  min="1"
-                  value={recurringCount}
-                  onChange={(e) => setRecurringCount(e.target.value)}
-                  placeholder="Every"
-                  className={`${inputClass} w-20`}
-                />
-              </div>
-              <div>
-                <select
-                  value={recurringInterval}
-                  onChange={(e) => setRecurringInterval(e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="day">Day(s)</option>
-                  <option value="week">Week(s)</option>
-                  <option value="month">Month(s)</option>
-                </select>
-              </div>
+            <div className="flex w-1/2 items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                value={recurringCount}
+                onChange={(e) => setRecurringCount(e.target.value)}
+                placeholder="Every"
+                className={`${inputClass} w-20`}
+              />
+              <select
+                value={recurringInterval}
+                onChange={(e) => setRecurringInterval(e.target.value)}
+                className={selectClass}
+              >
+                <option value="day">Day(s)</option>
+                <option value="week">Week(s)</option>
+                <option value="month">Month(s)</option>
+              </select>
             </div>
           )}
         </div>
@@ -915,23 +892,6 @@ export function ServiceForm({
   function renderCustomDurationSection() {
     return (
       <div className="mt-4 space-y-4">
-        {/* Title */}
-        <div>
-          <input
-            value={customDurationTitle}
-            onChange={(e) => setCustomDurationTitle(e.target.value)}
-            placeholder="e.g. Choose your session length"
-            className={inputClass}
-          />
-        </div>
-
-        {/* Show Labels toggle */}
-        <label className="relative inline-flex cursor-pointer items-center gap-2">
-          <input type="checkbox" checked={customDurationShowLabels} onChange={(e) => setCustomDurationShowLabels(e.target.checked)} className="peer sr-only" />
-          <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-          <span className="text-sm text-gray-700">Show option labels to customers</span>
-        </label>
-
         {/* Duration Options Table */}
         {customDurations.length > 0 && (
           <div className="overflow-x-auto rounded-lg border border-gray-200">

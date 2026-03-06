@@ -422,8 +422,8 @@ export default function LoyaltyPage() {
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <div className="space-y-6">
                 {/* Active toggle */}
-                <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
-                  <div>
+                <div className="flex items-center rounded-lg border border-gray-200 p-4">
+                  <div className="w-1/2">
                     <p className="text-sm font-medium text-gray-900">Program Status</p>
                     <p className="text-xs text-gray-500">Enable or disable this program</p>
                   </div>
@@ -447,36 +447,26 @@ export default function LoyaltyPage() {
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Points Earning</h3>
                   {isEditing ? (
                     <div className="space-y-3">
-                      <div className="group flex items-center gap-4">
-                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Pts / Booking</span>
-                        <div className="relative flex-1">
-                          <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                            {form.points_per_booking || '\u2014'}
-                          </span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={form.points_per_booking}
-                            onChange={(e) => setForm({ ...form, points_per_booking: Number(e.target.value) || 0 })}
-                            className="invisible absolute inset-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
-                          />
-                        </div>
+                      <div>
+                        <label className="text-xs text-gray-400">Pts / Booking</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.points_per_booking}
+                          onChange={(e) => setForm({ ...form, points_per_booking: Number(e.target.value) || 0 })}
+                          className="w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
                       </div>
-                      <div className="group flex items-center gap-4">
-                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Pts / $1 Spent</span>
-                        <div className="relative flex-1">
-                          <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                            {form.points_per_dollar || '\u2014'}
-                          </span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={form.points_per_dollar}
-                            onChange={(e) => setForm({ ...form, points_per_dollar: Number(e.target.value) || 0 })}
-                            className="invisible absolute inset-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
-                          />
-                        </div>
+                      <div>
+                        <label className="text-xs text-gray-400">Pts / $1 Spent</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={form.points_per_dollar}
+                          onChange={(e) => setForm({ ...form, points_per_dollar: Number(e.target.value) || 0 })}
+                          className="w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
                       </div>
                     </div>
                   ) : (
@@ -489,7 +479,7 @@ export default function LoyaltyPage() {
                           value={form.points_per_booking}
                           onChange={(e) => setForm({ ...form, points_per_booking: Number(e.target.value) || 0 })}
                           placeholder="0"
-                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          className="flex-1 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                       </div>
                       <div className="flex items-center gap-4">
@@ -501,7 +491,7 @@ export default function LoyaltyPage() {
                           value={form.points_per_dollar}
                           onChange={(e) => setForm({ ...form, points_per_dollar: Number(e.target.value) || 0 })}
                           placeholder="0"
-                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          className="flex-1 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                       </div>
                     </div>
@@ -515,7 +505,7 @@ export default function LoyaltyPage() {
                     <select
                       value={ruleType}
                       onChange={(e) => { setRuleType(e.target.value as 'service' | 'staff'); setRuleTargetId(''); }}
-                      className="rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                       <option value="service">Service</option>
                       <option value="staff">Staff</option>
@@ -523,7 +513,7 @@ export default function LoyaltyPage() {
                     <select
                       value={ruleTargetId}
                       onChange={(e) => setRuleTargetId(e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="flex-1 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                       <option value="">Select...</option>
                       {(ruleType === 'service' ? services : staffList).map((item) => (
@@ -536,7 +526,7 @@ export default function LoyaltyPage() {
                       value={rulePoints}
                       onChange={(e) => setRulePoints(e.target.value)}
                       placeholder="Pts"
-                      className="w-20 rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="w-20 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                     <button
                       type="button"
@@ -566,35 +556,25 @@ export default function LoyaltyPage() {
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Redemption</h3>
                   {isEditing ? (
                     <div className="space-y-3">
-                      <div className="group flex items-center gap-4">
-                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Pts to $1</span>
-                        <div className="relative flex-1">
-                          <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                            {form.redemption_rate || '\u2014'}
-                          </span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={form.redemption_rate}
-                            onChange={(e) => setForm({ ...form, redemption_rate: Number(e.target.value) || 0 })}
-                            className="invisible absolute inset-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
-                          />
-                        </div>
+                      <div>
+                        <label className="text-xs text-gray-400">Pts to $1</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.redemption_rate}
+                          onChange={(e) => setForm({ ...form, redemption_rate: Number(e.target.value) || 0 })}
+                          className="w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
                       </div>
-                      <div className="group flex items-center gap-4">
-                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Min Threshold</span>
-                        <div className="relative flex-1">
-                          <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                            {form.min_redemption_points || '\u2014'}
-                          </span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={form.min_redemption_points}
-                            onChange={(e) => setForm({ ...form, min_redemption_points: Number(e.target.value) || 0 })}
-                            className="invisible absolute inset-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
-                          />
-                        </div>
+                      <div>
+                        <label className="text-xs text-gray-400">Min Threshold</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.min_redemption_points}
+                          onChange={(e) => setForm({ ...form, min_redemption_points: Number(e.target.value) || 0 })}
+                          className="w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
                       </div>
                     </div>
                   ) : (
@@ -607,7 +587,7 @@ export default function LoyaltyPage() {
                           value={form.redemption_rate}
                           onChange={(e) => setForm({ ...form, redemption_rate: Number(e.target.value) || 0 })}
                           placeholder="0"
-                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          className="flex-1 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                       </div>
                       <div className="flex items-center gap-4">
@@ -618,7 +598,7 @@ export default function LoyaltyPage() {
                           value={form.min_redemption_points}
                           onChange={(e) => setForm({ ...form, min_redemption_points: Number(e.target.value) || 0 })}
                           placeholder="0"
-                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          className="flex-1 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                       </div>
                     </div>
@@ -633,7 +613,7 @@ export default function LoyaltyPage() {
                       value={tierName}
                       onChange={(e) => setTierName(e.target.value)}
                       placeholder="Tier name"
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                     <input
                       type="number"
@@ -641,14 +621,14 @@ export default function LoyaltyPage() {
                       value={tierMinPoints}
                       onChange={(e) => setTierMinPoints(e.target.value)}
                       placeholder="Min pts"
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                     <div className="flex gap-2">
                       <input
                         type="color"
                         value={tierColor}
                         onChange={(e) => setTierColor(e.target.value)}
-                        className="h-9 w-10 cursor-pointer rounded-lg border border-gray-300"
+                        className="h-8 w-10 cursor-pointer rounded-[.3rem] border border-[#f1f1f1]"
                       />
                       <button
                         type="button"
@@ -665,7 +645,7 @@ export default function LoyaltyPage() {
                       value={tierBenefits}
                       onChange={(e) => setTierBenefits(e.target.value)}
                       placeholder="Benefits for this tier (optional)..."
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                   </div>
                   {form.tiers.length > 0 && (
@@ -691,21 +671,16 @@ export default function LoyaltyPage() {
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Points Expiry</h3>
                   {isEditing ? (
-                    <div className="group flex items-center gap-4">
-                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Expiry Days</span>
-                      <div className="relative flex-1">
-                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                          {form.points_expiry_days > 0 ? `${form.points_expiry_days} days` : 'Never'}
-                        </span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={form.points_expiry_days}
-                          onChange={(e) => setForm({ ...form, points_expiry_days: Number(e.target.value) || 0 })}
-                          placeholder="0 = never"
-                          className="invisible absolute inset-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
-                        />
-                      </div>
+                    <div>
+                      <label className="text-xs text-gray-400">Expiry Days</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={form.points_expiry_days}
+                        onChange={(e) => setForm({ ...form, points_expiry_days: Number(e.target.value) || 0 })}
+                        placeholder="0 = never"
+                        className="w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
                     </div>
                   ) : (
                     <div className="flex items-center gap-4">
@@ -716,7 +691,7 @@ export default function LoyaltyPage() {
                         value={form.points_expiry_days}
                         onChange={(e) => setForm({ ...form, points_expiry_days: Number(e.target.value) || 0 })}
                         placeholder="0 = never"
-                        className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        className="flex-1 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       />
                     </div>
                   )}

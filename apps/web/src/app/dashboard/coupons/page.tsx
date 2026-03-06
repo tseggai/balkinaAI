@@ -222,8 +222,10 @@ export default function CouponsPage() {
 
   /* ── Shared form field classes ─────────────────────────────────────── */
 
-  const inputClasses =
-    'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const addInputClass =
+    'w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const editInputClass =
+    'w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
   /* ── List view ──────────────────────────────────────────────────────── */
 
@@ -383,74 +385,58 @@ export default function CouponsPage() {
                   /* ─── EDIT MODE: horizontal label-left, value-right, hover-to-edit ─── */
                   <>
                     {/* Code */}
-                    <div className="group flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Code</span>
+                    <div className="space-y-0.5">
+                      <span className="text-xs text-gray-400">Code</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-900 group-hover:hidden">{form.code}</span>
-                        <div className="hidden items-center gap-2 group-hover:flex">
-                          <input
-                            value={form.code}
-                            onChange={(e) => setForm({ ...form, code: e.target.value })}
-                            className="w-40 rounded-lg border border-gray-300 px-2 py-1 text-sm uppercase focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setForm({ ...form, code: generateCode() })}
-                            className="rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
-                          >
-                            Generate
-                          </button>
-                        </div>
+                        <input
+                          value={form.code}
+                          onChange={(e) => setForm({ ...form, code: e.target.value })}
+                          className={`flex-1 uppercase ${editInputClass}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, code: generateCode() })}
+                          className="rounded-[.3rem] border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                        >
+                          Generate
+                        </button>
                       </div>
                     </div>
 
                     {/* Discount Type */}
-                    <div className="group flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Discount Type</span>
-                      <span className="text-sm text-gray-900 group-hover:hidden">
-                        {form.discount_type === 'percentage' ? 'Percentage' : 'Fixed Amount'}
-                      </span>
-                      <div className="hidden group-hover:block">
-                        <select
-                          value={form.discount_type}
-                          onChange={(e) =>
-                            setForm({ ...form, discount_type: e.target.value as 'percentage' | 'fixed' })
-                          }
-                          className="rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        >
-                          <option value="percentage">Percentage</option>
-                          <option value="fixed">Fixed Amount</option>
-                        </select>
-                      </div>
+                    <div className="space-y-0.5">
+                      <span className="text-xs text-gray-400">Discount Type</span>
+                      <select
+                        value={form.discount_type}
+                        onChange={(e) =>
+                          setForm({ ...form, discount_type: e.target.value as 'percentage' | 'fixed' })
+                        }
+                        className={editInputClass}
+                      >
+                        <option value="percentage">Percentage</option>
+                        <option value="fixed">Fixed Amount</option>
+                      </select>
                     </div>
 
                     {/* Discount Value */}
-                    <div className="group flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">
+                    <div className="space-y-0.5">
+                      <span className="text-xs text-gray-400">
                         {form.discount_type === 'percentage' ? 'Discount (%)' : 'Discount ($)'}
                       </span>
-                      <span className="text-sm text-gray-900 group-hover:hidden">
-                        {form.discount_value || '0'}
-                      </span>
-                      <div className="hidden group-hover:block">
-                        <input
-                          type="number"
-                          min="0"
-                          step={form.discount_type === 'percentage' ? '1' : '0.01'}
-                          value={form.discount_value}
-                          onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
-                          className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        step={form.discount_type === 'percentage' ? '1' : '0.01'}
+                        value={form.discount_value}
+                        onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
+                        className={editInputClass}
+                      />
                     </div>
 
                     {/* Scope */}
-                    <div className="group flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Scope</span>
-                      <span className="text-sm text-gray-900 group-hover:hidden">
-                        {form.scope === 'per_customer' ? 'Per customer' : 'Per booking'}
-                      </span>
-                      <div className="hidden items-center gap-4 group-hover:flex">
+                    <div className="flex items-center">
+                      <span className="w-1/2 text-xs text-gray-400">Scope</span>
+                      <div className="flex w-1/2 items-center gap-4">
                         <label className="flex items-center gap-1.5 cursor-pointer">
                           <input
                             type="radio"
@@ -477,68 +463,55 @@ export default function CouponsPage() {
                     </div>
 
                     {/* Lifetime / Expiry */}
-                    <div className="group flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Expires</span>
-                      <span className="text-sm text-gray-900 group-hover:hidden">
-                        {form.is_lifetime
-                          ? 'Lifetime'
-                          : form.expires_at
-                            ? new Date(form.expires_at).toLocaleDateString()
-                            : 'Never'}
-                      </span>
-                      <div className="hidden items-center gap-2 group-hover:flex">
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <span className="text-xs text-gray-500">Lifetime</span>
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={form.is_lifetime}
-                            onClick={() => setForm({ ...form, is_lifetime: !form.is_lifetime })}
-                            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
-                              form.is_lifetime ? 'bg-brand-600' : 'bg-gray-200'
+                    <div className="flex items-center">
+                      <div className="flex w-1/2 items-center gap-2">
+                        <span className="text-xs text-gray-400">Lifetime</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={form.is_lifetime}
+                          onClick={() => setForm({ ...form, is_lifetime: !form.is_lifetime })}
+                          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
+                            form.is_lifetime ? 'bg-brand-600' : 'bg-gray-200'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              form.is_lifetime ? 'translate-x-4' : 'translate-x-0'
                             }`}
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                form.is_lifetime ? 'translate-x-4' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
-                        </label>
+                          />
+                        </button>
+                      </div>
+                      <div className="w-1/2">
                         {!form.is_lifetime && (
                           <input
                             type="date"
                             value={form.expires_at}
                             onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
-                            className="rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            className={editInputClass}
                           />
                         )}
                       </div>
                     </div>
 
                     {/* Usage Limit */}
-                    <div className="group flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Usage Limit</span>
-                      <span className="text-sm text-gray-900 group-hover:hidden">
-                        {form.usage_limit || 'Unlimited'}
-                      </span>
-                      <div className="hidden group-hover:block">
-                        <input
-                          type="number"
-                          min="1"
-                          value={form.usage_limit}
-                          onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
-                          placeholder="Unlimited"
-                          className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                      </div>
+                    <div className="space-y-0.5">
+                      <span className="text-xs text-gray-400">Usage Limit</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={form.usage_limit}
+                        onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
+                        placeholder="Unlimited"
+                        className={editInputClass}
+                      />
                     </div>
 
                     {/* Applicable Services */}
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-xs text-gray-400">
                         Applicable Services{' '}
-                        <span className="font-normal text-gray-400">
+                        <span className="font-normal">
                           ({form.applicable_service_ids.length === 0 ? 'All services' : `${form.applicable_service_ids.length} selected`})
                         </span>
                       </label>
@@ -583,9 +556,9 @@ export default function CouponsPage() {
 
                     {/* Applicable Staff */}
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                      <label className="mb-1 block text-xs text-gray-400">
                         Applicable Staff{' '}
-                        <span className="font-normal text-gray-400">
+                        <span className="font-normal">
                           ({form.applicable_staff_ids.length === 0 ? 'All staff' : `${form.applicable_staff_ids.length} selected`})
                         </span>
                       </label>
@@ -640,7 +613,7 @@ export default function CouponsPage() {
                           value={form.code}
                           onChange={(e) => setForm({ ...form, code: e.target.value })}
                           placeholder="Coupon Code"
-                          className={`flex-1 uppercase ${inputClasses}`}
+                          className={`flex-1 uppercase ${addInputClass}`}
                         />
                         <button
                           type="button"
@@ -660,7 +633,7 @@ export default function CouponsPage() {
                           onChange={(e) =>
                             setForm({ ...form, discount_type: e.target.value as 'percentage' | 'fixed' })
                           }
-                          className={inputClasses}
+                          className={addInputClass}
                         >
                           <option value="percentage">Percentage</option>
                           <option value="fixed">Fixed Amount</option>
@@ -674,7 +647,7 @@ export default function CouponsPage() {
                           value={form.discount_value}
                           onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
                           placeholder={form.discount_type === 'percentage' ? 'Discount (%)' : 'Discount ($)'}
-                          className={inputClasses}
+                          className={addInputClass}
                         />
                       </div>
                     </div>
@@ -731,7 +704,7 @@ export default function CouponsPage() {
                           </label>
                         </div>
                         {form.is_lifetime ? (
-                          <div className="flex h-[38px] items-center rounded-lg border border-gray-200 bg-gray-50 px-3">
+                          <div className="flex h-8 items-center rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3">
                             <span className="text-sm text-gray-400">Never expires</span>
                           </div>
                         ) : (
@@ -740,7 +713,7 @@ export default function CouponsPage() {
                             value={form.expires_at}
                             onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
                             placeholder="Expiry Date"
-                            className={inputClasses}
+                            className={addInputClass}
                           />
                         )}
                       </div>
@@ -752,7 +725,7 @@ export default function CouponsPage() {
                           value={form.usage_limit}
                           onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
                           placeholder="Usage Limit (Unlimited)"
-                          className={inputClasses}
+                          className={addInputClass}
                         />
                       </div>
                     </div>

@@ -26,8 +26,14 @@ interface Location {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const inputClass =
-  'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const addInputClass =
+  'w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const addTextareaClass =
+  'w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const editInputClass =
+  'w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const editTextareaClass =
+  'w-full rounded-[.3rem] border border-transparent bg-transparent px-3 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -282,20 +288,15 @@ export default function LocationsPage() {
               {/* Name */}
               <div>
                 {isEdit ? (
-                  <div className="group flex items-center gap-4">
-                    <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Name</span>
-                    <div className="relative flex-1">
-                      <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                        {name || '\u2014'}
-                      </span>
-                      <input
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Location Name *"
-                        className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                      />
-                    </div>
+                  <div>
+                    <span className="text-xs text-gray-400">Name</span>
+                    <input
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Location Name *"
+                      className={editInputClass}
+                    />
                   </div>
                 ) : (
                   <input
@@ -303,7 +304,7 @@ export default function LocationsPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Location Name *"
-                    className={inputClass}
+                    className={addInputClass}
                   />
                 )}
               </div>
@@ -311,22 +312,17 @@ export default function LocationsPage() {
               {/* Address — Google Places Autocomplete */}
               <div>
                 {isEdit ? (
-                  <div className="group flex items-center gap-4">
-                    <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Address</span>
-                    <div className="relative flex-1">
-                      <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                        {address || '\u2014'}
-                      </span>
-                      <input
-                        ref={addressInputRef}
-                        required
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        placeholder="Start typing an address... *"
-                        className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                        autoComplete="off"
-                      />
-                    </div>
+                  <div>
+                    <span className="text-xs text-gray-400">Address</span>
+                    <input
+                      ref={addressInputRef}
+                      required
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Start typing an address... *"
+                      className={editInputClass}
+                      autoComplete="off"
+                    />
                   </div>
                 ) : (
                   <input
@@ -335,7 +331,7 @@ export default function LocationsPage() {
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     placeholder="Start typing an address... *"
-                    className={inputClass}
+                    className={addInputClass}
                     autoComplete="off"
                   />
                 )}
@@ -358,8 +354,8 @@ export default function LocationsPage() {
 
               {/* Location Photo Upload */}
               <div>
-                <div className="flex items-center gap-3">
-                  <label className="cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                <div className="flex w-full items-center gap-3">
+                  <label className="w-full cursor-pointer rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-4 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-100">
                     {uploading ? 'Uploading...' : 'Upload Photo'}
                     <input
                       type="file"
@@ -410,20 +406,15 @@ export default function LocationsPage() {
               {/* Phone */}
               <div>
                 {isEdit ? (
-                  <div className="group flex items-center gap-4">
-                    <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Phone</span>
-                    <div className="relative flex-1">
-                      <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                        {phone || '\u2014'}
-                      </span>
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="Phone (+1 (555) 123-4567)"
-                        className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                      />
-                    </div>
+                  <div>
+                    <span className="text-xs text-gray-400">Phone</span>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="Phone (+1 (555) 123-4567)"
+                      className={editInputClass}
+                    />
                   </div>
                 ) : (
                   <input
@@ -431,7 +422,7 @@ export default function LocationsPage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="Phone (+1 (555) 123-4567)"
-                    className={inputClass}
+                    className={addInputClass}
                   />
                 )}
               </div>
@@ -439,20 +430,15 @@ export default function LocationsPage() {
               {/* Description */}
               <div>
                 {isEdit ? (
-                  <div className="group flex items-start gap-4">
-                    <span className="w-32 shrink-0 pt-2 text-sm font-medium text-gray-700">Description</span>
-                    <div className="relative flex-1">
-                      <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                        {description || '\u2014'}
-                      </span>
-                      <textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        rows={3}
-                        placeholder="Brief description of this location..."
-                        className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                      />
-                    </div>
+                  <div>
+                    <span className="text-xs text-gray-400">Description</span>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={3}
+                      placeholder="Brief description of this location..."
+                      className={editTextareaClass}
+                    />
                   </div>
                 ) : (
                   <textarea
@@ -460,7 +446,7 @@ export default function LocationsPage() {
                     onChange={(e) => setDescription(e.target.value)}
                     rows={3}
                     placeholder="Brief description of this location..."
-                    className={inputClass}
+                    className={addTextareaClass}
                   />
                 )}
               </div>
@@ -477,30 +463,30 @@ export default function LocationsPage() {
               {/* Booking Limiter */}
               <div className="rounded-lg border border-gray-200 p-4">
                 <h3 className="mb-3 text-sm font-semibold text-gray-900">Booking Limiter</h3>
-                <label className="relative inline-flex cursor-pointer items-center gap-2">
-                  <input type="checkbox" checked={bookingLimitEnabled} onChange={(e) => setBookingLimitEnabled(e.target.checked)} className="peer sr-only" />
-                  <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                  <span className="text-sm font-medium text-gray-700">
-                    Enable booking limit for this location
-                  </span>
-                </label>
-                {bookingLimitEnabled && (
-                  <div className="mt-3 flex items-center gap-3">
-                    <div>
+                <div className="flex items-start">
+                  <div className="w-1/2">
+                    <label className="relative inline-flex cursor-pointer items-center gap-2">
+                      <input type="checkbox" checked={bookingLimitEnabled} onChange={(e) => setBookingLimitEnabled(e.target.checked)} className="peer sr-only" />
+                      <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                      <span className="text-sm font-medium text-gray-700">
+                        Enable booking limit
+                      </span>
+                    </label>
+                  </div>
+                  {bookingLimitEnabled && (
+                    <div className="flex w-1/2 items-center gap-3">
                       <input
                         type="number"
                         min="1"
                         value={bookingLimitCapacity}
                         onChange={(e) => setBookingLimitCapacity(e.target.value)}
                         placeholder="Capacity"
-                        className={`${inputClass} w-24`}
+                        className={`${isEdit ? editInputClass : addInputClass} w-24`}
                       />
-                    </div>
-                    <div>
                       <select
                         value={bookingLimitInterval}
                         onChange={(e) => setBookingLimitInterval(e.target.value)}
-                        className={inputClass}
+                        className={isEdit ? editInputClass : addInputClass}
                       >
                         {INTERVAL_OPTIONS.map((opt) => (
                           <option key={opt} value={opt}>
@@ -509,8 +495,8 @@ export default function LocationsPage() {
                         ))}
                       </select>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {error && <p className="text-sm text-red-600">{error}</p>}
