@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -48,6 +48,61 @@ function parseMessageContent(content: string): { text: string; buttons: string[]
   }).replace(/\n{3,}/g, '\n\n').trim();
 
   return { text, buttons };
+}
+
+// ── Parse inline markdown (**bold** and *italic*) into Text elements ────────
+
+function renderFormattedText(
+  text: string,
+  baseStyle: object,
+): React.ReactNode[] {
+  // Split on **bold** and *italic* patterns
+  const parts: React.ReactNode[] = [];
+  // Regex: match **bold** first, then *italic*
+  const regex = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    // Add plain text before this match
+    if (match.index > lastIndex) {
+      parts.push(
+        <Text key={key++} style={baseStyle}>
+          {text.slice(lastIndex, match.index)}
+        </Text>,
+      );
+    }
+
+    if (match[2]) {
+      // **bold**
+      parts.push(
+        <Text key={key++} style={[baseStyle, { fontWeight: '700' }]}>
+          {match[2]}
+        </Text>,
+      );
+    } else if (match[3]) {
+      // *italic*
+      parts.push(
+        <Text key={key++} style={[baseStyle, { fontStyle: 'italic' }]}>
+          {match[3]}
+        </Text>,
+      );
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining plain text
+  if (lastIndex < text.length) {
+    parts.push(
+      <Text key={key++} style={baseStyle}>
+        {text.slice(lastIndex)}
+      </Text>,
+    );
+  }
+
+  return parts.length > 0 ? parts : [<Text key={0} style={baseStyle}>{text}</Text>];
 }
 
 // ── Typing Indicator ─────────────────────────────────────────────────────────
@@ -211,7 +266,15 @@ function MessageBubble({
                 isUser ? bubbleStyles.textUser : bubbleStyles.textAssistant,
               ]}
             >
-              {text}
+              {isUser
+                ? text
+                : renderFormattedText(
+                    text,
+                    StyleSheet.flatten([
+                      bubbleStyles.text,
+                      bubbleStyles.textAssistant,
+                    ]),
+                  )}
             </Text>
           )}
         </View>
