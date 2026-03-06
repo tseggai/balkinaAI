@@ -53,6 +53,35 @@ const PERM_LABELS: Record<PermField, string> = {
   can_delete: 'Delete',
 };
 
+const AVATAR_COLORS = [
+  'bg-blue-500',
+  'bg-green-500',
+  'bg-purple-500',
+  'bg-pink-500',
+  'bg-amber-500',
+  'bg-teal-500',
+  'bg-red-500',
+  'bg-indigo-500',
+];
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function getAvatarColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[index] as string;
+}
+
 function buildDefaultPermissions(): Permission[] {
   return MODULES.map((m) => ({
     module: m,
@@ -74,6 +103,7 @@ export default function RolesPage() {
   const [permissions, setPermissions] = useState<Permission[]>(buildDefaultPermissions());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const fetchRoles = useCallback(async () => {
     const res = await fetch('/api/roles');
@@ -171,6 +201,7 @@ export default function RolesPage() {
   async function handleDelete(id: string) {
     if (!confirm('Delete this role?')) return;
     await fetch(`/api/roles?id=${id}`, { method: 'DELETE' });
+    closePanel();
     fetchRoles();
   }
 
@@ -206,9 +237,26 @@ export default function RolesPage() {
     fetchRoles();
   }
 
+  function toggleRowSelect(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  }
+
+  function toggleSelectAllRows() {
+    if (selectedIds.length === roles.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(roles.map((r) => r.id));
+    }
+  }
+
   const inputClass =
     'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-  const labelClass = 'mb-1 block text-sm font-medium text-gray-700';
+
+  // Build a lookup from staff_id to staff name for the avatar display
+  const staffNameMap = new Map<string, string>();
+  staffList.forEach((s) => staffNameMap.set(s.id, s.name));
 
   return (
     <div className="p-6 lg:p-8">
@@ -239,28 +287,70 @@ export default function RolesPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.length === roles.length && roles.length > 0}
+                      onChange={toggleSelectAllRows}
+                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Role Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Staff Count</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Staff</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Notes</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {roles.map((role) => (
-                  <tr key={role.id} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{role.name}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
-                      {role.staff_role_assignments?.length ?? 0}
-                    </td>
-                    <td className="max-w-xs truncate px-4 py-3 text-sm text-gray-600">
-                      {role.notes ?? '---'}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
-                      <button onClick={() => openEdit(role)} className="mr-3 text-brand-600 hover:text-brand-800">Edit</button>
-                      <button onClick={() => handleDelete(role.id)} className="text-red-600 hover:text-red-800">Delete</button>
-                    </td>
-                  </tr>
-                ))}
+                {roles.map((role) => {
+                  const assignments = role.staff_role_assignments ?? [];
+                  return (
+                    <tr
+                      key={role.id}
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => openEdit(role)}
+                    >
+                      <td
+                        className="whitespace-nowrap px-4 py-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(role.id)}
+                          onChange={() => toggleRowSelect(role.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{role.name}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <div className="flex items-center -space-x-2">
+                          {assignments.slice(0, 5).map((a) => {
+                            const name = a.staff?.name ?? staffNameMap.get(a.staff_id) ?? '?';
+                            return (
+                              <div
+                                key={a.staff_id}
+                                title={name}
+                                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[10px] font-semibold text-white ${getAvatarColor(a.staff_id)}`}
+                              >
+                                {getInitials(name)}
+                              </div>
+                            );
+                          })}
+                          {assignments.length > 5 && (
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gray-300 text-[10px] font-semibold text-gray-700">
+                              +{assignments.length - 5}
+                            </div>
+                          )}
+                          {assignments.length === 0 && (
+                            <span className="text-xs text-gray-400">None</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="max-w-xs truncate px-4 py-3 text-sm text-gray-600">
+                        {role.notes ?? '---'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -271,7 +361,9 @@ export default function RolesPage() {
       {showPanel && (
         <>
           <div className="fixed inset-0 z-40 bg-black/30 transition-opacity" onClick={closePanel} />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
+          <div
+            className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]`}
+          >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-xl font-bold text-gray-900">
@@ -290,54 +382,118 @@ export default function RolesPage() {
             {/* Body */}
             <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
               <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-                {/* Role Name */}
-                <div>
-                  <label className={labelClass}>Role Name *</label>
-                  <input
-                    required
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className={inputClass}
-                  />
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label className={labelClass}>Notes</label>
-                  <textarea
-                    rows={2}
-                    value={form.notes}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                    className={inputClass}
-                  />
-                </div>
-
-                {/* Staff Selection */}
-                <div>
-                  <label className={labelClass}>Assigned Staff</label>
-                  {staffList.length === 0 ? (
-                    <p className="text-sm text-gray-500">No staff members available.</p>
-                  ) : (
-                    <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-3">
-                      {staffList.map((s) => (
-                        <label key={s.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-gray-50">
-                          <input
-                            type="checkbox"
-                            checked={selectedStaff.includes(s.id)}
-                            onChange={() => toggleStaff(s.id)}
-                            className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                          />
-                          <span className="text-sm text-gray-700">{s.name}</span>
-                        </label>
-                      ))}
+                {/* --- ADD MODE: placeholders instead of labels --- */}
+                {!editing && (
+                  <>
+                    {/* Role Name */}
+                    <div>
+                      <input
+                        required
+                        placeholder="Role Name *"
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        className={inputClass}
+                      />
                     </div>
-                  )}
-                </div>
+
+                    {/* Notes */}
+                    <div>
+                      <textarea
+                        rows={2}
+                        placeholder="Notes"
+                        value={form.notes}
+                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                        className={inputClass}
+                      />
+                    </div>
+
+                    {/* Staff Selection */}
+                    <div>
+                      <p className="mb-1 text-sm font-medium text-gray-700">Assigned Staff</p>
+                      {staffList.length === 0 ? (
+                        <p className="text-sm text-gray-500">No staff members available.</p>
+                      ) : (
+                        <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-3">
+                          {staffList.map((s) => (
+                            <label key={s.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-gray-50">
+                              <input
+                                type="checkbox"
+                                checked={selectedStaff.includes(s.id)}
+                                onChange={() => toggleStaff(s.id)}
+                                className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                              />
+                              <span className="text-sm text-gray-700">{s.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* --- EDIT MODE: horizontal label-left, value-right, hover-to-edit --- */}
+                {editing && (
+                  <>
+                    {/* Role Name */}
+                    <div className="group flex items-center justify-between gap-4">
+                      <span className="shrink-0 text-sm font-medium text-gray-500">Role Name</span>
+                      <div className="min-w-0 flex-1 text-right">
+                        <span className="block truncate text-sm text-gray-900 group-hover:hidden">
+                          {form.name || '---'}
+                        </span>
+                        <input
+                          required
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          className={`${inputClass} hidden text-right group-hover:block`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Notes */}
+                    <div className="group flex items-start justify-between gap-4">
+                      <span className="shrink-0 pt-1 text-sm font-medium text-gray-500">Notes</span>
+                      <div className="min-w-0 flex-1 text-right">
+                        <span className="block truncate text-sm text-gray-900 group-hover:hidden">
+                          {form.notes || '---'}
+                        </span>
+                        <textarea
+                          rows={2}
+                          value={form.notes}
+                          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                          className={`${inputClass} hidden text-right group-hover:block`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Staff Selection */}
+                    <div>
+                      <p className="mb-1 text-sm font-medium text-gray-500">Assigned Staff</p>
+                      {staffList.length === 0 ? (
+                        <p className="text-sm text-gray-500">No staff members available.</p>
+                      ) : (
+                        <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-3">
+                          {staffList.map((s) => (
+                            <label key={s.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-gray-50">
+                              <input
+                                type="checkbox"
+                                checked={selectedStaff.includes(s.id)}
+                                onChange={() => toggleStaff(s.id)}
+                                className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                              />
+                              <span className="text-sm text-gray-700">{s.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 {/* Permissions Matrix */}
                 <div>
                   <div className="mb-2 flex items-center justify-between">
-                    <label className="text-sm font-medium text-gray-700">Permissions</label>
+                    <span className="text-sm font-medium text-gray-700">Permissions</span>
                     <button
                       type="button"
                       onClick={toggleSelectAll}
@@ -404,7 +560,16 @@ export default function RolesPage() {
               </div>
 
               {/* Footer */}
-              <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
+              <div className="flex items-center gap-3 border-t border-gray-200 px-6 py-4">
+                {editing && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(editing.id)}
+                    className="mr-auto rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                )}
                 <button
                   type="submit"
                   disabled={saving}

@@ -95,7 +95,6 @@ function defaultSchedule(): WeekSchedule {
 
 const inputClass =
   'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-const labelClass = 'mb-1 block text-sm font-medium text-gray-700';
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -141,8 +140,8 @@ export default function StaffPage() {
   const [allLocations, setAllLocations] = useState<LocationOption[]>([]);
   const [allServices, setAllServices] = useState<ServiceOption[]>([]);
 
-  // Selection state
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // General state
   const [saving, setSaving] = useState(false);
@@ -274,6 +273,7 @@ export default function StaffPage() {
   async function handleDelete(id: string) {
     if (!confirm('Delete this staff member?')) return;
     await fetch(`/api/staff?id=${id}`, { method: 'DELETE' });
+    closePanel();
     fetchStaff();
   }
 
@@ -288,19 +288,17 @@ export default function StaffPage() {
   }
 
   function toggleSelectAll() {
-    if (selectedIds.size === staff.length) {
-      setSelectedIds(new Set());
+    if (selectedIds.length === staff.length) {
+      setSelectedIds([]);
     } else {
-      setSelectedIds(new Set(staff.map((s) => s.id)));
+      setSelectedIds(staff.map((s) => s.id));
     }
   }
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      return [...prev, id];
     });
   }
 
@@ -481,9 +479,195 @@ export default function StaffPage() {
   // ── Tab Renderers ──────────────────────────────────────────────────────────
 
   function renderDetailsTab() {
+    const isEdit = Boolean(editing);
+
+    if (isEdit) {
+      // ── Edit mode: horizontal label + hover-to-edit fields ──
+      return (
+        <div className="space-y-5">
+          {/* Image Upload */}
+          <ImageUpload
+            value={imageUrl}
+            onChange={setImageUrl}
+            label="Staff Photo"
+          />
+
+          {/* First Name + Last Name */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="group flex items-center gap-4">
+              <span className="w-32 shrink-0 text-sm font-medium text-gray-700">First Name *</span>
+              <div className="relative flex-1">
+                <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                  {firstName || '\u2014'}
+                </span>
+                <input
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="First Name *"
+                  className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                />
+              </div>
+            </div>
+            <div className="group flex items-center gap-4">
+              <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Last Name</span>
+              <div className="relative flex-1">
+                <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                  {lastName || '\u2014'}
+                </span>
+                <input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Last Name"
+                  className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Profession */}
+          <div className="group flex items-center gap-4">
+            <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Profession</span>
+            <div className="relative flex-1">
+              <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                {profession || '\u2014'}
+              </span>
+              <input
+                value={profession}
+                onChange={(e) => setProfession(e.target.value)}
+                placeholder="e.g. Hair Stylist, Massage Therapist..."
+                className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+              />
+            </div>
+          </div>
+
+          {/* Email + Phone */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="group flex items-center gap-4">
+              <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Email *</span>
+              <div className="relative flex-1">
+                <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                  {email || '\u2014'}
+                </span>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email *"
+                  className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                />
+              </div>
+            </div>
+            <div className="group flex items-center gap-4">
+              <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Phone</span>
+              <div className="relative flex-1">
+                <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                  {phone || '\u2014'}
+                </span>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Phone"
+                  className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Locations multi-select */}
+          <div className="flex gap-4">
+            <span className="w-32 shrink-0 text-sm font-medium text-gray-700 pt-2">Locations</span>
+            <div className="flex-1">
+              {allLocations.length === 0 ? (
+                <p className="text-sm text-gray-400">No locations available. Add locations first.</p>
+              ) : (
+                <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
+                  {allLocations.map((loc) => (
+                    <label key={loc.id} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedLocationIds.includes(loc.id)}
+                        onChange={() => toggleLocation(loc.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                      />
+                      <span className="text-sm text-gray-700">{loc.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Services multi-select */}
+          <div className="flex gap-4">
+            <span className="w-32 shrink-0 text-sm font-medium text-gray-700 pt-2">Services</span>
+            <div className="flex-1">
+              {allServices.length === 0 ? (
+                <p className="text-sm text-gray-400">No services available. Add services first.</p>
+              ) : (
+                <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
+                  {allServices.map((svc) => (
+                    <label key={svc.id} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedServiceIds.includes(svc.id)}
+                        onChange={() => toggleService(svc.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                      />
+                      <span className="text-sm text-gray-700">{svc.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="group flex gap-4">
+            <span className="w-32 shrink-0 text-sm font-medium text-gray-700 pt-2">Notes</span>
+            <div className="relative flex-1">
+              <span className="block px-3 py-2 text-sm text-gray-900 whitespace-pre-wrap group-hover:invisible">
+                {notes || '\u2014'}
+              </span>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                placeholder="Notes"
+                className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+              />
+            </div>
+          </div>
+
+          {/* Active toggle */}
+          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Status</p>
+              <p className="text-xs text-gray-500">{isActive ? 'Active' : 'Inactive'}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsActive(!isActive)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                isActive ? 'bg-brand-600' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                  isActive ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Add mode: placeholders instead of labels ──
     return (
       <div className="space-y-5">
-        {/* Image Upload — top of form */}
+        {/* Image Upload */}
         <ImageUpload
           value={imageUrl}
           onChange={setImageUrl}
@@ -493,19 +677,19 @@ export default function StaffPage() {
         {/* First Name + Last Name */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>First Name *</label>
             <input
               required
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
+              placeholder="First Name *"
               className={inputClass}
             />
           </div>
           <div>
-            <label className={labelClass}>Last Name</label>
             <input
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
+              placeholder="Last Name"
               className={inputClass}
             />
           </div>
@@ -513,11 +697,10 @@ export default function StaffPage() {
 
         {/* Profession */}
         <div>
-          <label className={labelClass}>Profession</label>
           <input
             value={profession}
             onChange={(e) => setProfession(e.target.value)}
-            placeholder="e.g. Hair Stylist, Massage Therapist..."
+            placeholder="Profession (e.g. Hair Stylist, Massage Therapist...)"
             className={inputClass}
           />
         </div>
@@ -525,20 +708,20 @@ export default function StaffPage() {
         {/* Email + Phone */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>Email *</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email *"
               className={inputClass}
             />
           </div>
           <div>
-            <label className={labelClass}>Phone</label>
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              placeholder="Phone"
               className={inputClass}
             />
           </div>
@@ -546,11 +729,17 @@ export default function StaffPage() {
 
         {/* Locations multi-select */}
         <div>
-          <label className={labelClass}>Locations</label>
+          <input
+            readOnly
+            placeholder="Locations"
+            className={`${inputClass} cursor-default`}
+            value={selectedLocationIds.length > 0 ? `${selectedLocationIds.length} selected` : ''}
+            onFocus={(e) => e.target.blur()}
+          />
           {allLocations.length === 0 ? (
-            <p className="text-sm text-gray-400">No locations available. Add locations first.</p>
+            <p className="mt-1 text-sm text-gray-400">No locations available. Add locations first.</p>
           ) : (
-            <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
+            <div className="mt-1 max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
               {allLocations.map((loc) => (
                 <label key={loc.id} className="flex items-center gap-2">
                   <input
@@ -568,11 +757,17 @@ export default function StaffPage() {
 
         {/* Services multi-select */}
         <div>
-          <label className={labelClass}>Services</label>
+          <input
+            readOnly
+            placeholder="Services"
+            className={`${inputClass} cursor-default`}
+            value={selectedServiceIds.length > 0 ? `${selectedServiceIds.length} selected` : ''}
+            onFocus={(e) => e.target.blur()}
+          />
           {allServices.length === 0 ? (
-            <p className="text-sm text-gray-400">No services available. Add services first.</p>
+            <p className="mt-1 text-sm text-gray-400">No services available. Add services first.</p>
           ) : (
-            <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
+            <div className="mt-1 max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
               {allServices.map((svc) => (
                 <label key={svc.id} className="flex items-center gap-2">
                   <input
@@ -590,11 +785,11 @@ export default function StaffPage() {
 
         {/* Notes */}
         <div>
-          <label className={labelClass}>Notes</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
+            placeholder="Notes"
             className={inputClass}
           />
         </div>
@@ -720,11 +915,11 @@ export default function StaffPage() {
         {/* Add special day */}
         <div className="flex items-end gap-3">
           <div>
-            <label className={labelClass}>Date</label>
             <input
               type="date"
               value={newSpecialDate}
               onChange={(e) => setNewSpecialDate(e.target.value)}
+              placeholder="Date"
               className={inputClass}
             />
           </div>
@@ -864,11 +1059,11 @@ export default function StaffPage() {
         {/* Add holiday */}
         <div className="flex items-end gap-3">
           <div>
-            <label className={labelClass}>Date</label>
             <input
               type="date"
               value={newHolidayDate}
               onChange={(e) => setNewHolidayDate(e.target.value)}
+              placeholder="Date"
               className={inputClass}
             />
           </div>
@@ -931,17 +1126,16 @@ export default function StaffPage() {
           {bookingLimitEnabled && (
             <div className="mt-3 flex items-center gap-3">
               <div>
-                <label className={labelClass}>Capacity</label>
                 <input
                   type="number"
                   min="1"
                   value={bookingLimitCapacity}
                   onChange={(e) => setBookingLimitCapacity(e.target.value)}
+                  placeholder="Capacity"
                   className={`${inputClass} w-24`}
                 />
               </div>
               <div>
-                <label className={labelClass}>Per</label>
                 <select
                   value={bookingLimitInterval}
                   onChange={(e) => setBookingLimitInterval(e.target.value)}
@@ -987,7 +1181,7 @@ export default function StaffPage() {
           onClick={closePanel}
         />
         {/* Panel */}
-        <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
+        <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h2 className="text-xl font-bold text-gray-900">
@@ -1029,20 +1223,29 @@ export default function StaffPage() {
             </div>
 
             {/* Footer */}
-            <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : editing ? 'Update Staff' : 'Add Staff'}
-              </button>
+            <div className="flex items-center gap-3 border-t border-gray-200 px-6 py-4">
+              {editing && (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(editing.id)}
+                  className="mr-auto rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              )}
               <button
                 type="button"
                 onClick={closePanel}
                 className="rounded-lg border border-gray-300 px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : editing ? 'Update' : 'Add Staff'}
               </button>
             </div>
           </form>
@@ -1091,7 +1294,7 @@ export default function StaffPage() {
                   <th className="w-10 px-3 py-3">
                     <input
                       type="checkbox"
-                      checked={selectedIds.size === staff.length && staff.length > 0}
+                      checked={selectedIds.length === staff.length && staff.length > 0}
                       onChange={toggleSelectAll}
                       className="h-4 w-4 rounded border-gray-300 text-brand-600"
                     />
@@ -1103,16 +1306,19 @@ export default function StaffPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Profession</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Active</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Services</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {staff.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-3">
+                  <tr
+                    key={s.id}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => openEdit(s)}
+                  >
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
-                        checked={selectedIds.has(s.id)}
+                        checked={selectedIds.includes(s.id)}
                         onChange={() => toggleSelect(s.id)}
                         className="h-4 w-4 rounded border-gray-300 text-brand-600"
                       />
@@ -1136,7 +1342,7 @@ export default function StaffPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                       {s.profession ?? '\u2014'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">
+                    <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         onClick={() => handleToggleActive(s)}
@@ -1153,20 +1359,6 @@ export default function StaffPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                       {s.services_count}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
-                      <button
-                        onClick={() => openEdit(s)}
-                        className="mr-3 text-brand-600 hover:text-brand-800"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(s.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Delete
-                      </button>
                     </td>
                   </tr>
                 ))}

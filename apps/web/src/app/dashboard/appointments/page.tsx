@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -173,7 +173,6 @@ export default function AppointmentsPage() {
 
   // Panel state
   const [panelOpen, setPanelOpen] = useState(false);
-  const [panelTab, setPanelTab] = useState<'details' | 'extras' | 'custom_fields' | 'coupons'>('details');
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -191,9 +190,14 @@ export default function AppointmentsPage() {
   const [formCustomFieldValues, setFormCustomFieldValues] = useState<Record<string, string>>({});
   const [formCouponId, setFormCouponId] = useState('');
 
-  // Row menu
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  // New customer inline creation
+  const [isNewCustomer, setIsNewCustomer] = useState(false);
+  const [newCustName, setNewCustName] = useState('');
+  const [newCustEmail, setNewCustEmail] = useState('');
+  const [newCustPhone, setNewCustPhone] = useState('');
+
+  // Edit panel: inline-edit hover state
+  const [editingField, setEditingField] = useState<string | null>(null);
 
   // ----------------------------------------------------------
   // Data fetching
@@ -242,17 +246,6 @@ export default function AppointmentsPage() {
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
   useEffect(() => { fetchDropdownData(); }, [fetchDropdownData]);
 
-  // Close row menu on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpenId(null);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
   // ----------------------------------------------------------
   // Selection
   // ----------------------------------------------------------
@@ -291,7 +284,10 @@ export default function AppointmentsPage() {
     setFormSelectedExtras(new Set());
     setFormCustomFieldValues({});
     setFormCouponId('');
-    setPanelTab('details');
+    setIsNewCustomer(false);
+    setNewCustName('');
+    setNewCustEmail('');
+    setNewCustPhone('');
     setFormError('');
     setPanelOpen(true);
   }
@@ -309,7 +305,11 @@ export default function AppointmentsPage() {
     setFormSelectedExtras(new Set());
     setFormCustomFieldValues({});
     setFormCouponId('');
-    setPanelTab('details');
+    setIsNewCustomer(false);
+    setNewCustName('');
+    setNewCustEmail('');
+    setNewCustPhone('');
+    setEditingField(null);
     setFormError('');
     setPanelOpen(true);
   }
@@ -317,6 +317,7 @@ export default function AppointmentsPage() {
   function closePanel() {
     setPanelOpen(false);
     setEditing(null);
+    setEditingField(null);
     setFormError('');
   }
 
@@ -347,12 +348,55 @@ export default function AppointmentsPage() {
 
   async function handleSave() {
     setFormError('');
-    if (!formCustomerId) { setFormError('Please select a customer.'); return; }
+
+    // If new customer mode, validate those fields
+    if (!editing && isNewCustomer) {
+      if (!newCustName.trim() && !newCustEmail.trim()) {
+        setFormError('Please provide at least a name or email for the new customer.');
+        return;
+      }
+    } else if (!formCustomerId) {
+      setFormError('Please select a customer.');
+      return;
+    }
+
     if (!formServiceId) { setFormError('Please select a service.'); return; }
     if (!formDate) { setFormError('Please select a date.'); return; }
     if (!formTime) { setFormError('Please select a time.'); return; }
 
     setSaving(true);
+
+    let customerId = formCustomerId;
+
+    // Create new customer first if needed
+    if (!editing && isNewCustomer) {
+      try {
+        const custRes = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            display_name: newCustName.trim() || null,
+            email: newCustEmail.trim() || null,
+            phone: newCustPhone.trim() || null,
+          }),
+        });
+        const custJson = await custRes.json() as { data: { id: string } | null; error: { message: string } | null };
+        if (!custRes.ok || !custJson.data) {
+          setFormError(custJson.error?.message ?? 'Failed to create customer.');
+          setSaving(false);
+          return;
+        }
+        customerId = custJson.data.id;
+        // Refresh customer list so new customer appears
+        const refreshRes = await fetch('/api/customers');
+        const refreshJson = await refreshRes.json() as { data: CustomerItem[] | null };
+        setCustomerList(refreshJson.data ?? []);
+      } catch {
+        setFormError('Failed to create customer.');
+        setSaving(false);
+        return;
+      }
+    }
 
     const duration = selectedService?.duration_minutes ?? 60;
     const startDateTime = new Date(`${formDate}T${formTime}`);
@@ -364,7 +408,7 @@ export default function AppointmentsPage() {
       .map(([cfId, value]) => ({ custom_field_id: cfId, value }));
 
     const body: Record<string, unknown> = {
-      customer_id: formCustomerId,
+      customer_id: customerId,
       service_id: formServiceId,
       staff_id: formStaffId || null,
       location_id: formLocationId || null,
@@ -404,7 +448,7 @@ export default function AppointmentsPage() {
   async function handleDelete(id: string) {
     if (!confirm('Are you sure you want to delete this appointment?')) return;
     await fetch(`/api/appointments?id=${id}`, { method: 'DELETE' });
-    setMenuOpenId(null);
+    closePanel();
     fetchAppointments();
   }
 
@@ -447,6 +491,57 @@ export default function AppointmentsPage() {
     }
 
     return pages;
+  }
+
+  // ----------------------------------------------------------
+  // Edit panel: editable row component
+  // ----------------------------------------------------------
+
+  function EditableRow({
+    label,
+    value,
+    fieldKey,
+    renderEdit,
+  }: {
+    label: string;
+    value: React.ReactNode;
+    fieldKey: string;
+    renderEdit?: () => React.ReactNode;
+  }) {
+    const isEditing = editingField === fieldKey;
+    return (
+      <div
+        className="group flex items-center justify-between py-2"
+        onClick={() => {
+          if (renderEdit && !isEditing) setEditingField(fieldKey);
+        }}
+      >
+        <span className="text-sm text-gray-500">{label}</span>
+        {isEditing && renderEdit ? (
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            {renderEdit()}
+            <button
+              onClick={() => setEditingField(null)}
+              className="ml-1 rounded p-0.5 text-gray-400 hover:text-gray-600"
+              title="Done"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <span className={`text-sm font-medium text-gray-900 ${renderEdit ? 'cursor-pointer group-hover:hidden' : ''}`}>
+            {value}
+          </span>
+        )}
+        {!isEditing && renderEdit && (
+          <span className="hidden text-sm font-medium text-brand-600 cursor-pointer group-hover:inline">
+            {value} <span className="text-xs text-gray-400 ml-1">click to edit</span>
+          </span>
+        )}
+      </div>
+    );
   }
 
   // ----------------------------------------------------------
@@ -573,7 +668,6 @@ export default function AppointmentsPage() {
                         className="h-4 w-4 rounded border-gray-300 text-brand-600"
                       />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">ID</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Start Date</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Customer</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
@@ -582,7 +676,6 @@ export default function AppointmentsPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Payment</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Duration</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Created At</th>
-                    <th className="w-10 px-3 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -594,20 +687,19 @@ export default function AppointmentsPage() {
                     const duration = calcDuration(appt.start_time, appt.end_time);
 
                     return (
-                      <tr key={appt.id} className="group hover:bg-gray-50">
+                      <tr
+                        key={appt.id}
+                        className="group cursor-pointer hover:bg-gray-50"
+                        onClick={() => openEditPanel(appt)}
+                      >
                         {/* Checkbox */}
-                        <td className="px-3 py-3">
+                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={selectedIds.has(appt.id)}
                             onChange={() => toggleSelect(appt.id)}
                             className="h-4 w-4 rounded border-gray-300 text-brand-600"
                           />
-                        </td>
-
-                        {/* ID */}
-                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">
-                          {appt.id.substring(0, 8)}
                         </td>
 
                         {/* Start Date */}
@@ -675,56 +767,6 @@ export default function AppointmentsPage() {
                         <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
                           {formatDate(appt.created_at)}
                         </td>
-
-                        {/* 3-dot menu */}
-                        <td className="relative px-3 py-3">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMenuOpenId(menuOpenId === appt.id ? null : appt.id);
-                            }}
-                            className="rounded p-1 text-gray-400 opacity-0 hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
-                          >
-                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                            </svg>
-                          </button>
-                          {menuOpenId === appt.id && (
-                            <div
-                              ref={menuRef}
-                              className="absolute right-4 top-10 z-50 w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
-                            >
-                              <button
-                                onClick={() => { openEditPanel(appt); setMenuOpenId(null); }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                              >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.64 0 8.577 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.64 0-8.577-3.007-9.963-7.178Z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                </svg>
-                                View
-                              </button>
-                              <button
-                                onClick={() => { openEditPanel(appt); setMenuOpenId(null); }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                              >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
-                                </svg>
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDelete(appt.id)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                              >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                </svg>
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </td>
                       </tr>
                     );
                   })}
@@ -784,7 +826,7 @@ export default function AppointmentsPage() {
           <div className="fixed inset-0 z-40 bg-black/30" onClick={closePanel} />
 
           {/* Panel */}
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]">
             {/* Panel header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -800,284 +842,269 @@ export default function AppointmentsPage() {
               </button>
             </div>
 
-            {/* Tabs */}
-            <div className="flex border-b border-gray-200">
-              {(['details', 'extras', 'custom_fields', 'coupons'] as const).map((tab) => {
-                const labels: Record<string, string> = {
-                  details: 'Details',
-                  extras: 'Extras',
-                  custom_fields: 'Custom Fields',
-                  coupons: 'Coupons',
-                };
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setPanelTab(tab)}
-                    className={`flex-1 border-b-2 px-4 py-2.5 text-sm font-medium ${
-                      panelTab === tab
-                        ? 'border-brand-600 text-brand-600'
-                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    }`}
-                  >
-                    {labels[tab]}
-                  </button>
-                );
-              })}
-            </div>
-
             {/* Panel body */}
             <div className="flex-1 overflow-y-auto px-6 py-5">
-              {/* Tab: Details */}
-              {panelTab === 'details' && (
+              {/* ====================================================== */}
+              {/* NEW APPOINTMENT PANEL (no tabs, just form) */}
+              {/* ====================================================== */}
+              {!editing && (
                 <div className="space-y-4">
                   {/* Location */}
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Location</label>
-                    <select
-                      value={formLocationId}
-                      onChange={(e) => setFormLocationId(e.target.value)}
-                      className={inputClass}
-                    >
-                      <option value="">Select location...</option>
-                      {locationList.map((l) => (
-                        <option key={l.id} value={l.id}>{l.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <select
+                    value={formLocationId}
+                    onChange={(e) => setFormLocationId(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Select location...</option>
+                    {locationList.map((l) => (
+                      <option key={l.id} value={l.id}>{l.name}</option>
+                    ))}
+                  </select>
 
                   {/* Service */}
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Service *</label>
-                    <select
-                      value={formServiceId}
-                      onChange={(e) => setFormServiceId(e.target.value)}
-                      className={inputClass}
-                      required
-                    >
-                      <option value="">Select service...</option>
-                      {(() => {
-                        const grouped = new Map<string, ServiceItem[]>();
-                        for (const s of serviceList) {
-                          const cat = s.service_category || s.category_name || 'Uncategorized';
-                          if (!grouped.has(cat)) grouped.set(cat, []);
-                          grouped.get(cat)!.push(s);
-                        }
-                        return Array.from(grouped.entries()).map(([cat, svcs]) => (
-                          <optgroup key={cat} label={cat}>
-                            {svcs.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name} (${s.price.toFixed(2)}, {s.duration_minutes} min)
-                              </option>
-                            ))}
-                          </optgroup>
-                        ));
-                      })()}
-                    </select>
-                  </div>
+                  <select
+                    value={formServiceId}
+                    onChange={(e) => setFormServiceId(e.target.value)}
+                    className={inputClass}
+                    required
+                  >
+                    <option value="">Select service... *</option>
+                    {(() => {
+                      const grouped = new Map<string, ServiceItem[]>();
+                      for (const s of serviceList) {
+                        const cat = s.service_category || s.category_name || 'Uncategorized';
+                        if (!grouped.has(cat)) grouped.set(cat, []);
+                        grouped.get(cat)!.push(s);
+                      }
+                      return Array.from(grouped.entries()).map(([cat, svcs]) => (
+                        <optgroup key={cat} label={cat}>
+                          {svcs.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} (${s.price.toFixed(2)}, {s.duration_minutes} min)
+                            </option>
+                          ))}
+                        </optgroup>
+                      ));
+                    })()}
+                  </select>
 
                   {/* Staff */}
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Staff</label>
-                    <select
-                      value={formStaffId}
-                      onChange={(e) => setFormStaffId(e.target.value)}
-                      className={inputClass}
-                    >
-                      <option value="">Select staff...</option>
-                      {staffList.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <select
+                    value={formStaffId}
+                    onChange={(e) => setFormStaffId(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Select staff...</option>
+                    {staffList.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
 
                   {/* Date & Time */}
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">Date *</label>
-                      <input
-                        type="date"
-                        value={formDate}
-                        onChange={(e) => setFormDate(e.target.value)}
-                        className={inputClass}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">Time *</label>
-                      <input
-                        type="time"
-                        value={formTime}
-                        onChange={(e) => setFormTime(e.target.value)}
-                        className={inputClass}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Customer */}
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Customer *</label>
-                    <select
-                      value={formCustomerId}
-                      onChange={(e) => setFormCustomerId(e.target.value)}
+                    <input
+                      type="date"
+                      value={formDate}
+                      onChange={(e) => setFormDate(e.target.value)}
                       className={inputClass}
                       required
-                    >
-                      <option value="">Select customer...</option>
-                      {customerList.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.display_name ?? c.email ?? 'Unknown'}{c.email ? ` (${c.email})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Date *"
+                    />
+                    <input
+                      type="time"
+                      value={formTime}
+                      onChange={(e) => setFormTime(e.target.value)}
+                      className={inputClass}
+                      required
+                      placeholder="Time *"
+                    />
+                  </div>
+
+                  {/* Customer - toggle between existing and new */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <label className="relative inline-flex cursor-pointer items-center">
+                        <input
+                          type="checkbox"
+                          checked={isNewCustomer}
+                          onChange={(e) => {
+                            setIsNewCustomer(e.target.checked);
+                            if (e.target.checked) setFormCustomerId('');
+                          }}
+                          className="peer sr-only"
+                        />
+                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white" />
+                      </label>
+                      <span className="text-sm text-gray-600">New Customer</span>
+                    </div>
+
+                    {isNewCustomer ? (
+                      <div className="space-y-2 rounded-lg border border-gray-200 p-3">
+                        <input
+                          type="text"
+                          value={newCustName}
+                          onChange={(e) => setNewCustName(e.target.value)}
+                          className={inputClass}
+                          placeholder="Customer name"
+                        />
+                        <input
+                          type="email"
+                          value={newCustEmail}
+                          onChange={(e) => setNewCustEmail(e.target.value)}
+                          className={inputClass}
+                          placeholder="Customer email"
+                        />
+                        <input
+                          type="tel"
+                          value={newCustPhone}
+                          onChange={(e) => setNewCustPhone(e.target.value)}
+                          className={inputClass}
+                          placeholder="Customer phone"
+                        />
+                      </div>
+                    ) : (
+                      <select
+                        value={formCustomerId}
+                        onChange={(e) => setFormCustomerId(e.target.value)}
+                        className={inputClass}
+                        required
+                      >
+                        <option value="">Select customer... *</option>
+                        {customerList.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.display_name ?? c.email ?? 'Unknown'}{c.email ? ` (${c.email})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
 
                   {/* Status */}
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
-                    <select
-                      value={formStatus}
-                      onChange={(e) => setFormStatus(e.target.value as AppointmentStatus)}
-                      className={inputClass}
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>{statusConfig[s].label}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <select
+                    value={formStatus}
+                    onChange={(e) => setFormStatus(e.target.value as AppointmentStatus)}
+                    className={inputClass}
+                  >
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s} value={s}>{statusConfig[s].label}</option>
+                    ))}
+                  </select>
 
                   {/* Notes */}
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
-                    <textarea
-                      value={formNotes}
-                      onChange={(e) => setFormNotes(e.target.value)}
-                      rows={3}
-                      className={inputClass}
-                      placeholder="Add notes about this appointment..."
-                    />
-                  </div>
-                </div>
-              )}
+                  <textarea
+                    value={formNotes}
+                    onChange={(e) => setFormNotes(e.target.value)}
+                    rows={3}
+                    className={inputClass}
+                    placeholder="Add notes about this appointment..."
+                  />
 
-              {/* Tab: Extras */}
-              {panelTab === 'extras' && (
-                <div>
-                  {!formServiceId ? (
-                    <p className="text-sm text-gray-500">Please select a service first to view available extras.</p>
-                  ) : serviceExtras.length === 0 ? (
-                    <p className="text-sm text-gray-500">No extras available for this service.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      <p className="text-sm text-gray-600">Select extras to add to this appointment:</p>
-                      {serviceExtras.map((extra) => (
-                        <label
-                          key={extra.id}
-                          className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 hover:bg-gray-50"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formSelectedExtras.has(extra.id)}
-                            onChange={() => {
-                              setFormSelectedExtras((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(extra.id)) next.delete(extra.id);
-                                else next.add(extra.id);
-                                return next;
-                              });
-                            }}
-                            className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                          />
-                          <div className="flex-1">
-                            <span className="text-sm font-medium text-gray-900">{extra.name}</span>
-                            {extra.duration_minutes > 0 && (
-                              <span className="ml-2 text-xs text-gray-500">+{extra.duration_minutes} min</span>
+                  {/* Extras section */}
+                  {formServiceId && serviceExtras.length > 0 && (
+                    <div>
+                      <h4 className="mb-2 text-sm font-semibold text-gray-700">Extras</h4>
+                      <div className="space-y-2">
+                        {serviceExtras.map((extra) => (
+                          <label
+                            key={extra.id}
+                            className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 hover:bg-gray-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formSelectedExtras.has(extra.id)}
+                              onChange={() => {
+                                setFormSelectedExtras((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(extra.id)) next.delete(extra.id);
+                                  else next.add(extra.id);
+                                  return next;
+                                });
+                              }}
+                              className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                            />
+                            <div className="flex-1">
+                              <span className="text-sm font-medium text-gray-900">{extra.name}</span>
+                              {extra.duration_minutes > 0 && (
+                                <span className="ml-2 text-xs text-gray-500">+{extra.duration_minutes} min</span>
+                              )}
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">+${extra.price.toFixed(2)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Custom Fields section */}
+                  {customFields.length > 0 && (
+                    <div>
+                      <h4 className="mb-2 text-sm font-semibold text-gray-700">Custom Fields</h4>
+                      <div className="space-y-3">
+                        {customFields.map((field) => (
+                          <div key={field.id}>
+                            {field.field_type === 'text' && (
+                              <input
+                                type="text"
+                                value={formCustomFieldValues[field.id] ?? ''}
+                                onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                className={inputClass}
+                                required={field.required}
+                                placeholder={`${field.label}${field.required ? ' *' : ''}`}
+                              />
+                            )}
+                            {field.field_type === 'number' && (
+                              <input
+                                type="number"
+                                value={formCustomFieldValues[field.id] ?? ''}
+                                onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                className={inputClass}
+                                required={field.required}
+                                placeholder={`${field.label}${field.required ? ' *' : ''}`}
+                              />
+                            )}
+                            {field.field_type === 'select' && (
+                              <select
+                                value={formCustomFieldValues[field.id] ?? ''}
+                                onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                className={inputClass}
+                                required={field.required}
+                              >
+                                <option value="">{field.label}{field.required ? ' *' : ''}...</option>
+                                {(field.options ?? []).map((opt) => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            )}
+                            {field.field_type === 'checkbox' && (
+                              <label className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={formCustomFieldValues[field.id] === 'true'}
+                                  onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: String(e.target.checked) }))}
+                                  className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                                />
+                                <span className="text-sm text-gray-600">{field.label}{field.required ? ' *' : ''}</span>
+                              </label>
+                            )}
+                            {field.field_type === 'date' && (
+                              <input
+                                type="date"
+                                value={formCustomFieldValues[field.id] ?? ''}
+                                onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                className={inputClass}
+                                required={field.required}
+                                placeholder={`${field.label}${field.required ? ' *' : ''}`}
+                              />
                             )}
                           </div>
-                          <span className="text-sm font-medium text-gray-700">+${extra.price.toFixed(2)}</span>
-                        </label>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* Tab: Custom Fields */}
-              {panelTab === 'custom_fields' && (
-                <div>
-                  {customFields.length === 0 ? (
-                    <p className="text-sm text-gray-500">No custom fields configured for this tenant.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {customFields.map((field) => (
-                        <div key={field.id}>
-                          <label className="mb-1 block text-sm font-medium text-gray-700">
-                            {field.label}
-                            {field.required && <span className="ml-1 text-red-500">*</span>}
-                          </label>
-                          {field.field_type === 'text' && (
-                            <input
-                              type="text"
-                              value={formCustomFieldValues[field.id] ?? ''}
-                              onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                              className={inputClass}
-                              required={field.required}
-                            />
-                          )}
-                          {field.field_type === 'number' && (
-                            <input
-                              type="number"
-                              value={formCustomFieldValues[field.id] ?? ''}
-                              onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                              className={inputClass}
-                              required={field.required}
-                            />
-                          )}
-                          {field.field_type === 'select' && (
-                            <select
-                              value={formCustomFieldValues[field.id] ?? ''}
-                              onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                              className={inputClass}
-                              required={field.required}
-                            >
-                              <option value="">Select...</option>
-                              {(field.options ?? []).map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
-                            </select>
-                          )}
-                          {field.field_type === 'checkbox' && (
-                            <label className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={formCustomFieldValues[field.id] === 'true'}
-                                onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: String(e.target.checked) }))}
-                                className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                              />
-                              <span className="text-sm text-gray-600">Yes</span>
-                            </label>
-                          )}
-                          {field.field_type === 'date' && (
-                            <input
-                              type="date"
-                              value={formCustomFieldValues[field.id] ?? ''}
-                              onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                              className={inputClass}
-                              required={field.required}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Tab: Coupons */}
-              {panelTab === 'coupons' && (
-                <div className="space-y-4">
+                  {/* Coupons section */}
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Apply Coupon</label>
+                    <h4 className="mb-2 text-sm font-semibold text-gray-700">Coupon</h4>
                     <select
                       value={formCouponId}
                       onChange={(e) => setFormCouponId(e.target.value)}
@@ -1132,22 +1159,409 @@ export default function AppointmentsPage() {
                   )}
                 </div>
               )}
+
+              {/* ====================================================== */}
+              {/* EDIT APPOINTMENT PANEL (all sections on one screen) */}
+              {/* ====================================================== */}
+              {editing && (
+                <div className="space-y-6">
+                  {/* Section: Details */}
+                  <div>
+                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Details</h3>
+                    <div className="divide-y divide-gray-100">
+                      {/* Start Time */}
+                      <EditableRow
+                        label="Start Time"
+                        value={`${formatDate(editing.start_time)} ${formatTime(editing.start_time)}`}
+                        fieldKey="start_time"
+                        renderEdit={() => (
+                          <div className="flex gap-1">
+                            <input
+                              type="date"
+                              value={formDate}
+                              onChange={(e) => setFormDate(e.target.value)}
+                              className="w-32 rounded border border-gray-300 px-2 py-1 text-sm"
+                            />
+                            <input
+                              type="time"
+                              value={formTime}
+                              onChange={(e) => setFormTime(e.target.value)}
+                              className="w-24 rounded border border-gray-300 px-2 py-1 text-sm"
+                            />
+                          </div>
+                        )}
+                      />
+
+                      {/* End Time (calculated, display only) */}
+                      <EditableRow
+                        label="End Time"
+                        value={(() => {
+                          const dur = selectedService?.duration_minutes ?? 60;
+                          const start = formDate && formTime ? new Date(`${formDate}T${formTime}`) : new Date(editing.end_time);
+                          const end = formDate && formTime ? new Date(start.getTime() + dur * 60000) : new Date(editing.end_time);
+                          return `${formatDate(end.toISOString())} ${formatTime(end.toISOString())}`;
+                        })()}
+                        fieldKey="end_time"
+                      />
+
+                      {/* Customer */}
+                      <EditableRow
+                        label="Customer"
+                        value={editing.customers?.display_name ?? editing.customers?.email ?? 'Unknown'}
+                        fieldKey="customer"
+                        renderEdit={() => (
+                          <select
+                            value={formCustomerId}
+                            onChange={(e) => setFormCustomerId(e.target.value)}
+                            className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
+                          >
+                            <option value="">Select customer...</option>
+                            {customerList.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.display_name ?? c.email ?? 'Unknown'}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      />
+
+                      {/* Service */}
+                      <EditableRow
+                        label="Service"
+                        value={editing.services?.name ?? '—'}
+                        fieldKey="service"
+                        renderEdit={() => (
+                          <select
+                            value={formServiceId}
+                            onChange={(e) => setFormServiceId(e.target.value)}
+                            className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
+                          >
+                            <option value="">Select service...</option>
+                            {serviceList.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name} (${s.price.toFixed(2)})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      />
+
+                      {/* Staff */}
+                      <EditableRow
+                        label="Staff"
+                        value={editing.staff?.name ?? '—'}
+                        fieldKey="staff"
+                        renderEdit={() => (
+                          <select
+                            value={formStaffId}
+                            onChange={(e) => setFormStaffId(e.target.value)}
+                            className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
+                          >
+                            <option value="">No staff</option>
+                            {staffList.map((s) => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
+                        )}
+                      />
+
+                      {/* Location */}
+                      <EditableRow
+                        label="Location"
+                        value={editing.tenant_locations?.name ?? '—'}
+                        fieldKey="location"
+                        renderEdit={() => (
+                          <select
+                            value={formLocationId}
+                            onChange={(e) => setFormLocationId(e.target.value)}
+                            className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
+                          >
+                            <option value="">No location</option>
+                            {locationList.map((l) => (
+                              <option key={l.id} value={l.id}>{l.name}</option>
+                            ))}
+                          </select>
+                        )}
+                      />
+
+                      {/* Status */}
+                      <EditableRow
+                        label="Status"
+                        value={
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusConfig[formStatus].bg} ${statusConfig[formStatus].text}`}>
+                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${statusConfig[formStatus].dot}`} />
+                            {statusConfig[formStatus].label}
+                          </span>
+                        }
+                        fieldKey="status"
+                        renderEdit={() => (
+                          <select
+                            value={formStatus}
+                            onChange={(e) => setFormStatus(e.target.value as AppointmentStatus)}
+                            className="w-40 rounded border border-gray-300 px-2 py-1 text-sm"
+                          >
+                            {STATUS_OPTIONS.map((s) => (
+                              <option key={s} value={s}>{statusConfig[s].label}</option>
+                            ))}
+                          </select>
+                        )}
+                      />
+
+                      {/* Payment */}
+                      <EditableRow
+                        label="Total Price"
+                        value={`$${(editing.total_price ?? 0).toFixed(2)}`}
+                        fieldKey="total_price"
+                      />
+
+                      {editing.deposit_paid && (
+                        <EditableRow
+                          label="Deposit Paid"
+                          value={`$${(editing.deposit_amount_paid ?? 0).toFixed(2)}`}
+                          fieldKey="deposit"
+                        />
+                      )}
+
+                      {editing.balance_due != null && editing.balance_due > 0 && (
+                        <EditableRow
+                          label="Balance Due"
+                          value={`$${editing.balance_due.toFixed(2)}`}
+                          fieldKey="balance"
+                        />
+                      )}
+
+                      {/* Duration */}
+                      <EditableRow
+                        label="Duration"
+                        value={`${calcDuration(editing.start_time, editing.end_time)} min`}
+                        fieldKey="duration"
+                      />
+
+                      {/* Notes */}
+                      <EditableRow
+                        label="Notes"
+                        value={formNotes || '—'}
+                        fieldKey="notes"
+                        renderEdit={() => (
+                          <textarea
+                            value={formNotes}
+                            onChange={(e) => setFormNotes(e.target.value)}
+                            rows={2}
+                            className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
+                            placeholder="Add notes..."
+                          />
+                        )}
+                      />
+
+                      {/* Created At */}
+                      <EditableRow
+                        label="Created At"
+                        value={formatDate(editing.created_at)}
+                        fieldKey="created_at"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Section: Extras */}
+                  <div>
+                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Extras</h3>
+                    {!formServiceId ? (
+                      <p className="text-sm text-gray-500">Please select a service first to view available extras.</p>
+                    ) : serviceExtras.length === 0 ? (
+                      <p className="text-sm text-gray-500">No extras available for this service.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {serviceExtras.map((extra) => (
+                          <label
+                            key={extra.id}
+                            className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 hover:bg-gray-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formSelectedExtras.has(extra.id)}
+                              onChange={() => {
+                                setFormSelectedExtras((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(extra.id)) next.delete(extra.id);
+                                  else next.add(extra.id);
+                                  return next;
+                                });
+                              }}
+                              className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                            />
+                            <div className="flex-1">
+                              <span className="text-sm font-medium text-gray-900">{extra.name}</span>
+                              {extra.duration_minutes > 0 && (
+                                <span className="ml-2 text-xs text-gray-500">+{extra.duration_minutes} min</span>
+                              )}
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">+${extra.price.toFixed(2)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Section: Custom Fields */}
+                  <div>
+                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Custom Fields</h3>
+                    {customFields.length === 0 ? (
+                      <p className="text-sm text-gray-500">No custom fields configured for this tenant.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {customFields.map((field) => (
+                          <div key={field.id}>
+                            {field.field_type === 'text' && (
+                              <div className="flex items-center justify-between py-1">
+                                <span className="text-sm text-gray-500">{field.label}{field.required ? ' *' : ''}</span>
+                                <input
+                                  type="text"
+                                  value={formCustomFieldValues[field.id] ?? ''}
+                                  onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                  className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
+                                  required={field.required}
+                                />
+                              </div>
+                            )}
+                            {field.field_type === 'number' && (
+                              <div className="flex items-center justify-between py-1">
+                                <span className="text-sm text-gray-500">{field.label}{field.required ? ' *' : ''}</span>
+                                <input
+                                  type="number"
+                                  value={formCustomFieldValues[field.id] ?? ''}
+                                  onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                  className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
+                                  required={field.required}
+                                />
+                              </div>
+                            )}
+                            {field.field_type === 'select' && (
+                              <div className="flex items-center justify-between py-1">
+                                <span className="text-sm text-gray-500">{field.label}{field.required ? ' *' : ''}</span>
+                                <select
+                                  value={formCustomFieldValues[field.id] ?? ''}
+                                  onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                  className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
+                                  required={field.required}
+                                >
+                                  <option value="">Select...</option>
+                                  {(field.options ?? []).map((opt) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                            {field.field_type === 'checkbox' && (
+                              <div className="flex items-center justify-between py-1">
+                                <span className="text-sm text-gray-500">{field.label}{field.required ? ' *' : ''}</span>
+                                <input
+                                  type="checkbox"
+                                  checked={formCustomFieldValues[field.id] === 'true'}
+                                  onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: String(e.target.checked) }))}
+                                  className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                                />
+                              </div>
+                            )}
+                            {field.field_type === 'date' && (
+                              <div className="flex items-center justify-between py-1">
+                                <span className="text-sm text-gray-500">{field.label}{field.required ? ' *' : ''}</span>
+                                <input
+                                  type="date"
+                                  value={formCustomFieldValues[field.id] ?? ''}
+                                  onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                  className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
+                                  required={field.required}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Section: Coupons */}
+                  <div>
+                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Coupons</h3>
+                    <select
+                      value={formCouponId}
+                      onChange={(e) => setFormCouponId(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">No coupon</option>
+                      {couponList
+                        .filter((c) => {
+                          if (c.expires_at && new Date(c.expires_at) < new Date()) return false;
+                          if (c.usage_limit && c.usage_count >= c.usage_limit) return false;
+                          return true;
+                        })
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.code} ({c.discount_type === 'percentage' ? `${c.discount_value}%` : `$${c.discount_value.toFixed(2)}`} off)
+                          </option>
+                        ))}
+                    </select>
+
+                    {/* Price breakdown */}
+                    {formServiceId && (
+                      <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        <h4 className="mb-3 text-sm font-medium text-gray-900">Price Breakdown</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Service: {selectedService?.name ?? ''}</span>
+                            <span className="text-gray-900">${(selectedService?.price ?? 0).toFixed(2)}</span>
+                          </div>
+                          {serviceExtras
+                            .filter((e) => formSelectedExtras.has(e.id))
+                            .map((e) => (
+                              <div key={e.id} className="flex justify-between">
+                                <span className="text-gray-600">+ {e.name}</span>
+                                <span className="text-gray-900">${e.price.toFixed(2)}</span>
+                              </div>
+                            ))}
+                          {selectedCoupon && (
+                            <div className="flex justify-between text-green-600">
+                              <span>Discount ({selectedCoupon.code})</span>
+                              <span>-${calcCouponDiscount().discount.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="border-t border-gray-300 pt-2">
+                            <div className="flex justify-between font-semibold">
+                              <span className="text-gray-900">Total</span>
+                              <span className="text-gray-900">${calcCouponDiscount().final.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Panel footer */}
             <div className="border-t border-gray-200 px-6 py-4">
               {formError && <p className="mb-3 text-sm text-red-600">{formError}</p>}
               <div className="flex gap-3">
+                {editing && (
+                  <button
+                    onClick={() => handleDelete(editing.id)}
+                    className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                )}
+                <div className="flex-1" />
                 <button
                   onClick={closePanel}
-                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : editing ? 'Update Appointment' : 'Create Appointment'}
                 </button>

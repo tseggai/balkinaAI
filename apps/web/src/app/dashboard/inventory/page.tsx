@@ -37,6 +37,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [form, setForm] = useState({
     name: '',
     image_url: '',
@@ -129,6 +130,8 @@ export default function InventoryPage() {
   async function handleDelete(id: string) {
     if (!confirm('Delete this product?')) return;
     await fetch(`/api/inventory?id=${id}`, { method: 'DELETE' });
+    setShowForm(false);
+    setEditing(null);
     fetchProducts();
   }
 
@@ -174,6 +177,22 @@ export default function InventoryPage() {
     fetchProducts();
   }
 
+  function toggleSelectId(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.length === products.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(products.map((p) => p.id));
+    }
+  }
+
+  const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+
   return (
     <div className="p-6 lg:p-8">
       <div className="flex items-center justify-between">
@@ -203,20 +222,39 @@ export default function InventoryPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.length === products.length && products.length > 0}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Image</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Stock</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Sell Price</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Services</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Active</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {products.map((p) => {
                   const isLowStock = p.min_order_quantity > 0 && p.quantity_on_hand < p.min_order_quantity;
                   return (
-                    <tr key={p.id} className={`hover:bg-gray-50 ${isLowStock ? 'bg-red-50' : ''}`}>
+                    <tr
+                      key={p.id}
+                      className={`cursor-pointer hover:bg-gray-50 ${isLowStock ? 'bg-red-50' : ''}`}
+                      onClick={() => openEdit(p)}
+                    >
+                      <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(p.id)}
+                          onChange={() => toggleSelectId(p.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                        />
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         {p.image_url ? (
                           <img src={p.image_url} alt={p.name} className="h-8 w-8 rounded object-cover" />
@@ -234,7 +272,7 @@ export default function InventoryPage() {
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                         {p.product_services?.length ?? 0}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3">
+                      <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => handleToggleActive(p)}
                           className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
@@ -247,10 +285,6 @@ export default function InventoryPage() {
                             }`}
                           />
                         </button>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
-                        <button onClick={() => openEdit(p)} className="mr-3 text-brand-600 hover:text-brand-800">Edit</button>
-                        <button onClick={() => handleDelete(p.id)} className="text-red-600 hover:text-red-800">Delete</button>
                       </td>
                     </tr>
                   );
@@ -265,7 +299,7 @@ export default function InventoryPage() {
       {showForm && (
         <>
           <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowForm(false)} />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
+          <div className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]`}>
             {/* Header */}
             <div className="flex items-center justify-between border-b px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -288,163 +322,352 @@ export default function InventoryPage() {
                   onChange={(url) => setForm({ ...form, image_url: url })}
                   label="Product Image"
                 />
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Name *</label>
-                  <input
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Qty on Hand</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={form.quantity_on_hand}
-                      onChange={(e) => setForm({ ...form, quantity_on_hand: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Min Qty</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={form.min_order_quantity}
-                      onChange={(e) => setForm({ ...form, min_order_quantity: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Max Qty</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={form.max_order_quantity}
-                      onChange={(e) => setForm({ ...form, max_order_quantity: e.target.value })}
-                      placeholder="Unlimited"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Purchase Price ($)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form.purchase_price}
-                      onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Sell Price ($)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form.sell_price}
-                      onChange={(e) => setForm({ ...form, sell_price: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    />
-                  </div>
-                </div>
-                {/* Linked Services */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Linked Services</label>
-                  <div className="flex gap-2">
-                    <select
-                      value={addServiceId}
-                      onChange={(e) => setAddServiceId(e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                      <option value="">Select a service</option>
-                      {services
-                        .filter((s) => !formServices.some((fs) => fs.service_id === s.id))
-                        .map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                    </select>
-                    <input
-                      type="number"
-                      min="1"
-                      value={addServiceQty}
-                      onChange={(e) => setAddServiceQty(e.target.value)}
-                      placeholder="Qty"
-                      className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={addServiceToList}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      Add
-                    </button>
-                  </div>
-                  {formServices.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {formServices.map((fs) => (
-                        <div key={fs.service_id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
-                          <span className="text-sm text-gray-700">{getServiceName(fs.service_id)} (qty: {fs.quantity_per_service})</span>
-                          <button type="button" onClick={() => removeServiceFromList(fs.service_id)} className="text-sm text-red-600 hover:text-red-800">Remove</button>
-                        </div>
-                      ))}
+
+                {editing ? (
+                  /* ===== EDIT MODE: horizontal label-value with hover-to-edit ===== */
+                  <>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Name *</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.name || '\u2014'}
+                        </span>
+                        <input
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
+                      </div>
                     </div>
-                  )}
-                </div>
-                {/* Toggles */}
-                <div className="flex gap-6">
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={form.display_in_booking}
-                      onChange={(e) => setForm({ ...form, display_in_booking: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                    />
-                    Display in booking
-                  </label>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={form.is_active}
-                      onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                    />
-                    Active
-                  </label>
-                </div>
-                {/* Description */}
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
-                  <textarea
-                    rows={3}
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                  />
-                </div>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Qty on Hand</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.quantity_on_hand || '0'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.quantity_on_hand}
+                          onChange={(e) => setForm({ ...form, quantity_on_hand: e.target.value })}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
+                      </div>
+                    </div>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Min Qty</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.min_order_quantity || '0'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.min_order_quantity}
+                          onChange={(e) => setForm({ ...form, min_order_quantity: e.target.value })}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
+                      </div>
+                    </div>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Max Qty</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.max_order_quantity || 'Unlimited'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.max_order_quantity}
+                          onChange={(e) => setForm({ ...form, max_order_quantity: e.target.value })}
+                          placeholder="Unlimited"
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
+                      </div>
+                    </div>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Purchase Price ($)</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.purchase_price || '0.00'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.purchase_price}
+                          onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
+                      </div>
+                    </div>
+                    <div className="group flex items-center gap-4">
+                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Sell Price ($)</span>
+                      <div className="relative flex-1">
+                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.sell_price || '0.00'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.sell_price}
+                          onChange={(e) => setForm({ ...form, sell_price: e.target.value })}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
+                      </div>
+                    </div>
+                    {/* Linked Services */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700">Linked Services</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={addServiceId}
+                          onChange={(e) => setAddServiceId(e.target.value)}
+                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                          <option value="">Select a service</option>
+                          {services
+                            .filter((s) => !formServices.some((fs) => fs.service_id === s.id))
+                            .map((s) => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                        </select>
+                        <input
+                          type="number"
+                          min="1"
+                          value={addServiceQty}
+                          onChange={(e) => setAddServiceQty(e.target.value)}
+                          placeholder="Qty"
+                          className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={addServiceToList}
+                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {formServices.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          {formServices.map((fs) => (
+                            <div key={fs.service_id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                              <span className="text-sm text-gray-700">{getServiceName(fs.service_id)} (qty: {fs.quantity_per_service})</span>
+                              <button type="button" onClick={() => removeServiceFromList(fs.service_id)} className="text-sm text-red-600 hover:text-red-800">Remove</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* Toggles */}
+                    <div className="flex gap-6">
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={form.display_in_booking}
+                          onChange={(e) => setForm({ ...form, display_in_booking: e.target.checked })}
+                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                        />
+                        Display in booking
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={form.is_active}
+                          onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                        />
+                        Active
+                      </label>
+                    </div>
+                    {/* Description */}
+                    <div className="group flex items-start gap-4">
+                      <span className="w-32 shrink-0 pt-2 text-sm font-medium text-gray-700">Description</span>
+                      <div className="relative flex-1">
+                        <span className="block whitespace-pre-wrap px-3 py-2 text-sm text-gray-900 group-hover:invisible">
+                          {form.description || '\u2014'}
+                        </span>
+                        <textarea
+                          rows={3}
+                          value={form.description}
+                          onChange={(e) => setForm({ ...form, description: e.target.value })}
+                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* ===== ADD MODE: placeholders instead of labels ===== */
+                  <>
+                    <div>
+                      <input
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        placeholder="Name *"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.quantity_on_hand}
+                          onChange={(e) => setForm({ ...form, quantity_on_hand: e.target.value })}
+                          placeholder="Qty on Hand"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.min_order_quantity}
+                          onChange={(e) => setForm({ ...form, min_order_quantity: e.target.value })}
+                          placeholder="Min Qty"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.max_order_quantity}
+                          onChange={(e) => setForm({ ...form, max_order_quantity: e.target.value })}
+                          placeholder="Max Qty (Unlimited)"
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.purchase_price}
+                          onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
+                          placeholder="Purchase Price ($)"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.sell_price}
+                          onChange={(e) => setForm({ ...form, sell_price: e.target.value })}
+                          placeholder="Sell Price ($)"
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                    {/* Linked Services */}
+                    <div>
+                      <div className="flex gap-2">
+                        <select
+                          value={addServiceId}
+                          onChange={(e) => setAddServiceId(e.target.value)}
+                          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                          <option value="">Select a service to link</option>
+                          {services
+                            .filter((s) => !formServices.some((fs) => fs.service_id === s.id))
+                            .map((s) => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                        </select>
+                        <input
+                          type="number"
+                          min="1"
+                          value={addServiceQty}
+                          onChange={(e) => setAddServiceQty(e.target.value)}
+                          placeholder="Qty"
+                          className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={addServiceToList}
+                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {formServices.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          {formServices.map((fs) => (
+                            <div key={fs.service_id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                              <span className="text-sm text-gray-700">{getServiceName(fs.service_id)} (qty: {fs.quantity_per_service})</span>
+                              <button type="button" onClick={() => removeServiceFromList(fs.service_id)} className="text-sm text-red-600 hover:text-red-800">Remove</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* Toggles */}
+                    <div className="flex gap-6">
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={form.display_in_booking}
+                          onChange={(e) => setForm({ ...form, display_in_booking: e.target.checked })}
+                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                        />
+                        Display in booking
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={form.is_active}
+                          onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                        />
+                        Active
+                      </label>
+                    </div>
+                    {/* Description */}
+                    <div>
+                      <textarea
+                        rows={3}
+                        value={form.description}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        placeholder="Description"
+                        className={inputClass}
+                      />
+                    </div>
+                  </>
+                )}
+
                 {error && <p className="text-sm text-red-600">{error}</p>}
               </div>
             </div>
             {/* Footer */}
-            <div className="flex justify-end gap-3 border-t px-6 py-4">
-              <button
-                onClick={() => setShowForm(false)}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Close
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={saving}
-                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : editing ? 'Update Product' : 'Create Product'}
-              </button>
+            <div className="flex items-center border-t px-6 py-4">
+              {editing && (
+                <button
+                  onClick={() => handleDelete(editing.id)}
+                  className="mr-auto rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              )}
+              <div className={`flex gap-3 ${editing ? '' : 'ml-auto'}`}>
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={saving}
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : editing ? 'Update' : 'Create Product'}
+                </button>
+              </div>
             </div>
           </div>
         </>

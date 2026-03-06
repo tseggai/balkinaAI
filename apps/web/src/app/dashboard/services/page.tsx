@@ -192,16 +192,6 @@ function FitIcon() {
   );
 }
 
-function EllipsisIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="1" />
-      <circle cx="19" cy="12" r="1" />
-      <circle cx="5" cy="12" r="1" />
-    </svg>
-  );
-}
-
 function EditIcon({ className }: { className?: string }) {
   return (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -229,83 +219,15 @@ function TrashIcon({ className }: { className?: string }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// ActionMenu — 3-dot menu for list view
-// ---------------------------------------------------------------------------
-
-function ActionMenu({
-  onEdit,
-  onDuplicate,
-  onDelete,
-}: {
-  onEdit: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-  const ref = useRef<HTMLDivElement>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node) && btnRef.current && !btnRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    if (open) {
-      document.addEventListener('mousedown', handleClick);
-    }
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
-
-  function toggle() {
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + 4, left: rect.right - 144 });
-    }
-    setOpen(!open);
-  }
-
+/** Placeholder icon for services without an image */
+function ImagePlaceholderIcon() {
   return (
-    <div data-action-menu className="relative inline-block">
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={toggle}
-        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-      >
-        <EllipsisIcon />
-      </button>
-      {open && (
-        <div
-          ref={ref}
-          className="fixed z-[9999] w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
-          style={{ top: pos.top, left: pos.left }}
-        >
-          <button
-            type="button"
-            onClick={() => { setOpen(false); onEdit(); }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-          >
-            <EditIcon /> Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => { setOpen(false); onDuplicate(); }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-          >
-            <DuplicateIcon /> Duplicate
-          </button>
-          <button
-            type="button"
-            onClick={() => { setOpen(false); onDelete(); }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-          >
-            <TrashIcon /> Delete
-          </button>
-        </div>
-      )}
+    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-400">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <polyline points="21 15 16 10 5 21" />
+      </svg>
     </div>
   );
 }
@@ -646,6 +568,7 @@ export default function ServicesPage() {
   const [editing, setEditing] = useState<Service | null>(null);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const fetchServices = useCallback(async () => {
     const res = await fetch('/api/services');
@@ -661,6 +584,7 @@ export default function ServicesPage() {
   async function handleDelete(id: string) {
     if (!confirm('Delete this service?')) return;
     await fetch(`/api/services?id=${id}`, { method: 'DELETE' });
+    setSelectedIds((prev) => prev.filter((sid) => sid !== id));
     fetchServices();
   }
 
@@ -683,6 +607,20 @@ export default function ServicesPage() {
     setShowForm(false);
     setEditing(null);
     fetchServices();
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.length === filteredServices.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredServices.map((s) => s.id));
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
+    );
   }
 
   const filteredServices = search.trim()
@@ -784,6 +722,14 @@ export default function ServicesPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="w-10 px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={filteredServices.length > 0 && selectedIds.length === filteredServices.length}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Image</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Category</th>
@@ -792,7 +738,6 @@ export default function ServicesPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Duration</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Staff</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Visibility</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -801,11 +746,21 @@ export default function ServicesPage() {
                       key={s.id}
                       className="cursor-pointer hover:bg-gray-50"
                       onClick={(e) => {
-                        if ((e.target as HTMLElement).closest('[data-action-menu]')) return;
+                        // Don't open edit if clicking on the checkbox
+                        if ((e.target as HTMLElement).closest('[data-checkbox-cell]')) return;
                         handleEdit(s);
                       }}
                     >
-                      {/* Image / Color dot */}
+                      {/* Checkbox */}
+                      <td data-checkbox-cell className="w-10 whitespace-nowrap px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(s.id)}
+                          onChange={() => toggleSelect(s.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                        />
+                      </td>
+                      {/* Image */}
                       <td className="whitespace-nowrap px-4 py-3">
                         {s.image_url ? (
                           <img
@@ -814,10 +769,7 @@ export default function ServicesPage() {
                             className="h-8 w-8 rounded-md object-cover"
                           />
                         ) : (
-                          <div
-                            className="h-4 w-4 rounded-full"
-                            style={{ backgroundColor: s.color || '#6366f1' }}
-                          />
+                          <ImagePlaceholderIcon />
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
@@ -849,13 +801,6 @@ export default function ServicesPage() {
                           </span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
-                        <ActionMenu
-                          onEdit={() => handleEdit(s)}
-                          onDuplicate={() => handleDuplicate(s)}
-                          onDelete={() => handleDelete(s.id)}
-                        />
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -877,7 +822,7 @@ export default function ServicesPage() {
       {showForm && (
         <>
           <div className="fixed inset-0 z-40 bg-black/40" onClick={handleClose} />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[50%] sm:min-w-[480px]">
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]">
             {/* Header */}
             <div className="flex items-center justify-between border-b px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -894,7 +839,11 @@ export default function ServicesPage() {
             </div>
             {/* Body */}
             <div className="flex-1 overflow-hidden px-6 py-4">
-              <ServiceForm service={editing} onClose={handleClose} />
+              <ServiceForm
+                service={editing}
+                onClose={handleClose}
+                onDelete={handleDelete}
+              />
             </div>
           </div>
         </>
