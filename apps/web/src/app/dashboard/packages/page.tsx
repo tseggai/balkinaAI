@@ -288,10 +288,10 @@ export default function PackagesPage() {
       {/* Slide-in Panel — Add Mode */}
       {isAddMode && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowForm(false)} />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]">
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowForm(false)} />
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
             {/* Header */}
-            <div className="flex items-center justify-between border-b px-6 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">New Package</h2>
               <button
                 onClick={() => setShowForm(false)}
@@ -303,7 +303,7 @@ export default function PackagesPage() {
               </button>
             </div>
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 overflow-y-auto px-6 py-5">
               <div className="space-y-5">
                 <ImageUpload
                   value={form.image_url}
@@ -333,13 +333,9 @@ export default function PackagesPage() {
                 </div>
                 {/* Expiration */}
                 <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={form.has_expiration}
-                      onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                    />
+                  <label className="relative mb-2 inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                    <input type="checkbox" checked={form.has_expiration} onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })} className="peer sr-only" />
+                    <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                     Has Expiration
                   </label>
                   {form.has_expiration && (
@@ -366,13 +362,9 @@ export default function PackagesPage() {
                   )}
                 </div>
                 {/* Private toggle */}
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={form.is_private}
-                    onChange={(e) => setForm({ ...form, is_private: e.target.checked })}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                  />
+                <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                  <input type="checkbox" checked={form.is_private} onChange={(e) => setForm({ ...form, is_private: e.target.checked })} className="peer sr-only" />
+                  <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                   Private package
                 </label>
                 {/* Description */}
@@ -431,12 +423,12 @@ export default function PackagesPage() {
               </div>
             </div>
             {/* Footer */}
-            <div className="flex justify-end gap-3 border-t px-6 py-4">
+            <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
               <button
                 onClick={() => setShowForm(false)}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
-                Close
+                Cancel
               </button>
               <button
                 onClick={handleSubmit}
@@ -453,10 +445,10 @@ export default function PackagesPage() {
       {/* Slide-in Panel — Edit Mode */}
       {isEditMode && editing && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowForm(false)} />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]">
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowForm(false)} />
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
             {/* Header */}
-            <div className="flex items-center justify-between border-b px-6 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">Edit Package</h2>
               <button
                 onClick={() => setShowForm(false)}
@@ -468,7 +460,7 @@ export default function PackagesPage() {
               </button>
             </div>
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 overflow-y-auto px-6 py-5">
               <div className="space-y-5">
                 <ImageUpload
                   value={form.image_url}
@@ -528,12 +520,10 @@ export default function PackagesPage() {
                 <div className="group flex items-center gap-4">
                   <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Expiration</span>
                   <div className="flex flex-1 items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={form.has_expiration}
-                      onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                    />
+                    <label className="relative inline-flex cursor-pointer items-center">
+                      <input type="checkbox" checked={form.has_expiration} onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })} className="peer sr-only" />
+                      <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                    </label>
                     {form.has_expiration && (
                       <>
                         <div className="group/exp relative w-24">
@@ -566,22 +556,18 @@ export default function PackagesPage() {
                 {/* Active toggle */}
                 <div className="flex items-center gap-4">
                   <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Active</span>
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                  />
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="peer sr-only" />
+                    <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                  </label>
                 </div>
                 {/* Private toggle */}
                 <div className="flex items-center gap-4">
                   <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Private</span>
-                  <input
-                    type="checkbox"
-                    checked={form.is_private}
-                    onChange={(e) => setForm({ ...form, is_private: e.target.checked })}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                  />
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input type="checkbox" checked={form.is_private} onChange={(e) => setForm({ ...form, is_private: e.target.checked })} className="peer sr-only" />
+                    <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                  </label>
                 </div>
                 {/* Services */}
                 <div>
@@ -630,7 +616,7 @@ export default function PackagesPage() {
               </div>
             </div>
             {/* Footer */}
-            <div className="flex items-center border-t px-6 py-4">
+            <div className="flex items-center border-t border-gray-200 px-6 py-4">
               <button
                 onClick={() => handleDelete(editing.id)}
                 className="mr-auto rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"

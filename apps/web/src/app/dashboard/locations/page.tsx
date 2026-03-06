@@ -260,18 +260,18 @@ export default function LocationsPage() {
           onClick={closePanel}
         />
         {/* Panel */}
-        <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]">
+        <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 className="text-lg font-semibold text-gray-900">
               {isEdit ? 'Edit Location' : 'Add Location'}
             </h2>
             <button
               onClick={closePanel}
               className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
@@ -477,13 +477,9 @@ export default function LocationsPage() {
               {/* Booking Limiter */}
               <div className="rounded-lg border border-gray-200 p-4">
                 <h3 className="mb-3 text-sm font-semibold text-gray-900">Booking Limiter</h3>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={bookingLimitEnabled}
-                    onChange={(e) => setBookingLimitEnabled(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                  />
+                <label className="relative inline-flex cursor-pointer items-center gap-2">
+                  <input type="checkbox" checked={bookingLimitEnabled} onChange={(e) => setBookingLimitEnabled(e.target.checked)} className="peer sr-only" />
+                  <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                   <span className="text-sm font-medium text-gray-700">
                     Enable booking limit for this location
                   </span>
@@ -532,18 +528,18 @@ export default function LocationsPage() {
                 </button>
               )}
               <button
-                type="submit"
-                disabled={saving}
-                className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : isEdit ? 'Update Location' : 'Add Location'}
-              </button>
-              <button
                 type="button"
                 onClick={closePanel}
-                className="rounded-lg border border-gray-300 px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : isEdit ? 'Update Location' : 'Add Location'}
               </button>
             </div>
           </form>

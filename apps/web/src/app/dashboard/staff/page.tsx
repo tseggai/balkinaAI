@@ -831,13 +831,9 @@ export default function StaffPage() {
             return (
               <div key={day} className="rounded-lg border border-gray-100 p-3">
                 <div className="flex items-center gap-3">
-                  <label className="flex w-28 items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={ds.enabled}
-                      onChange={(e) => updateDay(key, 'enabled', e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                    />
+                  <label className="relative inline-flex w-28 cursor-pointer items-center gap-2">
+                    <input type="checkbox" checked={ds.enabled} onChange={(e) => updateDay(key, 'enabled', e.target.checked)} className="peer sr-only" />
+                    <div className="peer h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                     <span className="text-sm font-medium text-gray-700">{day}</span>
                   </label>
                   {ds.enabled && (
@@ -951,13 +947,9 @@ export default function StaffPage() {
                   </button>
                 </div>
                 <div className="mt-3 flex items-center gap-4">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={sd.is_day_off}
-                      onChange={(e) => updateSpecialDay(idx, 'is_day_off', e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                    />
+                  <label className="relative inline-flex cursor-pointer items-center gap-2">
+                    <input type="checkbox" checked={sd.is_day_off} onChange={(e) => updateSpecialDay(idx, 'is_day_off', e.target.checked)} className="peer sr-only" />
+                    <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                     <span className="text-sm text-gray-700">Day Off</span>
                   </label>
                   {!sd.is_day_off && (
@@ -1112,13 +1104,9 @@ export default function StaffPage() {
     return (
       <div className="space-y-5">
         <div className="rounded-lg border border-gray-200 p-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={bookingLimitEnabled}
-              onChange={(e) => setBookingLimitEnabled(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600"
-            />
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={bookingLimitEnabled} onChange={(e) => setBookingLimitEnabled(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">
               Enable booking limit for this staff member
             </span>
@@ -1181,7 +1169,7 @@ export default function StaffPage() {
           onClick={closePanel}
         />
         {/* Panel */}
-        <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]">
+        <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h2 className="text-xl font-bold text-gray-900">

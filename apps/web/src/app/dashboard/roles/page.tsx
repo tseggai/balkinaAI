@@ -104,6 +104,7 @@ export default function RolesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showStaffDropdown, setShowStaffDropdown] = useState(false);
 
   const fetchRoles = useCallback(async () => {
     const res = await fetch('/api/roles');
@@ -362,7 +363,7 @@ export default function RolesPage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/30 transition-opacity" onClick={closePanel} />
           <div
-            className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]`}
+            className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]`}
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
@@ -409,24 +410,46 @@ export default function RolesPage() {
 
                     {/* Staff Selection */}
                     <div>
-                      <p className="mb-1 text-sm font-medium text-gray-700">Assigned Staff</p>
-                      {staffList.length === 0 ? (
-                        <p className="text-sm text-gray-500">No staff members available.</p>
-                      ) : (
-                        <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-3">
-                          {staffList.map((s) => (
-                            <label key={s.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-gray-50">
-                              <input
-                                type="checkbox"
-                                checked={selectedStaff.includes(s.id)}
-                                onChange={() => toggleStaff(s.id)}
-                                className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                              />
-                              <span className="text-sm text-gray-700">{s.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Assigned Staff <span className="font-normal text-gray-400">({selectedStaff.length} selected)</span>
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 p-3 min-h-[42px]">
+                        {selectedStaff.map((sid) => {
+                          const st = staffList.find((s) => s.id === sid);
+                          if (!st) return null;
+                          return (
+                            <span key={sid} className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700">
+                              {st.name}
+                              <button type="button" onClick={() => toggleStaff(sid)} className="ml-0.5 text-brand-400 hover:text-brand-600">
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                              </button>
+                            </span>
+                          );
+                        })}
+                        {staffList.length > 0 && (
+                          <div className="relative">
+                            <button type="button" onClick={() => setShowStaffDropdown(!showStaffDropdown)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1 text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600">
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                              Add
+                            </button>
+                            {showStaffDropdown && (
+                              <div className="absolute left-0 top-full z-10 mt-1 max-h-48 w-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                                {staffList.filter((s) => !selectedStaff.includes(s.id)).map((s) => (
+                                  <button key={s.id} type="button" onClick={() => { toggleStaff(s.id); setShowStaffDropdown(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
+                                    {s.name}
+                                  </button>
+                                ))}
+                                {staffList.filter((s) => !selectedStaff.includes(s.id)).length === 0 && (
+                                  <div className="px-3 py-2 text-sm text-gray-400">All staff selected</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {staffList.length === 0 && (
+                          <span className="text-sm text-gray-400">No staff members available.</span>
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
@@ -468,24 +491,46 @@ export default function RolesPage() {
 
                     {/* Staff Selection */}
                     <div>
-                      <p className="mb-1 text-sm font-medium text-gray-500">Assigned Staff</p>
-                      {staffList.length === 0 ? (
-                        <p className="text-sm text-gray-500">No staff members available.</p>
-                      ) : (
-                        <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-3">
-                          {staffList.map((s) => (
-                            <label key={s.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-gray-50">
-                              <input
-                                type="checkbox"
-                                checked={selectedStaff.includes(s.id)}
-                                onChange={() => toggleStaff(s.id)}
-                                className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                              />
-                              <span className="text-sm text-gray-700">{s.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
+                      <label className="mb-2 block text-sm font-medium text-gray-500">
+                        Assigned Staff <span className="font-normal text-gray-400">({selectedStaff.length} selected)</span>
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 p-3 min-h-[42px]">
+                        {selectedStaff.map((sid) => {
+                          const st = staffList.find((s) => s.id === sid);
+                          if (!st) return null;
+                          return (
+                            <span key={sid} className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700">
+                              {st.name}
+                              <button type="button" onClick={() => toggleStaff(sid)} className="ml-0.5 text-brand-400 hover:text-brand-600">
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                              </button>
+                            </span>
+                          );
+                        })}
+                        {staffList.length > 0 && (
+                          <div className="relative">
+                            <button type="button" onClick={() => setShowStaffDropdown(!showStaffDropdown)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1 text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600">
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                              Add
+                            </button>
+                            {showStaffDropdown && (
+                              <div className="absolute left-0 top-full z-10 mt-1 max-h-48 w-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                                {staffList.filter((s) => !selectedStaff.includes(s.id)).map((s) => (
+                                  <button key={s.id} type="button" onClick={() => { toggleStaff(s.id); setShowStaffDropdown(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
+                                    {s.name}
+                                  </button>
+                                ))}
+                                {staffList.filter((s) => !selectedStaff.includes(s.id)).length === 0 && (
+                                  <div className="px-3 py-2 text-sm text-gray-400">All staff selected</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {staffList.length === 0 && (
+                          <span className="text-sm text-gray-400">No staff members available.</span>
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
