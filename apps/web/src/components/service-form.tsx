@@ -143,6 +143,7 @@ export function ServiceForm({
   const [selectedStaff, setSelectedStaff] = useState<ServiceStaffMember[]>(
     service?.service_staff ?? []
   );
+  const [showStaffDropdown, setShowStaffDropdown] = useState(false);
 
   // --- Timesheet tab state ---
   const [timesheetEnabled, setTimesheetEnabled] = useState(service?.timesheet != null);
@@ -554,13 +555,9 @@ export function ServiceForm({
 
           {/* Deposit */}
           <div className="rounded-lg border border-gray-200 p-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={depositEnabled}
-                onChange={(e) => setDepositEnabled(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-brand-600"
-              />
+            <label className="relative inline-flex cursor-pointer items-center gap-2">
+              <input type="checkbox" checked={depositEnabled} onChange={(e) => setDepositEnabled(e.target.checked)} className="peer sr-only" />
+              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
               <span className="text-sm font-medium text-gray-700">Enable Deposit</span>
             </label>
             {depositEnabled && (
@@ -625,13 +622,9 @@ export function ServiceForm({
 
           {/* Custom Duration Toggle */}
           <div className="rounded-lg border border-gray-200 p-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={customDuration}
-                onChange={(e) => setCustomDuration(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-brand-600"
-              />
+            <label className="relative inline-flex cursor-pointer items-center gap-2">
+              <input type="checkbox" checked={customDuration} onChange={(e) => setCustomDuration(e.target.checked)} className="peer sr-only" />
+              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
               <span className="text-sm font-medium text-gray-700">Allow Custom Duration</span>
             </label>
             <p className="ml-6 mt-0.5 text-xs text-gray-400">Let customers choose from predefined duration options</p>
@@ -640,35 +633,23 @@ export function ServiceForm({
 
           {/* Toggles Row */}
           <div className="space-y-3">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={hidePrice}
-                onChange={(e) => setHidePrice(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-brand-600"
-              />
+            <label className="relative inline-flex cursor-pointer items-center gap-2">
+              <input type="checkbox" checked={hidePrice} onChange={(e) => setHidePrice(e.target.checked)} className="peer sr-only" />
+              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
               <span className="text-sm font-medium text-gray-700">Hide price on the booking page</span>
             </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={hideDuration}
-                onChange={(e) => setHideDuration(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-brand-600"
-              />
+            <label className="relative inline-flex cursor-pointer items-center gap-2">
+              <input type="checkbox" checked={hideDuration} onChange={(e) => setHideDuration(e.target.checked)} className="peer sr-only" />
+              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
               <span className="text-sm font-medium text-gray-700">Hide duration on the booking page</span>
             </label>
           </div>
 
           {/* Recurring Service */}
           <div className="rounded-lg border border-gray-200 p-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={isRecurring}
-                onChange={(e) => setIsRecurring(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-brand-600"
-              />
+            <label className="relative inline-flex cursor-pointer items-center gap-2">
+              <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="peer sr-only" />
+              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
               <span className="text-sm font-medium text-gray-700">Recurring Service</span>
             </label>
             <p className="ml-6 mt-0.5 text-xs text-gray-400">Automatically rebook this service at a regular interval</p>
@@ -816,13 +797,9 @@ export function ServiceForm({
 
         {/* Deposit */}
         <div className="rounded-lg border border-gray-200 p-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={depositEnabled}
-              onChange={(e) => setDepositEnabled(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600"
-            />
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={depositEnabled} onChange={(e) => setDepositEnabled(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Enable Deposit</span>
           </label>
           {depositEnabled && (
@@ -873,13 +850,9 @@ export function ServiceForm({
 
         {/* Custom Duration Toggle */}
         <div className="rounded-lg border border-gray-200 p-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={customDuration}
-              onChange={(e) => setCustomDuration(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600"
-            />
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={customDuration} onChange={(e) => setCustomDuration(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Allow Custom Duration</span>
           </label>
           <p className="ml-6 mt-0.5 text-xs text-gray-400">Let customers choose from predefined duration options</p>
@@ -888,35 +861,23 @@ export function ServiceForm({
 
         {/* Toggles Row */}
         <div className="space-y-3">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={hidePrice}
-              onChange={(e) => setHidePrice(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600"
-            />
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={hidePrice} onChange={(e) => setHidePrice(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Hide price on the booking page</span>
           </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={hideDuration}
-              onChange={(e) => setHideDuration(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600"
-            />
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={hideDuration} onChange={(e) => setHideDuration(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Hide duration on the booking page</span>
           </label>
         </div>
 
         {/* Recurring Service */}
         <div className="rounded-lg border border-gray-200 p-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={isRecurring}
-              onChange={(e) => setIsRecurring(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600"
-            />
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Recurring Service</span>
           </label>
           <p className="ml-6 mt-0.5 text-xs text-gray-400">Automatically rebook this service at a regular interval</p>
@@ -965,13 +926,9 @@ export function ServiceForm({
         </div>
 
         {/* Show Labels toggle */}
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={customDurationShowLabels}
-            onChange={(e) => setCustomDurationShowLabels(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-brand-600"
-          />
+        <label className="relative inline-flex cursor-pointer items-center gap-2">
+          <input type="checkbox" checked={customDurationShowLabels} onChange={(e) => setCustomDurationShowLabels(e.target.checked)} className="peer sr-only" />
+          <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
           <span className="text-sm text-gray-700">Show option labels to customers</span>
         </label>
 
@@ -1077,13 +1034,17 @@ export function ServiceForm({
   }
 
   function renderStaffTab() {
+    const unselectedStaff = allStaff.filter(
+      (s) => !selectedStaff.some((sel) => sel.staff_id === s.id)
+    );
+
     return (
       <div className="space-y-5">
-        <p className="text-sm text-gray-500">Select staff members who can perform this service.</p>
-
-        {/* Selected staff chips */}
-        {selectedStaff.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+        <div>
+          <label className="mb-2 block text-sm font-medium text-gray-700">
+            Staff <span className="font-normal text-gray-400">({selectedStaff.length} selected)</span>
+          </label>
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 p-3 min-h-[42px]">
             {selectedStaff.map((s) => (
               <span
                 key={s.staff_id}
@@ -1093,35 +1054,52 @@ export function ServiceForm({
                 <button
                   type="button"
                   onClick={() => removeStaff(s.staff_id)}
-                  className="ml-1 text-brand-400 hover:text-brand-600"
+                  className="ml-0.5 text-brand-400 hover:text-brand-600"
                 >
-                  &times;
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </span>
             ))}
+            {allStaff.length > 0 && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowStaffDropdown(!showStaffDropdown)}
+                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1 text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                  Add
+                </button>
+                {showStaffDropdown && (
+                  <div className="absolute left-0 top-full z-10 mt-1 max-h-48 w-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                    {unselectedStaff.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          toggleStaff(s.id, s.name);
+                          setShowStaffDropdown(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        {s.name}
+                      </button>
+                    ))}
+                    {unselectedStaff.length === 0 && (
+                      <div className="px-3 py-2 text-sm text-gray-400">All staff selected</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {allStaff.length === 0 && (
+              <span className="text-sm text-gray-400">No staff members found. Add staff from the Staff page first.</span>
+            )}
           </div>
-        )}
-
-        {/* Staff checkboxes */}
-        <div className="space-y-2 rounded-lg border border-gray-200 p-4">
-          {allStaff.length === 0 ? (
-            <p className="text-sm text-gray-400">No staff members found. Add staff from the Staff page first.</p>
-          ) : (
-            allStaff.map((s) => {
-              const checked = selectedStaff.some((sel) => sel.staff_id === s.id);
-              return (
-                <label key={s.id} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleStaff(s.id, s.name)}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                  />
-                  <span className="text-sm text-gray-700">{s.name}</span>
-                </label>
-              );
-            })
-          )}
         </div>
       </div>
     );
@@ -1130,13 +1108,9 @@ export function ServiceForm({
   function renderTimesheetTab() {
     return (
       <div className="space-y-5">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={timesheetEnabled}
-            onChange={(e) => setTimesheetEnabled(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-brand-600"
-          />
+        <label className="relative inline-flex cursor-pointer items-center gap-2">
+          <input type="checkbox" checked={timesheetEnabled} onChange={(e) => setTimesheetEnabled(e.target.checked)} className="peer sr-only" />
+          <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
           <span className="text-sm font-medium text-gray-700">
             Configure specific timesheet for this service
           </span>
@@ -1149,13 +1123,9 @@ export function ServiceForm({
               const ds = timesheet[key] ?? { enabled: false, start: '09:00', end: '17:00' };
               return (
                 <div key={day} className="flex items-center gap-3">
-                  <label className="flex w-28 items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={ds.enabled}
-                      onChange={(e) => updateTimesheetDay(key, 'enabled', e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                    />
+                  <label className="relative inline-flex w-28 cursor-pointer items-center gap-2">
+                    <input type="checkbox" checked={ds.enabled} onChange={(e) => updateTimesheetDay(key, 'enabled', e.target.checked)} className="peer sr-only" />
+                    <div className="peer h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                     <span className="text-sm text-gray-700">{day}</span>
                   </label>
                   {ds.enabled && (
@@ -1300,13 +1270,9 @@ export function ServiceForm({
 
         {/* Max Booking Days Ahead */}
         <div className="rounded-lg border border-gray-200 p-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={maxDaysEnabled}
-              onChange={(e) => setMaxDaysEnabled(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600"
-            />
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={maxDaysEnabled} onChange={(e) => setMaxDaysEnabled(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Limit how far ahead customers can book</span>
           </label>
           {maxDaysEnabled && (
@@ -1325,13 +1291,9 @@ export function ServiceForm({
 
         {/* Min Service Extras */}
         <div className="rounded-lg border border-gray-200 p-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={minExtrasEnabled}
-              onChange={(e) => setMinExtrasEnabled(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600"
-            />
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={minExtrasEnabled} onChange={(e) => setMinExtrasEnabled(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Require minimum number of extras</span>
           </label>
           {minExtrasEnabled && (
@@ -1350,13 +1312,9 @@ export function ServiceForm({
 
         {/* Max Service Extras */}
         <div className="rounded-lg border border-gray-200 p-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={maxExtrasEnabled}
-              onChange={(e) => setMaxExtrasEnabled(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600"
-            />
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={maxExtrasEnabled} onChange={(e) => setMaxExtrasEnabled(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Limit maximum number of extras</span>
           </label>
           {maxExtrasEnabled && (
@@ -1381,13 +1339,9 @@ export function ServiceForm({
       <div className="space-y-5">
         {/* Limit per customer */}
         <div className="rounded-lg border border-gray-200 p-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={limitPerCustomerEnabled}
-              onChange={(e) => setLimitPerCustomerEnabled(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600"
-            />
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={limitPerCustomerEnabled} onChange={(e) => setLimitPerCustomerEnabled(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Limit appointments per customer</span>
           </label>
           {limitPerCustomerEnabled && (
@@ -1421,13 +1375,9 @@ export function ServiceForm({
 
         {/* Limit per time slot */}
         <div className="rounded-lg border border-gray-200 p-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={limitPerSlotEnabled}
-              onChange={(e) => setLimitPerSlotEnabled(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600"
-            />
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={limitPerSlotEnabled} onChange={(e) => setLimitPerSlotEnabled(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Limit bookings per time slot</span>
           </label>
           {limitPerSlotEnabled && (

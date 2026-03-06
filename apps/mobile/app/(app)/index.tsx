@@ -37,6 +37,19 @@ function generateId(): string {
   });
 }
 
+// ── Parse [[button:...]] from message content ───────────────────────────────
+
+function parseMessageContent(content: string): { text: string; buttons: string[] } {
+  const buttonRegex = /\[\[button:([^\]]+)\]\]/g;
+  const buttons: string[] = [];
+  const text = content.replace(buttonRegex, (_match, label: string) => {
+    buttons.push(label.trim());
+    return '';
+  }).replace(/\n{3,}/g, '\n\n').trim();
+
+  return { text, buttons };
+}
+
 // ── Typing Indicator ─────────────────────────────────────────────────────────
 
 function TypingIndicator() {
@@ -111,9 +124,45 @@ const typingStyles = StyleSheet.create({
   },
 });
 
+// ── Action Button ───────────────────────────────────────────────────────────
+
+function ActionButton({ label, onPress }: { label: string; onPress: (label: string) => void }) {
+  return (
+    <TouchableOpacity
+      style={actionBtnStyles.btn}
+      onPress={() => onPress(label)}
+      activeOpacity={0.7}
+    >
+      <Text style={actionBtnStyles.text}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+const actionBtnStyles = StyleSheet.create({
+  btn: {
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#6366f1',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  text: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6366f1',
+  },
+});
+
 // ── Message Bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({
+  message,
+  onButtonPress,
+}: {
+  message: ChatMessage;
+  onButtonPress: (label: string) => void;
+}) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(10)).current;
 
@@ -133,6 +182,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   }, [fadeAnim, slideAnim]);
 
   const isUser = message.role === 'user';
+  const { text, buttons } = isUser
+    ? { text: message.content, buttons: [] }
+    : parseMessageContent(message.content);
 
   return (
     <Animated.View
@@ -142,25 +194,37 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
       ]}
     >
-      <View
-        style={[
-          bubbleStyles.bubble,
-          isUser ? bubbleStyles.bubbleUser : bubbleStyles.bubbleAssistant,
-        ]}
-      >
-        {message.isStreaming && !message.content ? (
-          <TypingIndicator />
-        ) : (
-          <Text
-            style={[
-              bubbleStyles.text,
-              isUser ? bubbleStyles.textUser : bubbleStyles.textAssistant,
-            ]}
-          >
-            {message.content}
-          </Text>
-        )}
-      </View>
+      {/* Text bubble */}
+      {(text || message.isStreaming) && (
+        <View
+          style={[
+            bubbleStyles.bubble,
+            isUser ? bubbleStyles.bubbleUser : bubbleStyles.bubbleAssistant,
+          ]}
+        >
+          {message.isStreaming && !message.content ? (
+            <TypingIndicator />
+          ) : (
+            <Text
+              style={[
+                bubbleStyles.text,
+                isUser ? bubbleStyles.textUser : bubbleStyles.textAssistant,
+              ]}
+            >
+              {text}
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Action buttons rendered below the bubble */}
+      {buttons.length > 0 && !message.isStreaming && (
+        <View style={bubbleStyles.buttonsRow}>
+          {buttons.map((btn, i) => (
+            <ActionButton key={`${btn}-${i}`} label={btn} onPress={onButtonPress} />
+          ))}
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -169,15 +233,17 @@ const bubbleStyles = StyleSheet.create({
   wrapper: {
     paddingHorizontal: 12,
     marginVertical: 3,
+    maxWidth: '88%',
   },
   wrapperUser: {
+    alignSelf: 'flex-end',
     alignItems: 'flex-end',
   },
   wrapperAssistant: {
+    alignSelf: 'flex-start',
     alignItems: 'flex-start',
   },
   bubble: {
-    maxWidth: '82%',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 18,
@@ -199,6 +265,12 @@ const bubbleStyles = StyleSheet.create({
   },
   textAssistant: {
     color: '#111827',
+  },
+  buttonsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
   },
 });
 
@@ -382,10 +454,10 @@ export default function ChatScreen() {
 
         // React Native's fetch does not support ReadableStream, so we
         // read the full response body as text and parse SSE events from it.
-        const text = await res.text();
+        const respText = await res.text();
         let fullText = '';
 
-        const lines = text.split('\n');
+        const lines = respText.split('\n');
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
           const jsonStr = line.slice(6).trim();
@@ -442,7 +514,7 @@ export default function ChatScreen() {
     [input, isLoading, sessionId, customerName, customerPhone, customerEmail, userId, userCoords],
   );
 
-  const handleChipPress = useCallback(
+  const handleButtonPress = useCallback(
     (label: string) => {
       sendMessage(label);
     },
@@ -470,19 +542,19 @@ export default function ChatScreen() {
             <View style={styles.chipsContainer}>
               <SuggestionChip
                 label="Book a haircut"
-                onPress={() => handleChipPress('Book a haircut')}
+                onPress={() => handleButtonPress('Book a haircut')}
               />
               <SuggestionChip
                 label="Find a dentist"
-                onPress={() => handleChipPress('Find a dentist')}
+                onPress={() => handleButtonPress('Find a dentist')}
               />
               <SuggestionChip
                 label="My appointments"
-                onPress={() => handleChipPress('My appointments')}
+                onPress={() => handleButtonPress('My appointments')}
               />
               <SuggestionChip
                 label="Cancel a booking"
-                onPress={() => handleChipPress('Cancel a booking')}
+                onPress={() => handleButtonPress('Cancel a booking')}
               />
             </View>
 
@@ -553,7 +625,9 @@ export default function ChatScreen() {
           ref={flatListRef}
           data={[...messages].reverse()}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <MessageBubble message={item} />}
+          renderItem={({ item }) => (
+            <MessageBubble message={item} onButtonPress={handleButtonPress} />
+          )}
           contentContainerStyle={styles.messagesList}
           inverted
         />

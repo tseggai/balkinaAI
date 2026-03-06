@@ -826,7 +826,7 @@ export default function AppointmentsPage() {
           <div className="fixed inset-0 z-40 bg-black/30" onClick={closePanel} />
 
           {/* Panel */}
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]">
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
             {/* Panel header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -1288,10 +1288,15 @@ export default function AppointmentsPage() {
                       <EditableRow
                         label="Status"
                         value={
-                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusConfig[formStatus].bg} ${statusConfig[formStatus].text}`}>
-                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${statusConfig[formStatus].dot}`} />
-                            {statusConfig[formStatus].label}
-                          </span>
+                          (() => {
+                            const sc = statusConfig[formStatus] ?? statusConfig.pending;
+                            return (
+                              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${sc.bg} ${sc.text}`}>
+                                <span className={`inline-block h-1.5 w-1.5 rounded-full ${sc.dot}`} />
+                                {sc.label}
+                              </span>
+                            );
+                          })()
                         }
                         fieldKey="status"
                         renderEdit={() => (

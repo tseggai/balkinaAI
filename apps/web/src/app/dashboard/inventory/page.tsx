@@ -298,10 +298,10 @@ export default function InventoryPage() {
       {/* Slide-in Panel */}
       {showForm && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowForm(false)} />
-          <div className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[30%] sm:min-w-[380px]`}>
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowForm(false)} />
+          <div className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]`}>
             {/* Header */}
-            <div className="flex items-center justify-between border-b px-6 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
                 {editing ? 'Edit Product' : 'New Product'}
               </h2>
@@ -315,7 +315,7 @@ export default function InventoryPage() {
               </button>
             </div>
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 overflow-y-auto px-6 py-5">
               <div className="space-y-5">
                 <ImageUpload
                   value={form.image_url}
@@ -462,22 +462,14 @@ export default function InventoryPage() {
                     </div>
                     {/* Toggles */}
                     <div className="flex gap-6">
-                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={form.display_in_booking}
-                          onChange={(e) => setForm({ ...form, display_in_booking: e.target.checked })}
-                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                        />
+                      <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                        <input type="checkbox" checked={form.display_in_booking} onChange={(e) => setForm({ ...form, display_in_booking: e.target.checked })} className="peer sr-only" />
+                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                         Display in booking
                       </label>
-                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={form.is_active}
-                          onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                        />
+                      <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                        <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="peer sr-only" />
+                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                         Active
                       </label>
                     </div>
@@ -608,22 +600,14 @@ export default function InventoryPage() {
                     </div>
                     {/* Toggles */}
                     <div className="flex gap-6">
-                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={form.display_in_booking}
-                          onChange={(e) => setForm({ ...form, display_in_booking: e.target.checked })}
-                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                        />
+                      <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                        <input type="checkbox" checked={form.display_in_booking} onChange={(e) => setForm({ ...form, display_in_booking: e.target.checked })} className="peer sr-only" />
+                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                         Display in booking
                       </label>
-                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={form.is_active}
-                          onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                        />
+                      <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                        <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="peer sr-only" />
+                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                         Active
                       </label>
                     </div>
@@ -644,7 +628,7 @@ export default function InventoryPage() {
               </div>
             </div>
             {/* Footer */}
-            <div className="flex items-center border-t px-6 py-4">
+            <div className="flex items-center border-t border-gray-200 px-6 py-4">
               {editing && (
                 <button
                   onClick={() => handleDelete(editing.id)}
