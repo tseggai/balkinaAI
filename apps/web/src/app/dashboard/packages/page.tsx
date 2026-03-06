@@ -308,7 +308,7 @@ export default function PackagesPage() {
                 <ImageUpload
                   value={form.image_url}
                   onChange={(url) => setForm({ ...form, image_url: url })}
-                  label="Package Image"
+                  label=""
                 />
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -316,7 +316,7 @@ export default function PackagesPage() {
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       placeholder="Name *"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                   </div>
                   <div>
@@ -327,31 +327,33 @@ export default function PackagesPage() {
                       value={form.price}
                       onChange={(e) => setForm({ ...form, price: e.target.value })}
                       placeholder="Price ($)"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                   </div>
                 </div>
                 {/* Expiration */}
-                <div>
-                  <label className="relative mb-2 inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
-                    <input type="checkbox" checked={form.has_expiration} onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })} className="peer sr-only" />
-                    <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                    Has Expiration
-                  </label>
+                <div className="flex items-center">
+                  <div className="w-1/2">
+                    <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                      <input type="checkbox" checked={form.has_expiration} onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })} className="peer sr-only" />
+                      <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                      Has Expiration
+                    </label>
+                  </div>
                   {form.has_expiration && (
-                    <div className="flex gap-3">
+                    <div className="flex w-1/2 gap-3">
                       <input
                         type="number"
                         min="1"
                         value={form.expiration_value}
                         onChange={(e) => setForm({ ...form, expiration_value: e.target.value })}
                         placeholder="Value"
-                        className="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        className="w-32 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       />
                       <select
                         value={form.expiration_unit}
                         onChange={(e) => setForm({ ...form, expiration_unit: e.target.value })}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        className="h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       >
                         <option value="days">Days</option>
                         <option value="weeks">Weeks</option>
@@ -362,11 +364,15 @@ export default function PackagesPage() {
                   )}
                 </div>
                 {/* Private toggle */}
-                <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
-                  <input type="checkbox" checked={form.is_private} onChange={(e) => setForm({ ...form, is_private: e.target.checked })} className="peer sr-only" />
-                  <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                  Private package
-                </label>
+                <div className="flex items-center">
+                  <div className="w-1/2">
+                    <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                      <input type="checkbox" checked={form.is_private} onChange={(e) => setForm({ ...form, is_private: e.target.checked })} className="peer sr-only" />
+                      <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                      Private package
+                    </label>
+                  </div>
+                </div>
                 {/* Description */}
                 <div>
                   <textarea
@@ -374,7 +380,7 @@ export default function PackagesPage() {
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                     placeholder="Description"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    className="w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                   />
                 </div>
                 {/* Services */}
@@ -383,7 +389,7 @@ export default function PackagesPage() {
                     <select
                       value={addServiceId}
                       onChange={(e) => setAddServiceId(e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="flex-1 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                       <option value="">Select a service</option>
                       {services
@@ -397,7 +403,7 @@ export default function PackagesPage() {
                       min="1"
                       value={addServiceQty}
                       onChange={(e) => setAddServiceQty(e.target.value)}
-                      className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="w-20 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       placeholder="Qty"
                     />
                     <button
@@ -465,118 +471,108 @@ export default function PackagesPage() {
                 <ImageUpload
                   value={form.image_url}
                   onChange={(url) => setForm({ ...form, image_url: url })}
-                  label="Package Image"
+                  label=""
                 />
                 {/* Name */}
-                <div className="group flex items-center gap-4">
-                  <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Name</span>
-                  <div className="relative flex-1">
-                    <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                      {form.name || '\u2014'}
-                    </span>
-                    <input
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      placeholder="Name *"
-                      className="invisible absolute inset-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
-                    />
-                  </div>
+                <div>
+                  <label className="text-xs text-gray-400">Name</label>
+                  <input
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="Name *"
+                    className="w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  />
                 </div>
                 {/* Price */}
-                <div className="group flex items-center gap-4">
-                  <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Price ($)</span>
-                  <div className="relative flex-1">
-                    <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                      {form.price ? `$${Number(form.price).toFixed(2)}` : '\u2014'}
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form.price}
-                      onChange={(e) => setForm({ ...form, price: e.target.value })}
-                      placeholder="Price ($)"
-                      className="invisible absolute inset-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
-                    />
-                  </div>
+                <div>
+                  <label className="text-xs text-gray-400">Price ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.price}
+                    onChange={(e) => setForm({ ...form, price: e.target.value })}
+                    placeholder="Price ($)"
+                    className="w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  />
                 </div>
                 {/* Description */}
-                <div className="group flex items-start gap-4">
-                  <span className="w-32 shrink-0 pt-2 text-sm font-medium text-gray-700">Description</span>
-                  <div className="relative flex-1">
-                    <span className="block min-h-[4rem] whitespace-pre-wrap px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                      {form.description || '\u2014'}
-                    </span>
-                    <textarea
-                      rows={3}
-                      value={form.description}
-                      onChange={(e) => setForm({ ...form, description: e.target.value })}
-                      placeholder="Description"
-                      className="invisible absolute inset-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover:visible"
-                    />
-                  </div>
+                <div>
+                  <label className="text-xs text-gray-400">Description</label>
+                  <textarea
+                    rows={3}
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    placeholder="Description"
+                    className="w-full rounded-[.3rem] border border-transparent bg-transparent px-3 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  />
                 </div>
                 {/* Expiration */}
-                <div className="group flex items-center gap-4">
-                  <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Expiration</span>
-                  <div className="flex flex-1 items-center gap-3">
-                    <label className="relative inline-flex cursor-pointer items-center">
-                      <input type="checkbox" checked={form.has_expiration} onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })} className="peer sr-only" />
-                      <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                    </label>
-                    {form.has_expiration && (
-                      <>
-                        <div className="group/exp relative w-24">
-                          <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover/exp:invisible">
-                            {form.expiration_value || '\u2014'}
-                          </span>
-                          <input
-                            type="number"
-                            min="1"
-                            value={form.expiration_value}
-                            onChange={(e) => setForm({ ...form, expiration_value: e.target.value })}
-                            placeholder="Value"
-                            className="invisible absolute inset-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover/exp:visible"
-                          />
-                        </div>
-                        <select
-                          value={form.expiration_unit}
-                          onChange={(e) => setForm({ ...form, expiration_unit: e.target.value })}
-                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        >
-                          <option value="days">Days</option>
-                          <option value="weeks">Weeks</option>
-                          <option value="months">Months</option>
-                          <option value="years">Years</option>
-                        </select>
-                      </>
-                    )}
+                <div className="flex items-center">
+                  <div className="w-1/2">
+                    <label className="text-xs text-gray-400">Expiration</label>
+                    <div className="mt-1">
+                      <label className="relative inline-flex cursor-pointer items-center">
+                        <input type="checkbox" checked={form.has_expiration} onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })} className="peer sr-only" />
+                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                      </label>
+                    </div>
                   </div>
+                  {form.has_expiration && (
+                    <div className="flex w-1/2 gap-3">
+                      <input
+                        type="number"
+                        min="1"
+                        value={form.expiration_value}
+                        onChange={(e) => setForm({ ...form, expiration_value: e.target.value })}
+                        placeholder="Value"
+                        className="w-24 h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                      <select
+                        value={form.expiration_unit}
+                        onChange={(e) => setForm({ ...form, expiration_unit: e.target.value })}
+                        className="h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="days">Days</option>
+                        <option value="weeks">Weeks</option>
+                        <option value="months">Months</option>
+                        <option value="years">Years</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
                 {/* Active toggle */}
-                <div className="flex items-center gap-4">
-                  <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Active</span>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="peer sr-only" />
-                    <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                  </label>
+                <div className="flex items-center">
+                  <div className="w-1/2">
+                    <label className="text-xs text-gray-400">Active</label>
+                    <div className="mt-1">
+                      <label className="relative inline-flex cursor-pointer items-center">
+                        <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="peer sr-only" />
+                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                      </label>
+                    </div>
+                  </div>
                 </div>
                 {/* Private toggle */}
-                <div className="flex items-center gap-4">
-                  <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Private</span>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input type="checkbox" checked={form.is_private} onChange={(e) => setForm({ ...form, is_private: e.target.checked })} className="peer sr-only" />
-                    <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                  </label>
+                <div className="flex items-center">
+                  <div className="w-1/2">
+                    <label className="text-xs text-gray-400">Private</label>
+                    <div className="mt-1">
+                      <label className="relative inline-flex cursor-pointer items-center">
+                        <input type="checkbox" checked={form.is_private} onChange={(e) => setForm({ ...form, is_private: e.target.checked })} className="peer sr-only" />
+                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                      </label>
+                    </div>
+                  </div>
                 </div>
                 {/* Services */}
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Services</label>
-                  <div className="flex gap-2">
+                  <label className="text-xs text-gray-400">Services</label>
+                  <div className="mt-1 flex gap-2">
                     <select
                       value={addServiceId}
                       onChange={(e) => setAddServiceId(e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="flex-1 h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                       <option value="">Select a service</option>
                       {services
@@ -590,7 +586,7 @@ export default function PackagesPage() {
                       min="1"
                       value={addServiceQty}
                       onChange={(e) => setAddServiceQty(e.target.value)}
-                      className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="w-20 h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       placeholder="Qty"
                     />
                     <button

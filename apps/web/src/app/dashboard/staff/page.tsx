@@ -93,8 +93,14 @@ function defaultSchedule(): WeekSchedule {
   return schedule;
 }
 
-const inputClass =
-  'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const addInputClass =
+  'w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const addTextareaClass =
+  'w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const editInputClass =
+  'w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const editTextareaClass =
+  'w-full rounded-[.3rem] border border-transparent bg-transparent px-3 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -489,96 +495,70 @@ export default function StaffPage() {
           <ImageUpload
             value={imageUrl}
             onChange={setImageUrl}
-            label="Staff Photo"
           />
 
           {/* First Name + Last Name */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="group flex items-center gap-4">
-              <span className="w-32 shrink-0 text-sm font-medium text-gray-700">First Name *</span>
-              <div className="relative flex-1">
-                <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                  {firstName || '\u2014'}
-                </span>
-                <input
-                  required
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="First Name *"
-                  className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                />
-              </div>
-            </div>
-            <div className="group flex items-center gap-4">
-              <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Last Name</span>
-              <div className="relative flex-1">
-                <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                  {lastName || '\u2014'}
-                </span>
-                <input
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  placeholder="Last Name"
-                  className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Profession */}
-          <div className="group flex items-center gap-4">
-            <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Profession</span>
-            <div className="relative flex-1">
-              <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                {profession || '\u2014'}
-              </span>
+            <div>
+              <span className="text-xs text-gray-400">First Name *</span>
               <input
-                value={profession}
-                onChange={(e) => setProfession(e.target.value)}
-                placeholder="e.g. Hair Stylist, Massage Therapist..."
-                className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
+                required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="First Name *"
+                className={editInputClass}
+              />
+            </div>
+            <div>
+              <span className="text-xs text-gray-400">Last Name</span>
+              <input
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Last Name"
+                className={editInputClass}
               />
             </div>
           </div>
 
+          {/* Profession */}
+          <div>
+            <span className="text-xs text-gray-400">Profession</span>
+            <input
+              value={profession}
+              onChange={(e) => setProfession(e.target.value)}
+              placeholder="e.g. Hair Stylist, Massage Therapist..."
+              className={editInputClass}
+            />
+          </div>
+
           {/* Email + Phone */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="group flex items-center gap-4">
-              <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Email *</span>
-              <div className="relative flex-1">
-                <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                  {email || '\u2014'}
-                </span>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Email *"
-                  className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                />
-              </div>
+            <div>
+              <span className="text-xs text-gray-400">Email *</span>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email *"
+                className={editInputClass}
+              />
             </div>
-            <div className="group flex items-center gap-4">
-              <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Phone</span>
-              <div className="relative flex-1">
-                <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                  {phone || '\u2014'}
-                </span>
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Phone"
-                  className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                />
-              </div>
+            <div>
+              <span className="text-xs text-gray-400">Phone</span>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Phone"
+                className={editInputClass}
+              />
             </div>
           </div>
 
           {/* Locations multi-select */}
-          <div className="flex gap-4">
-            <span className="w-32 shrink-0 text-sm font-medium text-gray-700 pt-2">Locations</span>
-            <div className="flex-1">
+          <div>
+            <span className="text-xs text-gray-400">Locations</span>
+            <div>
               {allLocations.length === 0 ? (
                 <p className="text-sm text-gray-400">No locations available. Add locations first.</p>
               ) : (
@@ -600,9 +580,9 @@ export default function StaffPage() {
           </div>
 
           {/* Services multi-select */}
-          <div className="flex gap-4">
-            <span className="w-32 shrink-0 text-sm font-medium text-gray-700 pt-2">Services</span>
-            <div className="flex-1">
+          <div>
+            <span className="text-xs text-gray-400">Services</span>
+            <div>
               {allServices.length === 0 ? (
                 <p className="text-sm text-gray-400">No services available. Add services first.</p>
               ) : (
@@ -624,20 +604,15 @@ export default function StaffPage() {
           </div>
 
           {/* Notes */}
-          <div className="group flex gap-4">
-            <span className="w-32 shrink-0 text-sm font-medium text-gray-700 pt-2">Notes</span>
-            <div className="relative flex-1">
-              <span className="block px-3 py-2 text-sm text-gray-900 whitespace-pre-wrap group-hover:invisible">
-                {notes || '\u2014'}
-              </span>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                placeholder="Notes"
-                className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-              />
-            </div>
+          <div>
+            <span className="text-xs text-gray-400">Notes</span>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Notes"
+              className={editTextareaClass}
+            />
           </div>
 
           {/* Active toggle */}
@@ -671,7 +646,6 @@ export default function StaffPage() {
         <ImageUpload
           value={imageUrl}
           onChange={setImageUrl}
-          label="Staff Photo"
         />
 
         {/* First Name + Last Name */}
@@ -682,7 +656,7 @@ export default function StaffPage() {
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               placeholder="First Name *"
-              className={inputClass}
+              className={addInputClass}
             />
           </div>
           <div>
@@ -690,7 +664,7 @@ export default function StaffPage() {
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               placeholder="Last Name"
-              className={inputClass}
+              className={addInputClass}
             />
           </div>
         </div>
@@ -701,7 +675,7 @@ export default function StaffPage() {
             value={profession}
             onChange={(e) => setProfession(e.target.value)}
             placeholder="Profession (e.g. Hair Stylist, Massage Therapist...)"
-            className={inputClass}
+            className={addInputClass}
           />
         </div>
 
@@ -714,7 +688,7 @@ export default function StaffPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email *"
-              className={inputClass}
+              className={addInputClass}
             />
           </div>
           <div>
@@ -722,7 +696,7 @@ export default function StaffPage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="Phone"
-              className={inputClass}
+              className={addInputClass}
             />
           </div>
         </div>
@@ -732,7 +706,7 @@ export default function StaffPage() {
           <input
             readOnly
             placeholder="Locations"
-            className={`${inputClass} cursor-default`}
+            className={`${addInputClass} cursor-default`}
             value={selectedLocationIds.length > 0 ? `${selectedLocationIds.length} selected` : ''}
             onFocus={(e) => e.target.blur()}
           />
@@ -760,7 +734,7 @@ export default function StaffPage() {
           <input
             readOnly
             placeholder="Services"
-            className={`${inputClass} cursor-default`}
+            className={`${addInputClass} cursor-default`}
             value={selectedServiceIds.length > 0 ? `${selectedServiceIds.length} selected` : ''}
             onFocus={(e) => e.target.blur()}
           />
@@ -790,7 +764,7 @@ export default function StaffPage() {
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
             placeholder="Notes"
-            className={inputClass}
+            className={addTextareaClass}
           />
         </div>
 
@@ -916,7 +890,7 @@ export default function StaffPage() {
               value={newSpecialDate}
               onChange={(e) => setNewSpecialDate(e.target.value)}
               placeholder="Date"
-              className={inputClass}
+              className={addInputClass}
             />
           </div>
           <button
@@ -1056,7 +1030,7 @@ export default function StaffPage() {
               value={newHolidayDate}
               onChange={(e) => setNewHolidayDate(e.target.value)}
               placeholder="Date"
-              className={inputClass}
+              className={addInputClass}
             />
           </div>
           <button
@@ -1081,7 +1055,7 @@ export default function StaffPage() {
                   value={h.note}
                   onChange={(e) => updateHolidayNote(idx, e.target.value)}
                   placeholder="Note (optional)"
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  className="flex-1 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 />
                 <button
                   type="button"
@@ -1104,30 +1078,30 @@ export default function StaffPage() {
     return (
       <div className="space-y-5">
         <div className="rounded-lg border border-gray-200 p-4">
-          <label className="relative inline-flex cursor-pointer items-center gap-2">
-            <input type="checkbox" checked={bookingLimitEnabled} onChange={(e) => setBookingLimitEnabled(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-            <span className="text-sm font-medium text-gray-700">
-              Enable booking limit for this staff member
-            </span>
-          </label>
-          {bookingLimitEnabled && (
-            <div className="mt-3 flex items-center gap-3">
-              <div>
+          <div className="flex items-start">
+            <div className="w-1/2">
+              <label className="relative inline-flex cursor-pointer items-center gap-2">
+                <input type="checkbox" checked={bookingLimitEnabled} onChange={(e) => setBookingLimitEnabled(e.target.checked)} className="peer sr-only" />
+                <div className="peer h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                <span className="text-sm font-medium text-gray-700">
+                  Enable booking limit
+                </span>
+              </label>
+            </div>
+            {bookingLimitEnabled && (
+              <div className="w-1/2 flex items-center gap-3">
                 <input
                   type="number"
                   min="1"
                   value={bookingLimitCapacity}
                   onChange={(e) => setBookingLimitCapacity(e.target.value)}
                   placeholder="Capacity"
-                  className={`${inputClass} w-24`}
+                  className={`${addInputClass} w-24`}
                 />
-              </div>
-              <div>
                 <select
                   value={bookingLimitInterval}
                   onChange={(e) => setBookingLimitInterval(e.target.value)}
-                  className={inputClass}
+                  className={addInputClass}
                 >
                   {INTERVAL_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>
@@ -1136,8 +1110,8 @@ export default function StaffPage() {
                   ))}
                 </select>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     );

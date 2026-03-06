@@ -59,7 +59,7 @@ export function ImageUpload({ value, onChange, label = 'Image' }: ImageUploadPro
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
+      {label && <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>}
 
       {value ? (
         <div className="relative inline-block">

@@ -107,7 +107,10 @@ export default function CategoriesPage() {
 
   const parentOptions = categories.filter((c) => c.id !== editing?.id && !c.parent_id);
 
-  const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const addInputClass = 'w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const addTextareaClass = 'w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const editInputClass = 'w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const editTextareaClass = 'w-full rounded-[.3rem] border border-transparent bg-transparent px-3 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
   return (
     <div className="p-6 lg:p-8">
@@ -219,7 +222,7 @@ export default function CategoriesPage() {
                         value={form.name}
                         onChange={(e) => setForm({ ...form, name: e.target.value })}
                         placeholder="Category Name *"
-                        className={inputClass}
+                        className={addInputClass}
                       />
                     </div>
 
@@ -243,7 +246,7 @@ export default function CategoriesPage() {
                       <select
                         value={form.parent_id}
                         onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
-                        className={inputClass}
+                        className={addInputClass}
                       >
                         <option value="">Parent Category (none)</option>
                         {parentOptions.map((p) => (
@@ -258,7 +261,7 @@ export default function CategoriesPage() {
                         value={form.description}
                         onChange={(e) => setForm({ ...form, description: e.target.value })}
                         placeholder="Description"
-                        className={inputClass}
+                        className={addTextareaClass}
                       />
                     </div>
                   </>
@@ -267,24 +270,19 @@ export default function CategoriesPage() {
                 {/* --- EDIT MODE: horizontal label-left, hover-to-edit --- */}
                 {editing && (
                   <>
-                    <div className="group flex items-center gap-4">
-                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Name *</span>
-                      <div className="relative flex-1">
-                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                          {form.name || '\u2014'}
-                        </span>
-                        <input
-                          required
-                          value={form.name}
-                          onChange={(e) => setForm({ ...form, name: e.target.value })}
-                          placeholder="Category Name"
-                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                        />
-                      </div>
+                    <div className="space-y-0.5">
+                      <label className="block text-xs text-gray-400">Name *</label>
+                      <input
+                        required
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        placeholder="Category Name"
+                        className={editInputClass}
+                      />
                     </div>
 
                     <div className="flex items-center gap-4">
-                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Color</span>
+                      <label className="w-32 shrink-0 text-xs text-gray-400">Color</label>
                       <div className="flex items-center gap-3">
                         {PRESET_COLORS.map((c) => (
                           <button
@@ -300,39 +298,29 @@ export default function CategoriesPage() {
                       </div>
                     </div>
 
-                    <div className="group flex items-center gap-4">
-                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Parent</span>
-                      <div className="relative flex-1">
-                        <span className="block truncate px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                          {parentOptions.find((p) => p.id === form.parent_id)?.name ?? 'None (top-level)'}
-                        </span>
-                        <select
-                          value={form.parent_id}
-                          onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
-                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                        >
-                          <option value="">None (top-level)</option>
-                          {parentOptions.map((p) => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                          ))}
-                        </select>
-                      </div>
+                    <div className="space-y-0.5">
+                      <label className="block text-xs text-gray-400">Parent</label>
+                      <select
+                        value={form.parent_id}
+                        onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
+                        className={editInputClass}
+                      >
+                        <option value="">None (top-level)</option>
+                        {parentOptions.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
                     </div>
 
-                    <div className="group flex items-start gap-4">
-                      <span className="w-32 shrink-0 pt-2 text-sm font-medium text-gray-700">Description</span>
-                      <div className="relative flex-1">
-                        <span className="block whitespace-pre-wrap px-3 py-2 text-sm text-gray-900 group-hover:invisible">
-                          {form.description || '\u2014'}
-                        </span>
-                        <textarea
-                          rows={3}
-                          value={form.description}
-                          onChange={(e) => setForm({ ...form, description: e.target.value })}
-                          placeholder="Description"
-                          className={`${inputClass} invisible absolute inset-0 group-hover:visible`}
-                        />
-                      </div>
+                    <div className="space-y-0.5">
+                      <label className="block text-xs text-gray-400">Description</label>
+                      <textarea
+                        rows={3}
+                        value={form.description}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        placeholder="Description"
+                        className={editTextareaClass}
+                      />
                     </div>
                   </>
                 )}

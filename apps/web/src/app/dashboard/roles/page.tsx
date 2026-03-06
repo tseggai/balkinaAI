@@ -252,8 +252,14 @@ export default function RolesPage() {
     }
   }
 
-  const inputClass =
-    'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const addInputClass =
+    'w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const addTextareaClass =
+    'w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const editInputClass =
+    'w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const editTextareaClass =
+    'w-full rounded-[.3rem] border border-transparent bg-transparent px-3 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
   // Build a lookup from staff_id to staff name for the avatar display
   const staffNameMap = new Map<string, string>();
@@ -393,7 +399,7 @@ export default function RolesPage() {
                         placeholder="Role Name *"
                         value={form.name}
                         onChange={(e) => setForm({ ...form, name: e.target.value })}
-                        className={inputClass}
+                        className={addInputClass}
                       />
                     </div>
 
@@ -404,7 +410,7 @@ export default function RolesPage() {
                         placeholder="Notes"
                         value={form.notes}
                         onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                        className={inputClass}
+                        className={addTextareaClass}
                       />
                     </div>
 
@@ -458,40 +464,30 @@ export default function RolesPage() {
                 {editing && (
                   <>
                     {/* Role Name */}
-                    <div className="group flex items-center justify-between gap-4">
-                      <span className="shrink-0 text-sm font-medium text-gray-500">Role Name</span>
-                      <div className="min-w-0 flex-1 text-right">
-                        <span className="block truncate text-sm text-gray-900 group-hover:hidden">
-                          {form.name || '---'}
-                        </span>
-                        <input
-                          required
-                          value={form.name}
-                          onChange={(e) => setForm({ ...form, name: e.target.value })}
-                          className={`${inputClass} hidden text-right group-hover:block`}
-                        />
-                      </div>
+                    <div>
+                      <label className="text-xs text-gray-400">Role Name</label>
+                      <input
+                        required
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        className={editInputClass}
+                      />
                     </div>
 
                     {/* Notes */}
-                    <div className="group flex items-start justify-between gap-4">
-                      <span className="shrink-0 pt-1 text-sm font-medium text-gray-500">Notes</span>
-                      <div className="min-w-0 flex-1 text-right">
-                        <span className="block truncate text-sm text-gray-900 group-hover:hidden">
-                          {form.notes || '---'}
-                        </span>
-                        <textarea
-                          rows={2}
-                          value={form.notes}
-                          onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                          className={`${inputClass} hidden text-right group-hover:block`}
-                        />
-                      </div>
+                    <div>
+                      <label className="text-xs text-gray-400">Notes</label>
+                      <textarea
+                        rows={2}
+                        value={form.notes}
+                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                        className={editTextareaClass}
+                      />
                     </div>
 
                     {/* Staff Selection */}
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-500">
+                      <label className="mb-1 block text-xs text-gray-400">
                         Assigned Staff <span className="font-normal text-gray-400">({selectedStaff.length} selected)</span>
                       </label>
                       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 p-3 min-h-[42px]">
