@@ -141,6 +141,15 @@ export default function BookingsScreen() {
       }
     }
 
+    // Link user_id to customer if found by email/phone but not user_id
+    if (customerId && !byUserId) {
+      await supabase
+        .from('customers')
+        .update({ user_id: user.id })
+        .eq('id', customerId)
+        .is('user_id', null);
+    }
+
     if (!customerId) {
       // No customer record found — show empty state
       setAppointments([]);
@@ -150,6 +159,9 @@ export default function BookingsScreen() {
     }
 
     const now = new Date().toISOString();
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayISO = todayStart.toISOString();
     const isUpcoming = tab === 'upcoming';
 
     let query = supabase
@@ -162,7 +174,7 @@ export default function BookingsScreen() {
 
     if (isUpcoming) {
       query = query
-        .gte('start_time', now)
+        .gte('start_time', todayISO)
         .in('status', ['pending', 'confirmed']);
     } else {
       query = query.or(
@@ -238,7 +250,7 @@ export default function BookingsScreen() {
           </View>
 
           <Text style={styles.price}>
-            ${(item.total_price / 100).toFixed(2)}
+            ${(item.total_price ?? 0).toFixed(2)}
           </Text>
         </View>
       </View>
