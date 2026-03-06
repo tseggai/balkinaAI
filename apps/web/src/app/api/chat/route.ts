@@ -239,6 +239,10 @@ Use [[button:Label]] syntax. These render as tappable buttons in the app.
 - Services: button per service with price+duration inline
 - Time slots: buttons, max 8 per message
 - NEVER list as text bullets. Use buttons.
+- NEVER include text lists of times, staff, services, or businesses — ONLY use [[button:...]] syntax.
+- Staff: when user asks for staff options, present each as: [[button:StaffName]]
+- After tool results, NEVER repeat the data as a text list. Convert directly to buttons.
+- Keep descriptive text to ONE short sentence maximum, then buttons only.
 
 ## Packages
 Use get_packages when customer asks about deals/bundles.
@@ -325,6 +329,10 @@ find_businesses returns each business's "id" (tenant_id). You MUST pass this ten
 - Per business: name, time buttons (max 5), price + duration on one line
 - NEVER list services as text. Use buttons.
 - Max 8 buttons per row. Use multiple rows if needed.
+- NEVER include text lists of times, staff, services, or businesses — ONLY use [[button:...]] syntax.
+- Staff: when user asks for staff options, present each as: [[button:StaffName]]
+- Business names: present as [[button:BusinessName]] when asking user to pick one.
+- After tool results, NEVER repeat the data as a text list. Convert directly to buttons.
 
 ## Appointments
 - Use get_booking_details with customer email/phone to show upcoming bookings

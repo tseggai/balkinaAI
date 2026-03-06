@@ -108,7 +108,7 @@ const statusConfig: Record<AppointmentStatus, { bg: string; text: string; dot: s
   emergency:   { bg: 'bg-rose-50',    text: 'text-rose-700',    dot: 'bg-rose-500',    label: 'Emergency' },
 };
 
-const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm h-9 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm h-10 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -138,6 +138,13 @@ function calcDuration(start: string, end: string): number {
 function formatDateInput(iso: string | null): string {
   if (!iso) return '';
   return iso.split('T')[0] ?? '';
+}
+
+function formatTimeInput(iso: string): string {
+  const d = new Date(iso);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -196,8 +203,7 @@ export default function AppointmentsPage() {
   const [newCustEmail, setNewCustEmail] = useState('');
   const [newCustPhone, setNewCustPhone] = useState('');
 
-  // Edit panel: inline-edit hover state
-  const [editingField, setEditingField] = useState<string | null>(null);
+  // (editingField state removed — edit panel now uses direct inputs)
 
   // ----------------------------------------------------------
   // Data fetching
@@ -298,7 +304,7 @@ export default function AppointmentsPage() {
     setFormServiceId(appt.service_id ?? '');
     setFormStaffId(appt.staff_id ?? '');
     setFormDate(formatDateInput(appt.start_time));
-    setFormTime(formatTime(appt.start_time));
+    setFormTime(formatTimeInput(appt.start_time));
     setFormCustomerId(appt.customer_id ?? '');
     setFormStatus(appt.status);
     setFormNotes(appt.notes ?? '');
@@ -309,7 +315,6 @@ export default function AppointmentsPage() {
     setNewCustName('');
     setNewCustEmail('');
     setNewCustPhone('');
-    setEditingField(null);
     setFormError('');
     setPanelOpen(true);
   }
@@ -317,7 +322,6 @@ export default function AppointmentsPage() {
   function closePanel() {
     setPanelOpen(false);
     setEditing(null);
-    setEditingField(null);
     setFormError('');
   }
 
@@ -491,57 +495,6 @@ export default function AppointmentsPage() {
     }
 
     return pages;
-  }
-
-  // ----------------------------------------------------------
-  // Edit panel: editable row component
-  // ----------------------------------------------------------
-
-  function EditableRow({
-    label,
-    value,
-    fieldKey,
-    renderEdit,
-  }: {
-    label: string;
-    value: React.ReactNode;
-    fieldKey: string;
-    renderEdit?: () => React.ReactNode;
-  }) {
-    const isEditing = editingField === fieldKey;
-    return (
-      <div
-        className="group flex items-center justify-between py-2"
-        onClick={() => {
-          if (renderEdit && !isEditing) setEditingField(fieldKey);
-        }}
-      >
-        <span className="text-sm text-gray-500">{label}</span>
-        {isEditing && renderEdit ? (
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            {renderEdit()}
-            <button
-              onClick={() => setEditingField(null)}
-              className="ml-1 rounded p-0.5 text-gray-400 hover:text-gray-600"
-              title="Done"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-              </svg>
-            </button>
-          </div>
-        ) : (
-          <span className={`text-sm font-medium text-gray-900 ${renderEdit ? 'cursor-pointer group-hover:hidden' : ''}`}>
-            {value}
-          </span>
-        )}
-        {!isEditing && renderEdit && (
-          <span className="hidden text-sm font-medium text-brand-600 cursor-pointer group-hover:inline">
-            {value} <span className="text-xs text-gray-400 ml-1">click to edit</span>
-          </span>
-        )}
-      </div>
-    );
   }
 
   // ----------------------------------------------------------
@@ -848,7 +801,7 @@ export default function AppointmentsPage() {
               {/* NEW APPOINTMENT PANEL (no tabs, just form) */}
               {/* ====================================================== */}
               {!editing && (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {/* Location */}
                   <select
                     value={formLocationId}
@@ -1161,220 +1114,158 @@ export default function AppointmentsPage() {
               )}
 
               {/* ====================================================== */}
-              {/* EDIT APPOINTMENT PANEL (all sections on one screen) */}
+              {/* EDIT APPOINTMENT PANEL — direct inputs for quick staff use */}
               {/* ====================================================== */}
               {editing && (
-                <div className="space-y-6">
-                  {/* Section: Details */}
-                  <div>
-                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Details</h3>
-                    <div className="divide-y divide-gray-100">
-                      {/* Start Time */}
-                      <EditableRow
-                        label="Start Time"
-                        value={`${formatDate(editing.start_time)} ${formatTime(editing.start_time)}`}
-                        fieldKey="start_time"
-                        renderEdit={() => (
-                          <div className="flex gap-1">
-                            <input
-                              type="date"
-                              value={formDate}
-                              onChange={(e) => setFormDate(e.target.value)}
-                              className="w-32 rounded border border-gray-300 px-2 py-1 text-sm"
-                            />
-                            <input
-                              type="time"
-                              value={formTime}
-                              onChange={(e) => setFormTime(e.target.value)}
-                              className="w-24 rounded border border-gray-300 px-2 py-1 text-sm"
-                            />
-                          </div>
-                        )}
-                      />
+                <div className="space-y-3">
+                  {/* Date & Time */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="date"
+                      value={formDate}
+                      onChange={(e) => setFormDate(e.target.value)}
+                      className={inputClass}
+                      required
+                    />
+                    <input
+                      type="time"
+                      value={formTime}
+                      onChange={(e) => setFormTime(e.target.value)}
+                      className={inputClass}
+                      required
+                    />
+                  </div>
 
-                      {/* End Time (calculated, display only) */}
-                      <EditableRow
-                        label="End Time"
-                        value={(() => {
-                          const dur = selectedService?.duration_minutes ?? 60;
-                          const start = formDate && formTime ? new Date(`${formDate}T${formTime}`) : new Date(editing.end_time);
-                          const end = formDate && formTime ? new Date(start.getTime() + dur * 60000) : new Date(editing.end_time);
+                  {/* Customer */}
+                  <select
+                    value={formCustomerId}
+                    onChange={(e) => setFormCustomerId(e.target.value)}
+                    className={inputClass}
+                    required
+                  >
+                    <option value="">Select customer... *</option>
+                    {customerList.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.display_name ?? c.email ?? 'Unknown'}{c.email ? ` (${c.email})` : ''}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Service */}
+                  <select
+                    value={formServiceId}
+                    onChange={(e) => setFormServiceId(e.target.value)}
+                    className={inputClass}
+                    required
+                  >
+                    <option value="">Select service... *</option>
+                    {(() => {
+                      const grouped = new Map<string, ServiceItem[]>();
+                      for (const s of serviceList) {
+                        const cat = s.service_category || s.category_name || 'Uncategorized';
+                        if (!grouped.has(cat)) grouped.set(cat, []);
+                        grouped.get(cat)!.push(s);
+                      }
+                      return Array.from(grouped.entries()).map(([cat, svcs]) => (
+                        <optgroup key={cat} label={cat}>
+                          {svcs.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} (${s.price.toFixed(2)}, {s.duration_minutes} min)
+                            </option>
+                          ))}
+                        </optgroup>
+                      ));
+                    })()}
+                  </select>
+
+                  {/* Staff */}
+                  <select
+                    value={formStaffId}
+                    onChange={(e) => setFormStaffId(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Select staff...</option>
+                    {staffList.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+
+                  {/* Location */}
+                  <select
+                    value={formLocationId}
+                    onChange={(e) => setFormLocationId(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Select location...</option>
+                    {locationList.map((l) => (
+                      <option key={l.id} value={l.id}>{l.name}</option>
+                    ))}
+                  </select>
+
+                  {/* Status */}
+                  <select
+                    value={formStatus}
+                    onChange={(e) => setFormStatus(e.target.value as AppointmentStatus)}
+                    className={inputClass}
+                  >
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s} value={s}>{statusConfig[s].label}</option>
+                    ))}
+                  </select>
+
+                  {/* Notes */}
+                  <textarea
+                    value={formNotes}
+                    onChange={(e) => setFormNotes(e.target.value)}
+                    rows={2}
+                    className={inputClass}
+                    placeholder="Add notes..."
+                  />
+
+                  {/* Read-only info */}
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">End Time</span>
+                      <span className="font-medium text-gray-900">{(() => {
+                        const dur = selectedService?.duration_minutes ?? 60;
+                        const start = formDate && formTime ? new Date(`${formDate}T${formTime}`) : null;
+                        if (start && !isNaN(start.getTime())) {
+                          const end = new Date(start.getTime() + dur * 60000);
                           return `${formatDate(end.toISOString())} ${formatTime(end.toISOString())}`;
-                        })()}
-                        fieldKey="end_time"
-                      />
-
-                      {/* Customer */}
-                      <EditableRow
-                        label="Customer"
-                        value={editing.customers?.display_name ?? editing.customers?.email ?? 'Unknown'}
-                        fieldKey="customer"
-                        renderEdit={() => (
-                          <select
-                            value={formCustomerId}
-                            onChange={(e) => setFormCustomerId(e.target.value)}
-                            className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
-                          >
-                            <option value="">Select customer...</option>
-                            {customerList.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.display_name ?? c.email ?? 'Unknown'}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      />
-
-                      {/* Service */}
-                      <EditableRow
-                        label="Service"
-                        value={editing.services?.name ?? '—'}
-                        fieldKey="service"
-                        renderEdit={() => (
-                          <select
-                            value={formServiceId}
-                            onChange={(e) => setFormServiceId(e.target.value)}
-                            className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
-                          >
-                            <option value="">Select service...</option>
-                            {serviceList.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name} (${s.price.toFixed(2)})
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      />
-
-                      {/* Staff */}
-                      <EditableRow
-                        label="Staff"
-                        value={editing.staff?.name ?? '—'}
-                        fieldKey="staff"
-                        renderEdit={() => (
-                          <select
-                            value={formStaffId}
-                            onChange={(e) => setFormStaffId(e.target.value)}
-                            className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
-                          >
-                            <option value="">No staff</option>
-                            {staffList.map((s) => (
-                              <option key={s.id} value={s.id}>{s.name}</option>
-                            ))}
-                          </select>
-                        )}
-                      />
-
-                      {/* Location */}
-                      <EditableRow
-                        label="Location"
-                        value={editing.tenant_locations?.name ?? '—'}
-                        fieldKey="location"
-                        renderEdit={() => (
-                          <select
-                            value={formLocationId}
-                            onChange={(e) => setFormLocationId(e.target.value)}
-                            className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
-                          >
-                            <option value="">No location</option>
-                            {locationList.map((l) => (
-                              <option key={l.id} value={l.id}>{l.name}</option>
-                            ))}
-                          </select>
-                        )}
-                      />
-
-                      {/* Status */}
-                      <EditableRow
-                        label="Status"
-                        value={
-                          (() => {
-                            const sc = statusConfig[formStatus] ?? statusConfig.pending;
-                            return (
-                              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${sc.bg} ${sc.text}`}>
-                                <span className={`inline-block h-1.5 w-1.5 rounded-full ${sc.dot}`} />
-                                {sc.label}
-                              </span>
-                            );
-                          })()
                         }
-                        fieldKey="status"
-                        renderEdit={() => (
-                          <select
-                            value={formStatus}
-                            onChange={(e) => setFormStatus(e.target.value as AppointmentStatus)}
-                            className="w-40 rounded border border-gray-300 px-2 py-1 text-sm"
-                          >
-                            {STATUS_OPTIONS.map((s) => (
-                              <option key={s} value={s}>{statusConfig[s].label}</option>
-                            ))}
-                          </select>
-                        )}
-                      />
-
-                      {/* Payment */}
-                      <EditableRow
-                        label="Total Price"
-                        value={`$${(editing.total_price ?? 0).toFixed(2)}`}
-                        fieldKey="total_price"
-                      />
-
-                      {editing.deposit_paid && (
-                        <EditableRow
-                          label="Deposit Paid"
-                          value={`$${(editing.deposit_amount_paid ?? 0).toFixed(2)}`}
-                          fieldKey="deposit"
-                        />
-                      )}
-
-                      {editing.balance_due != null && editing.balance_due > 0 && (
-                        <EditableRow
-                          label="Balance Due"
-                          value={`$${editing.balance_due.toFixed(2)}`}
-                          fieldKey="balance"
-                        />
-                      )}
-
-                      {/* Duration */}
-                      <EditableRow
-                        label="Duration"
-                        value={`${calcDuration(editing.start_time, editing.end_time)} min`}
-                        fieldKey="duration"
-                      />
-
-                      {/* Notes */}
-                      <EditableRow
-                        label="Notes"
-                        value={formNotes || '—'}
-                        fieldKey="notes"
-                        renderEdit={() => (
-                          <textarea
-                            value={formNotes}
-                            onChange={(e) => setFormNotes(e.target.value)}
-                            rows={2}
-                            className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
-                            placeholder="Add notes..."
-                          />
-                        )}
-                      />
-
-                      {/* Created At */}
-                      <EditableRow
-                        label="Created At"
-                        value={formatDate(editing.created_at)}
-                        fieldKey="created_at"
-                      />
+                        return `${formatDate(editing.end_time)} ${formatTime(editing.end_time)}`;
+                      })()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Duration</span>
+                      <span className="font-medium text-gray-900">{calcDuration(editing.start_time, editing.end_time)} min</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Total Price</span>
+                      <span className="font-medium text-gray-900">${(editing.total_price ?? 0).toFixed(2)}</span>
+                    </div>
+                    {editing.deposit_paid && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Deposit Paid</span>
+                        <span className="font-medium text-gray-900">${(editing.deposit_amount_paid ?? 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {editing.balance_due != null && editing.balance_due > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Balance Due</span>
+                        <span className="font-medium text-gray-900">${editing.balance_due.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Created</span>
+                      <span className="font-medium text-gray-900">{formatDate(editing.created_at)}</span>
                     </div>
                   </div>
 
-                  {/* Section: Extras */}
-                  <div>
-                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Extras</h3>
-                    {!formServiceId ? (
-                      <p className="text-sm text-gray-500">Please select a service first to view available extras.</p>
-                    ) : serviceExtras.length === 0 ? (
-                      <p className="text-sm text-gray-500">No extras available for this service.</p>
-                    ) : (
+                  {/* Extras section */}
+                  {formServiceId && serviceExtras.length > 0 && (
+                    <div>
+                      <h4 className="mb-2 text-sm font-semibold text-gray-700">Extras</h4>
                       <div className="space-y-2">
                         {serviceExtras.map((extra) => (
                           <label
@@ -1404,90 +1295,79 @@ export default function AppointmentsPage() {
                           </label>
                         ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  {/* Section: Custom Fields */}
-                  <div>
-                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Custom Fields</h3>
-                    {customFields.length === 0 ? (
-                      <p className="text-sm text-gray-500">No custom fields configured for this tenant.</p>
-                    ) : (
+                  {/* Custom Fields section */}
+                  {customFields.length > 0 && (
+                    <div>
+                      <h4 className="mb-2 text-sm font-semibold text-gray-700">Custom Fields</h4>
                       <div className="space-y-3">
                         {customFields.map((field) => (
                           <div key={field.id}>
                             {field.field_type === 'text' && (
-                              <div className="flex items-center justify-between py-1">
-                                <span className="text-sm text-gray-500">{field.label}{field.required ? ' *' : ''}</span>
-                                <input
-                                  type="text"
-                                  value={formCustomFieldValues[field.id] ?? ''}
-                                  onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                                  className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
-                                  required={field.required}
-                                />
-                              </div>
+                              <input
+                                type="text"
+                                value={formCustomFieldValues[field.id] ?? ''}
+                                onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                className={inputClass}
+                                required={field.required}
+                                placeholder={`${field.label}${field.required ? ' *' : ''}`}
+                              />
                             )}
                             {field.field_type === 'number' && (
-                              <div className="flex items-center justify-between py-1">
-                                <span className="text-sm text-gray-500">{field.label}{field.required ? ' *' : ''}</span>
-                                <input
-                                  type="number"
-                                  value={formCustomFieldValues[field.id] ?? ''}
-                                  onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                                  className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
-                                  required={field.required}
-                                />
-                              </div>
+                              <input
+                                type="number"
+                                value={formCustomFieldValues[field.id] ?? ''}
+                                onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                className={inputClass}
+                                required={field.required}
+                                placeholder={`${field.label}${field.required ? ' *' : ''}`}
+                              />
                             )}
                             {field.field_type === 'select' && (
-                              <div className="flex items-center justify-between py-1">
-                                <span className="text-sm text-gray-500">{field.label}{field.required ? ' *' : ''}</span>
-                                <select
-                                  value={formCustomFieldValues[field.id] ?? ''}
-                                  onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                                  className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
-                                  required={field.required}
-                                >
-                                  <option value="">Select...</option>
-                                  {(field.options ?? []).map((opt) => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                  ))}
-                                </select>
-                              </div>
+                              <select
+                                value={formCustomFieldValues[field.id] ?? ''}
+                                onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                className={inputClass}
+                                required={field.required}
+                              >
+                                <option value="">{field.label}{field.required ? ' *' : ''}...</option>
+                                {(field.options ?? []).map((opt) => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
                             )}
                             {field.field_type === 'checkbox' && (
-                              <div className="flex items-center justify-between py-1">
-                                <span className="text-sm text-gray-500">{field.label}{field.required ? ' *' : ''}</span>
+                              <label className="flex items-center gap-2">
                                 <input
                                   type="checkbox"
                                   checked={formCustomFieldValues[field.id] === 'true'}
                                   onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: String(e.target.checked) }))}
                                   className="h-4 w-4 rounded border-gray-300 text-brand-600"
                                 />
-                              </div>
+                                <span className="text-sm text-gray-600">{field.label}{field.required ? ' *' : ''}</span>
+                              </label>
                             )}
                             {field.field_type === 'date' && (
-                              <div className="flex items-center justify-between py-1">
-                                <span className="text-sm text-gray-500">{field.label}{field.required ? ' *' : ''}</span>
-                                <input
-                                  type="date"
-                                  value={formCustomFieldValues[field.id] ?? ''}
-                                  onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                                  className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
-                                  required={field.required}
-                                />
-                              </div>
+                              <input
+                                type="date"
+                                value={formCustomFieldValues[field.id] ?? ''}
+                                onChange={(e) => setFormCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                className={inputClass}
+                                required={field.required}
+                                placeholder={`${field.label}${field.required ? ' *' : ''}`}
+                              />
                             )}
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  {/* Section: Coupons */}
+                  {/* Coupon */}
                   <div>
-                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Coupons</h3>
+                    <h4 className="mb-2 text-sm font-semibold text-gray-700">Coupon</h4>
                     <select
                       value={formCouponId}
                       onChange={(e) => setFormCouponId(e.target.value)}
@@ -1506,40 +1386,40 @@ export default function AppointmentsPage() {
                           </option>
                         ))}
                     </select>
+                  </div>
 
-                    {/* Price breakdown */}
-                    {formServiceId && (
-                      <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                        <h4 className="mb-3 text-sm font-medium text-gray-900">Price Breakdown</h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Service: {selectedService?.name ?? ''}</span>
-                            <span className="text-gray-900">${(selectedService?.price ?? 0).toFixed(2)}</span>
+                  {/* Price breakdown */}
+                  {formServiceId && (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      <h4 className="mb-3 text-sm font-medium text-gray-900">Price Breakdown</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Service: {selectedService?.name ?? ''}</span>
+                          <span className="text-gray-900">${(selectedService?.price ?? 0).toFixed(2)}</span>
+                        </div>
+                        {serviceExtras
+                          .filter((e) => formSelectedExtras.has(e.id))
+                          .map((e) => (
+                            <div key={e.id} className="flex justify-between">
+                              <span className="text-gray-600">+ {e.name}</span>
+                              <span className="text-gray-900">${e.price.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        {selectedCoupon && (
+                          <div className="flex justify-between text-green-600">
+                            <span>Discount ({selectedCoupon.code})</span>
+                            <span>-${calcCouponDiscount().discount.toFixed(2)}</span>
                           </div>
-                          {serviceExtras
-                            .filter((e) => formSelectedExtras.has(e.id))
-                            .map((e) => (
-                              <div key={e.id} className="flex justify-between">
-                                <span className="text-gray-600">+ {e.name}</span>
-                                <span className="text-gray-900">${e.price.toFixed(2)}</span>
-                              </div>
-                            ))}
-                          {selectedCoupon && (
-                            <div className="flex justify-between text-green-600">
-                              <span>Discount ({selectedCoupon.code})</span>
-                              <span>-${calcCouponDiscount().discount.toFixed(2)}</span>
-                            </div>
-                          )}
-                          <div className="border-t border-gray-300 pt-2">
-                            <div className="flex justify-between font-semibold">
-                              <span className="text-gray-900">Total</span>
-                              <span className="text-gray-900">${calcCouponDiscount().final.toFixed(2)}</span>
-                            </div>
+                        )}
+                        <div className="border-t border-gray-300 pt-2">
+                          <div className="flex justify-between font-semibold">
+                            <span className="text-gray-900">Total</span>
+                            <span className="text-gray-900">${calcCouponDiscount().final.toFixed(2)}</span>
                           </div>
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
