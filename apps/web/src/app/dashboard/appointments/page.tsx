@@ -81,6 +81,16 @@ interface Coupon {
   usage_limit: number | null;
 }
 
+interface ProductItem {
+  id: string;
+  name: string;
+  sell_price: number;
+  quantity_on_hand: number;
+  display_in_booking: boolean;
+  is_active: boolean;
+  product_services?: { service_id: string }[];
+}
+
 interface CustomField {
   id: string;
   label: string;
@@ -188,6 +198,7 @@ export default function AppointmentsPage() {
   const [locationList, setLocationList] = useState<LocationItem[]>([]);
   const [customerList, setCustomerList] = useState<CustomerItem[]>([]);
   const [couponList, setCouponList] = useState<Coupon[]>([]);
+  const [productList, setProductList] = useState<ProductItem[]>([]);
   const [_customFields] = useState<CustomField[]>([]);
 
   // Panel state
@@ -208,6 +219,7 @@ export default function AppointmentsPage() {
   const [formSelectedExtras, setFormSelectedExtras] = useState<Set<string>>(new Set());
   const [formCustomFieldValues, setFormCustomFieldValues] = useState<Record<string, string>>({});
   const [formCouponId, setFormCouponId] = useState('');
+  const [formSelectedProducts, setFormSelectedProducts] = useState<Map<string, number>>(new Map());
 
   // New customer inline creation
   const [isNewCustomer, setIsNewCustomer] = useState(false);
@@ -249,24 +261,27 @@ export default function AppointmentsPage() {
   }, [statusFilter, staffFilter, serviceFilter, dateFrom, dateTo, search, page, limit]);
 
   const fetchDropdownData = useCallback(async () => {
-    const [staffRes, servicesRes, locationsRes, customersRes, couponsRes] = await Promise.all([
+    const [staffRes, servicesRes, locationsRes, customersRes, couponsRes, productsRes] = await Promise.all([
       fetch('/api/staff'),
       fetch('/api/services'),
       fetch('/api/locations'),
       fetch('/api/customers'),
       fetch('/api/coupons'),
+      fetch('/api/inventory'),
     ]);
     const staffJson = await staffRes.json() as { data: StaffMember[] | null };
     const servicesJson = await servicesRes.json() as { data: ServiceItem[] | null };
     const locationsJson = await locationsRes.json() as { data: LocationItem[] | null };
     const customersJson = await customersRes.json() as { data: CustomerItem[] | null };
     const couponsJson = await couponsRes.json() as { data: Coupon[] | null };
+    const productsJson = await productsRes.json() as { data: ProductItem[] | null };
 
     setStaffList(staffJson.data ?? []);
     setServiceList(servicesJson.data ?? []);
     setLocationList(locationsJson.data ?? []);
     setCustomerList(customersJson.data ?? []);
     setCouponList(couponsJson.data ?? []);
+    setProductList(productsJson.data ?? []);
   }, []);
 
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
@@ -308,6 +323,7 @@ export default function AppointmentsPage() {
     setFormStatus('pending');
     setFormNotes('');
     setFormSelectedExtras(new Set());
+    setFormSelectedProducts(new Map());
     setFormCustomFieldValues({});
     setFormCouponId('');
     setIsNewCustomer(false);
@@ -334,6 +350,7 @@ export default function AppointmentsPage() {
     setFormStatus(appt.status);
     setFormNotes(appt.notes ?? '');
     setFormSelectedExtras(new Set());
+    setFormSelectedProducts(new Map());
     setFormCustomFieldValues({});
     setFormCouponId('');
     setIsNewCustomer(false);
@@ -360,21 +377,51 @@ export default function AppointmentsPage() {
   const selectedService = serviceList.find((s) => s.id === formServiceId) ?? null;
   const serviceExtras = selectedService?.service_extras ?? [];
 
+  // Filter products: active, display_in_booking, and optionally linked to selected service
+  const availableProducts = productList.filter((p) => {
+    if (!p.is_active || !p.display_in_booking) return false;
+    if (p.quantity_on_hand <= 0) return false;
+    // If product has service links, only show if it matches selected service
+    if (p.product_services && p.product_services.length > 0 && formServiceId) {
+      return p.product_services.some((ps) => ps.service_id === formServiceId);
+    }
+    return true;
+  });
+
+  // Filter coupons: valid (not expired, not maxed out)
+  const validCoupons = couponList.filter((c) => {
+    if (c.expires_at && new Date(c.expires_at) < new Date()) return false;
+    if (c.usage_limit && c.usage_count >= c.usage_limit) return false;
+    return true;
+  });
+
   // Calculate coupon discount
   const selectedCoupon = couponList.find((c) => c.id === formCouponId) ?? null;
-  function calcCouponDiscount(): { discount: number; final: number } {
+
+  // Calculate products total
+  function calcProductsTotal(): number {
+    let total = 0;
+    formSelectedProducts.forEach((qty, productId) => {
+      const product = productList.find((p) => p.id === productId);
+      if (product) total += product.sell_price * qty;
+    });
+    return total;
+  }
+
+  function calcCouponDiscount(): { discount: number; final: number; productsTotal: number; extrasTotal: number } {
     const basePrice = selectedService?.price ?? 0;
     const extrasTotal = serviceExtras
       .filter((e) => formSelectedExtras.has(e.id))
       .reduce((sum, e) => sum + e.price, 0);
-    const subtotal = basePrice + extrasTotal;
+    const productsTotal = calcProductsTotal();
+    const subtotal = basePrice + extrasTotal + productsTotal;
 
-    if (!selectedCoupon) return { discount: 0, final: subtotal };
+    if (!selectedCoupon) return { discount: 0, final: subtotal, productsTotal, extrasTotal };
     const disc = selectedCoupon.discount_type === 'percentage'
       ? subtotal * (selectedCoupon.discount_value / 100)
       : selectedCoupon.discount_value;
     const finalPrice = Math.max(0, subtotal - disc);
-    return { discount: disc, final: finalPrice };
+    return { discount: disc, final: finalPrice, productsTotal, extrasTotal };
   }
 
   // ----------------------------------------------------------
@@ -965,7 +1012,7 @@ export default function AppointmentsPage() {
                     </div>
                   )}
 
-                  {/* Extras section */}
+                  {/* Extras section — only shown when service has extras */}
                   {formServiceId && serviceExtras.length > 0 && (
                     <div>
                       <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Extras</h4>
@@ -1001,34 +1048,81 @@ export default function AppointmentsPage() {
                     </div>
                   )}
 
-                  {/* Products section (placeholder) */}
-                  <div>
-                    <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Products</h4>
-                    <p className="text-sm text-gray-400">No products available yet.</p>
-                  </div>
+                  {/* Products section — only shown when products are available */}
+                  {availableProducts.length > 0 && (
+                    <div>
+                      <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Products</h4>
+                      <div className="space-y-2">
+                        {availableProducts.map((product) => {
+                          const qty = formSelectedProducts.get(product.id) ?? 0;
+                          return (
+                            <div
+                              key={product.id}
+                              className="flex items-center gap-3 rounded-[.3rem] border border-[#f1f1f1] p-3 hover:bg-[#f9fafb]"
+                            >
+                              <div className="flex-1">
+                                <span className="text-sm font-medium text-gray-900">{product.name}</span>
+                                <span className="ml-2 text-xs text-gray-500">({product.quantity_on_hand} in stock)</span>
+                              </div>
+                              <span className="text-sm font-medium text-gray-700">${product.sell_price.toFixed(2)}</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormSelectedProducts((prev) => {
+                                      const next = new Map(prev);
+                                      if (qty <= 1) next.delete(product.id);
+                                      else next.set(product.id, qty - 1);
+                                      return next;
+                                    });
+                                  }}
+                                  disabled={qty === 0}
+                                  className="flex h-7 w-7 items-center justify-center rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-30"
+                                >
+                                  -
+                                </button>
+                                <span className="w-6 text-center text-sm font-medium">{qty}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormSelectedProducts((prev) => {
+                                      const next = new Map(prev);
+                                      const newQty = Math.min(qty + 1, product.quantity_on_hand);
+                                      next.set(product.id, newQty);
+                                      return next;
+                                    });
+                                  }}
+                                  disabled={qty >= product.quantity_on_hand}
+                                  className="flex h-7 w-7 items-center justify-center rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-30"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Coupon */}
-                  <div>
-                    <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Coupon</h4>
-                    <select
-                      value={formCouponId}
-                      onChange={(e) => setFormCouponId(e.target.value)}
-                      className={addInputClass}
-                    >
-                      <option value="">No coupon</option>
-                      {couponList
-                        .filter((c) => {
-                          if (c.expires_at && new Date(c.expires_at) < new Date()) return false;
-                          if (c.usage_limit && c.usage_count >= c.usage_limit) return false;
-                          return true;
-                        })
-                        .map((c) => (
+                  {/* Coupon — only shown when valid coupons exist */}
+                  {validCoupons.length > 0 && (
+                    <div>
+                      <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Coupon</h4>
+                      <select
+                        value={formCouponId}
+                        onChange={(e) => setFormCouponId(e.target.value)}
+                        className={addInputClass}
+                      >
+                        <option value="">No coupon</option>
+                        {validCoupons.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.code} ({c.discount_type === 'percentage' ? `${c.discount_value}%` : `$${c.discount_value.toFixed(2)}`} off)
                           </option>
                         ))}
-                    </select>
-                  </div>
+                      </select>
+                    </div>
+                  )}
 
                   {/* Notes */}
                   <textarea
@@ -1043,32 +1137,47 @@ export default function AppointmentsPage() {
                   {formServiceId && (
                     <div className="rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] p-4">
                       <h4 className="mb-3 text-sm font-medium text-gray-900">Price Breakdown</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Service: {selectedService?.name ?? ''}</span>
-                          <span className="text-gray-900">${(selectedService?.price ?? 0).toFixed(2)}</span>
-                        </div>
-                        {serviceExtras
-                          .filter((e) => formSelectedExtras.has(e.id))
-                          .map((e) => (
-                            <div key={e.id} className="flex justify-between">
-                              <span className="text-gray-600">+ {e.name}</span>
-                              <span className="text-gray-900">${e.price.toFixed(2)}</span>
+                      {(() => {
+                        const breakdown = calcCouponDiscount();
+                        return (
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Service: {selectedService?.name ?? ''}</span>
+                              <span className="text-gray-900">${(selectedService?.price ?? 0).toFixed(2)}</span>
                             </div>
-                          ))}
-                        {selectedCoupon && (
-                          <div className="flex justify-between text-green-600">
-                            <span>Discount ({selectedCoupon.code})</span>
-                            <span>-${calcCouponDiscount().discount.toFixed(2)}</span>
+                            {serviceExtras
+                              .filter((e) => formSelectedExtras.has(e.id))
+                              .map((e) => (
+                                <div key={e.id} className="flex justify-between">
+                                  <span className="text-gray-600">+ {e.name}</span>
+                                  <span className="text-gray-900">${e.price.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            {Array.from(formSelectedProducts.entries()).map(([productId, qty]) => {
+                              const product = productList.find((p) => p.id === productId);
+                              if (!product || qty <= 0) return null;
+                              return (
+                                <div key={productId} className="flex justify-between">
+                                  <span className="text-gray-600">+ {product.name} x{qty}</span>
+                                  <span className="text-gray-900">${(product.sell_price * qty).toFixed(2)}</span>
+                                </div>
+                              );
+                            })}
+                            {selectedCoupon && (
+                              <div className="flex justify-between text-green-600">
+                                <span>Discount ({selectedCoupon.code})</span>
+                                <span>-${breakdown.discount.toFixed(2)}</span>
+                              </div>
+                            )}
+                            <div className="border-t border-gray-300 pt-2">
+                              <div className="flex justify-between font-semibold">
+                                <span className="text-gray-900">Total</span>
+                                <span className="text-gray-900">${breakdown.final.toFixed(2)}</span>
+                              </div>
+                            </div>
                           </div>
-                        )}
-                        <div className="border-t border-gray-300 pt-2">
-                          <div className="flex justify-between font-semibold">
-                            <span className="text-gray-900">Total</span>
-                            <span className="text-gray-900">${calcCouponDiscount().final.toFixed(2)}</span>
-                          </div>
-                        </div>
-                      </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -1234,77 +1343,131 @@ export default function AppointmentsPage() {
                     </div>
                   </div>
 
-                  {/* Row 4: Extras — tag format */}
-                  <div>
-                    <span className="text-xs text-gray-400">Extras</span>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 rounded-[.3rem] border border-[#f1f1f1] p-3 min-h-[46px]">
-                      {serviceExtras
-                        .filter((e) => formSelectedExtras.has(e.id))
-                        .map((extra) => (
-                          <span key={extra.id} className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700">
-                            {extra.name} (+${extra.price.toFixed(2)})
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFormSelectedExtras((prev) => {
-                                  const next = new Set(prev);
-                                  next.delete(extra.id);
-                                  return next;
-                                });
-                              }}
-                              className="ml-1 text-brand-400 hover:text-brand-700"
-                            >
-                              &times;
-                            </button>
-                          </span>
-                        ))}
-                      {/* Add more extras dropdown */}
-                      {serviceExtras.filter((e) => !formSelectedExtras.has(e.id)).length > 0 && (
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              setFormSelectedExtras((prev) => new Set([...prev, e.target.value]));
-                            }
-                          }}
-                          className="h-8 rounded-full border border-dashed border-gray-300 bg-transparent px-3 text-sm text-gray-500 hover:border-brand-500 focus:outline-none"
-                        >
-                          <option value="">+ Add</option>
-                          {serviceExtras
-                            .filter((e) => !formSelectedExtras.has(e.id))
-                            .map((e) => (
-                              <option key={e.id} value={e.id}>{e.name} (+${e.price.toFixed(2)})</option>
-                            ))}
-                        </select>
-                      )}
-                      {!formServiceId && <span className="text-sm text-gray-400">Select a service first</span>}
+                  {/* Row 4: Extras — only shown when service has extras */}
+                  {formServiceId && serviceExtras.length > 0 && (
+                    <div>
+                      <span className="text-xs text-gray-400">Extras</span>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 rounded-[.3rem] border border-[#f1f1f1] p-3 min-h-[46px]">
+                        {serviceExtras
+                          .filter((e) => formSelectedExtras.has(e.id))
+                          .map((extra) => (
+                            <span key={extra.id} className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700">
+                              {extra.name} (+${extra.price.toFixed(2)})
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormSelectedExtras((prev) => {
+                                    const next = new Set(prev);
+                                    next.delete(extra.id);
+                                    return next;
+                                  });
+                                }}
+                                className="ml-1 text-brand-400 hover:text-brand-700"
+                              >
+                                &times;
+                              </button>
+                            </span>
+                          ))}
+                        {/* Add more extras dropdown */}
+                        {serviceExtras.filter((e) => !formSelectedExtras.has(e.id)).length > 0 && (
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setFormSelectedExtras((prev) => new Set([...prev, e.target.value]));
+                              }
+                            }}
+                            className="h-8 rounded-full border border-dashed border-gray-300 bg-transparent px-3 text-sm text-gray-500 hover:border-brand-500 focus:outline-none"
+                          >
+                            <option value="">+ Add</option>
+                            {serviceExtras
+                              .filter((e) => !formSelectedExtras.has(e.id))
+                              .map((e) => (
+                                <option key={e.id} value={e.id}>{e.name} (+${e.price.toFixed(2)})</option>
+                              ))}
+                          </select>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Row 5: Coupon */}
-                  <div>
-                    <span className="text-xs text-gray-400">Coupon</span>
-                    <select
-                      value={formCouponId}
-                      onChange={(e) => setFormCouponId(e.target.value)}
-                      className={editInputClass}
-                    >
-                      <option value="">No coupon</option>
-                      {couponList
-                        .filter((c) => {
-                          if (c.expires_at && new Date(c.expires_at) < new Date()) return false;
-                          if (c.usage_limit && c.usage_count >= c.usage_limit) return false;
-                          return true;
-                        })
-                        .map((c) => (
+                  {/* Row 5: Products — only shown when products are available */}
+                  {availableProducts.length > 0 && (
+                    <div>
+                      <span className="text-xs text-gray-400">Products</span>
+                      <div className="mt-1 space-y-2">
+                        {availableProducts.map((product) => {
+                          const qty = formSelectedProducts.get(product.id) ?? 0;
+                          return (
+                            <div
+                              key={product.id}
+                              className="flex items-center gap-3 rounded-[.3rem] border border-[#f1f1f1] p-3 hover:bg-[#f9fafb]"
+                            >
+                              <div className="flex-1">
+                                <span className="text-sm font-medium text-gray-900">{product.name}</span>
+                                <span className="ml-2 text-xs text-gray-500">({product.quantity_on_hand} in stock)</span>
+                              </div>
+                              <span className="text-sm font-medium text-gray-700">${product.sell_price.toFixed(2)}</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormSelectedProducts((prev) => {
+                                      const next = new Map(prev);
+                                      if (qty <= 1) next.delete(product.id);
+                                      else next.set(product.id, qty - 1);
+                                      return next;
+                                    });
+                                  }}
+                                  disabled={qty === 0}
+                                  className="flex h-7 w-7 items-center justify-center rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-30"
+                                >
+                                  -
+                                </button>
+                                <span className="w-6 text-center text-sm font-medium">{qty}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormSelectedProducts((prev) => {
+                                      const next = new Map(prev);
+                                      const newQty = Math.min(qty + 1, product.quantity_on_hand);
+                                      next.set(product.id, newQty);
+                                      return next;
+                                    });
+                                  }}
+                                  disabled={qty >= product.quantity_on_hand}
+                                  className="flex h-7 w-7 items-center justify-center rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-30"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 6: Coupon — only shown when valid coupons exist */}
+                  {validCoupons.length > 0 && (
+                    <div>
+                      <span className="text-xs text-gray-400">Coupon</span>
+                      <select
+                        value={formCouponId}
+                        onChange={(e) => setFormCouponId(e.target.value)}
+                        className={editInputClass}
+                      >
+                        <option value="">No coupon</option>
+                        {validCoupons.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.code} ({c.discount_type === 'percentage' ? `${c.discount_value}%` : `$${c.discount_value.toFixed(2)}`} off)
                           </option>
                         ))}
-                    </select>
-                  </div>
+                      </select>
+                    </div>
+                  )}
 
-                  {/* Row 6: Notes */}
+                  {/* Row 7: Notes */}
                   <div>
                     <span className="text-xs text-gray-400">Notes</span>
                     <textarea
@@ -1316,28 +1479,62 @@ export default function AppointmentsPage() {
                     />
                   </div>
 
-                  {/* Price summary (read-only) */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <span className="text-xs text-gray-400">Total</span>
-                      <div className="flex h-[46px] items-center text-sm font-medium text-gray-900">
-                        ${(editing.total_price ?? 0).toFixed(2)}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-xs text-gray-400">Duration</span>
-                      <div className="flex h-[46px] items-center text-sm text-gray-900">
-                        {calcDuration(editing.start_time, editing.end_time)} min
-                      </div>
-                    </div>
-                    {editing.deposit_paid && (
-                      <div>
-                        <span className="text-xs text-gray-400">Deposit</span>
-                        <div className="flex h-[46px] items-center text-sm text-gray-900">
-                          ${(editing.deposit_amount_paid ?? 0).toFixed(2)}
+                  {/* Price Breakdown — same format as New Appointment panel */}
+                  <div className="rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] p-4">
+                    <h4 className="mb-3 text-sm font-medium text-gray-900">Price Breakdown</h4>
+                    {(() => {
+                      const breakdown = calcCouponDiscount();
+                      const hasExtras = formSelectedExtras.size > 0;
+                      const hasProducts = formSelectedProducts.size > 0;
+                      return (
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Service: {selectedService?.name ?? editing.services?.name ?? ''}</span>
+                            <span className="text-gray-900">${(selectedService?.price ?? editing.services?.price ?? editing.total_price ?? 0).toFixed(2)}</span>
+                          </div>
+                          {hasExtras && serviceExtras
+                            .filter((e) => formSelectedExtras.has(e.id))
+                            .map((e) => (
+                              <div key={e.id} className="flex justify-between">
+                                <span className="text-gray-600">+ {e.name}</span>
+                                <span className="text-gray-900">${e.price.toFixed(2)}</span>
+                              </div>
+                            ))}
+                          {hasProducts && Array.from(formSelectedProducts.entries()).map(([productId, qty]) => {
+                            const product = productList.find((p) => p.id === productId);
+                            if (!product || qty <= 0) return null;
+                            return (
+                              <div key={productId} className="flex justify-between">
+                                <span className="text-gray-600">+ {product.name} x{qty}</span>
+                                <span className="text-gray-900">${(product.sell_price * qty).toFixed(2)}</span>
+                              </div>
+                            );
+                          })}
+                          {selectedCoupon && (
+                            <div className="flex justify-between text-green-600">
+                              <span>Discount ({selectedCoupon.code})</span>
+                              <span>-${breakdown.discount.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {editing.deposit_paid && editing.deposit_amount_paid != null && editing.deposit_amount_paid > 0 && (
+                            <div className="flex justify-between text-blue-600">
+                              <span>Deposit paid</span>
+                              <span>-${editing.deposit_amount_paid.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="border-t border-gray-300 pt-2">
+                            <div className="flex justify-between font-semibold">
+                              <span className="text-gray-900">Total</span>
+                              <span className="text-gray-900">${breakdown.final.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-gray-500 mt-1">
+                              <span>Duration</span>
+                              <span>{calcDuration(editing.start_time, editing.end_time)} min</span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
               )}
