@@ -291,7 +291,7 @@ export default function PackagesPage() {
           <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowForm(false)} />
           <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
               <h2 className="text-lg font-semibold text-gray-900">New Package</h2>
               <button
                 onClick={() => setShowForm(false)}
@@ -303,7 +303,7 @@ export default function PackagesPage() {
               </button>
             </div>
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="flex-1 overflow-y-auto px-8 py-3">
               <div className="space-y-5">
                 <ImageUpload
                   value={form.image_url}
@@ -316,7 +316,7 @@ export default function PackagesPage() {
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       placeholder="Name *"
-                      className="w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                   </div>
                   <div>
@@ -327,7 +327,7 @@ export default function PackagesPage() {
                       value={form.price}
                       onChange={(e) => setForm({ ...form, price: e.target.value })}
                       placeholder="Price ($)"
-                      className="w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                   </div>
                 </div>
@@ -348,12 +348,12 @@ export default function PackagesPage() {
                         value={form.expiration_value}
                         onChange={(e) => setForm({ ...form, expiration_value: e.target.value })}
                         placeholder="Value"
-                        className="w-32 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        className="w-32 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       />
                       <select
                         value={form.expiration_unit}
                         onChange={(e) => setForm({ ...form, expiration_unit: e.target.value })}
-                        className="h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        className="h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       >
                         <option value="days">Days</option>
                         <option value="weeks">Weeks</option>
@@ -389,7 +389,7 @@ export default function PackagesPage() {
                     <select
                       value={addServiceId}
                       onChange={(e) => setAddServiceId(e.target.value)}
-                      className="flex-1 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="flex-1 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                       <option value="">Select a service</option>
                       {services
@@ -403,7 +403,7 @@ export default function PackagesPage() {
                       min="1"
                       value={addServiceQty}
                       onChange={(e) => setAddServiceQty(e.target.value)}
-                      className="w-20 h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="w-20 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       placeholder="Qty"
                     />
                     <button
@@ -429,7 +429,7 @@ export default function PackagesPage() {
               </div>
             </div>
             {/* Footer */}
-            <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+            <div className="flex justify-end gap-3 border-t border-gray-200 px-8 py-4">
               <button
                 onClick={() => setShowForm(false)}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -454,7 +454,7 @@ export default function PackagesPage() {
           <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowForm(false)} />
           <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
               <h2 className="text-lg font-semibold text-gray-900">Edit Package</h2>
               <button
                 onClick={() => setShowForm(false)}
@@ -466,7 +466,7 @@ export default function PackagesPage() {
               </button>
             </div>
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="flex-1 overflow-y-auto px-8 py-3">
               <div className="space-y-5">
                 <ImageUpload
                   value={form.image_url}
@@ -480,7 +480,7 @@ export default function PackagesPage() {
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="Name *"
-                    className="w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
                   />
                 </div>
                 {/* Price */}
@@ -493,7 +493,7 @@ export default function PackagesPage() {
                     value={form.price}
                     onChange={(e) => setForm({ ...form, price: e.target.value })}
                     placeholder="Price ($)"
-                    className="w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
                   />
                 </div>
                 {/* Description */}
@@ -504,7 +504,7 @@ export default function PackagesPage() {
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                     placeholder="Description"
-                    className="w-full rounded-[.3rem] border border-transparent bg-transparent px-3 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    className="w-full rounded-[.3rem] border border-transparent bg-transparent px-0 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
                   />
                 </div>
                 {/* Expiration */}
@@ -526,12 +526,12 @@ export default function PackagesPage() {
                         value={form.expiration_value}
                         onChange={(e) => setForm({ ...form, expiration_value: e.target.value })}
                         placeholder="Value"
-                        className="w-24 h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        className="w-24 h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
                       />
                       <select
                         value={form.expiration_unit}
                         onChange={(e) => setForm({ ...form, expiration_unit: e.target.value })}
-                        className="h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        className="h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
                       >
                         <option value="days">Days</option>
                         <option value="weeks">Weeks</option>
@@ -572,7 +572,7 @@ export default function PackagesPage() {
                     <select
                       value={addServiceId}
                       onChange={(e) => setAddServiceId(e.target.value)}
-                      className="flex-1 h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="flex-1 h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
                     >
                       <option value="">Select a service</option>
                       {services
@@ -586,7 +586,7 @@ export default function PackagesPage() {
                       min="1"
                       value={addServiceQty}
                       onChange={(e) => setAddServiceQty(e.target.value)}
-                      className="w-20 h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="w-20 h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
                       placeholder="Qty"
                     />
                     <button
@@ -612,7 +612,7 @@ export default function PackagesPage() {
               </div>
             </div>
             {/* Footer */}
-            <div className="flex items-center border-t border-gray-200 px-6 py-4">
+            <div className="flex items-center border-t border-gray-200 px-8 py-4">
               <button
                 onClick={() => handleDelete(editing.id)}
                 className="mr-auto rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"

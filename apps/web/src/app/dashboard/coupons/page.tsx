@@ -223,9 +223,9 @@ export default function CouponsPage() {
   /* ── Shared form field classes ─────────────────────────────────────── */
 
   const addInputClass =
-    'w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+    'w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
   const editInputClass =
-    'w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+    'w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3';
 
   /* ── List view ──────────────────────────────────────────────────────── */
 
@@ -364,7 +364,7 @@ export default function CouponsPage() {
             className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]`}
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b px-6 py-4">
+            <div className="flex items-center justify-between border-b px-8 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
                 {editing ? 'Edit Coupon' : 'Create Coupon'}
               </h2>
@@ -379,7 +379,7 @@ export default function CouponsPage() {
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 overflow-y-auto px-8 py-3">
               <div className="space-y-5">
                 {editing ? (
                   /* ─── EDIT MODE: horizontal label-left, value-right, hover-to-edit ─── */
@@ -831,7 +831,7 @@ export default function CouponsPage() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center border-t px-6 py-4">
+            <div className="flex items-center border-t px-8 py-4">
               {editing && (
                 <button
                   onClick={() => {

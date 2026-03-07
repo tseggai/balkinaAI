@@ -94,13 +94,13 @@ function defaultSchedule(): WeekSchedule {
 }
 
 const addInputClass =
-  'w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  'w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 const addTextareaClass =
   'w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 const editInputClass =
-  'w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  'w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3';
 const editTextareaClass =
-  'w-full rounded-[.3rem] border border-transparent bg-transparent px-3 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  'w-full rounded-[.3rem] border border-transparent bg-transparent px-0 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3';
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -1145,7 +1145,7 @@ export default function StaffPage() {
         {/* Panel */}
         <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
             <h2 className="text-xl font-bold text-gray-900">
               {editing ? 'Edit Staff' : 'Add Staff'}
             </h2>
@@ -1179,13 +1179,13 @@ export default function StaffPage() {
 
           {/* Body */}
           <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="flex-1 overflow-y-auto px-8 py-3">
               {renderActiveTab()}
               {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
             </div>
 
             {/* Footer */}
-            <div className="flex items-center gap-3 border-t border-gray-200 px-6 py-4">
+            <div className="flex items-center gap-3 border-t border-gray-200 px-8 py-4">
               {editing && (
                 <button
                   type="button"
