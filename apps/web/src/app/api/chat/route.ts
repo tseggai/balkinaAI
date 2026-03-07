@@ -228,12 +228,19 @@ Use [[button:Label]] syntax. These render as tappable buttons in the app.
    [[button:ServiceName]] — $price · duration
 2. Customer picks a service → ask when:
    [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-3. Customer picks a date → call check_availability, present time slots:
-   [[button:9:00 AM]] [[button:10:30 AM]] [[button:2:00 PM]]
+3. Customer picks a timeframe (e.g. "Next Week") → present the days as buttons:
+   [[button:March 8]] [[button:March 9]] [[button:March 10]] [[button:March 11]] ...
+4. Customer picks a date → call get_staff, present each staff member as a button:
+   [[button:StaffName1]] [[button:StaffName2]] [[button:StaffName3]]
+   Do NOT show time slots yet. Let the customer pick a staff member first.
+5. Customer picks a staff member → call check_availability for that staff + date, present time slots:
+   [[button:8:00 AM]] [[button:8:30 AM]] [[button:9:00 AM]] [[button:9:30 AM]]
    Add [[button:Show More Times]] if there are more than 8 slots.
-4. Customer picks a time → summarize on one line: service, time, price → [[button:Confirm Booking]] [[button:Change]]
-5. Customer confirms → create_booking
-6. Show brief confirmation
+6. Customer picks a time → summarize on one line: service, staff, time, price → [[button:Confirm Booking]] [[button:Change]]
+7. Customer confirms → create_booking
+8. Show brief confirmation
+
+CRITICAL: Each step is ONE message. Do NOT combine steps (e.g. do NOT show staff AND times in one message). Follow the flow exactly.
 
 ## Presenting options
 - Services: button per service with price+duration inline
