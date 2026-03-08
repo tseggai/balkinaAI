@@ -102,12 +102,24 @@ const editInputClass =
 const editTextareaClass =
   'w-full rounded-[.3rem] border border-transparent bg-transparent px-0 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3';
 
+// ── SVG Icons ──────────────────────────────────────────────────────────────────
+
+function PlusIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function StaffPage() {
   // List state
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   // Panel state
   const [showPanel, setShowPanel] = useState(false);
@@ -125,6 +137,10 @@ export default function StaffPage() {
   const [isActive, setIsActive] = useState(true);
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+
+  // Tag-pill dropdown state
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
 
   // Schedule tab state
   const [schedule, setSchedule] = useState<WeekSchedule>(defaultSchedule());
@@ -148,6 +164,8 @@ export default function StaffPage() {
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkActing, setBulkActing] = useState(false);
+  const [bulkStatusPickerOpen, setBulkStatusPickerOpen] = useState(false);
 
   // General state
   const [saving, setSaving] = useState(false);
@@ -205,6 +223,8 @@ export default function StaffPage() {
     setIsActive(true);
     setSelectedLocationIds([]);
     setSelectedServiceIds([]);
+    setShowLocationDropdown(false);
+    setShowServiceDropdown(false);
     setSchedule(defaultSchedule());
     setSpecialDays([]);
     setHolidays([]);
@@ -229,6 +249,8 @@ export default function StaffPage() {
     setIsActive(s.is_active ?? s.status !== 'inactive');
     setSelectedLocationIds([]);
     setSelectedServiceIds([]);
+    setShowLocationDropdown(false);
+    setShowServiceDropdown(false);
 
     // Parse schedule - ensure breaks array exists on each day
     const parsed: WeekSchedule = defaultSchedule();
@@ -279,25 +301,44 @@ export default function StaffPage() {
   async function handleDelete(id: string) {
     if (!confirm('Delete this staff member?')) return;
     await fetch(`/api/staff?id=${id}`, { method: 'DELETE' });
+    setSelectedIds((prev) => prev.filter((sid) => sid !== id));
     closePanel();
     fetchStaff();
   }
 
-  async function handleToggleActive(s: StaffMember) {
-    const newActive = !s.is_active;
-    await fetch('/api/staff', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: s.id, is_active: newActive }),
-    });
+  async function handleBulkDelete() {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedIds.length} staff member(s)?`)) return;
+    setBulkActing(true);
+    for (const id of selectedIds) {
+      await fetch(`/api/staff?id=${id}`, { method: 'DELETE' });
+    }
+    setSelectedIds([]);
+    setBulkActing(false);
+    fetchStaff();
+  }
+
+  async function handleBulkStatusChange(active: boolean) {
+    if (selectedIds.length === 0) return;
+    setBulkActing(true);
+    setBulkStatusPickerOpen(false);
+    for (const id of selectedIds) {
+      await fetch('/api/staff', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_active: active }),
+      });
+    }
+    setSelectedIds([]);
+    setBulkActing(false);
     fetchStaff();
   }
 
   function toggleSelectAll() {
-    if (selectedIds.length === staff.length) {
+    if (selectedIds.length === filteredStaff.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(staff.map((s) => s.id));
+      setSelectedIds(filteredStaff.map((s) => s.id));
     }
   }
 
@@ -468,17 +509,112 @@ export default function StaffPage() {
     setHolidays(holidays.filter((_, i) => i !== index));
   }
 
-  // ── Multi-select toggle helpers ────────────────────────────────────────────
+  // ── Multi-select tag helpers ───────────────────────────────────────────────
 
-  function toggleLocation(id: string) {
-    setSelectedLocationIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+  function removeLocation(id: string) {
+    setSelectedLocationIds((prev) => prev.filter((x) => x !== id));
   }
 
-  function toggleService(id: string) {
-    setSelectedServiceIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+  function addLocation(id: string) {
+    setSelectedLocationIds((prev) => [...prev, id]);
+    setShowLocationDropdown(false);
+  }
+
+  function removeService(id: string) {
+    setSelectedServiceIds((prev) => prev.filter((x) => x !== id));
+  }
+
+  function addService(id: string) {
+    setSelectedServiceIds((prev) => [...prev, id]);
+    setShowServiceDropdown(false);
+  }
+
+  // ── Filtered list ──────────────────────────────────────────────────────────
+
+  const filteredStaff = search.trim()
+    ? staff.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()))
+    : staff;
+
+  // ── Tag pill renderer (shared between locations and services) ──────────────
+
+  function renderTagPillSelect(
+    label: string,
+    allItems: { id: string; name: string }[],
+    selectedItemIds: string[],
+    onRemove: (id: string) => void,
+    onAdd: (id: string) => void,
+    showDropdown: boolean,
+    setShowDropdownFn: (v: boolean) => void,
+    emptyMessage: string,
+  ) {
+    const unselected = allItems.filter((item) => !selectedItemIds.includes(item.id));
+    const selectedItems = allItems.filter((item) => selectedItemIds.includes(item.id));
+
+    return (
+      <div>
+        {editing && <span className="text-xs text-gray-400">{label}</span>}
+        {!editing && selectedItems.length === 0 && (
+          <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
+        )}
+        {!editing && selectedItems.length > 0 && (
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            {label} <span className="font-normal text-gray-400">({selectedItems.length} selected)</span>
+          </label>
+        )}
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 p-3 min-h-[42px]">
+          {selectedItems.map((item) => (
+            <span
+              key={item.id}
+              className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700"
+            >
+              {item.name}
+              <button
+                type="button"
+                onClick={() => onRemove(item.id)}
+                className="ml-0.5 text-brand-400 hover:text-brand-600"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          ))}
+          {allItems.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowDropdownFn(!showDropdown)}
+                className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1 text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Add
+              </button>
+              {showDropdown && (
+                <div className="absolute left-0 top-full z-10 mt-1 max-h-48 w-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                  {unselected.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onAdd(item.id)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      {item.name}
+                    </button>
+                  ))}
+                  {unselected.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-gray-400">All {label.toLowerCase()} selected</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {allItems.length === 0 && (
+            <span className="text-sm text-gray-400">{emptyMessage}</span>
+          )}
+        </div>
+      </div>
     );
   }
 
@@ -555,53 +691,29 @@ export default function StaffPage() {
             </div>
           </div>
 
-          {/* Locations multi-select */}
-          <div>
-            <span className="text-xs text-gray-400">Locations</span>
-            <div>
-              {allLocations.length === 0 ? (
-                <p className="text-sm text-gray-400">No locations available. Add locations first.</p>
-              ) : (
-                <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
-                  {allLocations.map((loc) => (
-                    <label key={loc.id} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedLocationIds.includes(loc.id)}
-                        onChange={() => toggleLocation(loc.id)}
-                        className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                      />
-                      <span className="text-sm text-gray-700">{loc.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Locations - tag pills */}
+          {renderTagPillSelect(
+            'Locations',
+            allLocations,
+            selectedLocationIds,
+            removeLocation,
+            addLocation,
+            showLocationDropdown,
+            setShowLocationDropdown,
+            'No locations available. Add locations first.',
+          )}
 
-          {/* Services multi-select */}
-          <div>
-            <span className="text-xs text-gray-400">Services</span>
-            <div>
-              {allServices.length === 0 ? (
-                <p className="text-sm text-gray-400">No services available. Add services first.</p>
-              ) : (
-                <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
-                  {allServices.map((svc) => (
-                    <label key={svc.id} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedServiceIds.includes(svc.id)}
-                        onChange={() => toggleService(svc.id)}
-                        className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                      />
-                      <span className="text-sm text-gray-700">{svc.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Services - tag pills */}
+          {renderTagPillSelect(
+            'Services',
+            allServices,
+            selectedServiceIds,
+            removeService,
+            addService,
+            showServiceDropdown,
+            setShowServiceDropdown,
+            'No services available. Add services first.',
+          )}
 
           {/* Notes */}
           <div>
@@ -701,61 +813,29 @@ export default function StaffPage() {
           </div>
         </div>
 
-        {/* Locations multi-select */}
-        <div>
-          <input
-            readOnly
-            placeholder="Locations"
-            className={`${addInputClass} cursor-default`}
-            value={selectedLocationIds.length > 0 ? `${selectedLocationIds.length} selected` : ''}
-            onFocus={(e) => e.target.blur()}
-          />
-          {allLocations.length === 0 ? (
-            <p className="mt-1 text-sm text-gray-400">No locations available. Add locations first.</p>
-          ) : (
-            <div className="mt-1 max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
-              {allLocations.map((loc) => (
-                <label key={loc.id} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedLocationIds.includes(loc.id)}
-                    onChange={() => toggleLocation(loc.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                  />
-                  <span className="text-sm text-gray-700">{loc.name}</span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Locations - tag pills */}
+        {renderTagPillSelect(
+          'Locations',
+          allLocations,
+          selectedLocationIds,
+          removeLocation,
+          addLocation,
+          showLocationDropdown,
+          setShowLocationDropdown,
+          'No locations available. Add locations first.',
+        )}
 
-        {/* Services multi-select */}
-        <div>
-          <input
-            readOnly
-            placeholder="Services"
-            className={`${addInputClass} cursor-default`}
-            value={selectedServiceIds.length > 0 ? `${selectedServiceIds.length} selected` : ''}
-            onFocus={(e) => e.target.blur()}
-          />
-          {allServices.length === 0 ? (
-            <p className="mt-1 text-sm text-gray-400">No services available. Add services first.</p>
-          ) : (
-            <div className="mt-1 max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
-              {allServices.map((svc) => (
-                <label key={svc.id} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedServiceIds.includes(svc.id)}
-                    onChange={() => toggleService(svc.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                  />
-                  <span className="text-sm text-gray-700">{svc.name}</span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Services - tag pills */}
+        {renderTagPillSelect(
+          'Services',
+          allServices,
+          selectedServiceIds,
+          removeService,
+          addService,
+          showServiceDropdown,
+          setShowServiceDropdown,
+          'No services available. Add services first.',
+        )}
 
         {/* Notes */}
         <div>
@@ -1132,206 +1212,279 @@ export default function StaffPage() {
     }
   }
 
-  // ── Slide-in Panel ─────────────────────────────────────────────────────────
-
-  function renderPanel() {
-    return (
-      <>
-        {/* Backdrop */}
-        <div
-          className="fixed inset-0 z-40 bg-black/30 transition-opacity"
-          onClick={closePanel}
-        />
-        {/* Panel */}
-        <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
-            <h2 className="text-xl font-bold text-gray-900">
-              {editing ? 'Edit Staff' : 'Add Staff'}
-            </h2>
-            <button
-              onClick={closePanel}
-              className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-1 overflow-x-auto border-b border-gray-200 px-6">
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-                className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors ${
-                  activeTab === tab.key
-                    ? 'border-b-2 border-brand-600 text-brand-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Body */}
-          <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto px-8 py-3">
-              {renderActiveTab()}
-              {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center gap-3 border-t border-gray-200 px-8 py-4">
-              {editing && (
-                <button
-                  type="button"
-                  onClick={() => handleDelete(editing.id)}
-                  className="mr-auto rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-                >
-                  Delete
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={closePanel}
-                className="rounded-lg border border-gray-300 px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : editing ? 'Update' : 'Add Staff'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </>
-    );
-  }
-
   // ── Main Render ────────────────────────────────────────────────────────────
 
   return (
     <div className="p-6 lg:p-8">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900">Staff</h1>
-          <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+          <span className="inline-flex items-center justify-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">
             {staff.length}
           </span>
         </div>
-        <button
-          onClick={openNew}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-        >
-          + Add Staff
-        </button>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={openNew}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            <PlusIcon />
+            Add Staff
+          </button>
+        </div>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
-        {loading ? (
-          <div className="p-12 text-center text-sm text-gray-500">Loading...</div>
-        ) : staff.length === 0 ? (
-          <div className="p-12 text-center">
-            <p className="text-sm text-gray-500">No staff members yet.</p>
+      {/* Search Bar */}
+      <div className="mt-4">
+        <input
+          type="text"
+          placeholder="Search staff by name..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full max-w-md rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        />
+      </div>
+
+      {/* Bulk action bar */}
+      {selectedIds.length > 0 && (
+        <div className="mt-4 flex items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5">
+          <span className="text-sm font-medium text-brand-700">
+            {selectedIds.length} selected
+          </span>
+          <div className="h-4 w-px bg-brand-200" />
+          <div className="relative">
             <button
-              onClick={openNew}
-              className="mt-3 text-sm font-medium text-brand-600 hover:text-brand-700"
+              type="button"
+              onClick={() => setBulkStatusPickerOpen(!bulkStatusPickerOpen)}
+              disabled={bulkActing}
+              className="rounded-lg border border-brand-300 bg-white px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
             >
-              Add your first team member
+              Change Status
             </button>
+            {bulkStatusPickerOpen && (
+              <div className="absolute left-0 top-full z-10 mt-1 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => handleBulkStatusChange(true)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                >
+                  <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                  Active
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBulkStatusChange(false)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                >
+                  <span className="inline-block h-2 w-2 rounded-full bg-yellow-500" />
+                  Inactive
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            disabled={bulkActing}
+            className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            Delete
+          </button>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={() => { setSelectedIds([]); setBulkStatusPickerOpen(false); }}
+            className="text-sm text-brand-600 hover:text-brand-800"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
+      {/* Content */}
+      <div className="mt-6">
+        {loading ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-12 text-center text-sm text-gray-500">
+            Loading...
+          </div>
+        ) : filteredStaff.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
+            <p className="text-sm text-gray-500">
+              {search.trim() ? 'No staff members match your search.' : 'No staff members yet.'}
+            </p>
+            {!search.trim() && (
+              <button
+                onClick={openNew}
+                className="mt-3 text-sm font-medium text-brand-600 hover:text-brand-700"
+              >
+                Add your first team member
+              </button>
+            )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="w-10 px-3 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.length === staff.length && staff.length > 0}
-                      onChange={toggleSelectAll}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                    />
-                  </th>
-                  <th className="w-14 px-3 py-3 text-left text-xs font-medium uppercase text-gray-500">Photo</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Email</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Phone</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Profession</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Active</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Services</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {staff.map((s) => (
-                  <tr
-                    key={s.id}
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => openEdit(s)}
-                  >
-                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="w-10 px-4 py-3">
                       <input
                         type="checkbox"
-                        checked={selectedIds.includes(s.id)}
-                        onChange={() => toggleSelect(s.id)}
+                        checked={filteredStaff.length > 0 && selectedIds.length === filteredStaff.length}
+                        onChange={toggleSelectAll}
                         className="h-4 w-4 rounded border-gray-300 text-brand-600"
                       />
-                    </td>
-                    <td className="px-3 py-3">
-                      {s.image_url ? (
-                        <img src={s.image_url} alt={s.name} className="h-10 w-10 rounded-full object-cover" />
-                      ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
-                          {getInitials(s.name)}
-                        </div>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
-                      {s.name}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{s.email}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
-                      {s.phone ?? '\u2014'}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
-                      {s.profession ?? '\u2014'}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleActive(s)}
-                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                          s.is_active !== false ? 'bg-brand-600' : 'bg-gray-200'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                            s.is_active !== false ? 'translate-x-4' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
-                      {s.services_count}
-                    </td>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Photo</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Phone</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Profession</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Services</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredStaff.map((s) => (
+                    <tr
+                      key={s.id}
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('[data-checkbox-cell]')) return;
+                        openEdit(s);
+                      }}
+                    >
+                      {/* Checkbox */}
+                      <td data-checkbox-cell className="w-10 whitespace-nowrap px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(s.id)}
+                          onChange={() => toggleSelect(s.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                        />
+                      </td>
+                      {/* Photo */}
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {s.image_url ? (
+                          <img src={s.image_url} alt={s.name} className="h-8 w-8 rounded-full object-cover" />
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
+                            {getInitials(s.name)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
+                        {s.name}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{s.email}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
+                        {s.phone ?? '\u2014'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
+                        {s.profession ?? '\u2014'}
+                      </td>
+                      {/* Status - tag pill (like Service visibility) */}
+                      <td className="whitespace-nowrap px-4 py-3 text-sm">
+                        {s.is_active !== false ? (
+                          <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">
+                            Inactive
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
+                        {s.services_count}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
       {/* Slide-in Panel */}
-      {showPanel && renderPanel()}
+      {showPanel && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/40" onClick={closePanel} />
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {editing ? 'Edit Staff' : 'Add Staff'}
+              </h2>
+              <button
+                onClick={closePanel}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 overflow-x-auto border-b border-gray-200 px-6">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors ${
+                    activeTab === tab.key
+                      ? 'border-b-2 border-brand-600 text-brand-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Body */}
+            <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto px-8 py-3">
+                {renderActiveTab()}
+                {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center gap-3 border-t border-gray-200 px-8 py-4">
+                {editing && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(editing.id)}
+                    className="mr-auto rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                )}
+                <div className="flex-1" />
+                <button
+                  type="button"
+                  onClick={closePanel}
+                  className="rounded-lg border border-gray-300 px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : editing ? 'Update' : 'Add Staff'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
     </div>
   );
 }
