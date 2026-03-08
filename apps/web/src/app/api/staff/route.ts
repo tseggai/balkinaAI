@@ -15,24 +15,30 @@ export async function GET() {
 
   const supabase = createClient();
 
-  // Fetch staff with service_staff count and holidays
+  // Fetch staff with service_staff, staff_locations, holidays, and special days
   const { data, error } = await supabase
     .from('staff')
-    .select('*, service_staff(staff_id), staff_holidays(*)')
+    .select('*, service_staff(service_id), staff_locations(location_id), staff_holidays(*), staff_special_days(*)')
     .eq('tenant_id', tenantId)
     .order('name');
 
   if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
 
-  // Map to include services_count
+  // Map to include services_count and extract IDs
   const mapped = (data as Record<string, unknown>[] | null)?.map((staff) => {
-    const serviceStaffArr = staff.service_staff as { staff_id: string }[] | null;
+    const serviceStaffArr = staff.service_staff as { service_id: string }[] | null;
+    const staffLocationsArr = staff.staff_locations as { location_id: string }[] | null;
     const holidays = staff.staff_holidays as { id: string; date: string; note: string | null }[] | null;
+    const specialDays = staff.staff_special_days as { id: string; date: string; start_time: string | null; end_time: string | null; is_day_off: boolean; breaks: unknown }[] | null;
     return {
       ...staff,
       services_count: serviceStaffArr?.length ?? 0,
+      service_ids: serviceStaffArr?.map((ss) => ss.service_id) ?? [],
+      location_ids: staffLocationsArr?.map((sl) => sl.location_id) ?? [],
       staff_holidays: holidays ?? [],
+      staff_special_days: specialDays ?? [],
       service_staff: undefined,
+      staff_locations: undefined,
     };
   }) ?? [];
 
@@ -79,12 +85,36 @@ export async function POST(request: Request) {
     );
   }
 
-  // Insert service_staff links if location/service IDs provided
+  // Insert service_staff links if service IDs provided
   if (body.service_ids && Array.isArray(body.service_ids) && (body.service_ids as unknown[]).length > 0) {
     await supabase.from('service_staff').insert(
       (body.service_ids as string[]).map((serviceId) => ({
         service_id: serviceId,
         staff_id: staffData.id,
+      })) as never
+    );
+  }
+
+  // Insert staff_locations links if location IDs provided
+  if (body.location_ids && Array.isArray(body.location_ids) && (body.location_ids as unknown[]).length > 0) {
+    await supabase.from('staff_locations').insert(
+      (body.location_ids as string[]).map((locationId) => ({
+        location_id: locationId,
+        staff_id: staffData.id,
+      })) as never
+    );
+  }
+
+  // Insert staff_special_days if provided
+  if (body.staff_special_days && Array.isArray(body.staff_special_days) && (body.staff_special_days as unknown[]).length > 0) {
+    await supabase.from('staff_special_days').insert(
+      (body.staff_special_days as { date: string; start_time: string; end_time: string; is_day_off: boolean; breaks: unknown }[]).map((sd) => ({
+        staff_id: staffData.id,
+        date: sd.date,
+        start_time: sd.start_time || null,
+        end_time: sd.end_time || null,
+        is_day_off: sd.is_day_off ?? false,
+        breaks: JSON.stringify(sd.breaks ?? []),
       })) as never
     );
   }
@@ -155,6 +185,38 @@ export async function PATCH(request: Request) {
         serviceIds.map((serviceId) => ({
           service_id: serviceId,
           staff_id: id,
+        })) as never
+      );
+    }
+  }
+
+  // Replace staff_locations links if provided
+  if ('location_ids' in body && Array.isArray(body.location_ids)) {
+    const locationIds = body.location_ids as string[];
+    await supabase.from('staff_locations').delete().eq('staff_id', id);
+    if (locationIds.length > 0) {
+      await supabase.from('staff_locations').insert(
+        locationIds.map((locationId) => ({
+          location_id: locationId,
+          staff_id: id,
+        })) as never
+      );
+    }
+  }
+
+  // Replace staff_special_days if provided
+  if ('staff_special_days' in body && Array.isArray(body.staff_special_days)) {
+    const specialDays = body.staff_special_days as { date: string; start_time: string; end_time: string; is_day_off: boolean; breaks: unknown }[];
+    await supabase.from('staff_special_days').delete().eq('staff_id', id);
+    if (specialDays.length > 0) {
+      await supabase.from('staff_special_days').insert(
+        specialDays.map((sd) => ({
+          staff_id: id,
+          date: sd.date,
+          start_time: sd.start_time || null,
+          end_time: sd.end_time || null,
+          is_day_off: sd.is_day_off ?? false,
+          breaks: JSON.stringify(sd.breaks ?? []),
         })) as never
       );
     }

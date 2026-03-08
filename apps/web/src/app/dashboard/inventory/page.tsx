@@ -171,10 +171,31 @@ export default function InventoryPage() {
 
     const json = await res.json();
     if (!res.ok) { setError(json.error?.message ?? 'Failed to save'); setSaving(false); return; }
-    setShowForm(false);
-    setEditing(null);
     setSaving(false);
-    fetchProducts();
+    // Refresh the list without closing the panel
+    const refreshRes = await fetch('/api/inventory');
+    const refreshJson = await refreshRes.json();
+    const refreshedProducts = (refreshJson.data ?? []) as Product[];
+    setProducts(refreshedProducts);
+
+    // If we just created a new product, switch to edit mode
+    if (!editing && json.data?.id) {
+      const newProduct = refreshedProducts.find((p) => p.id === json.data.id);
+      if (newProduct) {
+        openEdit(newProduct);
+      }
+    } else if (editing) {
+      const updatedProduct = refreshedProducts.find((p) => p.id === editing.id);
+      if (updatedProduct) {
+        setEditing(updatedProduct);
+        setFormServices(
+          (updatedProduct.product_services ?? []).map((ps) => ({
+            service_id: ps.service_id,
+            quantity_per_service: ps.quantity_per_service,
+          }))
+        );
+      }
+    }
   }
 
   function toggleSelectId(id: string) {

@@ -165,10 +165,31 @@ export default function PackagesPage() {
 
     const json = await res.json();
     if (!res.ok) { setError(json.error?.message ?? 'Failed to save'); setSaving(false); return; }
-    setShowForm(false);
-    setEditing(null);
     setSaving(false);
-    fetchPackages();
+    // Refresh the list without closing the panel
+    const refreshRes = await fetch('/api/packages');
+    const refreshJson = await refreshRes.json();
+    const refreshedPackages = (refreshJson.data ?? []) as Package[];
+    setPackages(refreshedPackages);
+
+    // If we just created a new package, switch to edit mode
+    if (!editing && json.data?.id) {
+      const newPkg = refreshedPackages.find((p) => p.id === json.data.id);
+      if (newPkg) {
+        openEdit(newPkg);
+      }
+    } else if (editing) {
+      const updatedPkg = refreshedPackages.find((p) => p.id === editing.id);
+      if (updatedPkg) {
+        setEditing(updatedPkg);
+        setFormServices(
+          (updatedPkg.package_services ?? []).map((ps) => ({
+            service_id: ps.service_id,
+            quantity: ps.quantity,
+          }))
+        );
+      }
+    }
   }
 
   function toggleSelect(id: string) {
