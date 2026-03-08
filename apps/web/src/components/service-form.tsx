@@ -334,29 +334,13 @@ export function ServiceForm({
   // =========================================================================
 
   const addInputClass =
-    'w-full h-8 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+    'w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
   const addSelectClass = addInputClass;
   const editInputClass =
-    'w-full h-8 rounded-[.3rem] border border-transparent bg-transparent px-3 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+    'w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3';
   const editSelectClass = editInputClass;
   const inputClass = isEditMode ? editInputClass : addInputClass;
   const selectClass = isEditMode ? editSelectClass : addSelectClass;
-
-  /** Wraps a field in horizontal label-left / value-right layout for edit mode */
-  function EditField({
-    label,
-    children,
-  }: {
-    label: string;
-    children: React.ReactNode;
-  }) {
-    return (
-      <div className="group flex items-center gap-2">
-        <span className="w-36 flex-shrink-0 text-xs text-gray-400">{label}</span>
-        <div className="flex-1 text-sm font-medium text-gray-900">{children}</div>
-      </div>
-    );
-  }
 
   /** Input that shows as plain text and reveals input on hover (edit mode) */
   function HoverInput({
@@ -423,103 +407,108 @@ export function ServiceForm({
     // ----- EDIT MODE: horizontal labels, hover-to-edit -----
     if (isEditMode) {
       return (
-        <div className="space-y-4">
-          {/* Image Upload — full width, no label */}
+        <div className="space-y-3">
+          {/* Row 1: Image Upload — full width */}
           <ImageUpload value={imageUrl} onChange={setImageUrl} label="" />
 
-          {/* Name */}
-          <EditField label="Service Name">
-            <HoverInput required value={name} onChange={setName} placeholder="Service name" />
-          </EditField>
-
-          {/* Category */}
-          <EditField label="Category">
-            {addingNewCategory ? (
-              <div className="flex gap-2">
-                <input
-                  value={newCategoryInput}
-                  onChange={(e) => setNewCategoryInput(e.target.value)}
-                  placeholder="Enter new category name..."
-                  className={inputClass}
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  disabled={savingCategory}
-                  onClick={async () => {
-                    const trimmed = newCategoryInput.trim();
-                    if (!trimmed) return;
-                    setSavingCategory(true);
-                    try {
-                      const res = await fetch('/api/tenant-categories', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: trimmed }),
-                      });
-                      if (res.ok) {
-                        setCategoryName(trimmed);
-                        const catRes = await fetch('/api/tenant-categories');
-                        const catJson = await catRes.json();
-                        const cats = (catJson.data ?? []) as { id: string; name: string }[];
-                        setAllCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
+          {/* Row 2: Name + Category (50% each) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <span className="text-xs text-gray-400">Service Name</span>
+              <HoverInput required value={name} onChange={setName} placeholder="Service name" />
+            </div>
+            <div>
+              <span className="text-xs text-gray-400">Category</span>
+              {addingNewCategory ? (
+                <div className="flex gap-2">
+                  <input
+                    value={newCategoryInput}
+                    onChange={(e) => setNewCategoryInput(e.target.value)}
+                    placeholder="New category..."
+                    className={inputClass}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    disabled={savingCategory}
+                    onClick={async () => {
+                      const trimmed = newCategoryInput.trim();
+                      if (!trimmed) return;
+                      setSavingCategory(true);
+                      try {
+                        const res = await fetch('/api/tenant-categories', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ name: trimmed }),
+                        });
+                        if (res.ok) {
+                          setCategoryName(trimmed);
+                          const catRes = await fetch('/api/tenant-categories');
+                          const catJson = await catRes.json();
+                          const cats = (catJson.data ?? []) as { id: string; name: string }[];
+                          setAllCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
+                        }
+                      } catch {
+                        // ignore
                       }
-                    } catch {
-                      // ignore
+                      setSavingCategory(false);
+                      setAddingNewCategory(false);
+                      setNewCategoryInput('');
+                    }}
+                    className="whitespace-nowrap rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    {savingCategory ? 'Saving...' : 'Add'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAddingNewCategory(false); setNewCategoryInput(''); }}
+                    className="whitespace-nowrap rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <HoverSelect
+                  value={categoryName}
+                  onChange={(v) => {
+                    if (v === '__new__') {
+                      setAddingNewCategory(true);
+                    } else {
+                      setCategoryName(v);
                     }
-                    setSavingCategory(false);
-                    setAddingNewCategory(false);
-                    setNewCategoryInput('');
                   }}
-                  className="whitespace-nowrap rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                  displayValue={categoryName || 'No category'}
                 >
-                  {savingCategory ? 'Saving...' : 'Add'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setAddingNewCategory(false); setNewCategoryInput(''); }}
-                  className="whitespace-nowrap rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <HoverSelect
-                value={categoryName}
-                onChange={(v) => {
-                  if (v === '__new__') {
-                    setAddingNewCategory(true);
-                  } else {
-                    setCategoryName(v);
-                  }
-                }}
-                displayValue={categoryName || 'No category'}
-              >
-                <option value="">Select a category...</option>
-                {allCategories.map((cat) => (
-                  <option key={cat.id} value={cat.name}>{cat.name}</option>
-                ))}
-                <option value="__new__">+ Add new category</option>
-              </HoverSelect>
-            )}
-          </EditField>
+                  <option value="">Select a category...</option>
+                  {allCategories.map((cat) => (
+                    <option key={cat.id} value={cat.name}>{cat.name}</option>
+                  ))}
+                  <option value="__new__">+ Add new category</option>
+                </HoverSelect>
+              )}
+            </div>
+          </div>
 
-          {/* Description */}
-          <EditField label="Description">
+          {/* Row 3: Description (100% width) */}
+          <div>
+            <span className="text-xs text-gray-400">Description</span>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               placeholder="Service description"
-              className="w-full rounded-[.3rem] border border-transparent bg-transparent px-3 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="w-full rounded-[.3rem] border border-transparent bg-transparent px-0 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
             />
-          </EditField>
+          </div>
 
-          {/* Price & Capacity side by side */}
-          <div className="grid grid-cols-2 gap-4">
-            <EditField label="Price">
+          {/* Row 4: Price + Capacity (50% each) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <span className="text-xs text-gray-400">Price</span>
               <HoverInput type="number" required min="0" step="0.01" value={price} onChange={setPrice} placeholder="0.00" prefix="$" />
-            </EditField>
-            <EditField label="Capacity">
+            </div>
+            <div>
+              <span className="text-xs text-gray-400">Capacity</span>
               <HoverSelect
                 value={capacity}
                 onChange={setCapacity}
@@ -529,23 +518,14 @@ export function ServiceForm({
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </HoverSelect>
-            </EditField>
+            </div>
           </div>
 
-          {/* Hide price — right below pricing */}
-          <div className="flex items-center">
-            <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2">
-              <input type="checkbox" checked={hidePrice} onChange={(e) => setHidePrice(e.target.checked)} className="peer sr-only" />
-              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-              <span className="text-sm font-medium text-gray-700">Hide price on the booking page</span>
-            </label>
-          </div>
-
-          {/* Deposit */}
+          {/* Row 5: Enable Deposit */}
           <div className="flex items-start">
             <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
               <input type="checkbox" checked={depositEnabled} onChange={(e) => setDepositEnabled(e.target.checked)} className="peer sr-only" />
-              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
               <span className="text-sm font-medium text-gray-700">Enable Deposit</span>
             </label>
             {depositEnabled && (
@@ -570,9 +550,10 @@ export function ServiceForm({
             )}
           </div>
 
-          {/* Duration & Buffer side by side */}
-          <div className="grid grid-cols-2 gap-4">
-            <EditField label="Duration">
+          {/* Row 6: Duration + Buffer (50% each) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <span className="text-xs text-gray-400">Duration</span>
               <HoverSelect
                 value={duration}
                 onChange={setDuration}
@@ -588,8 +569,9 @@ export function ServiceForm({
                   </option>
                 ))}
               </HoverSelect>
-            </EditField>
-            <EditField label="Buffer">
+            </div>
+            <div>
+              <span className="text-xs text-gray-400">Buffer</span>
               <HoverSelect
                 value={bufferTime}
                 onChange={setBufferTime}
@@ -601,23 +583,14 @@ export function ServiceForm({
                   </option>
                 ))}
               </HoverSelect>
-            </EditField>
+            </div>
           </div>
 
-          {/* Hide duration — right below booking duration */}
-          <div className="flex items-center">
-            <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2">
-              <input type="checkbox" checked={hideDuration} onChange={(e) => setHideDuration(e.target.checked)} className="peer sr-only" />
-              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-              <span className="text-sm font-medium text-gray-700">Hide duration on the booking page</span>
-            </label>
-          </div>
-
-          {/* Custom Duration Toggle */}
+          {/* Row 7: Allow Custom Duration Toggle */}
           <div className="flex items-start">
             <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
               <input type="checkbox" checked={customDuration} onChange={(e) => setCustomDuration(e.target.checked)} className="peer sr-only" />
-              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
               <span className="text-sm font-medium text-gray-700">Allow Custom Duration</span>
             </label>
             {customDuration && (
@@ -628,11 +601,11 @@ export function ServiceForm({
           </div>
           {customDuration && renderCustomDurationSection()}
 
-          {/* Recurring Service */}
+          {/* Row 8: Recurring Service */}
           <div className="flex items-start">
             <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
               <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="peer sr-only" />
-              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
               <span className="text-sm font-medium text-gray-700">Recurring Service</span>
             </label>
             {isRecurring && (
@@ -650,29 +623,46 @@ export function ServiceForm({
               </div>
             )}
           </div>
+
+          {/* Separator */}
+          <div className="border-t border-gray-200" />
+
+          {/* Row 9: Hide price on the booking page */}
+          <div className="flex items-center">
+            <label className="relative inline-flex cursor-pointer items-center gap-2">
+              <input type="checkbox" checked={hidePrice} onChange={(e) => setHidePrice(e.target.checked)} className="peer sr-only" />
+              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+              <span className="text-sm font-medium text-gray-700">Hide price on the booking page</span>
+            </label>
+          </div>
+
+          {/* Row 10: Hide duration on the booking page */}
+          <div className="flex items-center">
+            <label className="relative inline-flex cursor-pointer items-center gap-2">
+              <input type="checkbox" checked={hideDuration} onChange={(e) => setHideDuration(e.target.checked)} className="peer sr-only" />
+              <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+              <span className="text-sm font-medium text-gray-700">Hide duration on the booking page</span>
+            </label>
+          </div>
         </div>
       );
     }
 
     // ----- CREATE MODE: placeholders instead of labels, compact layout -----
     return (
-      <div className="space-y-5">
-        {/* Image Upload */}
+      <div className="space-y-3">
+        {/* Row 1: Image Upload (100% width) */}
         <ImageUpload value={imageUrl} onChange={setImageUrl} label="" />
 
-        {/* Name */}
-        <div>
+        {/* Row 2: Name + Category (50% each) */}
+        <div className="grid grid-cols-2 gap-3">
           <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Service Name *" className={inputClass} />
-        </div>
-
-        {/* Category */}
-        <div>
           {addingNewCategory ? (
             <div className="flex gap-2">
               <input
                 value={newCategoryInput}
                 onChange={(e) => setNewCategoryInput(e.target.value)}
-                placeholder="Enter new category name..."
+                placeholder="New category..."
                 className={inputClass}
                 autoFocus
               />
@@ -716,41 +706,39 @@ export function ServiceForm({
               </button>
             </div>
           ) : (
-            <div className="flex gap-2">
-              <select
-                value={categoryName}
-                onChange={(e) => {
-                  if (e.target.value === '__new__') {
-                    setAddingNewCategory(true);
-                  } else {
-                    setCategoryName(e.target.value);
-                  }
-                }}
-                className={selectClass}
-              >
-                <option value="">Select a category...</option>
-                {allCategories.map((cat) => (
-                  <option key={cat.id} value={cat.name}>{cat.name}</option>
-                ))}
-                <option value="__new__">+ Add new category</option>
-              </select>
-            </div>
+            <select
+              value={categoryName}
+              onChange={(e) => {
+                if (e.target.value === '__new__') {
+                  setAddingNewCategory(true);
+                } else {
+                  setCategoryName(e.target.value);
+                }
+              }}
+              className={selectClass}
+            >
+              <option value="">Select a category...</option>
+              {allCategories.map((cat) => (
+                <option key={cat.id} value={cat.name}>{cat.name}</option>
+              ))}
+              <option value="__new__">+ Add new category</option>
+            </select>
           )}
         </div>
 
-        {/* Description */}
+        {/* Row 3: Description (100% width) */}
         <div>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             placeholder="Description"
-            className={inputClass}
+            className="w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
 
-        {/* Price & Capacity side by side */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Row 4: Price + Capacity (50% each) */}
+        <div className="grid grid-cols-2 gap-3">
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
             <input
@@ -773,20 +761,11 @@ export function ServiceForm({
           </select>
         </div>
 
-        {/* Hide price — right below pricing */}
-        <div className="flex items-center">
-          <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2">
-            <input type="checkbox" checked={hidePrice} onChange={(e) => setHidePrice(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-            <span className="text-sm font-medium text-gray-700">Hide price on the booking page</span>
-          </label>
-        </div>
-
-        {/* Deposit */}
+        {/* Row 5: Enable Deposit */}
         <div className="flex items-start">
           <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
             <input type="checkbox" checked={depositEnabled} onChange={(e) => setDepositEnabled(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Enable Deposit</span>
           </label>
           {depositEnabled && (
@@ -812,8 +791,8 @@ export function ServiceForm({
           )}
         </div>
 
-        {/* Duration & Buffer side by side */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Row 6: Duration + Buffer (50% each) */}
+        <div className="grid grid-cols-2 gap-3">
           <select value={duration} onChange={(e) => setDuration(e.target.value)} className={selectClass}>
             {DURATION_OPTIONS.map((d) => (
               <option key={d} value={d}>
@@ -831,20 +810,11 @@ export function ServiceForm({
           </select>
         </div>
 
-        {/* Hide duration — right below booking duration */}
-        <div className="flex items-center">
-          <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2">
-            <input type="checkbox" checked={hideDuration} onChange={(e) => setHideDuration(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-            <span className="text-sm font-medium text-gray-700">Hide duration on the booking page</span>
-          </label>
-        </div>
-
-        {/* Custom Duration Toggle */}
+        {/* Row 7: Allow Custom Duration Toggle */}
         <div className="flex items-start">
           <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
             <input type="checkbox" checked={customDuration} onChange={(e) => setCustomDuration(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Allow Custom Duration</span>
           </label>
           {customDuration && (
@@ -855,11 +825,11 @@ export function ServiceForm({
         </div>
         {customDuration && renderCustomDurationSection()}
 
-        {/* Recurring Service */}
+        {/* Row 8: Recurring Service */}
         <div className="flex items-start">
           <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
             <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Recurring Service</span>
           </label>
           {isRecurring && (
@@ -883,6 +853,27 @@ export function ServiceForm({
               </select>
             </div>
           )}
+        </div>
+
+        {/* Separator */}
+        <div className="border-t border-gray-200" />
+
+        {/* Row 9: Hide price on the booking page */}
+        <div className="flex items-center">
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={hidePrice} onChange={(e) => setHidePrice(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <span className="text-sm font-medium text-gray-700">Hide price on the booking page</span>
+          </label>
+        </div>
+
+        {/* Row 10: Hide duration on the booking page */}
+        <div className="flex items-center">
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={hideDuration} onChange={(e) => setHideDuration(e.target.checked)} className="peer sr-only" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <span className="text-sm font-medium text-gray-700">Hide duration on the booking page</span>
+          </label>
         </div>
       </div>
     );
@@ -1066,11 +1057,19 @@ export function ServiceForm({
   }
 
   function renderTimesheetTab() {
+    // Generate 15-minute interval time options from 00:00 to 23:45
+    const timeOptions: string[] = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        timeOptions.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+      }
+    }
+
     return (
       <div className="space-y-5">
         <label className="relative inline-flex cursor-pointer items-center gap-2">
           <input type="checkbox" checked={timesheetEnabled} onChange={(e) => setTimesheetEnabled(e.target.checked)} className="peer sr-only" />
-          <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+          <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
           <span className="text-sm font-medium text-gray-700">
             Configure specific timesheet for this service
           </span>
@@ -1085,24 +1084,30 @@ export function ServiceForm({
                 <div key={day} className="flex items-center gap-3">
                   <label className="relative inline-flex w-28 cursor-pointer items-center gap-2">
                     <input type="checkbox" checked={ds.enabled} onChange={(e) => updateTimesheetDay(key, 'enabled', e.target.checked)} className="peer sr-only" />
-                    <div className="peer h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                    <div className="peer h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                     <span className="text-sm text-gray-700">{day}</span>
                   </label>
                   {ds.enabled && (
                     <>
-                      <input
-                        type="time"
+                      <select
                         value={ds.start}
                         onChange={(e) => updateTimesheetDay(key, 'start', e.target.value)}
                         className="rounded border border-gray-300 px-2 py-1 text-sm"
-                      />
+                      >
+                        {timeOptions.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
                       <span className="text-sm text-gray-400">to</span>
-                      <input
-                        type="time"
+                      <select
                         value={ds.end}
                         onChange={(e) => updateTimesheetDay(key, 'end', e.target.value)}
                         className="rounded border border-gray-300 px-2 py-1 text-sm"
-                      />
+                      >
+                        {timeOptions.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
                     </>
                   )}
                 </div>
@@ -1232,7 +1237,7 @@ export function ServiceForm({
         <div className="rounded-lg border border-gray-200 p-4">
           <label className="relative inline-flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={maxDaysEnabled} onChange={(e) => setMaxDaysEnabled(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Limit how far ahead customers can book</span>
           </label>
           {maxDaysEnabled && (
@@ -1253,7 +1258,7 @@ export function ServiceForm({
         <div className="rounded-lg border border-gray-200 p-4">
           <label className="relative inline-flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={minExtrasEnabled} onChange={(e) => setMinExtrasEnabled(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Require minimum number of extras</span>
           </label>
           {minExtrasEnabled && (
@@ -1274,7 +1279,7 @@ export function ServiceForm({
         <div className="rounded-lg border border-gray-200 p-4">
           <label className="relative inline-flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={maxExtrasEnabled} onChange={(e) => setMaxExtrasEnabled(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Limit maximum number of extras</span>
           </label>
           {maxExtrasEnabled && (
@@ -1301,7 +1306,7 @@ export function ServiceForm({
         <div className="rounded-lg border border-gray-200 p-4">
           <label className="relative inline-flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={limitPerCustomerEnabled} onChange={(e) => setLimitPerCustomerEnabled(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Limit appointments per customer</span>
           </label>
           {limitPerCustomerEnabled && (
@@ -1337,7 +1342,7 @@ export function ServiceForm({
         <div className="rounded-lg border border-gray-200 p-4">
           <label className="relative inline-flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={limitPerSlotEnabled} onChange={(e) => setLimitPerSlotEnabled(e.target.checked)} className="peer sr-only" />
-            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Limit bookings per time slot</span>
           </label>
           {limitPerSlotEnabled && (

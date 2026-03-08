@@ -188,15 +188,58 @@ export async function PATCH(request: Request) {
   return NextResponse.json({ data, error: null });
 }
 
+export async function PUT(request: Request) {
+  const tenantId = await getTenantId();
+  if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
+
+  const body = await request.json() as { ids: string[]; visibility?: string };
+  const { ids, visibility } = body;
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    return NextResponse.json({ data: null, error: { message: 'Missing ids' } }, { status: 400 });
+  }
+
+  const supabase = createAdminClient();
+  const updateFields: Record<string, unknown> = {};
+  if (visibility) updateFields.visibility = visibility;
+
+  if (Object.keys(updateFields).length === 0) {
+    return NextResponse.json({ data: null, error: { message: 'No fields to update' } }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from('services')
+    .update(updateFields as never)
+    .in('id', ids)
+    .eq('tenant_id', tenantId);
+
+  if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
+  return NextResponse.json({ data: { ids }, error: null });
+}
+
 export async function DELETE(request: Request) {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
-  if (!id) return NextResponse.json({ data: null, error: { message: 'Missing id' } }, { status: 400 });
+  const ids = searchParams.get('ids');
 
   const supabase = createAdminClient();
+
+  if (ids) {
+    // Bulk delete
+    const idArr = ids.split(',').filter(Boolean);
+    const { error } = await supabase
+      .from('services')
+      .delete()
+      .in('id', idArr)
+      .eq('tenant_id', tenantId);
+    if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
+    return NextResponse.json({ data: { ids: idArr }, error: null });
+  }
+
+  if (!id) return NextResponse.json({ data: null, error: { message: 'Missing id' } }, { status: 400 });
+
   const { error } = await supabase
     .from('services')
     .delete()

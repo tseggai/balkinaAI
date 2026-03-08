@@ -62,16 +62,16 @@ export function ImageUpload({ value, onChange, label = 'Image' }: ImageUploadPro
       {label && <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>}
 
       {value ? (
-        <div className="relative inline-block">
+        <div className="relative">
           <img
             src={value}
             alt="Preview"
-            className="h-24 w-24 rounded-lg border border-gray-200 object-cover"
+            className="w-full max-h-48 rounded-lg border border-gray-200 object-cover"
           />
           <button
             type="button"
             onClick={handleRemove}
-            className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white shadow hover:bg-red-600"
+            className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs text-white shadow hover:bg-red-600"
           >
             &times;
           </button>
