@@ -597,8 +597,13 @@ export default function AppointmentsPage() {
     }
 
     setSaving(false);
-    closePanel();
-    fetchAppointments();
+    if (editing) {
+      // Don't close modal on update — just refresh the list so the table reflects the change
+      fetchAppointments();
+    } else {
+      closePanel();
+      fetchAppointments();
+    }
   }
 
   async function handleDelete(id: string) {

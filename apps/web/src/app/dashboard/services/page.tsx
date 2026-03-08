@@ -581,10 +581,37 @@ export default function ServicesPage() {
     fetchServices();
   }, [fetchServices]);
 
+  const [bulkActing, setBulkActing] = useState(false);
+  const [bulkVisibilityPickerOpen, setBulkVisibilityPickerOpen] = useState(false);
+
   async function handleDelete(id: string) {
     if (!confirm('Delete this service?')) return;
     await fetch(`/api/services?id=${id}`, { method: 'DELETE' });
     setSelectedIds((prev) => prev.filter((sid) => sid !== id));
+    fetchServices();
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedIds.length} service(s)?`)) return;
+    setBulkActing(true);
+    await fetch(`/api/services?ids=${selectedIds.join(',')}`, { method: 'DELETE' });
+    setSelectedIds([]);
+    setBulkActing(false);
+    fetchServices();
+  }
+
+  async function handleBulkVisibilityChange(visibility: string) {
+    if (selectedIds.length === 0) return;
+    setBulkActing(true);
+    setBulkVisibilityPickerOpen(false);
+    await fetch('/api/services', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: selectedIds, visibility }),
+    });
+    setSelectedIds([]);
+    setBulkActing(false);
     fetchServices();
   }
 
@@ -691,6 +718,62 @@ export default function ServicesPage() {
           className="w-full max-w-md rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         />
       </div>
+
+      {/* Bulk action bar */}
+      {selectedIds.length > 0 && (
+        <div className="mt-4 flex items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5">
+          <span className="text-sm font-medium text-brand-700">
+            {selectedIds.length} selected
+          </span>
+          <div className="h-4 w-px bg-brand-200" />
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setBulkVisibilityPickerOpen(!bulkVisibilityPickerOpen)}
+              disabled={bulkActing}
+              className="rounded-lg border border-brand-300 bg-white px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+            >
+              Change Visibility
+            </button>
+            {bulkVisibilityPickerOpen && (
+              <div className="absolute left-0 top-full z-10 mt-1 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => handleBulkVisibilityChange('public')}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                >
+                  <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                  Public
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBulkVisibilityChange('staff_only')}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                >
+                  <span className="inline-block h-2 w-2 rounded-full bg-yellow-500" />
+                  Staff Only
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            disabled={bulkActing}
+            className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            Delete
+          </button>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={() => { setSelectedIds([]); setBulkVisibilityPickerOpen(false); }}
+            className="text-sm text-brand-600 hover:text-brand-800"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
 
       {/* Content */}
       <div className="mt-6">
@@ -824,7 +907,7 @@ export default function ServicesPage() {
           <div className="fixed inset-0 z-40 bg-black/40" onClick={handleClose} />
           <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
             {/* Header */}
-            <div className="flex items-center justify-between border-b px-6 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
                 {editing ? 'Edit Service' : 'Add Service'}
               </h2>
@@ -838,7 +921,7 @@ export default function ServicesPage() {
               </button>
             </div>
             {/* Body */}
-            <div className="flex-1 overflow-hidden px-6 py-4">
+            <div className="flex-1 overflow-hidden px-8 py-3">
               <ServiceForm
                 service={editing}
                 onClose={handleClose}
