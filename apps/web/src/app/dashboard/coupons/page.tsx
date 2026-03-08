@@ -214,10 +214,25 @@ export default function CouponsPage() {
       setSaving(false);
       return;
     }
-    setShowForm(false);
-    setEditing(null);
     setSaving(false);
-    fetchCoupons();
+    // Refresh the list without closing the panel
+    const refreshRes = await fetch('/api/coupons');
+    const refreshJson = await refreshRes.json();
+    const refreshedCoupons = (refreshJson.data ?? []) as Coupon[];
+    setCoupons(refreshedCoupons);
+
+    // If we just created a new coupon, switch to edit mode
+    if (!editing && json.data?.id) {
+      const newCoupon = refreshedCoupons.find((c) => c.id === json.data.id);
+      if (newCoupon) {
+        openEdit(newCoupon);
+      }
+    } else if (editing) {
+      const updatedCoupon = refreshedCoupons.find((c) => c.id === editing.id);
+      if (updatedCoupon) {
+        setEditing(updatedCoupon);
+      }
+    }
   }
 
   /* ── Shared form field classes ─────────────────────────────────────── */

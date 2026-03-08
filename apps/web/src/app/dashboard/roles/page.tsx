@@ -233,9 +233,25 @@ export default function RolesPage() {
 
     const json = await res.json();
     if (!res.ok) { setError(json.error?.message ?? 'Failed to save'); setSaving(false); return; }
-    closePanel();
     setSaving(false);
-    fetchRoles();
+    // Refresh the list without closing the panel
+    const refreshRes = await fetch('/api/roles');
+    const refreshJson = await refreshRes.json();
+    const refreshedRoles = (refreshJson.data ?? []) as Role[];
+    setRoles(refreshedRoles);
+
+    // If we just created a new role, switch to edit mode
+    if (!editing && json.data?.id) {
+      const newRole = refreshedRoles.find((r) => r.id === json.data.id);
+      if (newRole) {
+        openEdit(newRole);
+      }
+    } else if (editing) {
+      const updatedRole = refreshedRoles.find((r) => r.id === editing.id);
+      if (updatedRole) {
+        setEditing(updatedRole);
+      }
+    }
   }
 
   function toggleRowSelect(id: string) {

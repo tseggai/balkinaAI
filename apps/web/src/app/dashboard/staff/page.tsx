@@ -73,7 +73,10 @@ interface StaffMember {
   booking_limit_capacity: number | null;
   booking_limit_interval: string | null;
   services_count: number;
+  service_ids: string[];
+  location_ids: string[];
   staff_holidays: StaffHoliday[];
+  staff_special_days: SpecialDay[];
   created_at: string;
 }
 
@@ -247,8 +250,8 @@ export default function StaffPage() {
     setImageUrl(s.image_url ?? '');
     setNotes(s.notes ?? '');
     setIsActive(s.is_active ?? s.status !== 'inactive');
-    setSelectedLocationIds([]);
-    setSelectedServiceIds([]);
+    setSelectedLocationIds(s.location_ids ?? []);
+    setSelectedServiceIds(s.service_ids ?? []);
     setShowLocationDropdown(false);
     setShowServiceDropdown(false);
 
@@ -279,7 +282,17 @@ export default function StaffPage() {
       }))
     );
 
-    setSpecialDays([]);
+    // Special days
+    setSpecialDays(
+      (s.staff_special_days ?? []).map((sd) => ({
+        id: sd.id,
+        date: sd.date,
+        start_time: sd.start_time ?? '09:00',
+        end_time: sd.end_time ?? '17:00',
+        is_day_off: sd.is_day_off ?? false,
+        breaks: Array.isArray(sd.breaks) ? sd.breaks as BreakSlot[] : [],
+      }))
+    );
 
     // Booking limiter
     const hasLimit = s.booking_limit_capacity != null && s.booking_limit_capacity > 0;
@@ -377,6 +390,14 @@ export default function StaffPage() {
       booking_limit_interval: bookingLimitEnabled ? bookingLimitInterval : null,
       staff_holidays: holidays.map((h) => ({ date: h.date, note: h.note || null })),
       service_ids: selectedServiceIds,
+      location_ids: selectedLocationIds,
+      staff_special_days: specialDays.map((sd) => ({
+        date: sd.date,
+        start_time: sd.start_time,
+        end_time: sd.end_time,
+        is_day_off: sd.is_day_off,
+        breaks: sd.breaks,
+      })),
     };
 
     const res = await fetch('/api/staff', {
@@ -393,8 +414,28 @@ export default function StaffPage() {
     }
 
     setSaving(false);
-    closePanel();
-    fetchStaff();
+    // Refresh the list without closing the panel
+    const refreshRes = await fetch('/api/staff');
+    const refreshJson = await refreshRes.json();
+    const refreshedStaff = refreshJson.data ?? [];
+    setStaff(refreshedStaff);
+
+    // If we just created a new staff member, switch to edit mode with the new data
+    if (!isEdit && json.data?.id) {
+      const newStaff = refreshedStaff.find((s: StaffMember) => s.id === json.data.id);
+      if (newStaff) {
+        openEdit(newStaff);
+      }
+    } else if (isEdit && editing) {
+      // Update the editing state with refreshed data
+      const updatedStaff = refreshedStaff.find((s: StaffMember) => s.id === editing.id);
+      if (updatedStaff) {
+        setEditing(updatedStaff);
+        // Re-populate location and service IDs from refreshed data
+        setSelectedLocationIds(updatedStaff.location_ids ?? []);
+        setSelectedServiceIds(updatedStaff.service_ids ?? []);
+      }
+    }
   }
 
   // ── Schedule helpers ───────────────────────────────────────────────────────

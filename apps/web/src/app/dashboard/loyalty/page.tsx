@@ -251,7 +251,7 @@ export default function LoyaltyPage() {
     const json = await res.json();
     if (!res.ok) { setError(json.error?.message ?? 'Failed to save'); setSaving(false); return; }
     setSaving(false);
-    setShowForm(false);
+    // Refresh data without closing the panel
     fetchData();
   }
 

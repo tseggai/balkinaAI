@@ -249,8 +249,24 @@ export default function LocationsPage() {
     }
 
     setSaving(false);
-    closePanel();
-    fetchLocations();
+    // Refresh the list without closing the panel
+    const refreshRes = await fetch('/api/locations');
+    const refreshJson = await refreshRes.json();
+    const refreshedLocations = (refreshJson.data ?? []) as Location[];
+    setLocations(refreshedLocations);
+
+    // If we just created a new location, switch to edit mode
+    if (!editing && json.data?.id) {
+      const newLoc = refreshedLocations.find((l) => l.id === json.data.id);
+      if (newLoc) {
+        openEdit(newLoc);
+      }
+    } else if (editing) {
+      const updatedLoc = refreshedLocations.find((l) => l.id === editing.id);
+      if (updatedLoc) {
+        setEditing(updatedLoc);
+      }
+    }
   }
 
   // ── Slide-in Panel ─────────────────────────────────────────────────────────

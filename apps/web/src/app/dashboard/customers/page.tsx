@@ -84,7 +84,7 @@ export default function CustomersPage() {
         setNewName('');
         setNewEmail('');
         setNewPhone('');
-        setShowAddModal(false);
+        // Refresh data without closing the modal
         fetchCustomers();
       }
     } finally {
