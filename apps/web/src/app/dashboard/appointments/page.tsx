@@ -339,7 +339,7 @@ export default function AppointmentsPage() {
     setPanelOpen(true);
   }
 
-  function openEditPanel(appt: Appointment) {
+  async function openEditPanel(appt: Appointment) {
     setEditing(appt);
     setFormLocationId(appt.location_id ?? '');
     setFormServiceId(appt.service_id ?? '');
@@ -365,6 +365,35 @@ export default function AppointmentsPage() {
     setShowStatusPicker(false);
     setFormError('');
     setPanelOpen(true);
+
+    // Fetch saved line items (extras, products, coupons) for this appointment
+    try {
+      const res = await fetch(`/api/appointments/line-items?appointment_id=${appt.id}`);
+      const json = await res.json() as {
+        data: {
+          extras: { extra_id: string }[];
+          products: { product_id: string; quantity: number }[];
+          coupons: { coupon_id: string }[];
+        } | null;
+      };
+      if (json.data) {
+        if (json.data.extras.length > 0) {
+          setFormSelectedExtras(new Set(json.data.extras.map((e) => e.extra_id)));
+        }
+        if (json.data.products.length > 0) {
+          const prodMap = new Map<string, number>();
+          for (const p of json.data.products) {
+            prodMap.set(p.product_id, p.quantity);
+          }
+          setFormSelectedProducts(prodMap);
+        }
+        if (json.data.coupons.length > 0) {
+          setFormCouponId(json.data.coupons[0]!.coupon_id);
+        }
+      }
+    } catch {
+      // Silently fail — line items will just appear empty
+    }
   }
 
   function closePanel() {
@@ -489,6 +518,40 @@ export default function AppointmentsPage() {
       .filter(([, v]) => v !== '')
       .map(([cfId, value]) => ({ custom_field_id: cfId, value }));
 
+    // Build extras array from selected extras
+    const extrasArr = serviceExtras
+      .filter((e) => formSelectedExtras.has(e.id))
+      .map((e) => ({
+        extra_id: e.id,
+        name: e.name,
+        price: e.price,
+        duration_minutes: e.duration_minutes,
+      }));
+
+    // Build products array from selected products
+    const productsArr: { product_id: string; name: string; price: number; quantity: number }[] = [];
+    formSelectedProducts.forEach((qty, productId) => {
+      const product = productList.find((p) => p.id === productId);
+      if (product && qty > 0) {
+        productsArr.push({
+          product_id: product.id,
+          name: product.name,
+          price: product.sell_price,
+          quantity: qty,
+        });
+      }
+    });
+
+    // Build coupon object if selected
+    const { discount } = calcCouponDiscount();
+    const couponObj = selectedCoupon ? {
+      coupon_id: selectedCoupon.id,
+      code: selectedCoupon.code,
+      discount_type: selectedCoupon.discount_type,
+      discount_value: selectedCoupon.discount_value,
+      discount_amount: discount,
+    } : null;
+
     const body: Record<string, unknown> = {
       customer_id: customerId,
       service_id: formServiceId,
@@ -499,6 +562,9 @@ export default function AppointmentsPage() {
       status: formStatus,
       total_price: totalPrice,
       notes: formNotes || null,
+      extras: extrasArr,
+      products: productsArr,
+      coupon: couponObj,
     };
 
     if (!editing) {
@@ -1016,34 +1082,45 @@ export default function AppointmentsPage() {
                   {formServiceId && serviceExtras.length > 0 && (
                     <div>
                       <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Extras</h4>
-                      <div className="space-y-2">
-                        {serviceExtras.map((extra) => (
-                          <label
-                            key={extra.id}
-                            className="flex items-center gap-3 rounded-[.3rem] border border-[#f1f1f1] p-3 hover:bg-[#f9fafb]"
+                      <div className="flex flex-wrap items-center gap-2 rounded-[.3rem] border border-[#f1f1f1] p-3 min-h-[46px]">
+                        {serviceExtras
+                          .filter((e) => formSelectedExtras.has(e.id))
+                          .map((extra) => (
+                            <span key={extra.id} className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700">
+                              {extra.name} (+${extra.price.toFixed(2)})
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormSelectedExtras((prev) => {
+                                    const next = new Set(prev);
+                                    next.delete(extra.id);
+                                    return next;
+                                  });
+                                }}
+                                className="ml-1 text-brand-400 hover:text-brand-700"
+                              >
+                                &times;
+                              </button>
+                            </span>
+                          ))}
+                        {serviceExtras.filter((e) => !formSelectedExtras.has(e.id)).length > 0 && (
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setFormSelectedExtras((prev) => new Set([...prev, e.target.value]));
+                              }
+                            }}
+                            className="h-8 rounded-full border border-dashed border-gray-300 bg-transparent px-3 text-sm text-gray-500 hover:border-brand-500 focus:outline-none"
                           >
-                            <input
-                              type="checkbox"
-                              checked={formSelectedExtras.has(extra.id)}
-                              onChange={() => {
-                                setFormSelectedExtras((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(extra.id)) next.delete(extra.id);
-                                  else next.add(extra.id);
-                                  return next;
-                                });
-                              }}
-                              className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                            />
-                            <div className="flex-1">
-                              <span className="text-sm font-medium text-gray-900">{extra.name}</span>
-                              {extra.duration_minutes > 0 && (
-                                <span className="ml-2 text-xs text-gray-500">+{extra.duration_minutes} min</span>
-                              )}
-                            </div>
-                            <span className="text-sm font-medium text-gray-700">+${extra.price.toFixed(2)}</span>
-                          </label>
-                        ))}
+                            <option value="">+ Add</option>
+                            {serviceExtras
+                              .filter((e) => !formSelectedExtras.has(e.id))
+                              .map((e) => (
+                                <option key={e.id} value={e.id}>{e.name} (+${e.price.toFixed(2)})</option>
+                              ))}
+                          </select>
+                        )}
                       </div>
                     </div>
                   )}
