@@ -402,10 +402,10 @@ export default function LoyaltyPage() {
       {/* Slide-in Panel */}
       {showForm && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowForm(false)} />
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowForm(false)} />
           <div className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]`}>
             {/* Header */}
-            <div className="flex items-center justify-between border-b px-8 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
                 {isEditing ? 'Edit Loyalty Program' : 'New Loyalty Program'}
               </h2>
@@ -420,7 +420,7 @@ export default function LoyaltyPage() {
             </div>
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-8 py-3">
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {/* Active toggle */}
                 <div className="flex items-center rounded-lg border border-gray-200 p-4">
                   <div className="w-1/2">
@@ -430,13 +430,13 @@ export default function LoyaltyPage() {
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, is_active: !form.is_active })}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
                       form.is_active ? 'bg-brand-600' : 'bg-gray-200'
                     }`}
                   >
                     <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                        form.is_active ? 'translate-x-5' : 'translate-x-0'
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        form.is_active ? 'translate-x-4' : 'translate-x-0'
                       }`}
                     />
                   </button>
@@ -701,7 +701,7 @@ export default function LoyaltyPage() {
               </div>
             </div>
             {/* Footer */}
-            <div className="flex items-center border-t px-8 py-4">
+            <div className="flex items-center border-t border-gray-200 px-8 py-4">
               {isEditing && (
                 <button
                   onClick={() => handleDelete(editingIndex)}

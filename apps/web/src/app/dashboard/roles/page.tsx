@@ -389,15 +389,15 @@ export default function RolesPage() {
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-lg font-semibold text-gray-900">
                 {editing ? 'Edit Role' : 'New Role'}
               </h2>
               <button
                 onClick={closePanel}
                 className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
@@ -617,7 +617,7 @@ export default function RolesPage() {
               </div>
 
               {/* Footer */}
-              <div className="flex items-center gap-3 border-t border-gray-200 px-8 py-4">
+              <div className="flex gap-3 border-t border-gray-200 px-8 py-4">
                 {editing && (
                   <button
                     type="button"
@@ -628,18 +628,18 @@ export default function RolesPage() {
                   </button>
                 )}
                 <button
-                  type="submit"
-                  disabled={saving}
-                  className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-                >
-                  {saving ? 'Saving...' : editing ? 'Update Role' : 'Create Role'}
-                </button>
-                <button
                   type="button"
                   onClick={closePanel}
-                  className="rounded-lg border border-gray-300 px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : editing ? 'Update Role' : 'Create Role'}
                 </button>
               </div>
             </form>
