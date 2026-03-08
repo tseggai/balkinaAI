@@ -337,9 +337,24 @@ export async function DELETE(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
-  if (!id) return NextResponse.json({ data: null, error: { message: 'Missing id' } }, { status: 400 });
+  const ids = searchParams.get('ids'); // comma-separated for bulk delete
 
   const supabase = createAdminClient();
+
+  if (ids) {
+    const idList = ids.split(',').filter(Boolean);
+    if (idList.length === 0) return NextResponse.json({ data: null, error: { message: 'Missing ids' } }, { status: 400 });
+    const { error } = await supabase
+      .from('appointments')
+      .delete()
+      .in('id', idList)
+      .eq('tenant_id', tenantId);
+    if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
+    return NextResponse.json({ data: { ids: idList }, error: null });
+  }
+
+  if (!id) return NextResponse.json({ data: null, error: { message: 'Missing id' } }, { status: 400 });
+
   const { error } = await supabase
     .from('appointments')
     .delete()
@@ -348,4 +363,35 @@ export async function DELETE(request: Request) {
 
   if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
   return NextResponse.json({ data: { id }, error: null });
+}
+
+// Bulk status update
+export async function PUT(request: Request) {
+  const tenantId = await getTenantId();
+  if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
+
+  const body = await request.json() as { ids?: string[]; status?: string };
+  const { ids, status } = body;
+
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    return NextResponse.json({ data: null, error: { message: 'Missing ids array' } }, { status: 400 });
+  }
+  if (!status) {
+    return NextResponse.json({ data: null, error: { message: 'Missing status' } }, { status: 400 });
+  }
+
+  const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled', 'no_show', 'rescheduled', 'rejected', 'emergency'];
+  if (!validStatuses.includes(status)) {
+    return NextResponse.json({ data: null, error: { message: 'Invalid status' } }, { status: 400 });
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from('appointments')
+    .update({ status })
+    .in('id', ids)
+    .eq('tenant_id', tenantId);
+
+  if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
+  return NextResponse.json({ data: { ids, status }, error: null });
 }

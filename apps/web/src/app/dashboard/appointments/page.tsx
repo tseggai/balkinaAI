@@ -235,6 +235,14 @@ export default function AppointmentsPage() {
   // Edit panel: status picker popover
   const [showStatusPicker, setShowStatusPicker] = useState(false);
 
+  // Bulk action state
+  const [bulkStatusPickerOpen, setBulkStatusPickerOpen] = useState(false);
+  const [bulkActing, setBulkActing] = useState(false);
+
+  // Available time slots for new appointment form
+  const [availableSlots, setAvailableSlots] = useState<{ time: string; staff: { id: string; name: string }[] }[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+
   // (editingField state removed — edit panel now uses direct inputs)
 
   // ----------------------------------------------------------
@@ -600,6 +608,67 @@ export default function AppointmentsPage() {
     fetchAppointments();
   }
 
+  // ----------------------------------------------------------
+  // Bulk actions
+  // ----------------------------------------------------------
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} appointment(s)?`)) return;
+    setBulkActing(true);
+    await fetch(`/api/appointments?ids=${Array.from(selectedIds).join(',')}`, { method: 'DELETE' });
+    setSelectedIds(new Set());
+    setBulkActing(false);
+    fetchAppointments();
+  }
+
+  async function handleBulkStatusChange(status: AppointmentStatus) {
+    if (selectedIds.size === 0) return;
+    setBulkActing(true);
+    setBulkStatusPickerOpen(false);
+    await fetch('/api/appointments', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: Array.from(selectedIds), status }),
+    });
+    setSelectedIds(new Set());
+    setBulkActing(false);
+    fetchAppointments();
+  }
+
+  // ----------------------------------------------------------
+  // Available time slots fetching
+  // ----------------------------------------------------------
+
+  useEffect(() => {
+    if (!formServiceId || !formDate || editing) {
+      setAvailableSlots([]);
+      return;
+    }
+    let cancelled = false;
+    async function fetchSlots() {
+      setLoadingSlots(true);
+      const params = new URLSearchParams({
+        service_id: formServiceId,
+        date: formDate,
+      });
+      if (formStaffId) params.set('staff_id', formStaffId);
+      try {
+        const res = await fetch(`/api/appointments/available-slots?${params}`);
+        const json = await res.json() as { data: { time: string; staff: { id: string; name: string }[] }[] | null };
+        if (!cancelled) {
+          setAvailableSlots(json.data ?? []);
+        }
+      } catch {
+        if (!cancelled) setAvailableSlots([]);
+      } finally {
+        if (!cancelled) setLoadingSlots(false);
+      }
+    }
+    fetchSlots();
+    return () => { cancelled = true; };
+  }, [formServiceId, formDate, formStaffId, editing]);
+
   const hasActiveFilters = search || statusFilter || staffFilter || serviceFilter || dateFrom || dateTo;
 
   function clearFilters() {
@@ -740,6 +809,57 @@ export default function AppointmentsPage() {
             </button>
           )}
         </div>
+
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div className="mt-4 flex items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5">
+            <span className="text-sm font-medium text-brand-700">
+              {selectedIds.size} selected
+            </span>
+            <div className="h-4 w-px bg-brand-200" />
+            <div className="relative">
+              <button
+                onClick={() => setBulkStatusPickerOpen(!bulkStatusPickerOpen)}
+                disabled={bulkActing}
+                className="rounded-lg border border-brand-300 bg-white px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+              >
+                Change Status
+              </button>
+              {bulkStatusPickerOpen && (
+                <div className="absolute left-0 top-full z-10 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                  {STATUS_OPTIONS.map((s) => {
+                    const sc = statusConfig[s];
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => handleBulkStatusChange(s)}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                      >
+                        <span className={`inline-block h-2 w-2 rounded-full ${sc.dot}`} />
+                        {sc.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkActing}
+              className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+            >
+              Delete
+            </button>
+            <div className="flex-1" />
+            <button
+              onClick={() => { setSelectedIds(new Set()); setBulkStatusPickerOpen(false); }}
+              className="text-sm text-brand-600 hover:text-brand-800"
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
 
         {/* Table */}
         <div className="mt-6 overflow-visible rounded-xl border border-gray-200 bg-white">
@@ -1002,19 +1122,44 @@ export default function AppointmentsPage() {
                     <input
                       type="date"
                       value={formDate}
-                      onChange={(e) => setFormDate(e.target.value)}
+                      onChange={(e) => { setFormDate(e.target.value); setFormTime(''); }}
                       className={addInputClass}
                       required
                       placeholder="Date *"
                     />
-                    <input
-                      type="time"
-                      value={formTime}
-                      onChange={(e) => setFormTime(e.target.value)}
-                      className={addInputClass}
-                      required
-                      placeholder="Time *"
-                    />
+                    {formServiceId && formDate ? (
+                      <select
+                        value={formTime}
+                        onChange={(e) => setFormTime(e.target.value)}
+                        className={addInputClass}
+                        required
+                      >
+                        <option value="">
+                          {loadingSlots ? 'Loading slots...' : availableSlots.length === 0 ? 'No slots available' : 'Select time... *'}
+                        </option>
+                        {availableSlots.map((slot) => {
+                          // Format time for display (e.g. "09:00" -> "9:00 AM")
+                          const [h, m] = slot.time.split(':').map(Number);
+                          const ampm = (h ?? 0) >= 12 ? 'PM' : 'AM';
+                          const displayHour = (h ?? 0) === 0 ? 12 : (h ?? 0) > 12 ? (h ?? 0) - 12 : h;
+                          const staffNames = slot.staff.map(s => s.name).join(', ');
+                          return (
+                            <option key={slot.time} value={slot.time}>
+                              {displayHour}:{String(m).padStart(2, '0')} {ampm}{staffNames ? ` (${staffNames})` : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    ) : (
+                      <input
+                        type="time"
+                        value={formTime}
+                        onChange={(e) => setFormTime(e.target.value)}
+                        className={addInputClass}
+                        required
+                        placeholder="Time *"
+                      />
+                    )}
                   </div>
 
                   {/* Customer & Status side by side */}
