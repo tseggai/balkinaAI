@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 async function getTenantId() {
   const supabase = createClient();
@@ -81,4 +81,64 @@ export async function GET() {
   result.sort((a, b) => b.total_bookings - a.total_bookings);
 
   return NextResponse.json({ data: result, error: null });
+}
+
+export async function POST(request: Request) {
+  const tenantId = await getTenantId();
+  if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
+
+  const body = await request.json() as {
+    display_name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  };
+
+  if (!body.display_name && !body.email) {
+    return NextResponse.json(
+      { data: null, error: { message: 'Please provide at least a name or email.' } },
+      { status: 400 }
+    );
+  }
+
+  const admin = createAdminClient();
+
+  // Create an auth user so the customer has a valid auth.users entry.
+  // Use email if provided, otherwise generate a placeholder email from phone or name.
+  const email = body.email?.trim()
+    || (body.phone?.trim() ? `${body.phone.trim().replace(/\D/g, '')}@placeholder.balkina.ai` : null)
+    || `${crypto.randomUUID().slice(0, 8)}@placeholder.balkina.ai`;
+
+  const { data: authUser, error: authError } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    user_metadata: { display_name: body.display_name, phone: body.phone },
+  });
+
+  if (authError) {
+    return NextResponse.json(
+      { data: null, error: { message: authError.message } },
+      { status: 500 }
+    );
+  }
+
+  // Insert the customer record linked to the new auth user
+  const { data: customer, error: custError } = await admin
+    .from('customers')
+    .insert({
+      id: authUser.user.id,
+      display_name: body.display_name || null,
+      email: body.email?.trim() || null,
+      phone: body.phone?.trim() || null,
+    } as never)
+    .select('id, display_name, email, phone')
+    .single();
+
+  if (custError) {
+    return NextResponse.json(
+      { data: null, error: { message: custError.message } },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ data: customer, error: null }, { status: 201 });
 }

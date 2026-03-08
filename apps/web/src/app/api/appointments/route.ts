@@ -132,10 +132,11 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
 
+  const appointmentData = data as { id: string } | null;
+
   // Insert custom field values if provided
   const customFieldValues = body.custom_field_values as { custom_field_id: string; value: string }[] | undefined;
   if (customFieldValues && Array.isArray(customFieldValues) && customFieldValues.length > 0) {
-    const appointmentData = data as { id: string } | null;
     if (appointmentData) {
       await supabase.from('appointment_custom_field_values').insert(
         customFieldValues.map((cfv) => ({
@@ -145,6 +146,47 @@ export async function POST(request: Request) {
         })) as never
       );
     }
+  }
+
+  // Insert appointment extras if provided
+  const extras = body.extras as { extra_id: string; name: string; price: number; duration_minutes: number }[] | undefined;
+  if (extras && Array.isArray(extras) && extras.length > 0 && appointmentData) {
+    await supabase.from('appointment_extras').insert(
+      extras.map((e) => ({
+        appointment_id: appointmentData.id,
+        extra_id: e.extra_id,
+        name: e.name,
+        price: e.price,
+        duration_minutes: e.duration_minutes,
+      })) as never
+    );
+  }
+
+  // Insert appointment products if provided
+  const products = body.products as { product_id: string; name: string; price: number; quantity: number }[] | undefined;
+  if (products && Array.isArray(products) && products.length > 0 && appointmentData) {
+    await supabase.from('appointment_products').insert(
+      products.map((p) => ({
+        appointment_id: appointmentData.id,
+        product_id: p.product_id,
+        name: p.name,
+        price: p.price,
+        quantity: p.quantity,
+      })) as never
+    );
+  }
+
+  // Insert appointment coupon if provided
+  const coupon = body.coupon as { coupon_id: string; code: string; discount_type: string; discount_value: number; discount_amount: number } | undefined;
+  if (coupon && appointmentData) {
+    await supabase.from('appointment_coupons').insert({
+      appointment_id: appointmentData.id,
+      coupon_id: coupon.coupon_id,
+      code: coupon.code,
+      discount_type: coupon.discount_type,
+      discount_value: coupon.discount_value,
+      discount_amount: coupon.discount_amount,
+    } as never);
   }
 
   return NextResponse.json({ data, error: null }, { status: 201 });
@@ -196,6 +238,56 @@ export async function PATCH(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
+
+  // Update appointment extras if provided (replace all)
+  const extras = body.extras as { extra_id: string; name: string; price: number; duration_minutes: number }[] | undefined;
+  if (extras !== undefined) {
+    await supabase.from('appointment_extras').delete().eq('appointment_id', id);
+    if (extras.length > 0) {
+      await supabase.from('appointment_extras').insert(
+        extras.map((e) => ({
+          appointment_id: id,
+          extra_id: e.extra_id,
+          name: e.name,
+          price: e.price,
+          duration_minutes: e.duration_minutes,
+        })) as never
+      );
+    }
+  }
+
+  // Update appointment products if provided (replace all)
+  const products = body.products as { product_id: string; name: string; price: number; quantity: number }[] | undefined;
+  if (products !== undefined) {
+    await supabase.from('appointment_products').delete().eq('appointment_id', id);
+    if (products.length > 0) {
+      await supabase.from('appointment_products').insert(
+        products.map((p) => ({
+          appointment_id: id,
+          product_id: p.product_id,
+          name: p.name,
+          price: p.price,
+          quantity: p.quantity,
+        })) as never
+      );
+    }
+  }
+
+  // Update appointment coupon if provided (replace)
+  const coupon = body.coupon as { coupon_id: string; code: string; discount_type: string; discount_value: number; discount_amount: number } | null | undefined;
+  if (coupon !== undefined) {
+    await supabase.from('appointment_coupons').delete().eq('appointment_id', id);
+    if (coupon) {
+      await supabase.from('appointment_coupons').insert({
+        appointment_id: id,
+        coupon_id: coupon.coupon_id,
+        code: coupon.code,
+        discount_type: coupon.discount_type,
+        discount_value: coupon.discount_value,
+        discount_amount: coupon.discount_amount,
+      } as never);
+    }
+  }
 
   // Auto-decrement inventory when appointment is completed
   if (shouldDecrementInventory && data) {
