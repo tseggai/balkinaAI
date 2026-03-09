@@ -2,10 +2,32 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { BulkActionBar } from '@/components/bulk-action-bar';
+import { ImageUpload } from '@/components/image-upload';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const INTERVAL_OPTIONS = ['hour', 'day', 'week', 'month'];
+
+const TIMEZONE_OPTIONS = [
+  'Pacific/Midway', 'Pacific/Honolulu', 'America/Anchorage', 'America/Los_Angeles',
+  'America/Denver', 'America/Phoenix', 'America/Chicago', 'America/New_York',
+  'America/Indianapolis', 'America/Halifax', 'America/St_Johns', 'America/Sao_Paulo',
+  'Atlantic/South_Georgia', 'Atlantic/Azores', 'Europe/London', 'Europe/Paris',
+  'Europe/Berlin', 'Europe/Helsinki', 'Europe/Istanbul', 'Asia/Dubai',
+  'Asia/Karachi', 'Asia/Kolkata', 'Asia/Kathmandu', 'Asia/Dhaka',
+  'Asia/Bangkok', 'Asia/Hong_Kong', 'Asia/Shanghai', 'Asia/Tokyo',
+  'Asia/Seoul', 'Australia/Sydney', 'Australia/Adelaide', 'Australia/Brisbane',
+  'Australia/Perth', 'Pacific/Auckland', 'Pacific/Fiji',
+  'America/Argentina/Buenos_Aires', 'America/Bogota', 'America/Caracas',
+  'America/Mexico_City', 'America/Toronto', 'America/Vancouver', 'America/Winnipeg',
+  'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos', 'Africa/Nairobi',
+  'Asia/Baghdad', 'Asia/Jerusalem', 'Asia/Riyadh', 'Asia/Singapore',
+  'Asia/Taipei', 'Europe/Amsterdam', 'Europe/Athens', 'Europe/Bucharest',
+  'Europe/Dublin', 'Europe/Kiev', 'Europe/Lisbon', 'Europe/Madrid',
+  'Europe/Moscow', 'Europe/Oslo', 'Europe/Prague', 'Europe/Rome',
+  'Europe/Stockholm', 'Europe/Vienna', 'Europe/Warsaw', 'Europe/Zurich',
+  'Pacific/Guam',
+];
 
 // ── Interfaces ─────────────────────────────────────────────────────────────────
 
@@ -52,7 +74,6 @@ export default function LocationsPage() {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [timezone, setTimezone] = useState('');
-  const [detectingTimezone, setDetectingTimezone] = useState(false);
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [bookingLimitEnabled, setBookingLimitEnabled] = useState(false);
@@ -61,8 +82,6 @@ export default function LocationsPage() {
   const [phone, setPhone] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-
-  const [uploading, setUploading] = useState(false);
 
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
@@ -113,25 +132,6 @@ export default function LocationsPage() {
         const newLng = place.geometry.location.lng();
         setLat(newLat);
         setLng(newLng);
-        // Auto-detect timezone via Google Maps Timezone API
-        setDetectingTimezone(true);
-        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-        if (apiKey) {
-          const timestamp = Math.floor(Date.now() / 1000);
-          fetch(
-            `https://maps.googleapis.com/maps/api/timezone/json?location=${newLat},${newLng}&timestamp=${timestamp}&key=${apiKey}`
-          )
-            .then((r) => r.json())
-            .then((tzJson: { status: string; timeZoneId?: string }) => {
-              if (tzJson.status === 'OK' && tzJson.timeZoneId) {
-                setTimezone(tzJson.timeZoneId);
-              }
-            })
-            .catch(() => {})
-            .finally(() => setDetectingTimezone(false));
-        } else {
-          setDetectingTimezone(false);
-        }
       }
     });
   }, [mapsLoaded, showPanel]);
@@ -313,6 +313,13 @@ export default function LocationsPage() {
           {/* Body */}
           <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
             <div className="flex-1 space-y-5 overflow-y-auto px-8 py-3">
+              {/* Photo Upload - First field */}
+              <ImageUpload
+                value={imageUrl}
+                onChange={setImageUrl}
+                label=""
+              />
+
               {/* Name */}
               <div>
                 {isEdit ? (
@@ -363,7 +370,7 @@ export default function LocationsPage() {
                     autoComplete="off"
                   />
                 )}
-                {address && <p className="mt-1 text-xs text-gray-500">{address}</p>}
+                {/* Map display after entering address */}
                 {lat != null && lng != null && (
                   <div className="mt-2">
                     <p className="text-xs text-gray-500">
@@ -371,64 +378,13 @@ export default function LocationsPage() {
                     </p>
                     {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && (
                       <img
-                        src={`https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=400x200&markers=color:red%7C${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
+                        src={`https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=600x200&markers=color:red%7C${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
                         alt="Location preview"
                         className="mt-2 w-full rounded-lg border border-gray-200"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                     )}
                   </div>
-                )}
-              </div>
-
-              {/* Location Photo Upload */}
-              <div>
-                <div className="flex w-full items-center gap-3">
-                  <label className="w-full cursor-pointer rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-4 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-100">
-                    {uploading ? 'Uploading...' : 'Upload Photo'}
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="hidden"
-                      disabled={uploading}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        setUploading(true);
-                        try {
-                          const formData = new FormData();
-                          formData.append('file', file);
-                          const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                          const json = await res.json();
-                          if (res.ok && json.url) {
-                            setImageUrl(json.url);
-                          } else {
-                            setError(json.error || 'Upload failed');
-                          }
-                        } catch {
-                          setError('Upload failed');
-                        }
-                        setUploading(false);
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
-                  {imageUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setImageUrl('')}
-                      className="text-sm text-red-600 hover:text-red-800"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-                {imageUrl && (
-                  <img
-                    src={imageUrl}
-                    alt="Location"
-                    className="mt-2 h-32 w-full rounded-lg border border-gray-200 object-cover"
-                  />
                 )}
               </div>
 
@@ -480,65 +436,63 @@ export default function LocationsPage() {
                 )}
               </div>
 
-              {/* Timezone */}
+              {/* Timezone - Dropdown */}
               <div>
                 {isEdit ? (
                   <div>
                     <span className="text-xs text-gray-400">Timezone</span>
-                    {detectingTimezone ? (
-                      <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">Detecting timezone...</p>
-                    ) : (
-                      <input
-                        value={timezone}
-                        onChange={(e) => setTimezone(e.target.value)}
-                        placeholder="Timezone"
-                        className={editInputClass}
-                      />
-                    )}
+                    <select
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
+                      className={editInputClass}
+                    >
+                      <option value="">Select timezone</option>
+                      {TIMEZONE_OPTIONS.map((tz) => (
+                        <option key={tz} value={tz}>{tz}</option>
+                      ))}
+                    </select>
                   </div>
                 ) : (
-                  <div>
-                    {detectingTimezone ? (
-                      <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">Detecting timezone...</p>
-                    ) : (
-                      <input
-                        value={timezone}
-                        onChange={(e) => setTimezone(e.target.value)}
-                        placeholder="Timezone (auto-detected from address)"
-                        className={addInputClass}
-                      />
-                    )}
-                  </div>
+                  <select
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    className={addInputClass}
+                  >
+                    <option value="">Select timezone</option>
+                    {TIMEZONE_OPTIONS.map((tz) => (
+                      <option key={tz} value={tz}>{tz}</option>
+                    ))}
+                  </select>
                 )}
               </div>
 
-              {/* Booking Limiter */}
+              {/* Booking Limiter - fixed widths */}
               <div className="rounded-lg border border-gray-200 p-4">
                 <h3 className="mb-3 text-sm font-semibold text-gray-900">Booking Limiter</h3>
-                <div className="flex items-start">
+                <div className="flex items-center gap-4">
                   <div className="w-1/2">
                     <label className="relative inline-flex cursor-pointer items-center gap-2">
                       <input type="checkbox" checked={bookingLimitEnabled} onChange={(e) => setBookingLimitEnabled(e.target.checked)} className="peer sr-only" />
-                      <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                      <div className="peer h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                       <span className="text-sm font-medium text-gray-700">
                         Enable booking limit
                       </span>
                     </label>
                   </div>
                   {bookingLimitEnabled && (
-                    <div className="flex w-1/2 items-center gap-3">
+                    <div className="flex w-1/2 items-center gap-2">
                       <input
                         type="number"
                         min="1"
                         value={bookingLimitCapacity}
                         onChange={(e) => setBookingLimitCapacity(e.target.value)}
                         placeholder="Capacity"
-                        className={`${isEdit ? editInputClass : addInputClass} w-24`}
+                        className={`${isEdit ? editInputClass : addInputClass} !w-24`}
                       />
                       <select
                         value={bookingLimitInterval}
                         onChange={(e) => setBookingLimitInterval(e.target.value)}
-                        className={isEdit ? editInputClass : addInputClass}
+                        className={`${isEdit ? editInputClass : addInputClass} !w-28`}
                       >
                         {INTERVAL_OPTIONS.map((opt) => (
                           <option key={opt} value={opt}>
@@ -604,6 +558,15 @@ export default function LocationsPage() {
           + Add Location
         </button>
       </div>
+
+      {/* Bulk action bar - above the table */}
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        totalCount={locations.length}
+        onDelete={handleBulkDelete}
+        onClearSelection={() => setSelectedIds([])}
+        deleting={bulkDeleting}
+      />
 
       <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
         {loading ? (
@@ -729,14 +692,6 @@ export default function LocationsPage() {
           </div>
         )}
       </div>
-
-      <BulkActionBar
-        selectedCount={selectedIds.length}
-        totalCount={locations.length}
-        onDelete={handleBulkDelete}
-        onClearSelection={() => setSelectedIds([])}
-        deleting={bulkDeleting}
-      />
 
       {/* Slide-in Panel */}
       {showPanel && renderPanel()}

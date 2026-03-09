@@ -44,6 +44,8 @@ export async function PUT(request: Request) {
   // Upsert loyalty program
   const programPayload = {
     tenant_id: tenantId,
+    name: body.name ?? null,
+    image_url: body.image_url ?? null,
     is_active: body.is_active ?? false,
     points_per_booking: body.points_per_booking ?? 0,
     points_per_currency_unit: body.points_per_dollar ?? 0,

@@ -336,6 +336,15 @@ export default function LoyaltyPage() {
         </button>
       </div>
 
+      {/* Bulk action bar - above the table */}
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        totalCount={programs.length}
+        onDelete={handleBulkDelete}
+        onClearSelection={() => setSelectedIds([])}
+        deleting={bulkDeleting}
+      />
+
       {/* List */}
       <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
         {programs.length === 0 ? (
@@ -363,11 +372,14 @@ export default function LoyaltyPage() {
                     className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                   />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Program</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Photo</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Pts/Booking</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Redemption Rate</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Pts/$1</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Redemption</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Tiers</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Rules</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Expiry</th>
               </tr>
             </thead>
@@ -392,19 +404,18 @@ export default function LoyaltyPage() {
                       />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex items-center gap-3">
+                      {prog.image_url ? (
+                        <img src={prog.image_url} alt={prog.name || 'Program'} className="h-9 w-9 rounded-lg object-cover" />
+                      ) : (
                         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50">
                           <svg className="h-5 w-5 text-brand-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
                           </svg>
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{prog.name || 'Loyalty Program'}</div>
-                          <div className="text-xs text-gray-500">
-                            {prog.points_per_dollar > 0 ? `${prog.points_per_dollar} pts/$` : ''}{prog.points_per_booking > 0 ? ` ${prog.points_per_booking} pts/booking` : ''}
-                          </div>
-                        </div>
-                      </div>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
+                      {prog.name || 'Loyalty Program'}
                     </td>
                     <td
                       className="whitespace-nowrap px-4 py-3"
@@ -424,8 +435,10 @@ export default function LoyaltyPage() {
                       </button>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{prog.points_per_booking}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{prog.points_per_dollar}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{prog.redemption_rate} pts = $1</td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{prog.tiers.length}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{prog.rules.length}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                       {prog.points_expiry_days > 0 ? `${prog.points_expiry_days} days` : 'Never'}
                     </td>
@@ -436,15 +449,6 @@ export default function LoyaltyPage() {
           </table>
         )}
       </div>
-
-      {/* Bulk Action Bar */}
-      <BulkActionBar
-        selectedCount={selectedIds.length}
-        totalCount={programs.length}
-        onDelete={handleBulkDelete}
-        onClearSelection={() => setSelectedIds([])}
-        deleting={bulkDeleting}
-      />
 
       {/* Slide-in Panel */}
       {showForm && (
@@ -492,8 +496,8 @@ export default function LoyaltyPage() {
                 {/* Points Earning */}
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Points Earning</h3>
-                  {/* Row 3: Pts/Booking + Pts/$1 side by side */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Row 3: Pts/Booking (25%) + Pts/$1 (25%) + Expire number (25%) + unit dropdown (25%) */}
+                  <div className="grid grid-cols-4 gap-3">
                     <div>
                       <label className="text-xs text-gray-400">Pts / Booking</label>
                       <input
@@ -517,11 +521,8 @@ export default function LoyaltyPage() {
                         className={`w-full ${inputClass}`}
                       />
                     </div>
-                  </div>
-                  {/* Row 4: Points Expire in [number] [unit] */}
-                  <div className="mt-3">
-                    <label className="text-xs text-gray-400">Points Expire in</label>
-                    <div className="flex gap-2">
+                    <div>
+                      <label className="text-xs text-gray-400">Expire in</label>
                       <input
                         type="number"
                         min="0"
@@ -529,15 +530,18 @@ export default function LoyaltyPage() {
                         onChange={(e) => setForm({ ...form, points_expiry_days: Number(e.target.value) || 0 })}
                         placeholder="0"
                         disabled={form.points_expiry_unit === 'lifetime'}
-                        className={`flex-1 ${inputClass} ${form.points_expiry_unit === 'lifetime' ? 'opacity-50' : ''}`}
+                        className={`w-full ${inputClass} ${form.points_expiry_unit === 'lifetime' ? 'opacity-50' : ''}`}
                       />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400">Unit</label>
                       <select
                         value={form.points_expiry_unit}
                         onChange={(e) => {
                           const unit = e.target.value as LoyaltyProgram['points_expiry_unit'];
                           setForm({ ...form, points_expiry_unit: unit, points_expiry_days: unit === 'lifetime' ? 0 : form.points_expiry_days });
                         }}
-                        className="h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        className={`w-full ${inputClass}`}
                       >
                         <option value="days">Days</option>
                         <option value="weeks">Weeks</option>
@@ -551,7 +555,8 @@ export default function LoyaltyPage() {
                 {/* Bonus Rules */}
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Bonus Rules (per Service/Staff)</h3>
-                  <div className="flex gap-2">
+                  {/* Row 5: toggle 25% + dropdown 50% + pts+add 25% */}
+                  <div className="grid grid-cols-4 gap-2">
                     <select
                       value={ruleType}
                       onChange={(e) => { setRuleType(e.target.value as 'service' | 'staff'); setRuleTargetId(''); }}
@@ -563,28 +568,30 @@ export default function LoyaltyPage() {
                     <select
                       value={ruleTargetId}
                       onChange={(e) => setRuleTargetId(e.target.value)}
-                      className="flex-1 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="col-span-2 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                       <option value="">Select...</option>
                       {(ruleType === 'service' ? services : staffList).map((item) => (
                         <option key={item.id} value={item.id}>{item.name}</option>
                       ))}
                     </select>
-                    <input
-                      type="number"
-                      min="1"
-                      value={rulePoints}
-                      onChange={(e) => setRulePoints(e.target.value)}
-                      placeholder="Pts"
-                      className="w-20 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={addRule}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      Add
-                    </button>
+                    <div className="flex gap-1">
+                      <input
+                        type="number"
+                        min="1"
+                        value={rulePoints}
+                        onChange={(e) => setRulePoints(e.target.value)}
+                        placeholder="Pts"
+                        className="w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={addRule}
+                        className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        Add
+                      </button>
+                    </div>
                   </div>
                   {form.rules.length > 0 && (
                     <div className="mt-2 space-y-1">
