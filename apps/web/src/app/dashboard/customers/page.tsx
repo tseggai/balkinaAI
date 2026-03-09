@@ -1,12 +1,20 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { BulkActionBar } from '@/components/bulk-action-bar';
+import { ImageUpload } from '@/components/image-upload';
 
 interface CustomerWithStats {
   id: string;
   display_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   phone: string | null;
   email: string | null;
+  date_of_birth: string | null;
+  gender: string | null;
+  notes: string | null;
+  profile_image_url: string | null;
   total_bookings: number;
   total_spent: number;
   last_booking_date: string | null;
@@ -26,12 +34,27 @@ export default function CustomersPage() {
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editDob, setEditDob] = useState('');
+  const [editGender, setEditGender] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const [editProfileImage, setEditProfileImage] = useState('');
+  const [updateLoading, setUpdateLoading] = useState(false);
 
   // Add customer form
-  const [newName, setNewName] = useState('');
+  const [newFirstName, setNewFirstName] = useState('');
+  const [newLastName, setNewLastName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [newDob, setNewDob] = useState('');
+  const [newGender, setNewGender] = useState('');
+  const [newNote, setNewNote] = useState('');
+  const [newProfileImage, setNewProfileImage] = useState('');
   const [addLoading, setAddLoading] = useState(false);
+
+  // Bulk delete
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const fetchCustomers = useCallback(async () => {
     const res = await fetch('/api/customers');
@@ -48,6 +71,12 @@ export default function CustomersPage() {
       setEditName(selected.display_name ?? '');
       setEditEmail(selected.email ?? '');
       setEditPhone(selected.phone ?? '');
+      setEditFirstName(selected.first_name ?? '');
+      setEditLastName(selected.last_name ?? '');
+      setEditDob(selected.date_of_birth ? (selected.date_of_birth.split('T')[0] ?? '') : '');
+      setEditGender(selected.gender ?? '');
+      setEditNote(selected.notes ?? '');
+      setEditProfileImage(selected.profile_image_url ?? '');
     }
   }, [selected]);
 
@@ -67,30 +96,78 @@ export default function CustomersPage() {
     );
   };
 
+  async function handleBulkDelete() {
+    if (!confirm(`Delete ${selectedIds.length} customer(s)?`)) return;
+    setBulkDeleting(true);
+    await Promise.all(selectedIds.map(id => fetch(`/api/customers?id=${id}`, { method: 'DELETE' })));
+    setSelectedIds([]);
+    setBulkDeleting(false);
+    fetchCustomers();
+  }
+
   const handleAddCustomer = async () => {
-    if (!newName.trim()) return;
+    if (!newFirstName.trim() && !newLastName.trim()) return;
     setAddLoading(true);
     try {
       const res = await fetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          display_name: newName.trim(),
+          first_name: newFirstName.trim() || null,
+          last_name: newLastName.trim() || null,
+          display_name: (newFirstName.trim() + ' ' + newLastName.trim()).trim(),
           email: newEmail.trim() || null,
           phone: newPhone.trim() || null,
+          date_of_birth: newDob || null,
+          gender: newGender || null,
+          notes: newNote.trim() || null,
+          profile_image_url: newProfileImage || null,
         }),
       });
       if (res.ok) {
-        setNewName('');
+        setNewFirstName('');
+        setNewLastName('');
         setNewEmail('');
         setNewPhone('');
-        // Refresh data without closing the modal
+        setNewDob('');
+        setNewGender('');
+        setNewNote('');
+        setNewProfileImage('');
         fetchCustomers();
       }
     } finally {
       setAddLoading(false);
     }
   };
+
+  const handleUpdateCustomer = async () => {
+    if (!selected) return;
+    setUpdateLoading(true);
+    try {
+      const res = await fetch('/api/customers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selected.id,
+          first_name: editFirstName.trim() || null,
+          last_name: editLastName.trim() || null,
+          display_name: (editFirstName.trim() + ' ' + editLastName.trim()).trim() || editName.trim() || null,
+          email: editEmail.trim() || null,
+          phone: editPhone.trim() || null,
+          date_of_birth: editDob || null,
+          gender: editGender || null,
+          notes: editNote.trim() || null,
+          profile_image_url: editProfileImage || null,
+        }),
+      });
+      if (res.ok) fetchCustomers();
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const addInputClass = 'w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const editInputClass = 'w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3';
 
   return (
     <div className="relative h-full">
@@ -169,6 +246,14 @@ export default function CustomersPage() {
             </table>
           )}
         </div>
+
+        <BulkActionBar
+          selectedCount={selectedIds.length}
+          totalCount={customers.length}
+          onDelete={handleBulkDelete}
+          onClearSelection={() => setSelectedIds([])}
+          deleting={bulkDeleting}
+        />
       </div>
 
       {/* Customer detail slide-in overlay panel */}
@@ -192,18 +277,37 @@ export default function CustomersPage() {
 
             <div className="flex-1 overflow-y-auto px-8 py-3">
               <div className="space-y-5">
-                {/* Editable Name */}
+                {/* Profile Image */}
                 <div className="space-y-0.5">
-                  <label className="block text-xs text-gray-400">Display Name</label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
-                  />
+                  <label className="block text-xs text-gray-400">Profile Photo</label>
+                  <ImageUpload value={editProfileImage} onChange={setEditProfileImage} />
                 </div>
 
-                {/* Editable Email */}
+                {/* First Name + Last Name */}
+                <div className="flex gap-4">
+                  <div className="flex-1 space-y-0.5">
+                    <label className="block text-xs text-gray-400">First Name</label>
+                    <input
+                      type="text"
+                      value={editFirstName}
+                      onChange={(e) => setEditFirstName(e.target.value)}
+                      placeholder="First name"
+                      className={editInputClass}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-0.5">
+                    <label className="block text-xs text-gray-400">Last Name</label>
+                    <input
+                      type="text"
+                      value={editLastName}
+                      onChange={(e) => setEditLastName(e.target.value)}
+                      placeholder="Last name"
+                      className={editInputClass}
+                    />
+                  </div>
+                </div>
+
+                {/* Email */}
                 <div className="space-y-0.5">
                   <label className="block text-xs text-gray-400">Email</label>
                   <input
@@ -211,11 +315,11 @@ export default function CustomersPage() {
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
                     placeholder="No email"
-                    className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
+                    className={editInputClass}
                   />
                 </div>
 
-                {/* Editable Phone */}
+                {/* Phone */}
                 <div className="space-y-0.5">
                   <label className="block text-xs text-gray-400">Phone</label>
                   <input
@@ -223,11 +327,51 @@ export default function CustomersPage() {
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
                     placeholder="No phone"
-                    className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
+                    className={editInputClass}
+                  />
+                </div>
+
+                {/* DOB + Gender */}
+                <div className="flex gap-4">
+                  <div className="flex-1 space-y-0.5">
+                    <label className="block text-xs text-gray-400">Date of Birth</label>
+                    <input
+                      type="date"
+                      value={editDob}
+                      onChange={(e) => setEditDob(e.target.value)}
+                      className={editInputClass}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-0.5">
+                    <label className="block text-xs text-gray-400">Gender</label>
+                    <select
+                      value={editGender}
+                      onChange={(e) => setEditGender(e.target.value)}
+                      className={editInputClass}
+                    >
+                      <option value="">Select</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="non-binary">Non-binary</option>
+                      <option value="prefer-not-to-say">Prefer not to say</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Note */}
+                <div className="space-y-0.5">
+                  <label className="block text-xs text-gray-400">Note</label>
+                  <textarea
+                    value={editNote}
+                    onChange={(e) => setEditNote(e.target.value)}
+                    placeholder="Add a note..."
+                    rows={3}
+                    className="w-full rounded-[.3rem] border border-transparent bg-transparent px-0 py-2 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
                   />
                 </div>
               </div>
 
+              {/* Stats */}
               <div className="mt-6 grid grid-cols-2 gap-4">
                 <StatCard label="Total Bookings" value={String(selected.total_bookings)} />
                 <StatCard label="Total Spent" value={`$${selected.total_spent.toFixed(2)}`} />
@@ -250,6 +394,33 @@ export default function CustomersPage() {
                 <p className="mt-1 text-sm text-gray-500">
                   {new Date(selected.created_at).toLocaleDateString()}
                 </p>
+              </div>
+            </div>
+
+            {/* Footer with actions */}
+            <div className="border-t border-gray-200 px-8 py-4">
+              <div className="flex justify-between">
+                <button
+                  onClick={async () => {
+                    if (!confirm('Delete this customer?')) return;
+                    await fetch(`/api/customers?id=${selected.id}`, { method: 'DELETE' });
+                    setSelected(null);
+                    fetchCustomers();
+                  }}
+                  className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+                <div className="flex gap-3">
+                  <button onClick={() => setSelected(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                  <button
+                    onClick={handleUpdateCustomer}
+                    disabled={updateLoading}
+                    className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    {updateLoading ? 'Saving...' : 'Update'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -277,27 +448,98 @@ export default function CustomersPage() {
 
             <div className="flex-1 overflow-y-auto px-8 py-3">
               <div className="space-y-5">
-                <input
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Display Name"
-                  className="w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                />
-                <input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="Email"
-                  className="w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                />
-                <input
-                  type="tel"
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  placeholder="Phone"
-                  className="w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                />
+                {/* Profile Image */}
+                <div className="space-y-0.5">
+                  <label className="block text-xs text-gray-400">Profile Photo</label>
+                  <ImageUpload value={newProfileImage} onChange={setNewProfileImage} />
+                </div>
+
+                {/* First Name + Last Name */}
+                <div className="flex gap-4">
+                  <div className="flex-1 space-y-0.5">
+                    <label className="block text-xs text-gray-400">First Name</label>
+                    <input
+                      type="text"
+                      value={newFirstName}
+                      onChange={(e) => setNewFirstName(e.target.value)}
+                      placeholder="First name"
+                      className={addInputClass}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-0.5">
+                    <label className="block text-xs text-gray-400">Last Name</label>
+                    <input
+                      type="text"
+                      value={newLastName}
+                      onChange={(e) => setNewLastName(e.target.value)}
+                      placeholder="Last name"
+                      className={addInputClass}
+                    />
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div className="space-y-0.5">
+                  <label className="block text-xs text-gray-400">Email</label>
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="Email"
+                    className={addInputClass}
+                  />
+                </div>
+
+                {/* Phone */}
+                <div className="space-y-0.5">
+                  <label className="block text-xs text-gray-400">Phone</label>
+                  <input
+                    type="tel"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    placeholder="Phone"
+                    className={addInputClass}
+                  />
+                </div>
+
+                {/* DOB + Gender */}
+                <div className="flex gap-4">
+                  <div className="flex-1 space-y-0.5">
+                    <label className="block text-xs text-gray-400">Date of Birth</label>
+                    <input
+                      type="date"
+                      value={newDob}
+                      onChange={(e) => setNewDob(e.target.value)}
+                      className={addInputClass}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-0.5">
+                    <label className="block text-xs text-gray-400">Gender</label>
+                    <select
+                      value={newGender}
+                      onChange={(e) => setNewGender(e.target.value)}
+                      className={addInputClass}
+                    >
+                      <option value="">Select</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="non-binary">Non-binary</option>
+                      <option value="prefer-not-to-say">Prefer not to say</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Note */}
+                <div className="space-y-0.5">
+                  <label className="block text-xs text-gray-400">Note</label>
+                  <textarea
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="Add a note..."
+                    rows={3}
+                    className="w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  />
+                </div>
               </div>
             </div>
 
@@ -306,7 +548,7 @@ export default function CustomersPage() {
                 <button onClick={() => setShowAddModal(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
                 <button
                   onClick={handleAddCustomer}
-                  disabled={addLoading || !newName.trim()}
+                  disabled={addLoading || (!newFirstName.trim() && !newLastName.trim())}
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {addLoading ? 'Adding...' : 'Add Customer'}

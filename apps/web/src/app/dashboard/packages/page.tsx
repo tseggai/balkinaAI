@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { ImageUpload } from '@/components/image-upload';
+import { BulkActionBar } from '@/components/bulk-action-bar';
 
 interface PackageService {
   id?: string;
@@ -52,6 +53,16 @@ export default function PackagesPage() {
   const [addServiceQty, setAddServiceQty] = useState('1');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  async function handleBulkDelete() {
+    if (!confirm(`Delete ${selectedIds.length} package(s)?`)) return;
+    setBulkDeleting(true);
+    await Promise.all(selectedIds.map(id => fetch(`/api/packages?id=${id}`, { method: 'DELETE' })));
+    setSelectedIds([]);
+    setBulkDeleting(false);
+    fetchPackages();
+  }
 
   const fetchPackages = useCallback(async () => {
     const res = await fetch('/api/packages');
@@ -306,6 +317,14 @@ export default function PackagesPage() {
         )}
       </div>
 
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        totalCount={packages.length}
+        onDelete={handleBulkDelete}
+        onClearSelection={() => setSelectedIds([])}
+        deleting={bulkDeleting}
+      />
+
       {/* Slide-in Panel — Add Mode */}
       {isAddMode && (
         <>
@@ -351,6 +370,48 @@ export default function PackagesPage() {
                       className="w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                   </div>
+                </div>
+                {/* Services */}
+                <div>
+                  <div className="flex gap-2">
+                    <select
+                      value={addServiceId}
+                      onChange={(e) => setAddServiceId(e.target.value)}
+                      className="flex-1 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      <option value="">Select a service</option>
+                      {services
+                        .filter((s) => !formServices.some((fs) => fs.service_id === s.id))
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                    </select>
+                    <input
+                      type="number"
+                      min="1"
+                      value={addServiceQty}
+                      onChange={(e) => setAddServiceQty(e.target.value)}
+                      className="w-20 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      placeholder="Qty"
+                    />
+                    <button
+                      type="button"
+                      onClick={addServiceToList}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {formServices.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {formServices.map((fs) => (
+                        <div key={fs.service_id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                          <span className="text-sm text-gray-700">{getServiceName(fs.service_id)} x{fs.quantity}</span>
+                          <button type="button" onClick={() => removeServiceFromList(fs.service_id)} className="text-sm text-red-600 hover:text-red-800">Remove</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {/* Expiration */}
                 <div className="flex items-center">
@@ -404,48 +465,6 @@ export default function PackagesPage() {
                     className="w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                   />
                 </div>
-                {/* Services */}
-                <div>
-                  <div className="flex gap-2">
-                    <select
-                      value={addServiceId}
-                      onChange={(e) => setAddServiceId(e.target.value)}
-                      className="flex-1 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                      <option value="">Select a service</option>
-                      {services
-                        .filter((s) => !formServices.some((fs) => fs.service_id === s.id))
-                        .map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                    </select>
-                    <input
-                      type="number"
-                      min="1"
-                      value={addServiceQty}
-                      onChange={(e) => setAddServiceQty(e.target.value)}
-                      className="w-20 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      placeholder="Qty"
-                    />
-                    <button
-                      type="button"
-                      onClick={addServiceToList}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      Add
-                    </button>
-                  </div>
-                  {formServices.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {formServices.map((fs) => (
-                        <div key={fs.service_id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
-                          <span className="text-sm text-gray-700">{getServiceName(fs.service_id)} x{fs.quantity}</span>
-                          <button type="button" onClick={() => removeServiceFromList(fs.service_id)} className="text-sm text-red-600 hover:text-red-800">Remove</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
                 {error && <p className="text-sm text-red-600">{error}</p>}
               </div>
             </div>
@@ -494,28 +513,59 @@ export default function PackagesPage() {
                   onChange={(url) => setForm({ ...form, image_url: url })}
                   label=""
                 />
-                {/* Name */}
-                <div>
-                  <label className="text-xs text-gray-400">Name</label>
-                  <input
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Name *"
-                    className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
-                  />
+                {/* Name + Price side by side */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-400">Name</label>
+                    <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Name *" className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400">Price ($)</label>
+                    <input type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="Price ($)" className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3" />
+                  </div>
                 </div>
-                {/* Price */}
+                {/* Services */}
                 <div>
-                  <label className="text-xs text-gray-400">Price ($)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.price}
-                    onChange={(e) => setForm({ ...form, price: e.target.value })}
-                    placeholder="Price ($)"
-                    className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
-                  />
+                  <label className="text-xs text-gray-400">Services</label>
+                  <div className="mt-1 flex gap-2">
+                    <select
+                      value={addServiceId}
+                      onChange={(e) => setAddServiceId(e.target.value)}
+                      className="flex-1 h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
+                    >
+                      <option value="">Select a service</option>
+                      {services
+                        .filter((s) => !formServices.some((fs) => fs.service_id === s.id))
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                    </select>
+                    <input
+                      type="number"
+                      min="1"
+                      value={addServiceQty}
+                      onChange={(e) => setAddServiceQty(e.target.value)}
+                      className="w-20 h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
+                      placeholder="Qty"
+                    />
+                    <button
+                      type="button"
+                      onClick={addServiceToList}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {formServices.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {formServices.map((fs) => (
+                        <div key={fs.service_id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                          <span className="text-sm text-gray-700">{getServiceName(fs.service_id)} x{fs.quantity}</span>
+                          <button type="button" onClick={() => removeServiceFromList(fs.service_id)} className="text-sm text-red-600 hover:text-red-800">Remove</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {/* Description */}
                 <div>
@@ -585,49 +635,6 @@ export default function PackagesPage() {
                       </label>
                     </div>
                   </div>
-                </div>
-                {/* Services */}
-                <div>
-                  <label className="text-xs text-gray-400">Services</label>
-                  <div className="mt-1 flex gap-2">
-                    <select
-                      value={addServiceId}
-                      onChange={(e) => setAddServiceId(e.target.value)}
-                      className="flex-1 h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
-                    >
-                      <option value="">Select a service</option>
-                      {services
-                        .filter((s) => !formServices.some((fs) => fs.service_id === s.id))
-                        .map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                    </select>
-                    <input
-                      type="number"
-                      min="1"
-                      value={addServiceQty}
-                      onChange={(e) => setAddServiceQty(e.target.value)}
-                      className="w-20 h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
-                      placeholder="Qty"
-                    />
-                    <button
-                      type="button"
-                      onClick={addServiceToList}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      Add
-                    </button>
-                  </div>
-                  {formServices.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {formServices.map((fs) => (
-                        <div key={fs.service_id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
-                          <span className="text-sm text-gray-700">{getServiceName(fs.service_id)} x{fs.quantity}</span>
-                          <button type="button" onClick={() => removeServiceFromList(fs.service_id)} className="text-sm text-red-600 hover:text-red-800">Remove</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
                 {error && <p className="text-sm text-red-600">{error}</p>}
               </div>

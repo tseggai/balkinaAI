@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { ImageUpload } from '@/components/image-upload';
+import { BulkActionBar } from '@/components/bulk-action-bar';
 
 interface ProductService {
   id?: string;
@@ -55,6 +56,16 @@ export default function InventoryPage() {
   const [addServiceQty, setAddServiceQty] = useState('1');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  async function handleBulkDelete() {
+    if (!confirm(`Delete ${selectedIds.length} product(s)?`)) return;
+    setBulkDeleting(true);
+    await Promise.all(selectedIds.map(id => fetch(`/api/inventory?id=${id}`, { method: 'DELETE' })));
+    setSelectedIds([]);
+    setBulkDeleting(false);
+    fetchProducts();
+  }
 
   const fetchProducts = useCallback(async () => {
     const res = await fetch('/api/inventory');
@@ -319,6 +330,14 @@ export default function InventoryPage() {
         )}
       </div>
 
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        totalCount={products.length}
+        onDelete={handleBulkDelete}
+        deleting={bulkDeleting}
+        onClearSelection={() => setSelectedIds([])}
+      />
+
       {/* Slide-in Panel */}
       {showForm && (
         <>
@@ -359,7 +378,8 @@ export default function InventoryPage() {
                         className={editInputClass}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Row 2: Qty on Hand + Min Qty + Max Qty */}
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-0.5">
                         <span className="text-xs text-gray-400">Qty on Hand</span>
                         <input
@@ -380,18 +400,19 @@ export default function InventoryPage() {
                           className={editInputClass}
                         />
                       </div>
+                      <div className="space-y-0.5">
+                        <span className="text-xs text-gray-400">Max Qty</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.max_order_quantity}
+                          onChange={(e) => setForm({ ...form, max_order_quantity: e.target.value })}
+                          placeholder="Unlimited"
+                          className={editInputClass}
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-0.5">
-                      <span className="text-xs text-gray-400">Max Qty</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.max_order_quantity}
-                        onChange={(e) => setForm({ ...form, max_order_quantity: e.target.value })}
-                        placeholder="Unlimited"
-                        className={editInputClass}
-                      />
-                    </div>
+                    {/* Row 3: Purchase Price + Sell Price */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-0.5">
                         <span className="text-xs text-gray-400">Purchase Price ($)</span>
@@ -416,14 +437,14 @@ export default function InventoryPage() {
                         />
                       </div>
                     </div>
-                    {/* Linked Services */}
+                    {/* Row 4: Linked Services (50% select + 50% qty+add) */}
                     <div>
                       <label className="mb-1 block text-xs text-gray-400">Linked Services</label>
-                      <div className="flex gap-2">
+                      <div className="grid grid-cols-2 gap-4">
                         <select
                           value={addServiceId}
                           onChange={(e) => setAddServiceId(e.target.value)}
-                          className={`flex-1 ${editInputClass}`}
+                          className={editInputClass}
                         >
                           <option value="">Select a service</option>
                           {services
@@ -432,21 +453,23 @@ export default function InventoryPage() {
                               <option key={s.id} value={s.id}>{s.name}</option>
                             ))}
                         </select>
-                        <input
-                          type="number"
-                          min="1"
-                          value={addServiceQty}
-                          onChange={(e) => setAddServiceQty(e.target.value)}
-                          placeholder="Qty"
-                          className={`w-20 ${editInputClass}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={addServiceToList}
-                          className="rounded-[.3rem] border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                        >
-                          Add
-                        </button>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            value={addServiceQty}
+                            onChange={(e) => setAddServiceQty(e.target.value)}
+                            placeholder="Qty"
+                            className={`flex-1 ${editInputClass}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={addServiceToList}
+                            className="rounded-[.3rem] border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            Add
+                          </button>
+                        </div>
                       </div>
                       {formServices.length > 0 && (
                         <div className="mt-3 space-y-2">
@@ -459,20 +482,7 @@ export default function InventoryPage() {
                         </div>
                       )}
                     </div>
-                    {/* Toggles */}
-                    <div className="flex items-center">
-                      <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
-                        <input type="checkbox" checked={form.display_in_booking} onChange={(e) => setForm({ ...form, display_in_booking: e.target.checked })} className="peer sr-only" />
-                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                        Display in booking
-                      </label>
-                      <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
-                        <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="peer sr-only" />
-                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                        Active
-                      </label>
-                    </div>
-                    {/* Description */}
+                    {/* Row 5: Description */}
                     <div className="space-y-0.5">
                       <span className="text-xs text-gray-400">Description</span>
                       <textarea
@@ -481,6 +491,22 @@ export default function InventoryPage() {
                         onChange={(e) => setForm({ ...form, description: e.target.value })}
                         className={editTextareaClass}
                       />
+                    </div>
+                    {/* Row 6: Display in booking toggle */}
+                    <div>
+                      <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                        <input type="checkbox" checked={form.display_in_booking} onChange={(e) => setForm({ ...form, display_in_booking: e.target.checked })} className="peer sr-only" />
+                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                        Display in booking
+                      </label>
+                    </div>
+                    {/* Row 7: Active toggle (Program Status) */}
+                    <div>
+                      <label className="relative inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                        <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="peer sr-only" />
+                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                        Active
+                      </label>
                     </div>
                   </>
                 ) : (
@@ -552,11 +578,11 @@ export default function InventoryPage() {
                     </div>
                     {/* Linked Services */}
                     <div>
-                      <div className="flex gap-2">
+                      <div className="grid grid-cols-2 gap-4">
                         <select
                           value={addServiceId}
                           onChange={(e) => setAddServiceId(e.target.value)}
-                          className={`flex-1 ${addInputClass}`}
+                          className={addInputClass}
                         >
                           <option value="">Select a service to link</option>
                           {services
@@ -565,21 +591,23 @@ export default function InventoryPage() {
                               <option key={s.id} value={s.id}>{s.name}</option>
                             ))}
                         </select>
-                        <input
-                          type="number"
-                          min="1"
-                          value={addServiceQty}
-                          onChange={(e) => setAddServiceQty(e.target.value)}
-                          placeholder="Qty"
-                          className={`w-20 ${addInputClass}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={addServiceToList}
-                          className="rounded-[.3rem] border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                        >
-                          Add
-                        </button>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            value={addServiceQty}
+                            onChange={(e) => setAddServiceQty(e.target.value)}
+                            placeholder="Qty"
+                            className={`flex-1 ${addInputClass}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={addServiceToList}
+                            className="rounded-[.3rem] border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            Add
+                          </button>
+                        </div>
                       </div>
                       {formServices.length > 0 && (
                         <div className="mt-3 space-y-2">
