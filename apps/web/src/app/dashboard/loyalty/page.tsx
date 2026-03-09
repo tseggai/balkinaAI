@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { BulkActionBar } from '@/components/bulk-action-bar';
+import { ImageUpload } from '@/components/image-upload';
 
 interface LoyaltyTier {
   name: string;
@@ -18,12 +20,15 @@ interface LoyaltyRule {
 
 interface LoyaltyProgram {
   id?: string;
+  name: string;
+  image_url: string | null;
   is_active: boolean;
   points_per_booking: number;
   points_per_dollar: number;
   redemption_rate: number;
   min_redemption_points: number;
   points_expiry_days: number;
+  points_expiry_unit: 'days' | 'weeks' | 'months' | 'lifetime';
   tiers: LoyaltyTier[];
   rules: LoyaltyRule[];
 }
@@ -40,12 +45,15 @@ interface StaffOption {
 
 function emptyProgram(): LoyaltyProgram {
   return {
+    name: '',
+    image_url: null,
     is_active: true,
     points_per_booking: 10,
     points_per_dollar: 1,
     redemption_rate: 100,
     min_redemption_points: 100,
     points_expiry_days: 0,
+    points_expiry_unit: 'days',
     tiers: [],
     rules: [],
   };
@@ -57,6 +65,7 @@ export default function LoyaltyPage() {
   const [staffList, setStaffList] = useState<StaffOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Panel state
   const [showForm, setShowForm] = useState(false);
@@ -90,12 +99,15 @@ export default function LoyaltyPage() {
       const p = loyaltyJson.data.program as Record<string, unknown>;
       const prog: LoyaltyProgram = {
         id: p.id as string | undefined,
+        name: (p.name as string) ?? '',
+        image_url: (p.image_url as string | null) ?? null,
         is_active: (p.is_active as boolean) ?? false,
         points_per_booking: (p.points_per_booking as number) ?? 0,
         points_per_dollar: (p.points_per_currency_unit as number ?? p.points_per_dollar as number) ?? 0,
         redemption_rate: (p.redemption_rate as number) ?? 0,
         min_redemption_points: (p.min_redemption_points as number) ?? 0,
         points_expiry_days: (p.points_expiry_days as number) ?? 0,
+        points_expiry_unit: 'days',
         tiers: (p.tiers as LoyaltyTier[]) ?? [],
         rules: (loyaltyJson.data?.rules as LoyaltyRule[]) ?? [],
       };
@@ -202,6 +214,17 @@ export default function LoyaltyPage() {
     setShowForm(false);
   }
 
+  async function handleBulkDelete() {
+    if (!confirm(`Delete ${selectedIds.length} loyalty program(s)?`)) return;
+    setBulkDeleting(true);
+    for (const id of selectedIds) {
+      const index = programs.findIndex(p => (p.id ?? '') === id);
+      if (index >= 0) await handleDelete(index);
+    }
+    setSelectedIds([]);
+    setBulkDeleting(false);
+  }
+
   async function handleToggleActive(index: number) {
     const prog = programs[index];
     if (!prog) return;
@@ -231,13 +254,25 @@ export default function LoyaltyPage() {
     }
     setSaving(true);
 
+    // Convert expiry value based on unit
+    let computedExpiryDays = form.points_expiry_days;
+    if (form.points_expiry_unit === 'lifetime') {
+      computedExpiryDays = 0;
+    } else if (form.points_expiry_unit === 'weeks') {
+      computedExpiryDays = form.points_expiry_days * 7;
+    } else if (form.points_expiry_unit === 'months') {
+      computedExpiryDays = form.points_expiry_days * 30;
+    }
+
     const body = {
+      name: form.name,
+      image_url: form.image_url,
       is_active: form.is_active,
       points_per_booking: form.points_per_booking,
       points_per_dollar: form.points_per_dollar,
       redemption_rate: form.redemption_rate,
       min_redemption_points: form.min_redemption_points,
-      points_expiry_days: form.points_expiry_days,
+      points_expiry_days: computedExpiryDays,
       tiers: form.tiers,
       rules: form.rules.map((r) => ({ type: r.type, target_id: r.target_id, points: r.points })),
     };
@@ -271,6 +306,9 @@ export default function LoyaltyPage() {
   }
 
   const isEditing = editingIndex !== null;
+  const inputClass = isEditing
+    ? 'h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3'
+    : 'h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
   if (loading) {
     return (
@@ -361,7 +399,7 @@ export default function LoyaltyPage() {
                           </svg>
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-gray-900">Loyalty Program</div>
+                          <div className="text-sm font-medium text-gray-900">{prog.name || 'Loyalty Program'}</div>
                           <div className="text-xs text-gray-500">
                             {prog.points_per_dollar > 0 ? `${prog.points_per_dollar} pts/$` : ''}{prog.points_per_booking > 0 ? ` ${prog.points_per_booking} pts/booking` : ''}
                           </div>
@@ -399,6 +437,15 @@ export default function LoyaltyPage() {
         )}
       </div>
 
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        totalCount={programs.length}
+        onDelete={handleBulkDelete}
+        onClearSelection={() => setSelectedIds([])}
+        deleting={bulkDeleting}
+      />
+
       {/* Slide-in Panel */}
       {showForm && (
         <>
@@ -421,81 +468,84 @@ export default function LoyaltyPage() {
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-8 py-3">
               <div className="space-y-5">
-                {/* Active toggle */}
-                <div className="flex items-center rounded-lg border border-gray-200 p-4">
-                  <div className="w-1/2">
-                    <p className="text-sm font-medium text-gray-900">Program Status</p>
-                    <p className="text-xs text-gray-500">Enable or disable this program</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, is_active: !form.is_active })}
-                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                      form.is_active ? 'bg-brand-600' : 'bg-gray-200'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                        form.is_active ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
+                {/* Row 1: Image Upload */}
+                <div>
+                  <ImageUpload
+                    value={form.image_url ?? ''}
+                    onChange={(url) => setForm({ ...form, image_url: url || null })}
+                    label="Program Image (optional)"
+                  />
+                </div>
+
+                {/* Row 2: Program Name */}
+                <div>
+                  <label className="text-xs text-gray-400">Program Name</label>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="e.g. VIP Rewards"
+                    className={`w-full ${inputClass}`}
+                  />
                 </div>
 
                 {/* Points Earning */}
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Points Earning</h3>
-                  {isEditing ? (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs text-gray-400">Pts / Booking</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={form.points_per_booking}
-                          onChange={(e) => setForm({ ...form, points_per_booking: Number(e.target.value) || 0 })}
-                          className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-400">Pts / $1 Spent</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.1"
-                          value={form.points_per_dollar}
-                          onChange={(e) => setForm({ ...form, points_per_dollar: Number(e.target.value) || 0 })}
-                          className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
-                        />
-                      </div>
+                  {/* Row 3: Pts/Booking + Pts/$1 side by side */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-400">Pts / Booking</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={form.points_per_booking}
+                        onChange={(e) => setForm({ ...form, points_per_booking: Number(e.target.value) || 0 })}
+                        placeholder="0"
+                        className={`w-full ${inputClass}`}
+                      />
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-4">
-                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Pts / Booking</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={form.points_per_booking}
-                          onChange={(e) => setForm({ ...form, points_per_booking: Number(e.target.value) || 0 })}
-                          placeholder="0"
-                          className="flex-1 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Pts / $1 Spent</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.1"
-                          value={form.points_per_dollar}
-                          onChange={(e) => setForm({ ...form, points_per_dollar: Number(e.target.value) || 0 })}
-                          placeholder="0"
-                          className="flex-1 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                      </div>
+                    <div>
+                      <label className="text-xs text-gray-400">Pts / $1 Spent</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={form.points_per_dollar}
+                        onChange={(e) => setForm({ ...form, points_per_dollar: Number(e.target.value) || 0 })}
+                        placeholder="0"
+                        className={`w-full ${inputClass}`}
+                      />
                     </div>
-                  )}
+                  </div>
+                  {/* Row 4: Points Expire in [number] [unit] */}
+                  <div className="mt-3">
+                    <label className="text-xs text-gray-400">Points Expire in</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        value={form.points_expiry_unit === 'lifetime' ? '' : form.points_expiry_days}
+                        onChange={(e) => setForm({ ...form, points_expiry_days: Number(e.target.value) || 0 })}
+                        placeholder="0"
+                        disabled={form.points_expiry_unit === 'lifetime'}
+                        className={`flex-1 ${inputClass} ${form.points_expiry_unit === 'lifetime' ? 'opacity-50' : ''}`}
+                      />
+                      <select
+                        value={form.points_expiry_unit}
+                        onChange={(e) => {
+                          const unit = e.target.value as LoyaltyProgram['points_expiry_unit'];
+                          setForm({ ...form, points_expiry_unit: unit, points_expiry_days: unit === 'lifetime' ? 0 : form.points_expiry_days });
+                        }}
+                        className="h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="days">Days</option>
+                        <option value="weeks">Weeks</option>
+                        <option value="months">Months</option>
+                        <option value="lifetime">Lifetime</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Bonus Rules */}
@@ -554,55 +604,30 @@ export default function LoyaltyPage() {
                 {/* Redemption */}
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Redemption</h3>
-                  {isEditing ? (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs text-gray-400">Pts to $1</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={form.redemption_rate}
-                          onChange={(e) => setForm({ ...form, redemption_rate: Number(e.target.value) || 0 })}
-                          className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-400">Min Threshold</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={form.min_redemption_points}
-                          onChange={(e) => setForm({ ...form, min_redemption_points: Number(e.target.value) || 0 })}
-                          className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
-                        />
-                      </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-400">Pts to $1</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={form.redemption_rate}
+                        onChange={(e) => setForm({ ...form, redemption_rate: Number(e.target.value) || 0 })}
+                        placeholder="0"
+                        className={`w-full ${inputClass}`}
+                      />
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-4">
-                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Pts to $1</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={form.redemption_rate}
-                          onChange={(e) => setForm({ ...form, redemption_rate: Number(e.target.value) || 0 })}
-                          placeholder="0"
-                          className="flex-1 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Min Threshold</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={form.min_redemption_points}
-                          onChange={(e) => setForm({ ...form, min_redemption_points: Number(e.target.value) || 0 })}
-                          placeholder="0"
-                          className="flex-1 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                      </div>
+                    <div>
+                      <label className="text-xs text-gray-400">Min Threshold</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={form.min_redemption_points}
+                        onChange={(e) => setForm({ ...form, min_redemption_points: Number(e.target.value) || 0 })}
+                        placeholder="0"
+                        className={`w-full ${inputClass}`}
+                      />
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* Tier System */}
@@ -667,34 +692,25 @@ export default function LoyaltyPage() {
                   )}
                 </div>
 
-                {/* Expiry */}
-                <div>
-                  <h3 className="mb-3 text-sm font-semibold text-gray-900">Points Expiry</h3>
-                  {isEditing ? (
-                    <div>
-                      <label className="text-xs text-gray-400">Expiry Days</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.points_expiry_days}
-                        onChange={(e) => setForm({ ...form, points_expiry_days: Number(e.target.value) || 0 })}
-                        placeholder="0 = never"
-                        className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-4">
-                      <span className="w-32 shrink-0 text-sm font-medium text-gray-700">Expiry Days</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.points_expiry_days}
-                        onChange={(e) => setForm({ ...form, points_expiry_days: Number(e.target.value) || 0 })}
-                        placeholder="0 = never"
-                        className="flex-1 h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      />
-                    </div>
-                  )}
+                {/* Program Status (moved to bottom) */}
+                <div className="flex items-center rounded-lg border border-gray-200 p-4">
+                  <div className="w-1/2">
+                    <p className="text-sm font-medium text-gray-900">Program Status</p>
+                    <p className="text-xs text-gray-500">Enable or disable this program</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, is_active: !form.is_active })}
+                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                      form.is_active ? 'bg-brand-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        form.is_active ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
 
                 {error && <p className="text-sm text-red-600">{error}</p>}

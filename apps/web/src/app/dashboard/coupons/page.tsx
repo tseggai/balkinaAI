@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { BulkActionBar } from '@/components/bulk-action-bar';
+import { ImageUpload } from '@/components/image-upload';
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 
@@ -16,6 +18,7 @@ interface Coupon {
   scope: 'per_customer' | 'per_booking';
   applicable_service_ids: string[] | null;
   applicable_staff_ids: string[] | null;
+  image_url: string | null;
   created_at: string;
 }
 
@@ -39,6 +42,7 @@ interface CouponForm {
   scope: 'per_customer' | 'per_booking';
   applicable_service_ids: string[];
   applicable_staff_ids: string[];
+  image_url: string;
 }
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
@@ -58,6 +62,7 @@ function emptyForm(): CouponForm {
     scope: 'per_booking',
     applicable_service_ids: [],
     applicable_staff_ids: [],
+    image_url: '',
   };
 }
 
@@ -72,6 +77,7 @@ export default function CouponsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Dropdown toggles for tag-based multi-selects
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
@@ -126,6 +132,25 @@ export default function CouponsPage() {
     }
   }
 
+  async function handleBulkDelete() {
+    if (!confirm(`Delete ${selectedIds.length} coupon(s)?`)) return;
+    setBulkDeleting(true);
+    await Promise.all(selectedIds.map(id => fetch(`/api/coupons?id=${id}`, { method: 'DELETE' })));
+    setSelectedIds([]);
+    setBulkDeleting(false);
+    fetchCoupons();
+  }
+
+  /* ── Select all services/staff helpers ───────────────────────────────── */
+
+  function selectAllServices() {
+    setForm(prev => ({ ...prev, applicable_service_ids: services.map(s => s.id) }));
+  }
+
+  function selectAllStaff() {
+    setForm(prev => ({ ...prev, applicable_staff_ids: staff.map(s => s.id) }));
+  }
+
   /* ── Form handlers ──────────────────────────────────────────────────── */
 
   function openNew() {
@@ -146,6 +171,7 @@ export default function CouponsPage() {
       scope: c.scope ?? 'per_booking',
       applicable_service_ids: c.applicable_service_ids ?? [],
       applicable_staff_ids: c.applicable_staff_ids ?? [],
+      image_url: c.image_url ?? '',
     });
     setShowForm(true);
   }
@@ -200,6 +226,7 @@ export default function CouponsPage() {
       scope: form.scope,
       applicable_service_ids: form.applicable_service_ids.length > 0 ? form.applicable_service_ids : null,
       applicable_staff_ids: form.applicable_staff_ids.length > 0 ? form.applicable_staff_ids : null,
+      image_url: form.image_url || null,
     };
 
     const res = await fetch('/api/coupons', {
@@ -291,13 +318,13 @@ export default function CouponsPage() {
                   Discount
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Scope
+                  Usage Type
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
                   Services
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Usage
+                  Usage Value
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
                   Expires
@@ -371,6 +398,14 @@ export default function CouponsPage() {
         )}
       </div>
 
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        totalCount={coupons.length}
+        onDelete={handleBulkDelete}
+        deleting={bulkDeleting}
+        onClearSelection={() => setSelectedIds([])}
+      />
+
       {/* Slide-in Panel */}
       {showForm && (
         <>
@@ -399,6 +434,14 @@ export default function CouponsPage() {
                 {editing ? (
                   /* ─── EDIT MODE: horizontal label-left, value-right, hover-to-edit ─── */
                   <>
+                    {/* Image Upload */}
+                    <div>
+                      <ImageUpload
+                        value={form.image_url}
+                        onChange={(url) => setForm({ ...form, image_url: url })}
+                      />
+                    </div>
+
                     {/* Code */}
                     <div className="space-y-0.5">
                       <span className="text-xs text-gray-400">Code</span>
@@ -418,40 +461,85 @@ export default function CouponsPage() {
                       </div>
                     </div>
 
-                    {/* Discount Type */}
-                    <div className="space-y-0.5">
-                      <span className="text-xs text-gray-400">Discount Type</span>
-                      <select
-                        value={form.discount_type}
-                        onChange={(e) =>
-                          setForm({ ...form, discount_type: e.target.value as 'percentage' | 'fixed' })
-                        }
-                        className={editInputClass}
-                      >
-                        <option value="percentage">Percentage</option>
-                        <option value="fixed">Fixed Amount</option>
-                      </select>
+                    {/* Discount Type + Discount Value */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-0.5">
+                        <span className="text-xs text-gray-400">Discount Type</span>
+                        <select
+                          value={form.discount_type}
+                          onChange={(e) =>
+                            setForm({ ...form, discount_type: e.target.value as 'percentage' | 'fixed' })
+                          }
+                          className={editInputClass}
+                        >
+                          <option value="percentage">Percentage</option>
+                          <option value="fixed">Fixed Amount</option>
+                        </select>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-xs text-gray-400">
+                          {form.discount_type === 'percentage' ? 'Discount (%)' : 'Discount ($)'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step={form.discount_type === 'percentage' ? '1' : '0.01'}
+                          value={form.discount_value}
+                          onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
+                          className={editInputClass}
+                        />
+                      </div>
                     </div>
 
-                    {/* Discount Value */}
-                    <div className="space-y-0.5">
-                      <span className="text-xs text-gray-400">
-                        {form.discount_type === 'percentage' ? 'Discount (%)' : 'Discount ($)'}
-                      </span>
-                      <input
-                        type="number"
-                        min="0"
-                        step={form.discount_type === 'percentage' ? '1' : '0.01'}
-                        value={form.discount_value}
-                        onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
-                        className={editInputClass}
-                      />
-                    </div>
-
-                    {/* Scope */}
+                    {/* Lifetime / Expiry */}
                     <div className="flex items-center">
-                      <span className="w-1/2 text-xs text-gray-400">Scope</span>
-                      <div className="flex w-1/2 items-center gap-4">
+                      <div className="w-1/2">
+                        {!form.is_lifetime && (
+                          <div className="space-y-0.5">
+                            <span className="text-xs text-gray-400">Expiry Date</span>
+                            <input
+                              type="date"
+                              value={form.expires_at}
+                              onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
+                              className={editInputClass}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex w-1/2 items-center gap-2 justify-end">
+                        <span className="text-xs text-gray-400">Lifetime</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={form.is_lifetime}
+                          onClick={() => setForm({ ...form, is_lifetime: !form.is_lifetime })}
+                          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
+                            form.is_lifetime ? 'bg-brand-600' : 'bg-gray-200'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              form.is_lifetime ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Usage Limit + Scope */}
+                    <div className="flex items-center">
+                      <div className="w-1/2 space-y-0.5">
+                        <span className="text-xs text-gray-400">Usage Limit</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={form.usage_limit}
+                          onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
+                          placeholder="Unlimited"
+                          className={editInputClass}
+                        />
+                      </div>
+                      <div className="flex w-1/2 items-center gap-4 justify-end">
                         <label className="flex items-center gap-1.5 cursor-pointer">
                           <input
                             type="radio"
@@ -475,51 +563,6 @@ export default function CouponsPage() {
                           <span className="text-xs text-gray-700">Per customer</span>
                         </label>
                       </div>
-                    </div>
-
-                    {/* Lifetime / Expiry */}
-                    <div className="flex items-center">
-                      <div className="flex w-1/2 items-center gap-2">
-                        <span className="text-xs text-gray-400">Lifetime</span>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={form.is_lifetime}
-                          onClick={() => setForm({ ...form, is_lifetime: !form.is_lifetime })}
-                          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
-                            form.is_lifetime ? 'bg-brand-600' : 'bg-gray-200'
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              form.is_lifetime ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      <div className="w-1/2">
-                        {!form.is_lifetime && (
-                          <input
-                            type="date"
-                            value={form.expires_at}
-                            onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
-                            className={editInputClass}
-                          />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Usage Limit */}
-                    <div className="space-y-0.5">
-                      <span className="text-xs text-gray-400">Usage Limit</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={form.usage_limit}
-                        onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
-                        placeholder="Unlimited"
-                        className={editInputClass}
-                      />
                     </div>
 
                     {/* Applicable Services */}
@@ -563,6 +606,9 @@ export default function CouponsPage() {
                             )}
                           </div>
                         )}
+                        <button type="button" onClick={selectAllServices} className="rounded-full border border-dashed border-gray-300 px-3 py-1 text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600">
+                          All
+                        </button>
                         {services.length === 0 && (
                           <span className="text-sm text-gray-400">No services found.</span>
                         )}
@@ -610,6 +656,9 @@ export default function CouponsPage() {
                             )}
                           </div>
                         )}
+                        <button type="button" onClick={selectAllStaff} className="rounded-full border border-dashed border-gray-300 px-3 py-1 text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600">
+                          All
+                        </button>
                         {staff.length === 0 && (
                           <span className="text-sm text-gray-400">No staff found.</span>
                         )}
@@ -621,6 +670,14 @@ export default function CouponsPage() {
                 ) : (
                   /* ─── CREATE MODE: placeholders instead of labels ─── */
                   <>
+                    {/* Image Upload */}
+                    <div>
+                      <ImageUpload
+                        value={form.image_url}
+                        onChange={(url) => setForm({ ...form, image_url: url })}
+                      />
+                    </div>
+
                     {/* Code */}
                     <div>
                       <div className="flex gap-2">
@@ -667,9 +724,56 @@ export default function CouponsPage() {
                       </div>
                     </div>
 
-                    {/* Scope */}
-                    <div>
-                      <div className="flex items-center gap-6">
+                    {/* Expiry date + Lifetime toggle */}
+                    <div className="flex items-center gap-4">
+                      <div className="w-1/2">
+                        {form.is_lifetime ? (
+                          <div className="flex h-[46px] items-center rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3">
+                            <span className="text-sm text-gray-400">Never expires</span>
+                          </div>
+                        ) : (
+                          <input
+                            type="date"
+                            value={form.expires_at}
+                            onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
+                            placeholder="Expiry Date"
+                            className={addInputClass}
+                          />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">Lifetime</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={form.is_lifetime}
+                          onClick={() => setForm({ ...form, is_lifetime: !form.is_lifetime })}
+                          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
+                            form.is_lifetime ? 'bg-brand-600' : 'bg-gray-200'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              form.is_lifetime ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Usage limit + Scope */}
+                    <div className="flex items-center gap-4">
+                      <div className="w-1/2">
+                        <input
+                          type="number"
+                          min="1"
+                          value={form.usage_limit}
+                          onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
+                          placeholder="Usage Limit (Unlimited)"
+                          className={addInputClass}
+                        />
+                      </div>
+                      <div className="flex items-center gap-4">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="radio"
@@ -692,56 +796,6 @@ export default function CouponsPage() {
                           />
                           <span className="text-sm text-gray-700">Per customer</span>
                         </label>
-                      </div>
-                    </div>
-
-                    {/* Lifetime toggle + Expiry date + Usage limit */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="mb-2 flex items-center justify-between">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <span className="text-xs text-gray-500">Lifetime</span>
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={form.is_lifetime}
-                              onClick={() => setForm({ ...form, is_lifetime: !form.is_lifetime })}
-                              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
-                                form.is_lifetime ? 'bg-brand-600' : 'bg-gray-200'
-                              }`}
-                            >
-                              <span
-                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                  form.is_lifetime ? 'translate-x-4' : 'translate-x-0'
-                                }`}
-                              />
-                            </button>
-                          </label>
-                        </div>
-                        {form.is_lifetime ? (
-                          <div className="flex h-8 items-center rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3">
-                            <span className="text-sm text-gray-400">Never expires</span>
-                          </div>
-                        ) : (
-                          <input
-                            type="date"
-                            value={form.expires_at}
-                            onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
-                            placeholder="Expiry Date"
-                            className={addInputClass}
-                          />
-                        )}
-                      </div>
-                      <div>
-                        <div className="mb-2 h-5" />
-                        <input
-                          type="number"
-                          min="1"
-                          value={form.usage_limit}
-                          onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
-                          placeholder="Usage Limit (Unlimited)"
-                          className={addInputClass}
-                        />
                       </div>
                     </div>
 
@@ -786,6 +840,9 @@ export default function CouponsPage() {
                             )}
                           </div>
                         )}
+                        <button type="button" onClick={selectAllServices} className="rounded-full border border-dashed border-gray-300 px-3 py-1 text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600">
+                          All
+                        </button>
                         {services.length === 0 && (
                           <span className="text-sm text-gray-400">No services found.</span>
                         )}
@@ -833,6 +890,9 @@ export default function CouponsPage() {
                             )}
                           </div>
                         )}
+                        <button type="button" onClick={selectAllStaff} className="rounded-full border border-dashed border-gray-300 px-3 py-1 text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600">
+                          All
+                        </button>
                         {staff.length === 0 && (
                           <span className="text-sm text-gray-400">No staff found.</span>
                         )}

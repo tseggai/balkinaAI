@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { BulkActionBar } from '@/components/bulk-action-bar';
 
 const MODULES = [
   'appointments',
@@ -105,6 +106,16 @@ export default function RolesPage() {
   const [error, setError] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showStaffDropdown, setShowStaffDropdown] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  async function handleBulkDelete() {
+    if (!confirm(`Delete ${selectedIds.length} role(s)?`)) return;
+    setBulkDeleting(true);
+    await Promise.all(selectedIds.map(id => fetch(`/api/roles?id=${id}`, { method: 'DELETE' })));
+    setSelectedIds([]);
+    setBulkDeleting(false);
+    fetchRoles();
+  }
 
   const fetchRoles = useCallback(async () => {
     const res = await fetch('/api/roles');
@@ -380,6 +391,14 @@ export default function RolesPage() {
         )}
       </div>
 
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        totalCount={roles.length}
+        onDelete={handleBulkDelete}
+        onClearSelection={() => setSelectedIds([])}
+        deleting={bulkDeleting}
+      />
+
       {/* Slide-in Panel */}
       {showPanel && (
         <>
@@ -416,17 +435,6 @@ export default function RolesPage() {
                         value={form.name}
                         onChange={(e) => setForm({ ...form, name: e.target.value })}
                         className={addInputClass}
-                      />
-                    </div>
-
-                    {/* Notes */}
-                    <div>
-                      <textarea
-                        rows={2}
-                        placeholder="Notes"
-                        value={form.notes}
-                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                        className={addTextareaClass}
                       />
                     </div>
 
@@ -487,17 +495,6 @@ export default function RolesPage() {
                         value={form.name}
                         onChange={(e) => setForm({ ...form, name: e.target.value })}
                         className={editInputClass}
-                      />
-                    </div>
-
-                    {/* Notes */}
-                    <div>
-                      <label className="text-xs text-gray-400">Notes</label>
-                      <textarea
-                        rows={2}
-                        value={form.notes}
-                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                        className={editTextareaClass}
                       />
                     </div>
 
@@ -611,6 +608,18 @@ export default function RolesPage() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+
+                {/* Notes - below permissions */}
+                <div>
+                  {editing ? (
+                    <>
+                      <label className="text-xs text-gray-400">Notes</label>
+                      <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={editTextareaClass} />
+                    </>
+                  ) : (
+                    <textarea rows={2} placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={addTextareaClass} />
+                  )}
                 </div>
 
                 {error && <p className="text-sm text-red-600">{error}</p>}

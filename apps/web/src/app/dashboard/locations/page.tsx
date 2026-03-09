@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { BulkActionBar } from '@/components/bulk-action-bar';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,8 @@ export default function LocationsPage() {
   const [imageUrl, setImageUrl] = useState('');
 
   const [uploading, setUploading] = useState(false);
+
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // General state
   const [saving, setSaving] = useState(false);
@@ -207,6 +210,15 @@ export default function LocationsPage() {
   }
 
   // ── CRUD ───────────────────────────────────────────────────────────────────
+
+  async function handleBulkDelete() {
+    if (!confirm(`Delete ${selectedIds.length} location(s)?`)) return;
+    setBulkDeleting(true);
+    await Promise.all(selectedIds.map(id => fetch(`/api/locations?id=${id}`, { method: 'DELETE' })));
+    setSelectedIds([]);
+    setBulkDeleting(false);
+    fetchLocations();
+  }
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this location?')) return;
@@ -362,6 +374,7 @@ export default function LocationsPage() {
                         src={`https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=400x200&markers=color:red%7C${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
                         alt="Location preview"
                         className="mt-2 w-full rounded-lg border border-gray-200"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                     )}
                   </div>
@@ -467,14 +480,37 @@ export default function LocationsPage() {
                 )}
               </div>
 
-              {/* Timezone (auto-detected) */}
-              {(timezone || detectingTimezone) && (
-                <div>
-                  <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                    {detectingTimezone ? 'Detecting timezone...' : timezone}
-                  </p>
-                </div>
-              )}
+              {/* Timezone */}
+              <div>
+                {isEdit ? (
+                  <div>
+                    <span className="text-xs text-gray-400">Timezone</span>
+                    {detectingTimezone ? (
+                      <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">Detecting timezone...</p>
+                    ) : (
+                      <input
+                        value={timezone}
+                        onChange={(e) => setTimezone(e.target.value)}
+                        placeholder="Timezone"
+                        className={editInputClass}
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    {detectingTimezone ? (
+                      <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">Detecting timezone...</p>
+                    ) : (
+                      <input
+                        value={timezone}
+                        onChange={(e) => setTimezone(e.target.value)}
+                        placeholder="Timezone (auto-detected from address)"
+                        className={addInputClass}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Booking Limiter */}
               <div className="rounded-lg border border-gray-200 p-4">
@@ -693,6 +729,14 @@ export default function LocationsPage() {
           </div>
         )}
       </div>
+
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        totalCount={locations.length}
+        onDelete={handleBulkDelete}
+        onClearSelection={() => setSelectedIds([])}
+        deleting={bulkDeleting}
+      />
 
       {/* Slide-in Panel */}
       {showPanel && renderPanel()}
