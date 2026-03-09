@@ -31,11 +31,10 @@ export default function CustomersPage() {
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Editable detail fields
-  const [editName, setEditName] = useState('');
-  const [editEmail, setEditEmail] = useState('');
-  const [editPhone, setEditPhone] = useState('');
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
   const [editDob, setEditDob] = useState('');
   const [editGender, setEditGender] = useState('');
   const [editNote, setEditNote] = useState('');
@@ -68,11 +67,10 @@ export default function CustomersPage() {
   // When selected customer changes, populate editable fields
   useEffect(() => {
     if (selected) {
-      setEditName(selected.display_name ?? '');
-      setEditEmail(selected.email ?? '');
-      setEditPhone(selected.phone ?? '');
       setEditFirstName(selected.first_name ?? '');
       setEditLastName(selected.last_name ?? '');
+      setEditEmail(selected.email ?? '');
+      setEditPhone(selected.phone ?? '');
       setEditDob(selected.date_of_birth ? (selected.date_of_birth.split('T')[0] ?? '') : '');
       setEditGender(selected.gender ?? '');
       setEditNote(selected.notes ?? '');
@@ -133,6 +131,7 @@ export default function CustomersPage() {
         setNewGender('');
         setNewNote('');
         setNewProfileImage('');
+        setShowAddModal(false);
         fetchCustomers();
       }
     } finally {
@@ -151,7 +150,7 @@ export default function CustomersPage() {
           id: selected.id,
           first_name: editFirstName.trim() || null,
           last_name: editLastName.trim() || null,
-          display_name: (editFirstName.trim() + ' ' + editLastName.trim()).trim() || editName.trim() || null,
+          display_name: (editFirstName.trim() + ' ' + editLastName.trim()).trim() || null,
           email: editEmail.trim() || null,
           phone: editPhone.trim() || null,
           date_of_birth: editDob || null,
@@ -186,6 +185,15 @@ export default function CustomersPage() {
           </button>
         </div>
 
+        {/* Bulk action bar - above the table */}
+        <BulkActionBar
+          selectedCount={selectedIds.length}
+          totalCount={customers.length}
+          onDelete={handleBulkDelete}
+          onClearSelection={() => setSelectedIds([])}
+          deleting={bulkDeleting}
+        />
+
         <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
           {loading ? (
             <div className="p-12 text-center text-sm text-gray-500">Loading...</div>
@@ -206,6 +214,7 @@ export default function CustomersPage() {
                       className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                     />
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Photo</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Contact</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Bookings</th>
@@ -228,6 +237,17 @@ export default function CustomersPage() {
                         className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                       />
                     </td>
+                    <td className="px-4 py-3">
+                      {c.profile_image_url ? (
+                        <img src={c.profile_image_url} alt={c.display_name ?? ''} className="h-9 w-9 rounded-full border border-gray-200 object-cover" />
+                      ) : (
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
+                          <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0" />
+                          </svg>
+                        </div>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
                       {c.display_name ?? 'Unknown'}
                     </td>
@@ -246,25 +266,12 @@ export default function CustomersPage() {
             </table>
           )}
         </div>
-
-        <BulkActionBar
-          selectedCount={selectedIds.length}
-          totalCount={customers.length}
-          onDelete={handleBulkDelete}
-          onClearSelection={() => setSelectedIds([])}
-          deleting={bulkDeleting}
-        />
       </div>
 
       {/* Customer detail slide-in overlay panel */}
       {selected && (
         <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-40 bg-black/30"
-            onClick={() => setSelected(null)}
-          />
-          {/* Panel */}
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setSelected(null)} />
           <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
             <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
               <h2 className="text-lg font-semibold text-gray-900">Customer Profile</h2>
@@ -277,78 +284,30 @@ export default function CustomersPage() {
 
             <div className="flex-1 overflow-y-auto px-8 py-3">
               <div className="space-y-5">
-                {/* Profile Image */}
-                <div className="space-y-0.5">
-                  <label className="block text-xs text-gray-400">Profile Photo</label>
-                  <ImageUpload value={editProfileImage} onChange={setEditProfileImage} />
-                </div>
+                {/* Row 1: Profile Image (100%) */}
+                <ImageUpload value={editProfileImage} onChange={setEditProfileImage} label="" />
 
-                {/* First Name + Last Name */}
-                <div className="flex gap-4">
-                  <div className="flex-1 space-y-0.5">
+                {/* Row 2: First Name (50%) + Last Name (50%) */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
                     <label className="block text-xs text-gray-400">First Name</label>
-                    <input
-                      type="text"
-                      value={editFirstName}
-                      onChange={(e) => setEditFirstName(e.target.value)}
-                      placeholder="First name"
-                      className={editInputClass}
-                    />
+                    <input type="text" value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} placeholder="First name" className={editInputClass} />
                   </div>
-                  <div className="flex-1 space-y-0.5">
+                  <div>
                     <label className="block text-xs text-gray-400">Last Name</label>
-                    <input
-                      type="text"
-                      value={editLastName}
-                      onChange={(e) => setEditLastName(e.target.value)}
-                      placeholder="Last name"
-                      className={editInputClass}
-                    />
+                    <input type="text" value={editLastName} onChange={(e) => setEditLastName(e.target.value)} placeholder="Last name" className={editInputClass} />
                   </div>
                 </div>
 
-                {/* Email */}
-                <div className="space-y-0.5">
-                  <label className="block text-xs text-gray-400">Email</label>
-                  <input
-                    type="email"
-                    value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    placeholder="No email"
-                    className={editInputClass}
-                  />
-                </div>
-
-                {/* Phone */}
-                <div className="space-y-0.5">
-                  <label className="block text-xs text-gray-400">Phone</label>
-                  <input
-                    type="tel"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    placeholder="No phone"
-                    className={editInputClass}
-                  />
-                </div>
-
-                {/* DOB + Gender */}
-                <div className="flex gap-4">
-                  <div className="flex-1 space-y-0.5">
+                {/* Row 3: Date of Birth (50%) + Gender (50%) */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
                     <label className="block text-xs text-gray-400">Date of Birth</label>
-                    <input
-                      type="date"
-                      value={editDob}
-                      onChange={(e) => setEditDob(e.target.value)}
-                      className={editInputClass}
-                    />
+                    <input type="date" value={editDob} onChange={(e) => setEditDob(e.target.value)} className={editInputClass} />
                   </div>
-                  <div className="flex-1 space-y-0.5">
+                  <div>
                     <label className="block text-xs text-gray-400">Gender</label>
-                    <select
-                      value={editGender}
-                      onChange={(e) => setEditGender(e.target.value)}
-                      className={editInputClass}
-                    >
+                    <select value={editGender} onChange={(e) => setEditGender(e.target.value)} className={editInputClass}>
                       <option value="">Select</option>
                       <option value="male">Male</option>
                       <option value="female">Female</option>
@@ -358,8 +317,8 @@ export default function CustomersPage() {
                   </div>
                 </div>
 
-                {/* Note */}
-                <div className="space-y-0.5">
+                {/* Row 4: Note (100%) */}
+                <div>
                   <label className="block text-xs text-gray-400">Note</label>
                   <textarea
                     value={editNote}
@@ -397,7 +356,6 @@ export default function CustomersPage() {
               </div>
             </div>
 
-            {/* Footer with actions */}
             <div className="border-t border-gray-200 px-8 py-4">
               <div className="flex justify-between">
                 <button
@@ -430,12 +388,7 @@ export default function CustomersPage() {
       {/* Add Customer modal overlay panel */}
       {showAddModal && (
         <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-40 bg-black/30"
-            onClick={() => setShowAddModal(false)}
-          />
-          {/* Panel */}
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowAddModal(false)} />
           <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
             <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
               <h2 className="text-lg font-semibold text-gray-900">Add Customer</h2>
@@ -448,98 +401,41 @@ export default function CustomersPage() {
 
             <div className="flex-1 overflow-y-auto px-8 py-3">
               <div className="space-y-5">
-                {/* Profile Image */}
-                <div className="space-y-0.5">
-                  <label className="block text-xs text-gray-400">Profile Photo</label>
-                  <ImageUpload value={newProfileImage} onChange={setNewProfileImage} />
+                {/* Row 1: Upload profile photo (100%) */}
+                <ImageUpload value={newProfileImage} onChange={setNewProfileImage} label="" />
+
+                {/* Row 2: First Name (50%) + Last Name (50%) */}
+                <div className="grid grid-cols-2 gap-4">
+                  <input type="text" value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} placeholder="First name" className={addInputClass} />
+                  <input type="text" value={newLastName} onChange={(e) => setNewLastName(e.target.value)} placeholder="Last name" className={addInputClass} />
                 </div>
 
-                {/* First Name + Last Name */}
-                <div className="flex gap-4">
-                  <div className="flex-1 space-y-0.5">
-                    <label className="block text-xs text-gray-400">First Name</label>
-                    <input
-                      type="text"
-                      value={newFirstName}
-                      onChange={(e) => setNewFirstName(e.target.value)}
-                      placeholder="First name"
-                      className={addInputClass}
-                    />
-                  </div>
-                  <div className="flex-1 space-y-0.5">
-                    <label className="block text-xs text-gray-400">Last Name</label>
-                    <input
-                      type="text"
-                      value={newLastName}
-                      onChange={(e) => setNewLastName(e.target.value)}
-                      placeholder="Last name"
-                      className={addInputClass}
-                    />
-                  </div>
+                {/* Row 3: Email (50%) + Phone (50%) */}
+                <div className="grid grid-cols-2 gap-4">
+                  <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email" className={addInputClass} />
+                  <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="Phone" className={addInputClass} />
                 </div>
 
-                {/* Email */}
-                <div className="space-y-0.5">
-                  <label className="block text-xs text-gray-400">Email</label>
-                  <input
-                    type="email"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="Email"
-                    className={addInputClass}
-                  />
+                {/* Row 4: Date of Birth (50%) + Gender (50%) */}
+                <div className="grid grid-cols-2 gap-4">
+                  <input type="date" value={newDob} onChange={(e) => setNewDob(e.target.value)} placeholder="Date of Birth" className={addInputClass} />
+                  <select value={newGender} onChange={(e) => setNewGender(e.target.value)} className={addInputClass}>
+                    <option value="">Gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="non-binary">Non-binary</option>
+                    <option value="prefer-not-to-say">Prefer not to say</option>
+                  </select>
                 </div>
 
-                {/* Phone */}
-                <div className="space-y-0.5">
-                  <label className="block text-xs text-gray-400">Phone</label>
-                  <input
-                    type="tel"
-                    value={newPhone}
-                    onChange={(e) => setNewPhone(e.target.value)}
-                    placeholder="Phone"
-                    className={addInputClass}
-                  />
-                </div>
-
-                {/* DOB + Gender */}
-                <div className="flex gap-4">
-                  <div className="flex-1 space-y-0.5">
-                    <label className="block text-xs text-gray-400">Date of Birth</label>
-                    <input
-                      type="date"
-                      value={newDob}
-                      onChange={(e) => setNewDob(e.target.value)}
-                      className={addInputClass}
-                    />
-                  </div>
-                  <div className="flex-1 space-y-0.5">
-                    <label className="block text-xs text-gray-400">Gender</label>
-                    <select
-                      value={newGender}
-                      onChange={(e) => setNewGender(e.target.value)}
-                      className={addInputClass}
-                    >
-                      <option value="">Select</option>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                      <option value="non-binary">Non-binary</option>
-                      <option value="prefer-not-to-say">Prefer not to say</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Note */}
-                <div className="space-y-0.5">
-                  <label className="block text-xs text-gray-400">Note</label>
-                  <textarea
-                    value={newNote}
-                    onChange={(e) => setNewNote(e.target.value)}
-                    placeholder="Add a note..."
-                    rows={3}
-                    className="w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                  />
-                </div>
+                {/* Row 5: Note (100%) */}
+                <textarea
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  placeholder="Note"
+                  rows={3}
+                  className="w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
               </div>
             </div>
 

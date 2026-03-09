@@ -89,8 +89,14 @@ export async function POST(request: Request) {
 
   const body = await request.json() as {
     display_name?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
     email?: string | null;
     phone?: string | null;
+    date_of_birth?: string | null;
+    gender?: string | null;
+    notes?: string | null;
+    profile_image_url?: string | null;
   };
 
   if (!body.display_name && !body.email) {
@@ -127,10 +133,16 @@ export async function POST(request: Request) {
     .insert({
       id: authUser.user.id,
       display_name: body.display_name || null,
+      first_name: body.first_name || null,
+      last_name: body.last_name || null,
       email: body.email?.trim() || null,
       phone: body.phone?.trim() || null,
+      date_of_birth: body.date_of_birth || null,
+      gender: body.gender || null,
+      notes: body.notes || null,
+      profile_image_url: body.profile_image_url || null,
     } as never)
-    .select('id, display_name, email, phone')
+    .select()
     .single();
 
   if (custError) {
@@ -141,4 +153,41 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ data: customer, error: null }, { status: 201 });
+}
+
+export async function PATCH(request: Request) {
+  const tenantId = await getTenantId();
+  if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
+
+  const body = await request.json() as { id: string; [key: string]: unknown };
+  const { id, ...updates } = body;
+  if (!id) return NextResponse.json({ data: null, error: { message: 'Missing id' } }, { status: 400 });
+
+  const admin = createAdminClient();
+
+  // Verify the customer has appointments with this tenant
+  const { data: customer, error: custError } = await admin
+    .from('customers')
+    .update(updates as never)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (custError) return NextResponse.json({ data: null, error: { message: custError.message } }, { status: 500 });
+  return NextResponse.json({ data: customer, error: null });
+}
+
+export async function DELETE(request: Request) {
+  const tenantId = await getTenantId();
+  if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
+  if (!id) return NextResponse.json({ data: null, error: { message: 'Missing id' } }, { status: 400 });
+
+  const admin = createAdminClient();
+  const { error } = await admin.from('customers').delete().eq('id', id);
+
+  if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
+  return NextResponse.json({ data: { id }, error: null });
 }

@@ -242,6 +242,15 @@ export default function InventoryPage() {
         </button>
       </div>
 
+      {/* Bulk action bar - above the table */}
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        totalCount={products.length}
+        onDelete={handleBulkDelete}
+        onClearSelection={() => setSelectedIds([])}
+        deleting={bulkDeleting}
+      />
+
       <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
         {loading ? (
           <div className="p-12 text-center text-sm text-gray-500">Loading...</div>
@@ -268,7 +277,11 @@ export default function InventoryPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Image</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Stock</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Cost</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Sell Price</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Margin</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Value</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Services</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Active</th>
                 </tr>
@@ -303,7 +316,29 @@ export default function InventoryPage() {
                           {p.quantity_on_hand}
                         </span>
                       </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm">
+                        {p.quantity_on_hand === 0 ? (
+                          <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Out of Stock</span>
+                        ) : isLowStock ? (
+                          <span className="inline-flex rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">Low Stock</span>
+                        ) : (
+                          <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">In Stock</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">${p.purchase_price.toFixed(2)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">${p.sell_price.toFixed(2)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm">
+                        {p.sell_price > 0 ? (
+                          <span className={`font-medium ${((p.sell_price - p.purchase_price) / p.sell_price) * 100 >= 30 ? 'text-green-600' : ((p.sell_price - p.purchase_price) / p.sell_price) * 100 >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>
+                            {(((p.sell_price - p.purchase_price) / p.sell_price) * 100).toFixed(0)}%
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
+                        ${(p.quantity_on_hand * p.sell_price).toFixed(2)}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                         {p.product_services?.length ?? 0}
                       </td>
@@ -329,14 +364,6 @@ export default function InventoryPage() {
           </div>
         )}
       </div>
-
-      <BulkActionBar
-        selectedCount={selectedIds.length}
-        totalCount={products.length}
-        onDelete={handleBulkDelete}
-        deleting={bulkDeleting}
-        onClearSelection={() => setSelectedIds([])}
-      />
 
       {/* Slide-in Panel */}
       {showForm && (

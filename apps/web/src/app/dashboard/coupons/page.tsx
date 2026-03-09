@@ -286,6 +286,15 @@ export default function CouponsPage() {
         </button>
       </div>
 
+      {/* Bulk action bar - above the table */}
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        totalCount={coupons.length}
+        onDelete={handleBulkDelete}
+        deleting={bulkDeleting}
+        onClearSelection={() => setSelectedIds([])}
+      />
+
       <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
         {loading ? (
           <div className="p-12 text-center text-sm text-gray-500">Loading...</div>
@@ -310,6 +319,9 @@ export default function CouponsPage() {
                     onChange={toggleSelectAll}
                     className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                   />
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                  Image
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
                   Code
@@ -350,6 +362,13 @@ export default function CouponsPage() {
                         onChange={() => toggleSelect(c.id)}
                         className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                       />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      {c.image_url ? (
+                        <img src={c.image_url} alt={c.code} className="h-8 w-8 rounded object-cover" />
+                      ) : (
+                        <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-200 text-xs text-gray-400">--</div>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-sm font-medium text-gray-900">
                       {c.code}
@@ -397,14 +416,6 @@ export default function CouponsPage() {
           </table>
         )}
       </div>
-
-      <BulkActionBar
-        selectedCount={selectedIds.length}
-        totalCount={coupons.length}
-        onDelete={handleBulkDelete}
-        deleting={bulkDeleting}
-        onClearSelection={() => setSelectedIds([])}
-      />
 
       {/* Slide-in Panel */}
       {showForm && (
@@ -491,8 +502,15 @@ export default function CouponsPage() {
                       </div>
                     </div>
 
-                    {/* Lifetime / Expiry */}
-                    <div className="flex items-center">
+                    {/* Row 4: No expiry date (50%) + Expiry date (50%) */}
+                    <div className="flex items-center gap-4">
+                      <div className="w-1/2">
+                        <label className="relative inline-flex cursor-pointer items-center gap-2">
+                          <input type="checkbox" checked={form.is_lifetime} onChange={(e) => setForm({ ...form, is_lifetime: e.target.checked })} className="peer sr-only" />
+                          <div className="peer h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                          <span className="text-sm font-medium text-gray-700">No expiry date</span>
+                        </label>
+                      </div>
                       <div className="w-1/2">
                         {!form.is_lifetime && (
                           <div className="space-y-0.5">
@@ -506,40 +524,11 @@ export default function CouponsPage() {
                           </div>
                         )}
                       </div>
-                      <div className="flex w-1/2 items-center gap-2 justify-end">
-                        <span className="text-xs text-gray-400">Lifetime</span>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={form.is_lifetime}
-                          onClick={() => setForm({ ...form, is_lifetime: !form.is_lifetime })}
-                          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
-                            form.is_lifetime ? 'bg-brand-600' : 'bg-gray-200'
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              form.is_lifetime ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </div>
                     </div>
 
-                    {/* Usage Limit + Scope */}
-                    <div className="flex items-center">
-                      <div className="w-1/2 space-y-0.5">
-                        <span className="text-xs text-gray-400">Usage Limit</span>
-                        <input
-                          type="number"
-                          min="1"
-                          value={form.usage_limit}
-                          onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
-                          placeholder="Unlimited"
-                          className={editInputClass}
-                        />
-                      </div>
-                      <div className="flex w-1/2 items-center gap-4 justify-end">
+                    {/* Row 5: Use per booking / Use per customer (50%) + Usage limit (50%) */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex w-1/2 items-center gap-4">
                         <label className="flex items-center gap-1.5 cursor-pointer">
                           <input
                             type="radio"
@@ -562,6 +551,17 @@ export default function CouponsPage() {
                           />
                           <span className="text-xs text-gray-700">Per customer</span>
                         </label>
+                      </div>
+                      <div className="w-1/2 space-y-0.5">
+                        <span className="text-xs text-gray-400">Usage Limit</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={form.usage_limit}
+                          onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
+                          placeholder="Unlimited"
+                          className={editInputClass}
+                        />
                       </div>
                     </div>
 
@@ -724,14 +724,17 @@ export default function CouponsPage() {
                       </div>
                     </div>
 
-                    {/* Expiry date + Lifetime toggle */}
+                    {/* Row 4: No expiry date (50%) + Expiry date (50%) */}
                     <div className="flex items-center gap-4">
                       <div className="w-1/2">
-                        {form.is_lifetime ? (
-                          <div className="flex h-[46px] items-center rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3">
-                            <span className="text-sm text-gray-400">Never expires</span>
-                          </div>
-                        ) : (
+                        <label className="relative inline-flex cursor-pointer items-center gap-2">
+                          <input type="checkbox" checked={form.is_lifetime} onChange={(e) => setForm({ ...form, is_lifetime: e.target.checked })} className="peer sr-only" />
+                          <div className="peer h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                          <span className="text-sm font-medium text-gray-700">No expiry date</span>
+                        </label>
+                      </div>
+                      <div className="w-1/2">
+                        {!form.is_lifetime && (
                           <input
                             type="date"
                             value={form.expires_at}
@@ -741,39 +744,11 @@ export default function CouponsPage() {
                           />
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">Lifetime</span>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={form.is_lifetime}
-                          onClick={() => setForm({ ...form, is_lifetime: !form.is_lifetime })}
-                          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
-                            form.is_lifetime ? 'bg-brand-600' : 'bg-gray-200'
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              form.is_lifetime ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </div>
                     </div>
 
-                    {/* Usage limit + Scope */}
+                    {/* Row 5: Use per booking / Use per customer (50%) + Usage limit (50%) */}
                     <div className="flex items-center gap-4">
-                      <div className="w-1/2">
-                        <input
-                          type="number"
-                          min="1"
-                          value={form.usage_limit}
-                          onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
-                          placeholder="Usage Limit (Unlimited)"
-                          className={addInputClass}
-                        />
-                      </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex w-1/2 items-center gap-4">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="radio"
@@ -796,6 +771,16 @@ export default function CouponsPage() {
                           />
                           <span className="text-sm text-gray-700">Per customer</span>
                         </label>
+                      </div>
+                      <div className="w-1/2">
+                        <input
+                          type="number"
+                          min="1"
+                          value={form.usage_limit}
+                          onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
+                          placeholder="Usage Limit (Unlimited)"
+                          className={addInputClass}
+                        />
                       </div>
                     </div>
 

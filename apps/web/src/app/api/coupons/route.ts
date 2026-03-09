@@ -44,6 +44,7 @@ export async function POST(request: Request) {
       scope: body.scope ?? 'per_booking',
       applicable_service_ids: body.applicable_service_ids ?? null,
       applicable_staff_ids: body.applicable_staff_ids ?? null,
+      image_url: body.image_url ?? null,
     } as never)
     .select()
     .single();

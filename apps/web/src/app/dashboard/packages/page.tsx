@@ -234,6 +234,15 @@ export default function PackagesPage() {
         </button>
       </div>
 
+      {/* Bulk action bar - above the table */}
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        totalCount={packages.length}
+        onDelete={handleBulkDelete}
+        onClearSelection={() => setSelectedIds([])}
+        deleting={bulkDeleting}
+      />
+
       <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
         {loading ? (
           <div className="p-12 text-center text-sm text-gray-500">Loading...</div>
@@ -316,14 +325,6 @@ export default function PackagesPage() {
           </div>
         )}
       </div>
-
-      <BulkActionBar
-        selectedCount={selectedIds.length}
-        totalCount={packages.length}
-        onDelete={handleBulkDelete}
-        onClearSelection={() => setSelectedIds([])}
-        deleting={bulkDeleting}
-      />
 
       {/* Slide-in Panel — Add Mode */}
       {isAddMode && (
@@ -578,19 +579,17 @@ export default function PackagesPage() {
                     className="w-full rounded-[.3rem] border border-transparent bg-transparent px-0 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
                   />
                 </div>
-                {/* Expiration */}
-                <div className="flex items-center">
+                {/* Expiration (50%) + Value/Unit (50%) */}
+                <div className="flex items-center gap-4">
                   <div className="w-1/2">
-                    <label className="text-xs text-gray-400">Expiration</label>
-                    <div className="mt-1">
-                      <label className="relative inline-flex cursor-pointer items-center">
-                        <input type="checkbox" checked={form.has_expiration} onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })} className="peer sr-only" />
-                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                      </label>
-                    </div>
+                    <label className="relative inline-flex cursor-pointer items-center gap-2">
+                      <input type="checkbox" checked={form.has_expiration} onChange={(e) => setForm({ ...form, has_expiration: e.target.checked })} className="peer sr-only" />
+                      <div className="peer h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                      <span className="text-sm font-medium text-gray-700">Has expiration</span>
+                    </label>
                   </div>
                   {form.has_expiration && (
-                    <div className="flex w-1/2 gap-3">
+                    <div className="flex w-1/2 gap-2">
                       <input
                         type="number"
                         min="1"
@@ -612,28 +611,21 @@ export default function PackagesPage() {
                     </div>
                   )}
                 </div>
-                {/* Active toggle */}
-                <div className="flex items-center">
+                {/* Private (50%) + Active (50%) */}
+                <div className="flex items-center gap-4">
                   <div className="w-1/2">
-                    <label className="text-xs text-gray-400">Active</label>
-                    <div className="mt-1">
-                      <label className="relative inline-flex cursor-pointer items-center">
-                        <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="peer sr-only" />
-                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                      </label>
-                    </div>
+                    <label className="relative inline-flex cursor-pointer items-center gap-2">
+                      <input type="checkbox" checked={form.is_private} onChange={(e) => setForm({ ...form, is_private: e.target.checked })} className="peer sr-only" />
+                      <div className="peer h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                      <span className="text-sm font-medium text-gray-700">Package is private</span>
+                    </label>
                   </div>
-                </div>
-                {/* Private toggle */}
-                <div className="flex items-center">
                   <div className="w-1/2">
-                    <label className="text-xs text-gray-400">Private</label>
-                    <div className="mt-1">
-                      <label className="relative inline-flex cursor-pointer items-center">
-                        <input type="checkbox" checked={form.is_private} onChange={(e) => setForm({ ...form, is_private: e.target.checked })} className="peer sr-only" />
-                        <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-                      </label>
-                    </div>
+                    <label className="relative inline-flex cursor-pointer items-center gap-2">
+                      <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="peer sr-only" />
+                      <div className="peer h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                      <span className="text-sm font-medium text-gray-700">Package is active</span>
+                    </label>
                   </div>
                 </div>
                 {error && <p className="text-sm text-red-600">{error}</p>}
