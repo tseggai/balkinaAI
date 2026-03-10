@@ -181,19 +181,29 @@ export async function handleFindBusinesses(
     .ilike('categories.name', `%${sanitized}%`)
     .limit(10);
 
-  // Merge all found tenants (deduplicate by id)
+  // Merge all found tenants (deduplicate by id) and track matched services per business
   const tenantMap = new Map<string, { id: string; name: string }>();
+  const tenantMatchedServices = new Map<string, string[]>();
+
   for (const t of tenantsByName ?? []) {
     tenantMap.set(t.id, t);
   }
-  for (const s of (serviceMatches ?? []) as unknown as { tenants: { id: string; name: string } }[]) {
-    if (s.tenants) tenantMap.set(s.tenants.id, { id: s.tenants.id, name: s.tenants.name });
+  for (const s of (serviceMatches ?? []) as unknown as { tenant_id: string; name: string; price: number; tenants: { id: string; name: string } }[]) {
+    if (s.tenants) {
+      tenantMap.set(s.tenants.id, { id: s.tenants.id, name: s.tenants.name });
+      const existing = tenantMatchedServices.get(s.tenants.id) ?? [];
+      existing.push(s.name);
+      tenantMatchedServices.set(s.tenants.id, existing);
+    }
   }
   for (const t of (tenantsByCategory ?? []) as unknown as { id: string; name: string }[]) {
     tenantMap.set(t.id, { id: t.id, name: t.name });
   }
 
-  let businesses: { id: string; name: string; distance_km?: number; locations?: { name: string; address: string; lat: number | null; lng: number | null }[] }[] = Array.from(tenantMap.values());
+  let businesses: { id: string; name: string; distance_km?: number; matched_services?: string[]; locations?: { name: string; address: string; lat: number | null; lng: number | null }[] }[] = Array.from(tenantMap.values()).map((t) => ({
+    ...t,
+    matched_services: tenantMatchedServices.get(t.id),
+  }));
   let locationNote: string | undefined;
 
   // Fetch locations with addresses for all businesses
@@ -331,6 +341,7 @@ export async function handleCheckAvailability(
   supabase: AdminClient,
   tenantId: string,
   input: Record<string, unknown>,
+  sessionInfo?: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string; userId: string | null },
 ): Promise<ToolResult> {
   const serviceId = input.service_id as string;
   const date = input.date as string; // YYYY-MM-DD
@@ -340,17 +351,33 @@ export async function handleCheckAvailability(
     return { success: false, error: 'service_id and date are required' };
   }
 
-  // 1. Get service duration
+  // 1. Get service details including buffer times
   const { data: service, error: svcErr } = await supabase
     .from('services')
-    .select('duration_minutes, tenant_id')
+    .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after')
     .eq('id', serviceId)
     .single();
 
   if (svcErr || !service) return { success: false, error: 'Service not found' };
-  const svc = service as { duration_minutes: number; tenant_id: string };
+  const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null };
+  const bufferBefore = svc.buffer_time_before ?? 0;
+  const bufferAfter = svc.buffer_time_after ?? 0;
+  const totalSlotMinutes = bufferBefore + svc.duration_minutes + bufferAfter;
 
-  // 2. Get staff for this tenant
+  // 2. Check service_special_days for this date (day off or special hours)
+  const { data: serviceSpecialDays } = await supabase
+    .from('service_special_days')
+    .select('is_day_off, start_time, end_time, breaks')
+    .eq('service_id', serviceId)
+    .eq('date', date);
+
+  const serviceSpecialDay = (serviceSpecialDays ?? [])[0] as { is_day_off: boolean; start_time: string | null; end_time: string | null; breaks: unknown } | undefined;
+
+  if (serviceSpecialDay?.is_day_off) {
+    return { success: true, data: { date, service_duration_minutes: svc.duration_minutes, available_slots: [], message: 'This service is not available on this date.' } };
+  }
+
+  // 3. Get staff for this tenant
   let staffQuery = supabase
     .from('staff')
     .select('id, name, availability_schedule')
@@ -365,7 +392,30 @@ export async function handleCheckAvailability(
     return { success: true, data: { available_slots: [], message: 'No staff available' } };
   }
 
-  // 3. Resolve the tenant's timezone so we generate slots in local time
+  // 4. Check staff_special_days and staff_holidays for this date
+  const staffIds = (staffList as { id: string }[]).map((s) => s.id);
+
+  const { data: staffSpecialDays } = await supabase
+    .from('staff_special_days')
+    .select('staff_id, is_day_off, start_time, end_time, breaks')
+    .in('staff_id', staffIds)
+    .eq('date', date);
+
+  const staffSpecialMap = new Map<string, { is_day_off: boolean; start_time: string | null; end_time: string | null; breaks: unknown }>();
+  for (const ssd of (staffSpecialDays ?? []) as { staff_id: string; is_day_off: boolean; start_time: string | null; end_time: string | null; breaks: unknown }[]) {
+    staffSpecialMap.set(ssd.staff_id, ssd);
+  }
+
+  const { data: staffHolidays } = await supabase
+    .from('staff_holidays')
+    .select('staff_id')
+    .in('staff_id', staffIds)
+    .lte('start_date', date)
+    .gte('end_date', date);
+
+  const holidayStaffIds = new Set(((staffHolidays ?? []) as { staff_id: string }[]).map((h) => h.staff_id));
+
+  // 5. Resolve the tenant's timezone so we generate slots in local time
   const timezone = await getTenantTimezone(supabase, tenantId);
 
   // Query existing appointments for the entire local day (converted to UTC range)
@@ -382,40 +432,99 @@ export async function handleCheckAvailability(
 
   const appointments = (existingAppts ?? []) as { staff_id: string | null; start_time: string; end_time: string }[];
 
-  // 4. Generate available slots from staff schedules
+  // 6. Fetch the customer's existing appointments for this day (for conflict awareness)
+  let customerAppointments: { id: string; start_time: string; end_time: string; service_name: string; business_name: string }[] = [];
+  const customerId = sessionInfo?.customerId ?? null;
+  let resolvedCustomerId = customerId;
+
+  if (!resolvedCustomerId && sessionInfo?.userId) {
+    const { data: byUserId } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('user_id', sessionInfo.userId)
+      .limit(1)
+      .maybeSingle();
+    if (byUserId) resolvedCustomerId = (byUserId as { id: string }).id;
+  }
+
+  if (resolvedCustomerId) {
+    const { data: custAppts } = await supabase
+      .from('appointments')
+      .select('id, start_time, end_time, services(name), tenants(name)')
+      .eq('customer_id', resolvedCustomerId)
+      .gte('start_time', dayStartUtc)
+      .lte('start_time', dayEndUtc)
+      .in('status', ['pending', 'confirmed']);
+
+    customerAppointments = ((custAppts ?? []) as unknown as { id: string; start_time: string; end_time: string; services: { name: string } | null; tenants: { name: string } | null }[]).map((a) => ({
+      id: a.id,
+      start_time: a.start_time,
+      end_time: a.end_time,
+      service_name: a.services?.name ?? 'Unknown',
+      business_name: a.tenants?.name ?? 'Unknown',
+    }));
+  }
+
+  // 7. Generate available slots from staff schedules
   const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const dayOfWeek = dayNames[new Date(date).getDay()] as string;
 
   const slots: { time: string; staff_id: string; staff_name: string }[] = [];
 
   for (const staff of staffList as { id: string; name: string; availability_schedule: Record<string, unknown> }[]) {
+    // Skip staff on holiday
+    if (holidayStaffIds.has(staff.id)) continue;
+
+    // Check staff special day
+    const staffSpecial = staffSpecialMap.get(staff.id);
+    if (staffSpecial?.is_day_off) continue;
+
     const schedule = staff.availability_schedule as Record<string, { start: string; end: string } | undefined>;
-    const daySchedule = schedule[dayOfWeek];
+    let dayScheduleStart: string;
+    let dayScheduleEnd: string;
 
-    if (!daySchedule?.start || !daySchedule?.end) continue;
+    if (staffSpecial?.start_time && staffSpecial?.end_time) {
+      // Use special day hours override
+      dayScheduleStart = staffSpecial.start_time;
+      dayScheduleEnd = staffSpecial.end_time;
+    } else {
+      const daySchedule = schedule[dayOfWeek];
+      if (!daySchedule?.start || !daySchedule?.end) continue;
+      dayScheduleStart = daySchedule.start;
+      dayScheduleEnd = daySchedule.end;
+    }
 
-    // Parse schedule hours (e.g., "09:00" -> 9, "17:00" -> 17)
-    const startParts = daySchedule.start.split(':').map(Number);
-    const endParts = daySchedule.end.split(':').map(Number);
+    // If service has special hours, further constrain
+    if (serviceSpecialDay?.start_time && serviceSpecialDay?.end_time) {
+      // Use the more restrictive window
+      if (serviceSpecialDay.start_time > dayScheduleStart) dayScheduleStart = serviceSpecialDay.start_time;
+      if (serviceSpecialDay.end_time < dayScheduleEnd) dayScheduleEnd = serviceSpecialDay.end_time;
+    }
+
+    // Parse schedule hours
+    const startParts = dayScheduleStart.split(':').map(Number);
+    const endParts = dayScheduleEnd.split(':').map(Number);
     const scheduleStartMinutes = (startParts[0] ?? 0) * 60 + (startParts[1] ?? 0);
     const scheduleEndMinutes = (endParts[0] ?? 0) * 60 + (endParts[1] ?? 0);
 
     // Generate slots in 30-minute increments — convert local time to UTC
-    for (let minutes = scheduleStartMinutes; minutes + svc.duration_minutes <= scheduleEndMinutes; minutes += 30) {
+    for (let minutes = scheduleStartMinutes; minutes + totalSlotMinutes <= scheduleEndMinutes; minutes += 30) {
       const slotHour = Math.floor(minutes / 60);
       const slotMin = minutes % 60;
       const localTimeStr = `${String(slotHour).padStart(2, '0')}:${String(slotMin).padStart(2, '0')}`;
 
-      // Convert the local slot time to proper UTC
-      const slotStartUtc = localTimeToUTC(date, localTimeStr, timezone);
+      // Convert the local slot time to proper UTC (buffer_before comes before the actual start)
+      const bufferStartUtc = localTimeToUTC(date, localTimeStr, timezone);
+      const slotStartUtc = new Date(bufferStartUtc.getTime() + bufferBefore * 60000);
       const slotEndUtc = new Date(slotStartUtc.getTime() + svc.duration_minutes * 60000);
+      const bufferEndUtc = new Date(slotEndUtc.getTime() + bufferAfter * 60000);
 
-      // Check for conflicts against existing appointments (all in UTC)
+      // Check for conflicts against existing appointments (including buffer)
       const hasConflict = appointments.some((appt) => {
         if (appt.staff_id !== staff.id) return false;
         const apptStart = new Date(appt.start_time).getTime();
         const apptEnd = new Date(appt.end_time).getTime();
-        return slotStartUtc.getTime() < apptEnd && slotEndUtc.getTime() > apptStart;
+        return bufferStartUtc.getTime() < apptEnd && bufferEndUtc.getTime() > apptStart;
       });
 
       if (!hasConflict) {
@@ -434,6 +543,7 @@ export async function handleCheckAvailability(
       date,
       service_duration_minutes: svc.duration_minutes,
       available_slots: slots,
+      customer_appointments_on_this_day: customerAppointments.length > 0 ? customerAppointments : undefined,
     },
   };
 }
@@ -1071,6 +1181,194 @@ export async function handleGetCustomFields(
   return { success: true, data: data ?? [] };
 }
 
+// ── reschedule_appointment ──────────────────────────────────────────────────
+
+export async function handleRescheduleAppointment(
+  supabase: AdminClient,
+  tenantId: string,
+  input: Record<string, unknown>,
+  _sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string; userId: string | null },
+): Promise<ToolResult> {
+  const appointmentId = input.appointment_id as string;
+  const newStartTime = input.new_start_time as string;
+
+  if (!appointmentId) return { success: false, error: 'appointment_id is required' };
+  if (!newStartTime) return { success: false, error: 'new_start_time is required' };
+
+  // 1. Fetch the existing appointment
+  const { data: existing, error: fetchErr } = await supabase
+    .from('appointments')
+    .select('id, customer_id, tenant_id, service_id, staff_id, location_id, status, start_time, end_time, services(duration_minutes, name, price)')
+    .eq('id', appointmentId)
+    .in('status', ['pending', 'confirmed'])
+    .single();
+
+  if (fetchErr || !existing) {
+    return { success: false, error: 'Appointment not found or cannot be rescheduled (already cancelled/completed).' };
+  }
+
+  const appt = existing as unknown as {
+    id: string; customer_id: string; tenant_id: string;
+    service_id: string; staff_id: string | null; location_id: string | null;
+    status: string; start_time: string; end_time: string;
+    services: { duration_minutes: number; name: string; price: number } | null;
+  };
+
+  const durationMinutes = appt.services?.duration_minutes ?? 30;
+  const effectiveTenantId = appt.tenant_id || tenantId;
+
+  // 2. Parse the new start time (handle timezone like booking handler)
+  let newStart: Date;
+  const hasTimezoneInfo = /Z$|[+-]\d{2}:\d{2}$/.test(newStartTime);
+  if (hasTimezoneInfo) {
+    newStart = new Date(newStartTime);
+  } else {
+    const timezone = await getTenantTimezone(supabase, effectiveTenantId);
+    const [datePart, timePart] = newStartTime.split('T');
+    if (datePart && timePart) {
+      newStart = localTimeToUTC(datePart, timePart.slice(0, 5), timezone);
+    } else {
+      newStart = new Date(newStartTime);
+    }
+  }
+  const newEnd = new Date(newStart.getTime() + durationMinutes * 60000);
+
+  // 3. Check for conflicts at the new time (same staff)
+  if (appt.staff_id) {
+    const { data: conflicts } = await supabase
+      .from('appointments')
+      .select('id, start_time, end_time')
+      .eq('staff_id', appt.staff_id)
+      .neq('id', appointmentId)
+      .in('status', ['pending', 'confirmed'])
+      .lt('start_time', newEnd.toISOString())
+      .gt('end_time', newStart.toISOString());
+
+    if (conflicts && conflicts.length > 0) {
+      return {
+        success: false,
+        error: `The new time slot conflicts with an existing appointment. Please choose a different time.`,
+      };
+    }
+  }
+
+  // 4. Atomically update the appointment
+  const { data: updated, error: updateErr } = await supabase
+    .from('appointments')
+    .update({
+      start_time: newStart.toISOString(),
+      end_time: newEnd.toISOString(),
+    } as never)
+    .eq('id', appointmentId)
+    .select('id, start_time, end_time, status, services(name, price), staff(name), tenant_locations(name, address), tenants(name)')
+    .single();
+
+  if (updateErr) return { success: false, error: updateErr.message };
+
+  return {
+    success: true,
+    data: {
+      message: 'Appointment rescheduled successfully.',
+      appointment: updated,
+      old_start_time: appt.start_time,
+      new_start_time: newStart.toISOString(),
+      new_end_time: newEnd.toISOString(),
+    },
+  };
+}
+
+// ── get_directions ──────────────────────────────────────────────────────────
+
+export async function handleGetDirections(
+  supabase: AdminClient,
+  tenantId: string,
+  input: Record<string, unknown>,
+  userLocation?: { latitude: number; longitude: number } | null,
+): Promise<ToolResult> {
+  const locationId = input.location_id as string | undefined;
+  const destinationAddress = input.destination_address as string | undefined;
+  const originLat = (input.origin_latitude as number) ?? userLocation?.latitude;
+  const originLng = (input.origin_longitude as number) ?? userLocation?.longitude;
+
+  let destLat: number | null = null;
+  let destLng: number | null = null;
+  let destAddress: string | null = destinationAddress ?? null;
+  let destName: string | null = null;
+
+  // Resolve destination from location_id
+  if (locationId) {
+    const { data: loc } = await supabase
+      .from('tenant_locations')
+      .select('name, address, lat, lng')
+      .eq('id', locationId)
+      .single();
+
+    if (loc) {
+      const location = loc as { name: string; address: string; lat: number | null; lng: number | null };
+      destLat = location.lat;
+      destLng = location.lng;
+      destAddress = location.address;
+      destName = location.name;
+    }
+  }
+
+  // If no location_id, try to find by tenant_id
+  if (!destAddress && tenantId) {
+    const { data: loc } = await supabase
+      .from('tenant_locations')
+      .select('name, address, lat, lng')
+      .eq('tenant_id', tenantId)
+      .limit(1)
+      .single();
+
+    if (loc) {
+      const location = loc as { name: string; address: string; lat: number | null; lng: number | null };
+      destLat = location.lat;
+      destLng = location.lng;
+      destAddress = location.address;
+      destName = location.name;
+    }
+  }
+
+  if (!destAddress && !destLat) {
+    return { success: false, error: 'Could not determine destination. Please provide a location_id or destination_address.' };
+  }
+
+  // Build Google Maps directions URL
+  const destination = destAddress
+    ? encodeURIComponent(destAddress)
+    : `${destLat},${destLng}`;
+  const origin = originLat && originLng
+    ? `&origin=${originLat},${originLng}`
+    : '';
+
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1${origin}&destination=${destination}&travelmode=driving`;
+
+  // Calculate straight-line distance if we have both coordinates
+  let distanceInfo: { distance_km: number; distance_mi: number; estimated_drive_minutes: number } | null = null;
+  if (originLat && originLng && destLat && destLng) {
+    const distKm = haversineKm(originLat, originLng, destLat, destLng);
+    const distMi = distKm * 0.621371;
+    // Rough estimate: average 30 km/h in urban areas
+    const estMinutes = Math.round((distKm / 30) * 60);
+    distanceInfo = {
+      distance_km: Math.round(distKm * 10) / 10,
+      distance_mi: Math.round(distMi * 10) / 10,
+      estimated_drive_minutes: Math.max(estMinutes, 1),
+    };
+  }
+
+  return {
+    success: true,
+    data: {
+      destination_name: destName,
+      destination_address: destAddress,
+      directions_url: mapsUrl,
+      distance: distanceInfo,
+    },
+  };
+}
+
 // ── Tool dispatcher ─────────────────────────────────────────────────────────
 
 export async function executeTool(
@@ -1079,6 +1377,7 @@ export async function executeTool(
   supabase: AdminClient,
   tenantId: string,
   sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string; userId: string | null },
+  userLocation?: { latitude: number; longitude: number } | null,
 ): Promise<ToolResult> {
   try {
     switch (toolName) {
@@ -1093,7 +1392,7 @@ export async function executeTool(
       case 'get_staff':
         return await handleGetStaff(supabase, tenantId, toolInput);
       case 'check_availability':
-        return await handleCheckAvailability(supabase, tenantId, toolInput);
+        return await handleCheckAvailability(supabase, tenantId, toolInput, sessionInfo);
       case 'create_booking':
         return await handleBookAppointment(supabase, tenantId, toolInput, sessionInfo);
       case 'cancel_appointment':
@@ -1115,6 +1414,10 @@ export async function executeTool(
         return await handleGetInventory(supabase, tenantId, toolInput);
       case 'get_custom_fields':
         return await handleGetCustomFields(supabase, tenantId, toolInput);
+      case 'reschedule_appointment':
+        return await handleRescheduleAppointment(supabase, tenantId, toolInput, sessionInfo);
+      case 'get_directions':
+        return await handleGetDirections(supabase, tenantId, toolInput, userLocation);
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }

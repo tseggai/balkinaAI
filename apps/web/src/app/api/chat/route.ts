@@ -165,16 +165,54 @@ const findBusinessesTool: OpenAI.ChatCompletionTool = {
   type: 'function',
   function: {
     name: 'find_businesses',
-    description: 'Search for businesses by service type, category, or name. Use this when the user wants to book something but hasn\'t specified which business. When the user\'s location is available, results are sorted by proximity.',
+    description: 'Search for businesses by service type, category, or name. When query is empty, returns ALL nearby businesses. Results include matched service names for disambiguation. When the user\'s location is available, results are sorted by proximity with distance info.',
     parameters: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Search query - service type, category, or business name' },
+        query: { type: 'string', description: 'Search query - service type, category, or business name. Use empty string to list ALL nearby businesses.' },
         latitude: { type: 'number', description: 'User latitude for proximity search (optional)' },
         longitude: { type: 'number', description: 'User longitude for proximity search (optional)' },
         radius_km: { type: 'number', description: 'Search radius in km (default 50)' },
       },
-      required: ['query'],
+      required: [],
+    },
+  },
+};
+
+// Reschedule tool
+const rescheduleAppointmentTool: OpenAI.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'reschedule_appointment',
+    description: 'Reschedule an existing appointment to a new time. Atomically updates start/end time after checking the new slot is available. ALWAYS confirm WHICH appointment and the new time with the customer before calling.',
+    parameters: {
+      type: 'object',
+      properties: {
+        ...tenantIdProp,
+        appointment_id: { type: 'string', description: 'UUID of the appointment to reschedule' },
+        new_start_time: { type: 'string', description: 'New appointment start time in ISO 8601 format' },
+      },
+      required: ['appointment_id', 'new_start_time'],
+    },
+  },
+};
+
+// Directions tool
+const getDirectionsTool: OpenAI.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'get_directions',
+    description: 'Get driving directions and distance to a business location. Returns a Google Maps link and estimated distance. Use when the customer asks for directions, how to get there, or how far a place is.',
+    parameters: {
+      type: 'object',
+      properties: {
+        ...tenantIdProp,
+        location_id: { type: 'string', description: 'UUID of the tenant_location to navigate to (optional if destination_address is provided)' },
+        destination_address: { type: 'string', description: 'Address to navigate to (optional if location_id is provided)' },
+        origin_latitude: { type: 'number', description: 'User origin latitude (optional, uses current location if omitted)' },
+        origin_longitude: { type: 'number', description: 'User origin longitude (optional, uses current location if omitted)' },
+      },
+      required: [],
     },
   },
 };
@@ -223,31 +261,57 @@ ${customerSection}
 ## Quick-reply buttons
 Use [[button:Label]] syntax. These render as tappable buttons in the app.
 
+## Intent parsing — SKIP steps already answered
+BEFORE starting the flow, extract ALL info from the user's message: service, date, time, staff preference.
+- "Book me a haircut at 3pm today" → you already have service, date, time. Skip asking for those.
+NEVER re-ask a question the user has already answered in this conversation.
+
 ## Booking flow
+The flow is ADAPTIVE — skip any step the user already answered:
 1. Customer asks to book → call get_services, present each as:
-   [[button:ServiceName]] — $price · duration
-2. Customer picks a service → ask when:
+   [[button:ServiceName — $price · duration]]
+2. Customer picks a service → call get_staff, present staff options:
+   [[button:StaffName1]] [[button:StaffName2]] [[button:Any Available]]
+   ALWAYS show staff options. Never auto-assign without asking.
+3. Customer picks staff → ask when (if not already known):
    [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-3. Customer picks a timeframe (e.g. "Next Week") → present the days as buttons:
-   [[button:March 8]] [[button:March 9]] [[button:March 10]] [[button:March 11]] ...
-4. Customer picks a date → call get_staff, present each staff member as a button:
-   [[button:StaffName1]] [[button:StaffName2]] [[button:StaffName3]]
-   Do NOT show time slots yet. Let the customer pick a staff member first.
-5. Customer picks a staff member → call check_availability for that staff + date, present time slots:
+4. Customer picks a timeframe (e.g. "Next Week") → present days as buttons:
+   [[button:March 8]] [[button:March 9]] [[button:March 10]] [[button:March 11]]
+5. Customer picks a date → call check_availability for that staff + date, present time slots:
    [[button:8:00 AM]] [[button:8:30 AM]] [[button:9:00 AM]] [[button:9:30 AM]]
    Add [[button:Show More Times]] if there are more than 8 slots.
-6. Customer picks a time → summarize on one line: service, staff, time, price → [[button:Confirm Booking]] [[button:Change]]
+6. Customer picks a time → summarize: service, staff, time, price, deposit (if any) → [[button:Confirm Booking]] [[button:Change]]
 7. Customer confirms → create_booking
 8. Show brief confirmation
 
-CRITICAL: Each step is ONE message. Do NOT combine steps (e.g. do NOT show staff AND times in one message). Follow the flow exactly.
+Each step is ONE message. But SKIP steps where the answer is already known from context.
+
+## Deposit handling
+If a service requires a deposit, CLEARLY state the amount and let the customer decide. NEVER redirect to a different service because of a deposit requirement.
+- "This service requires a $X deposit. The remaining $Y is due at the appointment. Proceed?"
+- [[button:Yes, Book with Deposit]] [[button:Choose Another Service]]
+
+## Time conflict detection
+When the customer picks a time, check if they have an existing appointment at that time.
+- If conflict: "You already have [service] at [time]. Nearby available times:"
+  Show closest available alternatives as buttons.
+- NEVER just say "you have an appointment at that time" without offering alternatives.
+
+## Rescheduling
+- Use reschedule_appointment to move an appointment to a new time — do NOT cancel + rebook.
+- ALWAYS confirm WHICH appointment: "Move [service] from [old time] to [new time]?"
+- NEVER reschedule an appointment the customer didn't explicitly ask to change.
+- "Push it" / "move it" / "change it" refers to the LAST discussed appointment, NOT all appointments.
+
+## Directions
+When customer asks for directions or how far a place is, call get_directions. Do NOT try to rebook — just give directions.
 
 ## Presenting options
 - Services: button per service with price+duration inline
 - Time slots: buttons, max 8 per message
 - NEVER list as text bullets. Use buttons.
 - NEVER include text lists of times, staff, services, or businesses — ONLY use [[button:...]] syntax.
-- Staff: when user asks for staff options, present each as: [[button:StaffName]]
+- Staff: ALWAYS present as: [[button:StaffName1]] [[button:StaffName2]] [[button:Any Available]]
 - After tool results, NEVER repeat the data as a text list. Convert directly to buttons.
 - Keep descriptive text to ONE short sentence maximum, then buttons only.
 
@@ -257,6 +321,7 @@ Use get_packages when customer asks about deals/bundles.
 ## Appointments
 - Use get_booking_details with customer email/phone to show upcoming bookings
 - Use cancel_appointment to list cancellable appointments, then cancel by ID
+- Use reschedule_appointment to move an appointment — never cancel+rebook
 - Never ask for appointment ID — fetch list first
 - If authenticated, use their info immediately
 
@@ -307,25 +372,81 @@ Use [[button:Label]] syntax. These render as tappable buttons in the app.
 ## CRITICAL: tenant_id
 find_businesses returns each business's "id" (tenant_id). You MUST pass this tenant_id in ALL subsequent tool calls.
 
-## Discovery flow (location KNOWN — coordinates available)
-1. Customer says what they need → immediately ask when:
-   [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-2. Customer picks a timeframe (e.g. "Next Week") → call find_businesses WITH coordinates → present each business as a button for the customer to PICK ONE:
-   [[button:Shop Name]] [[button:Shop Name 2]] [[button:Shop Name 3]]
-   Do NOT show times yet. Do NOT repeat business names as text. ONLY buttons.
-3. Customer picks a business → call check_availability for the selected business for each day in the timeframe → present days as buttons:
-   [[button:Monday]] [[button:Tuesday]] [[button:Wednesday]] [[button:Thursday]] [[button:Friday]]
-4. Customer picks a day → show available time slots as buttons:
-   [[button:8:00 AM]] [[button:8:30 AM]] [[button:9:00 AM]] [[button:9:30 AM]]
-5. Customer taps a time → summarize on one line: service, shop, time, price → [[button:Confirm Booking]] [[button:Change]]
-6. Customer confirms → create_booking WITH tenant_id
+## Intent parsing — SKIP steps already answered
+BEFORE starting any flow, extract ALL info from the user's message: service type, business name, date, time, staff preference.
+- "Book me yoga nearby at 3pm today" → you already have: service=yoga, date=today, time=3pm. Skip asking for those.
+- "Is there a nail salon near me?" → you already have: service=nail salon. Skip category selection.
+- "What's near me?" or "List services in my neighborhood" → call find_businesses with empty query + coordinates to return ALL nearby businesses.
+NEVER re-ask a question the user has already answered in this conversation.
 
-CRITICAL: Each step is ONE message. Do NOT combine multiple steps. Do NOT show times and businesses in the same message. Follow the step-by-step flow exactly.
+## Discovery flow (location KNOWN — coordinates available)
+The flow is ADAPTIVE — skip any step the user already answered:
+1. Customer says what they need → call find_businesses immediately WITH coordinates and their query.
+   If the user already specified a date/time, remember it and skip asking later.
+2. Present matching businesses as buttons with distance:
+   [[button:Shop Name (0.5 mi)]] [[button:Shop Name 2 (1.2 mi)]]
+   Do NOT show times yet. Let the customer PICK a business first.
+3. Customer picks a business → call get_services for that business, present services:
+   [[button:ServiceName — $price · duration]]
+   If the user already said what service they want, auto-match it and skip this step.
+4. Customer picks a service → present staff options:
+   [[button:StaffName1]] [[button:StaffName2]] [[button:Any Available]]
+   ALWAYS show staff options. Never auto-assign without asking.
+5. Customer picks staff → ask when (if not already known):
+   [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
+6. Call check_availability for the selected service + staff + date → show time slots:
+   [[button:8:00 AM]] [[button:8:30 AM]] [[button:9:00 AM]]
+   Add [[button:Show More Times]] if there are more than 8 slots.
+7. Customer taps a time → summarize: service, staff, shop, time, price, deposit (if any) → [[button:Confirm Booking]] [[button:Change]]
+8. Customer confirms → create_booking WITH tenant_id
+
+Each step is ONE message. But SKIP steps where the answer is already known from context.
 
 ## Discovery flow (location NOT known)
 1. Customer says what they need → ask:
    [[button:Near Me]] [[button:Enter City/Zip]]
-2. Once location is provided, follow the "location KNOWN" flow above (step-by-step: when → pick business → pick day → pick time → confirm)
+2. Once location is provided, follow the "location KNOWN" flow above.
+
+## Search result disambiguation
+When find_businesses returns results, pay attention to the matched service names to avoid mixing up unrelated businesses:
+- "Nail Trim" at a pet groomer is NOT the same as "Nail Salon" for humans
+- Present results with the SPECIFIC matched service name so the customer understands what each business offers
+- Example: [[button:Happy Paws — Pet Nail Trim]] vs [[button:Luxe Nails — Manicure & Pedicure]]
+
+## Staff selection
+ALWAYS present staff options before showing time slots. Let the customer choose:
+[[button:StaffName1]] [[button:StaffName2]] [[button:Any Available]]
+If the user says "give me staff options next time" — you should ALWAYS show staff choices going forward.
+
+## Deposit handling
+If a service requires a deposit, CLEARLY state the amount and let the customer decide. NEVER redirect to a different service because of a deposit requirement.
+- "This service requires a $X deposit. The remaining $Y is due at the appointment. Proceed?"
+- [[button:Yes, Book with Deposit]] [[button:Choose Another Service]]
+
+## Time conflict detection
+When the customer picks a time, check if they have an existing appointment at that time.
+- If there's a conflict: "You already have [service] at [time]. Nearby available times:"
+  Then show the closest available alternatives as buttons.
+- NEVER just say "you have an appointment at that time" without offering alternatives.
+
+## Multi-appointment coordination
+When the customer wants to book multiple services close together:
+- Check availability for ALL services before presenting options.
+- If appointments are at DIFFERENT locations, mention the distance between them and suggest allowing travel time.
+- Present coordinated options: "Dog grooming at 3:00 PM (Happy Paws, 0.5 mi away) → Manicure at 3:30 PM (Luxe Nails)"
+- If exact times don't work, find the NEAREST day/time combination that satisfies all constraints.
+
+## Rescheduling
+- Use reschedule_appointment to move an appointment to a new time — do NOT cancel + rebook.
+- ALWAYS confirm WHICH appointment to reschedule: "Just to confirm, you want to move [service] at [business] from [old time] to [new time]?"
+- NEVER reschedule an appointment the customer didn't explicitly ask to change.
+- When the user says "push it" / "move it" / "change it", it refers to the LAST discussed appointment, NOT all appointments.
+
+## Directions
+When the customer asks for directions, how to get somewhere, or how far a place is:
+- Call get_directions with the location info.
+- Present the Google Maps link and distance/time estimate.
+- Do NOT try to rebook or offer services — just give directions.
 
 ## Presenting results
 - Show max 8 businesses as buttons per message. Add [[button:Show More]] for more.
@@ -335,17 +456,17 @@ CRITICAL: Each step is ONE message. Do NOT combine multiple steps. Do NOT show t
 - NEVER list services as text. Use buttons.
 - Max 8 buttons per row. Use multiple rows if needed.
 - NEVER include text lists of times, staff, services, or businesses — ONLY use [[button:...]] syntax.
-- Staff: when user asks for staff options, present each as: [[button:StaffName]]
 - After tool results, NEVER repeat the data as a text list. Convert directly to buttons.
 
 ## Appointments
 - Use get_booking_details with customer email/phone to show upcoming bookings
 - Use cancel_appointment to list cancellable appointments, then cancel by ID
+- Use reschedule_appointment to move an appointment — never cancel+rebook
 - Never ask for appointment ID — fetch list first
 - If authenticated, use their info immediately
 
 ## Location context
-${userLocation ? `User location: ${userLocation.latitude}, ${userLocation.longitude}. Coordinates ARE available — skip asking for location and go straight to asking WHEN. Pass coordinates to find_businesses.` : 'No location shared yet. Ask: [[button:Near Me]] [[button:Enter City/Zip]]'}
+${userLocation ? `User location: ${userLocation.latitude}, ${userLocation.longitude}. Coordinates ARE available — skip asking for location. Pass coordinates to find_businesses.` : 'No location shared yet. Ask: [[button:Near Me]] [[button:Enter City/Zip]]'}
 
 ## Boundaries
 - Only help with finding businesses and booking on Balkina AI
@@ -557,8 +678,8 @@ export async function POST(request: Request) {
 
   // 5. Build tools list and system prompt based on whether we have a tenant
   const chatTools: OpenAI.ChatCompletionTool[] = tenantId
-    ? [...tenantChatTools]
-    : [findBusinessesTool, ...tenantChatTools];
+    ? [...tenantChatTools, rescheduleAppointmentTool, getDirectionsTool]
+    : [findBusinessesTool, ...tenantChatTools, rescheduleAppointmentTool, getDirectionsTool];
 
   const resolvedName = chatSession.customer_name ?? customerName ?? null;
   const resolvedPhone = chatSession.customer_phone ?? customerPhone ?? null;
@@ -697,6 +818,7 @@ export async function POST(request: Request) {
                 chatSessionId: chatSession!.id,
                 userId: userId ?? null,
               },
+              userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
             );
 
             toolResults.push({
