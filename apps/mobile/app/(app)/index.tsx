@@ -45,7 +45,11 @@ function parseMessageContent(content: string): { text: string; buttons: string[]
   const text = content.replace(buttonRegex, (_match, label: string) => {
     buttons.push(label.trim());
     return '';
-  }).replace(/\n{3,}/g, '\n\n').trim();
+  })
+    .replace(/^[ \t]+$/gm, '')  // Remove lines that are only whitespace
+    .replace(/\n{2,}/g, '\n')   // Collapse multiple newlines to single
+    .replace(/^\n+|\n+$/g, '')  // Trim leading/trailing newlines
+    .trim();
 
   return { text, buttons };
 }
