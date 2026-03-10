@@ -67,7 +67,7 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'check_availability',
-      description: 'Check available time slots for a service on a given date. Returns available times with staff.',
+      description: 'Check available time slots for a service on a given date. Returns available times with staff. Each slot has a local_time field (e.g. "10:00 AM") — always use this for display instead of the raw ISO time field.',
       parameters: {
         type: 'object',
         properties: {
@@ -280,12 +280,20 @@ The flow is ADAPTIVE — skip any step the user already answered:
    [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
 4. Customer picks a timeframe (e.g. "Next Week") → present days as buttons:
    [[button:March 8]] [[button:March 9]] [[button:March 10]] [[button:March 11]]
-5. Customer picks a date → call check_availability for that staff + date, present time slots:
-   [[button:8:00 AM]] [[button:8:30 AM]] [[button:9:00 AM]] [[button:9:30 AM]]
+5. Customer picks a date → call check_availability for that staff + date, present time slots using the local_time field from each slot:
+   [[button:10:00 AM with Emily Watson]] [[button:10:30 AM with Emily Watson]]
+   ALWAYS use the local_time field from available_slots (NOT the raw ISO time field). Include staff name in the button.
    Add [[button:Show More Times]] if there are more than 8 slots.
 6. Customer picks a time → summarize: service, **staff name**, time, price, deposit (if any) → [[button:Confirm Booking]] [[button:Change]]
 7. Customer confirms → create_booking
-8. Show booking confirmation with **staff name**: "Booked! **Classic Haircut** with **Marcus Johnson** on March 12 at 4:30 PM. Total: $35."
+8. Show booking confirmation using the FULL details returned by create_booking:
+   - **Service name**
+   - Business: business_name
+   - Staff: staff_name
+   - Date: local_date
+   - Time: local_start_time - local_end_time
+   - Price: $total_price
+   - Address: location_address (if available)
    ALWAYS offer: [[button:View My Bookings]] [[button:Book Another Service]]
 
 Each step is ONE message. But SKIP steps where the answer is already known from context.
@@ -425,7 +433,8 @@ The flow is ADAPTIVE — skip any step the user already answered:
    If the user already specified a date/time, remember it and skip asking later.
 2. Present matching businesses as buttons with distance. State how many you're showing out of total:
    "Here are **8 of 15** service providers near you:"
-   [[button:Shop Name (0.5 mi)]] [[button:Shop Name 2 (1.2 mi)]]
+   [[button:Shop Name (0.5 mi · ~1 min drive)]] [[button:Shop Name 2 (1.2 mi · ~3 min drive)]]
+   Include the estimated_drive_minutes from tool results when available: "(X.X mi · ~Y min drive)".
    When has_more is true in results, ALWAYS add [[button:Show More]] at the end.
    Do NOT show services, staff, or times yet. Let the customer PICK a business first.
 3. When customer taps "Show More" → call find_businesses again with offset = previous offset + limit to get next page.
@@ -439,14 +448,21 @@ The flow is ADAPTIVE — skip any step the user already answered:
    ALWAYS show staff options. Never auto-assign without asking.
 6. Customer picks staff → ask when (if not already known):
    [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-7. Call check_availability for the selected service + staff + date → show time slots:
-   [[button:8:00 AM]] [[button:8:30 AM]] [[button:9:00 AM]]
+7. Call check_availability for the selected service + staff + date → show time slots using the local_time field from each slot:
+   [[button:10:00 AM with Emily Watson]] [[button:10:30 AM with Emily Watson]] [[button:11:00 AM with Marcus Johnson]]
+   ALWAYS use the local_time field from available_slots (NOT the raw ISO time field). Include staff name in the button.
    Add [[button:Show More Times]] if there are more than 8 slots.
 8. Customer taps a time → summarize: service, **staff name**, shop, time, price, deposit (if any) → [[button:Confirm Booking]] [[button:Change]]
 9. Customer confirms → create_booking WITH tenant_id
-10. After booking confirmation, ALWAYS:
-    - Show the booking summary including **staff name** who will perform the service
-    - Offer [[button:View My Bookings]] [[button:Book Another Service]]
+10. After booking confirmation, ALWAYS show the FULL booking summary using the data returned by create_booking:
+    - **Service name**
+    - Business: business_name
+    - Staff: staff_name
+    - Date: local_date
+    - Time: local_start_time - local_end_time
+    - Price: $total_price
+    - Address: location_address (if available)
+    Then offer [[button:View My Bookings]] [[button:Book Another Service]]
 
 Each step is ONE message. But SKIP steps where the answer is already known from context.
 
@@ -481,9 +497,10 @@ When the customer picks a time, check if they have an existing appointment at th
 When the customer wants to book multiple services close together:
 - Check availability for ALL services before presenting options.
 - If appointments are at DIFFERENT locations, ALWAYS show the **distance between them** (use get_directions or calculate from known coordinates).
-- Present coordinated options with BOLD business names, distance, and available staff:
-  "**Happy Paws Pet Grooming** *(0.5 mi from you)* — Bath & Brush Only at 3:00 PM with **Emily Watson**
-  **Milpitas Fades Barbershop** *(0.6 mi from groomer)* — Classic Haircut at 3:30 PM with **Marcus Johnson**"
+- Present coordinated options with BOLD business names, distance, and available staff.
+  ALWAYS use local_time from check_availability results (NOT raw ISO timestamps):
+  "**Happy Paws Pet Grooming** *(0.5 mi · ~1 min drive)* — Bath & Brush Only at 10:00 AM with **Emily Watson**
+  **Milpitas Fades Barbershop** *(0.6 mi from groomer)* — Classic Haircut at 10:30 AM with **Marcus Johnson**"
 - When the user asks for a specific gap between appointments (e.g. "30 min gap"), calculate the gap correctly:
   gap = second_appointment_start - first_appointment_end (NOT start-to-start).
   For example, if service A is 30 min and ends at 3:30 PM, then a 30 min gap means service B starts at 4:00 PM.
@@ -505,7 +522,8 @@ When the customer asks for directions, how to get somewhere, or how far a place 
 - Do NOT try to rebook or offer services — just give directions.
 
 ## Presenting results — CRITICAL FORMATTING RULES
-- In DISCOVERY mode (listing businesses): EVERY business MUST be a [[button:BusinessName (X.X mi)]].
+- In DISCOVERY mode (listing businesses): EVERY business MUST be a [[button:BusinessName (X.X mi · ~Y min drive)]].
+  Include the estimated_drive_minutes from tool results when available.
   State count: "Here are **8 of 15** service providers near you:"
   Add [[button:Show More]] when has_more is true.
 - In BOOKING FLOW (after picking a business): services, time slots, and staff MUST be buttons.
