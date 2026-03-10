@@ -82,7 +82,7 @@ export async function handleFindBusinesses(
       .from('tenants')
       .select('id, name')
       .eq('status', 'active')
-      .limit(10);
+      .limit(50);
 
     if (error) return { success: false, error: error.message };
 
@@ -139,7 +139,7 @@ export async function handleFindBusinesses(
     .select('id, name')
     .eq('status', 'active')
     .ilike('name', `%${sanitized}%`)
-    .limit(10);
+    .limit(50);
 
   // 2. Build flexible service search patterns
   //    - Full query: "haircut" → %haircut%
@@ -179,7 +179,7 @@ export async function handleFindBusinesses(
     .select('id, name, categories!inner(name)')
     .eq('status', 'active')
     .ilike('categories.name', `%${sanitized}%`)
-    .limit(10);
+    .limit(50);
 
   // Merge all found tenants (deduplicate by id) and track matched services per business
   const tenantMap = new Map<string, { id: string; name: string }>();
