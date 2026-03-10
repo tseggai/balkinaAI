@@ -45,7 +45,7 @@ function parseMessageContent(content: string): { text: string; buttons: string[]
   const text = content.replace(buttonRegex, (_match, label: string) => {
     buttons.push(label.trim());
     return '';
-  }).replace(/\n{3,}/g, '\n\n').trim();
+  }).replace(/^[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
 
   return { text, buttons };
 }
