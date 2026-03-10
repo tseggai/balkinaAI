@@ -348,10 +348,24 @@ export default function ChatWidgetPage() {
 // ── Button parsing helper ────────────────────────────────────────────────────
 
 const BUTTON_REGEX = /\[\[button:(.*?)\]\]/g;
+const LINK_REGEX = /\[\[link:([^|]+)\|([^\]]+)\]\]/g;
 
-function parseContentWithButtons(content: string): { textParts: string[]; buttons: string[] } {
+interface ParsedLink {
+  label: string;
+  url: string;
+}
+
+function parseContentWithButtons(content: string): { textParts: string[]; buttons: string[]; links: ParsedLink[] } {
+  const links: ParsedLink[] = [];
+
+  // Extract links first
+  const contentWithoutLinks = content.replace(LINK_REGEX, (_match, label: string, url: string) => {
+    links.push({ label: label.trim(), url: url.trim() });
+    return '';
+  });
+
   const buttons: string[] = [];
-  const textParts = content.split(BUTTON_REGEX);
+  const textParts = contentWithoutLinks.split(BUTTON_REGEX);
 
   // split alternates: text, captured group, text, captured group...
   // Even indices are text, odd indices are button labels
@@ -364,7 +378,7 @@ function parseContentWithButtons(content: string): { textParts: string[]; button
     }
   }
 
-  return { textParts: cleanTextParts, buttons };
+  return { textParts: cleanTextParts, buttons, links };
 }
 
 // ── MessageContent component with buttons and basic markdown ─────────────────
@@ -398,8 +412,8 @@ function MessageContent({
     return <span dangerouslySetInnerHTML={{ __html: formatted }} />;
   }
 
-  // Parse buttons from assistant messages
-  const { textParts, buttons } = parseContentWithButtons(content);
+  // Parse buttons and links from assistant messages
+  const { textParts, buttons, links } = parseContentWithButtons(content);
 
   // Reconstruct the text without button markup
   const textOnly = textParts.join('').trim();
@@ -411,6 +425,25 @@ function MessageContent({
     <div>
       {textOnly && (
         <span dangerouslySetInnerHTML={{ __html: formatted }} />
+      )}
+      {links.length > 0 && !isStreaming && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {links.map((link, i) => (
+            <a
+              key={`link-${i}`}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors no-underline"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              {link.label}
+            </a>
+          ))}
+        </div>
       )}
       {buttons.length > 0 && !isStreaming && (
         <div className="mt-2 flex flex-wrap gap-1.5">

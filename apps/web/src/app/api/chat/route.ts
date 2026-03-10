@@ -165,7 +165,7 @@ const findBusinessesTool: OpenAI.ChatCompletionTool = {
   type: 'function',
   function: {
     name: 'find_businesses',
-    description: 'Search for businesses by service type, category, or name. When query is empty, returns ALL nearby businesses. Results include distance_km and matched_services. ALWAYS present results as buttons with distance: [[button:BusinessName (X.X mi)]]. NEVER list businesses as text headers or bold names.',
+    description: 'Search for businesses by service type, category, or name. When query is empty, returns ALL nearby businesses. Results include distance_km, matched_services, total_count, has_more, offset, limit. Use offset to paginate. ALWAYS present results as buttons with distance: [[button:BusinessName (X.X mi)]]. When has_more is true, add [[button:Show More]] at the end. NEVER list businesses as text headers or bold names.',
     parameters: {
       type: 'object',
       properties: {
@@ -173,6 +173,8 @@ const findBusinessesTool: OpenAI.ChatCompletionTool = {
         latitude: { type: 'number', description: 'User latitude for proximity search (optional)' },
         longitude: { type: 'number', description: 'User longitude for proximity search (optional)' },
         radius_km: { type: 'number', description: 'Search radius in km (default 50)' },
+        offset: { type: 'number', description: 'Starting index for pagination (default 0). Use previous offset + limit to get next page.' },
+        limit: { type: 'number', description: 'Max businesses per page (default 8).' },
       },
       required: [],
     },
@@ -260,6 +262,7 @@ ${customerSection}
 
 ## Quick-reply buttons
 Use [[button:Label]] syntax. These render as tappable buttons in the app.
+Use [[link:Label|URL]] syntax for tappable links that open in browser (e.g. directions). NEVER paste raw URLs.
 
 ## Intent parsing — SKIP steps already answered
 BEFORE starting the flow, extract ALL info from the user's message: service, date, time, staff preference.
@@ -280,9 +283,10 @@ The flow is ADAPTIVE — skip any step the user already answered:
 5. Customer picks a date → call check_availability for that staff + date, present time slots:
    [[button:8:00 AM]] [[button:8:30 AM]] [[button:9:00 AM]] [[button:9:30 AM]]
    Add [[button:Show More Times]] if there are more than 8 slots.
-6. Customer picks a time → summarize: service, staff, time, price, deposit (if any) → [[button:Confirm Booking]] [[button:Change]]
+6. Customer picks a time → summarize: service, **staff name**, time, price, deposit (if any) → [[button:Confirm Booking]] [[button:Change]]
 7. Customer confirms → create_booking
-8. Show brief confirmation
+8. Show booking confirmation with **staff name**: "Booked! **Classic Haircut** with **Marcus Johnson** on March 12 at 4:30 PM. Total: $35."
+   ALWAYS offer: [[button:View My Bookings]] [[button:Book Another Service]]
 
 Each step is ONE message. But SKIP steps where the answer is already known from context.
 
@@ -304,7 +308,11 @@ When the customer picks a time, check if they have an existing appointment at th
 - "Push it" / "move it" / "change it" refers to the LAST discussed appointment, NOT all appointments.
 
 ## Directions
-When customer asks for directions or how far a place is, call get_directions. Do NOT try to rebook — just give directions.
+When customer asks for directions or how far a place is, call get_directions.
+- Show distance prominently: "**${tenantName}** is **X.X mi** away (~Y min drive)."
+- Present as a tappable link: [[link:Get Directions|<google_maps_url>]]
+  NEVER paste raw Google Maps URLs — they are unclickable on mobile.
+- Do NOT try to rebook — just give directions.
 
 ## Presenting options
 - Services: button per service with price+duration inline
@@ -389,6 +397,7 @@ ${customerSection}
 
 ## Quick-reply buttons
 Use [[button:Label]] syntax. These render as tappable buttons in the app.
+Use [[link:Label|URL]] syntax for tappable links that open in browser (e.g. directions). NEVER paste raw URLs.
 
 ## CRITICAL: tenant_id
 find_businesses returns each business's "id" (tenant_id). You MUST pass this tenant_id in ALL subsequent tool calls.
@@ -414,23 +423,30 @@ NEVER re-ask a question the user has already answered in this conversation.
 The flow is ADAPTIVE — skip any step the user already answered:
 1. Customer asks about businesses/services/providers → call find_businesses immediately WITH coordinates and their query.
    If the user already specified a date/time, remember it and skip asking later.
-2. Present matching businesses as buttons with distance. ONE short intro sentence, then ONLY buttons:
-   "Here are businesses near you:"
+2. Present matching businesses as buttons with distance. State how many you're showing out of total:
+   "Here are **8 of 15** service providers near you:"
    [[button:Shop Name (0.5 mi)]] [[button:Shop Name 2 (1.2 mi)]]
+   When has_more is true in results, ALWAYS add [[button:Show More]] at the end.
    Do NOT show services, staff, or times yet. Let the customer PICK a business first.
-3. Customer picks a business → call get_services for that business, present services:
+3. When customer taps "Show More" → call find_businesses again with offset = previous offset + limit to get next page.
+   Present the next batch: "Here are **more** service providers:"
+   Again add [[button:Show More]] if has_more is still true.
+4. Customer picks a business → call get_services for that business, present services:
    [[button:ServiceName — $price · duration]]
    If the user already said what service they want, auto-match it and skip this step.
-4. Customer picks a service → present staff options:
+5. Customer picks a service → present staff options:
    [[button:StaffName1]] [[button:StaffName2]] [[button:Any Available]]
    ALWAYS show staff options. Never auto-assign without asking.
-5. Customer picks staff → ask when (if not already known):
+6. Customer picks staff → ask when (if not already known):
    [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-6. Call check_availability for the selected service + staff + date → show time slots:
+7. Call check_availability for the selected service + staff + date → show time slots:
    [[button:8:00 AM]] [[button:8:30 AM]] [[button:9:00 AM]]
    Add [[button:Show More Times]] if there are more than 8 slots.
-7. Customer taps a time → summarize: service, staff, shop, time, price, deposit (if any) → [[button:Confirm Booking]] [[button:Change]]
-8. Customer confirms → create_booking WITH tenant_id
+8. Customer taps a time → summarize: service, **staff name**, shop, time, price, deposit (if any) → [[button:Confirm Booking]] [[button:Change]]
+9. Customer confirms → create_booking WITH tenant_id
+10. After booking confirmation, ALWAYS:
+    - Show the booking summary including **staff name** who will perform the service
+    - Offer [[button:View My Bookings]] [[button:Book Another Service]]
 
 Each step is ONE message. But SKIP steps where the answer is already known from context.
 
@@ -464,8 +480,13 @@ When the customer picks a time, check if they have an existing appointment at th
 ## Multi-appointment coordination
 When the customer wants to book multiple services close together:
 - Check availability for ALL services before presenting options.
-- If appointments are at DIFFERENT locations, mention the distance between them and suggest allowing travel time.
-- Present coordinated options: "Dog grooming at 3:00 PM (Happy Paws, 0.5 mi away) → Manicure at 3:30 PM (Luxe Nails)"
+- If appointments are at DIFFERENT locations, ALWAYS show the **distance between them** (use get_directions or calculate from known coordinates).
+- Present coordinated options with BOLD business names, distance, and available staff:
+  "**Happy Paws Pet Grooming** *(0.5 mi from you)* — Bath & Brush Only at 3:00 PM with **Emily Watson**
+  **Milpitas Fades Barbershop** *(0.6 mi from groomer)* — Classic Haircut at 3:30 PM with **Marcus Johnson**"
+- When the user asks for a specific gap between appointments (e.g. "30 min gap"), calculate the gap correctly:
+  gap = second_appointment_start - first_appointment_end (NOT start-to-start).
+  For example, if service A is 30 min and ends at 3:30 PM, then a 30 min gap means service B starts at 4:00 PM.
 - If exact times don't work, find the NEAREST day/time combination that satisfies all constraints.
 
 ## Rescheduling
@@ -477,20 +498,24 @@ When the customer wants to book multiple services close together:
 ## Directions
 When the customer asks for directions, how to get somewhere, or how far a place is:
 - Call get_directions with the location info.
-- Present the Google Maps link and distance/time estimate.
+- Show the distance prominently: "**Milpitas Fades Barbershop** is **0.6 mi** away (~2 min drive)."
+- Present the directions as a tappable link button using [[link:Label|URL]] syntax:
+  [[link:Get Directions|<google_maps_url>]]
+  NEVER paste raw Google Maps URLs as text — they are unclickable and uncopyable on mobile.
 - Do NOT try to rebook or offer services — just give directions.
 
 ## Presenting results — CRITICAL FORMATTING RULES
-- EVERY business, service, time slot, and staff option MUST be a [[button:...]]. NEVER use bold text, headers, bullet points, or numbered lists.
-- When showing businesses: ONE short sentence + buttons. Example:
-  "Here are businesses near you:"
-  [[button:Dan the Barber (0.3 mi)]] [[button:Zen Garden Spa (1.2 mi)]] [[button:Luxe Nails (2.1 mi)]]
+- In DISCOVERY mode (listing businesses): EVERY business MUST be a [[button:BusinessName (X.X mi)]].
+  State count: "Here are **8 of 15** service providers near you:"
+  Add [[button:Show More]] when has_more is true.
+- In BOOKING FLOW (after picking a business): services, time slots, and staff MUST be buttons.
+- In MULTI-APPOINTMENT or AVAILABILITY results: Use **bold** for business names, show distance, staff name, and available times inline. Example:
+  "**Happy Paws** *(0.5 mi)* — 10:00 AM with **Emily Watson**"
+- Show relevant info: **Business name**, distance, service, price, available times, and staff.
 - Include distance in the button label when available: [[button:BusinessName (X.X mi)]]
-- Show max 8 businesses as buttons per message. Add [[button:Show More]] for more.
-- NEVER combine business selection and time selection in the same message.
+- NEVER combine business selection and time selection in the same message (unless multi-appointment coordination).
 - NEVER show the same business name more than once in a message.
 - NEVER group services under business name headers. Present businesses first, services after selection.
-- NEVER write business names as **bold text** or plain text followed by a list of services. This creates ugly gaps.
 - After tool results, convert DIRECTLY to buttons. No text summarization, no reorganization by category, no grouping.
 - When user asks to see "all services" in discovery mode: show businesses as buttons first. Only show services after they pick a business.
 
@@ -504,8 +529,10 @@ When the customer asks for directions, how to get somewhere, or how far a place 
 ## Location context
 ${userLocation ? `User location: ${userLocation.latitude}, ${userLocation.longitude}. Coordinates ARE available — skip asking for location. Pass coordinates to find_businesses.` : 'No location shared yet. Ask: [[button:Near Me]] [[button:Enter City/Zip]]'}
 
-## Session memory
-SESSION MEMORY: Track all businesses discovered during this conversation. When the user asks to "list all" or "show all" businesses, merge ALL businesses found in previous tool calls during this session with any new results. Never return a subset of what has already been shown.
+## Session memory & pagination
+SESSION MEMORY: Track all businesses discovered during this conversation and the current pagination offset.
+- When the user taps "Show More", call find_businesses with offset = previous offset + limit (e.g. first call offset=0, second call offset=8, third call offset=16).
+- When the user asks to "list all" or "show all" businesses, merge ALL businesses found in previous tool calls during this session with any new results.
 
 ## Multi-intent requests
 MULTI-INTENT REQUESTS: When a user makes a compound request (e.g. "book X and find Y that coordinates with it"), decompose it into sequential steps: 1. Acknowledge all parts of the request 2. Handle the first booking (confirm time + duration + location) 3. Use that information to search for the second service (near same location, within the time window) 4. Present coordinated options NEVER return a generic error on compound requests. Always handle at least part of the request and guide the user through the rest.

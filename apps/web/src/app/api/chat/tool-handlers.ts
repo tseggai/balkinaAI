@@ -75,6 +75,8 @@ export async function handleFindBusinesses(
   const userLat = input.latitude as number | undefined;
   const userLng = input.longitude as number | undefined;
   const radiusKm = (input.radius_km as number) || 50;
+  const offset = (input.offset as number) || 0;
+  const limit = (input.limit as number) || 8;
 
   if (!query) {
     // Return all active businesses when no query is provided
@@ -82,7 +84,7 @@ export async function handleFindBusinesses(
       .from('tenants')
       .select('id, name')
       .eq('status', 'active')
-      .limit(50);
+      .limit(200);
 
     if (error) return { success: false, error: error.message };
 
@@ -126,7 +128,11 @@ export async function handleFindBusinesses(
       locationNote = 'Showing all locations — enable location access for nearby results';
     }
 
-    return { success: true, data: { businesses, matching_services: [], location_note: locationNote } };
+    const totalCount = businesses.length;
+    const paged = businesses.slice(offset, offset + limit);
+    const hasMore = offset + limit < totalCount;
+
+    return { success: true, data: { businesses: paged, total_count: totalCount, offset, limit, has_more: hasMore, matching_services: [], location_note: locationNote } };
   }
 
   // Sanitize query for use in Supabase filter (escape % and _ which are SQL wildcards)
@@ -243,10 +249,18 @@ export async function handleFindBusinesses(
     locationNote = 'Showing all locations — enable location access for nearby results';
   }
 
+  const totalCount = businesses.length;
+  const paged = businesses.slice(offset, offset + limit);
+  const hasMore = offset + limit < totalCount;
+
   return {
     success: true,
     data: {
-      businesses,
+      businesses: paged,
+      total_count: totalCount,
+      offset,
+      limit,
+      has_more: hasMore,
       matching_services: serviceMatches ?? [],
       location_note: locationNote,
     },
@@ -714,11 +728,32 @@ export async function handleBookAppointment(
       .eq('id', sessionInfo.chatSessionId);
   }
 
+  // 9. Fetch staff name and business name for the response
+  let staffName: string | null = null;
+  if (finalStaffId) {
+    const { data: staffData } = await supabase
+      .from('staff')
+      .select('name')
+      .eq('id', finalStaffId)
+      .single();
+    staffName = (staffData as { name: string } | null)?.name ?? null;
+  }
+
+  let businessName: string | null = null;
+  const { data: tenantData } = await supabase
+    .from('tenants')
+    .select('name')
+    .eq('id', tenantId)
+    .single();
+  businessName = (tenantData as { name: string } | null)?.name ?? null;
+
   return {
     success: true,
     data: {
       appointment_id: (appointment as { id: string }).id,
       service_name: (service as { name: string }).name,
+      staff_name: staffName,
+      business_name: businessName,
       start_time: start.toISOString(),
       end_time: end.toISOString(),
       total_price: svc.price,

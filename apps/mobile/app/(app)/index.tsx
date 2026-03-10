@@ -11,6 +11,7 @@ import {
   Animated,
   Keyboard,
   SafeAreaView,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
@@ -37,12 +38,25 @@ function generateId(): string {
   });
 }
 
-// ── Parse [[button:...]] from message content ───────────────────────────────
+// ── Parse [[button:...]] and [[link:Label|URL]] from message content ─────────
 
-function parseMessageContent(content: string): { text: string; buttons: string[] } {
+interface ParsedLink {
+  label: string;
+  url: string;
+}
+
+function parseMessageContent(content: string): { text: string; buttons: string[]; links: ParsedLink[] } {
   const buttonRegex = /\[\[button:([^\]]+)\]\]/g;
+  const linkRegex = /\[\[link:([^|]+)\|([^\]]+)\]\]/g;
   const buttons: string[] = [];
-  const text = content.replace(buttonRegex, (_match, label: string) => {
+  const links: ParsedLink[] = [];
+
+  let text = content.replace(linkRegex, (_match, label: string, url: string) => {
+    links.push({ label: label.trim(), url: url.trim() });
+    return '';
+  });
+
+  text = text.replace(buttonRegex, (_match, label: string) => {
     buttons.push(label.trim());
     return '';
   })
@@ -51,7 +65,7 @@ function parseMessageContent(content: string): { text: string; buttons: string[]
     .replace(/^\n+|\n+$/g, '')  // Trim leading/trailing newlines
     .trim();
 
-  return { text, buttons };
+  return { text, buttons, links };
 }
 
 // ── Parse inline markdown (**bold** and *italic*) into Text elements ────────
@@ -241,8 +255,8 @@ function MessageBubble({
   }, [fadeAnim, slideAnim]);
 
   const isUser = message.role === 'user';
-  const { text, buttons } = isUser
-    ? { text: message.content, buttons: [] }
+  const { text, buttons, links } = isUser
+    ? { text: message.content, buttons: [], links: [] }
     : parseMessageContent(message.content);
 
   return (
@@ -281,6 +295,23 @@ function MessageBubble({
                   )}
             </Text>
           )}
+        </View>
+      )}
+
+      {/* Link buttons rendered below the bubble (open URL in browser) */}
+      {links.length > 0 && !message.isStreaming && (
+        <View style={bubbleStyles.buttonsRow}>
+          {links.map((link, i) => (
+            <TouchableOpacity
+              key={`link-${i}`}
+              style={bubbleStyles.linkButton}
+              onPress={() => Linking.openURL(link.url)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="navigate-outline" size={14} color="#4f46e5" style={{ marginRight: 4 }} />
+              <Text style={bubbleStyles.linkButtonText}>{link.label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       )}
 
@@ -338,6 +369,21 @@ const bubbleStyles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 8,
+  },
+  linkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eef2ff',
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  linkButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4f46e5',
   },
 });
 
