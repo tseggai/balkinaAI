@@ -1,0 +1,551 @@
+import { useEffect, useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '@/lib/supabase';
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface AppointmentExtra {
+  quantity: number;
+  price_at_booking: number;
+  extra: { name: string } | null;
+}
+
+interface AppointmentCoupon {
+  code: string;
+  discount_amount: number;
+  discount_type: string;
+}
+
+interface Appointment {
+  id: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  total_price: number;
+  services: { name: string } | null;
+  staff: { name: string } | null;
+  tenant_locations: { name: string } | null;
+  tenants: { name: string } | null;
+  appointment_extras?: AppointmentExtra[];
+  coupon?: AppointmentCoupon | null;
+}
+
+type Tab = 'upcoming' | 'past';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function getStatusStyle(status: string): { bg: string; text: string } {
+  switch (status) {
+    case 'confirmed':
+      return { bg: '#dbeafe', text: '#1d4ed8' };
+    case 'pending':
+      return { bg: '#fef3c7', text: '#92400e' };
+    case 'completed':
+      return { bg: '#d1fae5', text: '#065f46' };
+    case 'cancelled':
+      return { bg: '#fee2e2', text: '#991b1b' };
+    default:
+      return { bg: '#f3f4f6', text: '#374151' };
+  }
+}
+
+function formatDateTime(dateStr: string): { date: string; time: string } {
+  const d = new Date(dateStr);
+  return {
+    date: d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    }),
+    time: d.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }),
+  };
+}
+
+// ── Main Screen ──────────────────────────────────────────────────────────────
+
+export default function BookingsScreen() {
+  const router = useRouter();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [tab, setTab] = useState<Tab>('upcoming');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const fetchAppointments = useCallback(async () => {
+    setErrorMsg(null);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      setRefreshing(false);
+      setErrorMsg('Please sign in to view your bookings.');
+      return;
+    }
+
+    // Step 1: Find the customer_id by looking up the customers table
+    // Match by user_id first (set when booking via chat), then by id, email, phone
+    let customerId: string | null = null;
+
+    // Try matching by user_id (linked authenticated user)
+    const { data: byUserId } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (byUserId) {
+      customerId = byUserId.id;
+    }
+
+    // Try matching by id (auth user id = customers.id)
+    if (!customerId) {
+      const { data: byId } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (byId) {
+        customerId = byId.id;
+      }
+    }
+
+    // If not found by id, try email
+    if (!customerId && user.email) {
+      const { data: byEmail } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('email', user.email)
+        .limit(1)
+        .maybeSingle();
+
+      if (byEmail) {
+        customerId = byEmail.id;
+      }
+    }
+
+    // If not found by email, try phone
+    if (!customerId && user.phone) {
+      const { data: byPhone } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('phone', user.phone)
+        .limit(1)
+        .maybeSingle();
+
+      if (byPhone) {
+        customerId = byPhone.id;
+      }
+    }
+
+    // Link user_id to customer if found by email/phone but not user_id
+    if (customerId && !byUserId) {
+      await supabase
+        .from('customers')
+        .update({ user_id: user.id })
+        .eq('id', customerId)
+        .is('user_id', null);
+    }
+
+    if (!customerId) {
+      // No customer record found — show empty state
+      setAppointments([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayISO = todayStart.toISOString();
+    const isUpcoming = tab === 'upcoming';
+
+    let query = supabase
+      .from('appointments')
+      .select(
+        'id, start_time, end_time, status, total_price, services(name), staff(name), tenant_locations(name), tenants(name), appointment_extras(quantity, price_at_booking, extra:service_extras(name)), coupon:coupons(code, discount_value, discount_type)',
+      )
+      .eq('customer_id', customerId)
+      .order('start_time', { ascending: isUpcoming });
+
+    if (isUpcoming) {
+      query = query
+        .gte('start_time', todayISO)
+        .in('status', ['pending', 'confirmed']);
+    } else {
+      query = query.or(
+        `start_time.lt.${now},status.eq.completed,status.eq.cancelled`,
+      );
+    }
+
+    const { data, error } = await query.limit(50);
+
+    if (error) {
+      setErrorMsg(`Failed to load bookings: ${error.message}`);
+      setAppointments([]);
+    } else {
+      setAppointments((data as unknown as Appointment[]) ?? []);
+    }
+
+    setLoading(false);
+    setRefreshing(false);
+  }, [tab]);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchAppointments();
+  }, [fetchAppointments]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchAppointments();
+  }, [fetchAppointments]);
+
+  const renderItem = ({ item }: { item: Appointment }) => {
+    const { date, time } = formatDateTime(item.start_time);
+    const statusColor = getStatusStyle(item.status);
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.businessName}>
+            {item.tenants?.name ?? 'Business'}
+          </Text>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: statusColor.bg },
+            ]}
+          >
+            <Text style={[styles.statusText, { color: statusColor.text }]}>
+              {item.status}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.serviceName}>
+          {item.services?.name ?? 'Service'}
+        </Text>
+
+        {/* Show extras below service name */}
+        {item.appointment_extras && item.appointment_extras.length > 0 && (
+          <View>
+            {item.appointment_extras.map((extra, idx) => (
+              <Text key={idx} style={styles.extraLine}>
+                {'• '}{extra.extra?.name ?? 'Extra'}{extra.quantity > 1 ? ` ×${extra.quantity}` : ''}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {/* Show coupon if used */}
+        {item.coupon?.code ? (
+          <Text style={styles.couponLine}>
+            {'\uD83C\uDFF7\uFE0F'} {item.coupon.code} applied
+          </Text>
+        ) : null}
+
+        {item.staff?.name ? (
+          <Text style={styles.staffName}>with {item.staff.name}</Text>
+        ) : null}
+
+        {item.tenant_locations?.name ? (
+          <Text style={styles.locationName}>
+            at {item.tenant_locations.name}
+          </Text>
+        ) : null}
+
+        <View style={styles.cardFooter}>
+          <View style={styles.dateTimeRow}>
+            <Ionicons name="calendar-outline" size={14} color="#6b7280" />
+            <Text style={styles.dateTimeText}>
+              {date} at {time}
+            </Text>
+          </View>
+
+          <Text style={styles.price}>
+            ${(item.total_price ?? 0).toFixed(2)}{item.coupon?.code ? ' (with discount)' : ''}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  return (
+    <View style={styles.container}>
+      {/* Tab bar */}
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tab, tab === 'upcoming' && styles.tabActive]}
+          onPress={() => setTab('upcoming')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              tab === 'upcoming' && styles.tabTextActive,
+            ]}
+          >
+            Upcoming
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, tab === 'past' && styles.tabActive]}
+          onPress={() => setTab('past')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              tab === 'past' && styles.tabTextActive,
+            ]}
+          >
+            Past
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#6366f1" />
+        </View>
+      ) : errorMsg ? (
+        <View style={styles.empty}>
+          <Ionicons name="alert-circle-outline" size={56} color="#ef4444" />
+          <Text style={styles.emptyTitle}>Error</Text>
+          <Text style={styles.emptySubtitle}>{errorMsg}</Text>
+          <TouchableOpacity
+            style={styles.startChatBtn}
+            onPress={() => {
+              setErrorMsg(null);
+              setLoading(true);
+              fetchAppointments();
+            }}
+          >
+            <Ionicons name="refresh" size={18} color="#fff" />
+            <Text style={styles.startChatBtnText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={appointments}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#6366f1"
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Ionicons name="calendar-outline" size={56} color="#d1d5db" />
+              <Text style={styles.emptyTitle}>No bookings yet</Text>
+              <Text style={styles.emptySubtitle}>
+                {tab === 'upcoming'
+                  ? 'Your upcoming appointments will appear here.'
+                  : 'Your past appointments will appear here.'}
+              </Text>
+              {tab === 'upcoming' && (
+                <TouchableOpacity
+                  style={styles.startChatBtn}
+                  onPress={() => {
+                    router.navigate('/(app)');
+                  }}
+                >
+                  <Ionicons
+                    name="chatbubbles-outline"
+                    size={18}
+                    color="#fff"
+                  />
+                  <Text style={styles.startChatBtnText}>Start chatting</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          }
+        />
+      )}
+    </View>
+  );
+}
+
+// ── Styles ───────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tabs: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: '#6366f1',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9ca3af',
+  },
+  tabTextActive: {
+    color: '#6366f1',
+  },
+  list: {
+    padding: 16,
+    paddingBottom: 24,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  businessName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    flex: 1,
+    marginRight: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  serviceName: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 2,
+  },
+  extraLine: {
+    fontSize: 13,
+    color: '#9ca3af',
+    marginBottom: 1,
+    paddingLeft: 4,
+  },
+  couponLine: {
+    fontSize: 13,
+    color: '#059669',
+    marginBottom: 2,
+    fontWeight: '500',
+  },
+  staffName: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 2,
+  },
+  locationName: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 10,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  dateTimeText: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  price: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  empty: {
+    alignItems: 'center',
+    paddingTop: 80,
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    paddingHorizontal: 40,
+    lineHeight: 20,
+  },
+  startChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 16,
+    gap: 8,
+  },
+  startChatBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+});

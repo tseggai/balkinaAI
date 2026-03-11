@@ -3,16 +3,20 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: HomeIcon },
   { href: '/dashboard/appointments', label: 'Appointments', icon: CalendarIcon },
   { href: '/dashboard/services', label: 'Services', icon: BriefcaseIcon },
+  { href: '/dashboard/categories', label: 'Categories', icon: CategoryIcon },
   { href: '/dashboard/staff', label: 'Staff', icon: UsersIcon },
   { href: '/dashboard/locations', label: 'Locations', icon: MapPinIcon },
+  { href: '/dashboard/packages', label: 'Packages', icon: PackageIcon },
   { href: '/dashboard/customers', label: 'Customers', icon: UserGroupIcon },
   { href: '/dashboard/coupons', label: 'Coupons', icon: TagIcon },
+  { href: '/dashboard/loyalty', label: 'Loyalty', icon: StarIcon },
+  { href: '/dashboard/inventory', label: 'Inventory', icon: BoxIcon },
+  { href: '/dashboard/roles', label: 'Roles', icon: ShieldIcon },
   { href: '/dashboard/settings', label: 'Settings', icon: CogIcon },
 ];
 
@@ -24,12 +28,11 @@ export function Sidebar({
   planName: string;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
 
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/auth/login');
+    window.location.href = '/auth/login';
   }
 
   return (
@@ -134,6 +137,14 @@ function MapPinIcon({ active }: { active?: boolean }) {
   );
 }
 
+function PackageIcon({ active }: { active?: boolean }) {
+  return (
+    <svg className={`h-5 w-5 ${active ? 'text-brand-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+    </svg>
+  );
+}
+
 function UserGroupIcon({ active }: { active?: boolean }) {
   return (
     <svg className={`h-5 w-5 ${active ? 'text-brand-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -147,6 +158,38 @@ function TagIcon({ active }: { active?: boolean }) {
     <svg className={`h-5 w-5 ${active ? 'text-brand-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6Z" />
+    </svg>
+  );
+}
+
+function StarIcon({ active }: { active?: boolean }) {
+  return (
+    <svg className={`h-5 w-5 ${active ? 'text-brand-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+    </svg>
+  );
+}
+
+function BoxIcon({ active }: { active?: boolean }) {
+  return (
+    <svg className={`h-5 w-5 ${active ? 'text-brand-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+    </svg>
+  );
+}
+
+function ShieldIcon({ active }: { active?: boolean }) {
+  return (
+    <svg className={`h-5 w-5 ${active ? 'text-brand-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+    </svg>
+  );
+}
+
+function CategoryIcon({ active }: { active?: boolean }) {
+  return (
+    <svg className={`h-5 w-5 ${active ? 'text-brand-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z" />
     </svg>
   );
 }

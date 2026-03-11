@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getStripe, PLAN_PRICE_IDS, type PlanKey } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
+
+const VALID_PLANS = ['starter', 'pro', 'enterprise'] as const;
+type PlanKey = (typeof VALID_PLANS)[number];
 
 export async function POST(request: Request) {
   try {
     const { plan } = await request.json() as { plan: string };
 
-    if (!plan || !PLAN_PRICE_IDS[plan as PlanKey]) {
+    if (!plan || !VALID_PLANS.includes(plan as PlanKey)) {
       return NextResponse.json(
         { data: null, error: { message: 'Invalid plan selected', code: 'VALIDATION_ERROR' } },
         { status: 400 }
@@ -46,18 +49,35 @@ export async function POST(request: Request) {
       );
     }
 
+    // Look up the Stripe price ID from the subscription_plans table.
+    // Plan name in DB is title-case (Starter, Pro, Enterprise).
+    const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
+    const { data: planData, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('id, stripe_price_id')
+      .eq('name', planName)
+      .single();
+
+    const subPlan = planData as { id: string; stripe_price_id: string | null } | null;
+
+    if (planError || !subPlan?.stripe_price_id) {
+      return NextResponse.json(
+        { data: null, error: { message: 'Plan not configured', code: 'SETUP_ERROR' } },
+        { status: 400 }
+      );
+    }
+
     const stripe = getStripe();
-    const priceId = PLAN_PRICE_IDS[plan as PlanKey];
 
     const session = await stripe.checkout.sessions.create({
       customer: tenant.stripe_customer_id,
       mode: 'subscription',
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [{ price: subPlan.stripe_price_id, quantity: 1 }],
       success_url: `${request.headers.get('origin') ?? process.env.NEXTAUTH_URL}/onboarding/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.headers.get('origin') ?? process.env.NEXTAUTH_URL}/onboarding/select-plan`,
-      metadata: { tenant_id: tenant.id },
+      metadata: { tenant_id: tenant.id, plan_id: subPlan.id },
       subscription_data: {
-        metadata: { tenant_id: tenant.id },
+        metadata: { tenant_id: tenant.id, plan_id: subPlan.id },
       },
     });
 

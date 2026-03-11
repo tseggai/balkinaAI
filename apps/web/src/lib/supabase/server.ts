@@ -1,9 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-// Note: Database generic removed due to @supabase/ssr v0.3.0 type incompatibility
-// with @supabase/supabase-js v2.98.0. Upgrade @supabase/ssr to restore typed queries.
-
 export function createClient() {
   const cookieStore = cookies();
 

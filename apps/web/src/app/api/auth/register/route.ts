@@ -90,6 +90,12 @@ export async function POST(request: Request) {
       );
     }
 
+    // Set tenant_id in user's app_metadata so the JWT carries it.
+    // This makes get_my_tenant_id() work for RLS on all tenant-scoped tables.
+    await supabase.auth.admin.updateUserById(userId, {
+      app_metadata: { tenant_id: tenant.id },
+    });
+
     return NextResponse.json({ data: { tenantId: tenant.id }, error: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';

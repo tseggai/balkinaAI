@@ -112,16 +112,49 @@ All tables require RLS enabled. Tenant data always filtered by tenant_id.
 - PR must include: what changed, how tested, screenshots for any UI changes.
 - .env.local is gitignored. Never commit any credentials.
 
+## Product Vision
+
+Balkina AI is NOT a marketplace browser. It is a conversational booking platform.
+
+**Customer experience**: One chat interface. Users ask, AI finds businesses, checks availability, books appointments, sends reminders. No browsing, no tenant pages, no category filtering UI. Everything surfaces as rich cards within the chat conversation.
+
+**Tenant experience**: Professional booking management dashboard rivaling Booknetic/Calendly. Full service configuration (images, colors, deposits, buffer times, extras, booking limits), staff management with schedules, location management, appointment management, customer CRM, coupon system, analytics.
+
+**Core differentiator**: The AI chatbot that handles the entire customer journey through natural language.
+
+## Database Tables — New (Migration 006)
+- service_staff — id, service_id, staff_id (junction table for which staff can perform which services)
+- service_special_days — id, service_id, date, start_time, end_time, is_day_off, breaks (jsonb)
+- services extended columns: image_url, color, description, buffer_time_before, buffer_time_after, custom_duration, is_recurring, capacity, hide_price, hide_duration, visibility, min_booking_lead_time, max_booking_days_ahead, min_extras, max_extras, booking_limit_per_customer, booking_limit_per_customer_interval, booking_limit_per_slot, booking_limit_per_slot_interval, category_name, timesheet (jsonb)
+- staff extended columns: image_url, status
+
+## Mobile App Structure (Conversational-First)
+```
+apps/mobile/app/
+├── _layout.tsx        — Root layout, auth state listener, redirects
+├── (auth)/            — Login, register screens
+│   ├── _layout.tsx
+│   ├── welcome.tsx
+│   ├── email-login.tsx
+│   ├── phone-login.tsx
+│   ├── verify-otp.tsx
+│   └── profile-setup.tsx
+└── (app)/             — Main app (chat-first)
+    ├── _layout.tsx    — Bottom tabs: Chat | Bookings | Profile
+    ├── index.tsx      — CHAT SCREEN (this is home, not a list)
+    ├── bookings.tsx   — Upcoming/past appointments
+    └── profile.tsx    — User profile and settings
+```
+
+## Chat API — Tenant Discovery
+The /api/chat endpoint accepts tenantId as OPTIONAL. When no tenantId is provided:
+- AI acts as a general booking assistant
+- Uses find_businesses tool to search for matching tenants
+- Once user picks a business, proceeds with normal booking flow
+
 ## When Stuck
 - Check /docs/ for detailed module specs.
 - Check /packages/shared/types before creating new types.
 - Check /packages/db/rls-policies.sql for RLS policy patterns.
 - Do not install new npm packages without checking if existing dependencies cover the need.
 - If a Supabase query returns unexpected results, check RLS policies first.
-```
-
----
-
-Scroll down and click **"Commit changes"** → commit message:
-```
-chore: add CLAUDE.md project instructions

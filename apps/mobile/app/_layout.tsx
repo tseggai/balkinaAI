@@ -15,11 +15,11 @@ export default function RootLayout() {
       setInitialized(true);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, s) => {
-        setSession(s);
-      }
-    );
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -28,19 +28,19 @@ export default function RootLayout() {
     if (!initialized) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inAppGroup = segments[0] === '(app)';
 
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/welcome');
-    } else if (session && inAuthGroup) {
-      router.replace('/');
+    } else if (session && !inAppGroup) {
+      router.replace('/(app)');
     }
   }, [session, initialized, segments, router]);
 
   return (
-    <Stack>
+    <Stack screenOptions={{ headerBackTitle: 'Back' }}>
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="chat" options={{ title: 'Book Appointment' }} />
+      <Stack.Screen name="(app)" options={{ headerShown: false }} />
     </Stack>
   );
 }
