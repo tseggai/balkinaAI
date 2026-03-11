@@ -93,6 +93,22 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
           staff_id: { type: 'string', description: 'UUID of preferred staff member (optional)' },
           start_time: { type: 'string', description: 'Appointment start time in ISO 8601 format' },
           location_id: { type: 'string', description: 'UUID of the location (optional)' },
+          selected_extras: {
+            type: 'array',
+            description: 'Service extras selected by the customer',
+            items: {
+              type: 'object',
+              properties: {
+                extra_id: { type: 'string', description: 'UUID of the service extra' },
+                quantity: { type: 'number', description: 'Quantity (default 1)' },
+              },
+              required: ['extra_id'],
+            },
+          },
+          coupon_code: { type: 'string', description: 'Coupon code to apply (optional)' },
+          loyalty_points_to_redeem: { type: 'number', description: 'Number of loyalty points to redeem (0 = don\'t redeem)' },
+          use_customer_package: { type: 'boolean', description: 'Use an existing customer package session instead of paying' },
+          package_id: { type: 'string', description: 'UUID of package being purchased (optional)' },
         },
         required: ['service_id', 'start_time'],
       },
@@ -138,10 +154,14 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_packages',
-      description: 'List available service packages (bundled services at a discounted price). Packages let customers purchase multiple services together.',
+      description: 'List available service packages (bundled services at a discounted price). Packages let customers purchase multiple services together. Also checks if the customer already owns active packages.',
       parameters: {
         type: 'object',
-        properties: { ...tenantIdProp },
+        properties: {
+          ...tenantIdProp,
+          customer_id: { type: 'string', description: 'UUID of the customer — checks their owned packages with sessions remaining' },
+          service_id: { type: 'string', description: 'UUID of a service — filters to only packages that include this service' },
+        },
         required: [],
       },
     },
@@ -155,6 +175,39 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
         type: 'object',
         properties: { ...tenantIdProp },
         required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_loyalty_info',
+      description: 'Get loyalty program info and customer points balance for a business. Returns points balance, redeemable value, tier, and points the customer would earn for this service.',
+      parameters: {
+        type: 'object',
+        properties: {
+          ...tenantIdProp,
+          customer_id: { type: 'string', description: 'UUID of the customer' },
+          service_price: { type: 'number', description: 'Price of the service being booked — used to calculate points they would earn' },
+        },
+        required: ['customer_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'apply_coupon',
+      description: 'Validate and apply a coupon code to a booking. Returns discount amount and final price.',
+      parameters: {
+        type: 'object',
+        properties: {
+          ...tenantIdProp,
+          coupon_code: { type: 'string', description: 'The coupon code entered by the customer' },
+          service_id: { type: 'string', description: 'UUID of the service being booked' },
+          total_price: { type: 'number', description: 'The current total price before coupon' },
+        },
+        required: ['coupon_code', 'service_id', 'total_price'],
       },
     },
   },
@@ -269,24 +322,60 @@ BEFORE starting the flow, extract ALL info from the user's message: service, dat
 - "Book me a haircut at 3pm today" → you already have service, date, time. Skip asking for those.
 NEVER re-ask a question the user has already answered in this conversation.
 
-## Booking flow
+## Booking flow — follow this exact sequence every time
 The flow is ADAPTIVE — skip any step the user already answered:
-1. Customer asks to book → call get_services, present each as:
+STEP 1: Customer asks to book → call get_services, present each as:
    [[button:ServiceName — $price · duration]]
-2. Customer picks a service → call get_staff, present staff options:
-   [[button:StaffName1]] [[button:StaffName2]] [[button:Any Available]]
+STEP 2: Customer picks a service →
+   ── PACKAGE CHECK (call get_packages for this tenant with the serviceId) ──
+   If the customer already owns an active package that covers this service:
+     Show: "You have a package with [X sessions remaining] for this service. Use it?"
+     [[button:Yes, use package]] [[button:No, pay separately]]
+   Else if packages exist that include this service:
+     Show: "This service is also available as part of a package: [Package Name — X services, $Y]. Interested?"
+     [[button:Yes, tell me more]] [[button:No, just this service]]
+   Then continue to availability.
+STEP 3: Ask staff preference with real staff names (call get_staff):
+   [[button:StaffName1]] [[button:StaffName2]] [[button:No preference]]
    ALWAYS show staff options. Never auto-assign without asking.
-3. Customer picks staff → ask when (if not already known):
+STEP 4: Ask when (if not already known):
    [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-4. Customer picks a timeframe (e.g. "Next Week") → present days as buttons:
-   [[button:March 8]] [[button:March 9]] [[button:March 10]] [[button:March 11]]
-5. Customer picks a date → call check_availability for that staff + date, present time slots using the local_time field from each slot:
+STEP 5: call check_availability → show next 6 time slots using the local_time field:
    [[button:10:00 AM with Emily Watson]] [[button:10:30 AM with Emily Watson]]
-   ALWAYS use the local_time field from available_slots (NOT the raw ISO time field). Include staff name in the button.
-   Add [[button:Show More Times]] if there are more than 8 slots.
-6. Customer picks a time → summarize: service, **staff name**, time, price, deposit (if any) → [[button:Confirm Booking]] [[button:Change]]
-7. Customer confirms → create_booking
-8. Show booking confirmation using the FULL details returned by create_booking:
+   ALWAYS use local_time from available_slots (NOT the raw ISO time field). Include staff name.
+   Add [[button:Show More Times]] if there are more than 6 slots.
+STEP 6 — EXTRAS (check if the service has extras from get_services results):
+   If the service has extras defined:
+     Show: "Want to add anything to your [service]?" with each extra as a button:
+     [[button:Extra Name +$price +Xmin]] (allow multi-select)
+     [[button:Nothing to add]]
+   If no extras: skip silently.
+STEP 7 — COUPON:
+   Ask inline: "Got a promo code?"
+   [[button:Enter code]] [[button:Skip]]
+   If code entered: call apply_coupon → show result
+STEP 8 — LOYALTY (call get_loyalty_info if customerId/userId available):
+   If customer has redeemable points:
+     Show: "You have [X points] = $[Y value]. Apply to this booking?"
+     [[button:Yes, save $Y]] [[button:No thanks]]
+   If no loyalty program or zero points: skip silently.
+STEP 9 — SUMMARY CARD:
+   Show a clean summary before confirming:
+   **Service:** [Name]
+   **Extras:** [list or "None"]
+   **Staff:** [Name]
+   **Date & Time:** [...]
+   ───────────────
+   Subtotal: $XX.XX
+   Package discount: -$XX.XX (if package used)
+   Extras: +$XX.XX (if any)
+   Coupon ([code]): -$XX.XX (if applied)
+   Loyalty discount: -$XX.XX (if redeemed)
+   ───────────────
+   **TOTAL: $XX.XX**
+   [[button:Confirm Booking]] [[button:Change something]]
+STEP 10: Customer confirms → create_booking with all selections
+STEP 11: Show booking confirmation using FULL details returned by create_booking:
    - **Service name**
    - Business: business_name
    - Staff: staff_name
@@ -294,7 +383,15 @@ The flow is ADAPTIVE — skip any step the user already answered:
    - Time: local_start_time - local_end_time
    - Price: $total_price
    - Address: location_address (if available)
+   - "You'll earn [Z loyalty points] for this booking" (if loyalty program active)
    ALWAYS offer: [[button:View My Bookings]] [[button:Book Another Service]]
+
+IMPORTANT RULES:
+- Never show steps 6-8 if there's nothing to show (no extras, no loyalty program, no points balance)
+- Never ask for a coupon if the tenant has no active coupons
+- Never mention loyalty if the tenant has no loyalty program configured
+- Always call get_packages, get_loyalty_info, and check service extras BEFORE presenting them
+- Keep each step to ONE question — don't combine multiple asks in one message
 
 Each step is ONE message. But SKIP steps where the answer is already known from context.
 
@@ -443,18 +540,55 @@ The flow is ADAPTIVE — skip any step the user already answered:
 4. Customer picks a business → call get_services for that business, present services:
    [[button:ServiceName — $price · duration]]
    If the user already said what service they want, auto-match it and skip this step.
-5. Customer picks a service → present staff options:
-   [[button:StaffName1]] [[button:StaffName2]] [[button:Any Available]]
+5. Customer picks a service →
+   ── PACKAGE CHECK (call get_packages for this tenant with the serviceId) ──
+   If the customer already owns an active package that covers this service:
+     Show: "You have a package with [X sessions remaining] for this service. Use it?"
+     [[button:Yes, use package]] [[button:No, pay separately]]
+   Else if packages exist that include this service:
+     Show: "This service is also available as part of a package: [Package Name — X services, $Y]. Interested?"
+     [[button:Yes, tell me more]] [[button:No, just this service]]
+   Then continue to availability.
+6. Ask staff preference with real staff names (call get_staff):
+   [[button:StaffName1]] [[button:StaffName2]] [[button:No preference]]
    ALWAYS show staff options. Never auto-assign without asking.
-6. Customer picks staff → ask when (if not already known):
+7. Ask when (if not already known):
    [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-7. Call check_availability for the selected service + staff + date → show time slots using the local_time field from each slot:
-   [[button:10:00 AM with Emily Watson]] [[button:10:30 AM with Emily Watson]] [[button:11:00 AM with Marcus Johnson]]
-   ALWAYS use the local_time field from available_slots (NOT the raw ISO time field). Include staff name in the button.
-   Add [[button:Show More Times]] if there are more than 8 slots.
-8. Customer taps a time → summarize: service, **staff name**, shop, time, price, deposit (if any) → [[button:Confirm Booking]] [[button:Change]]
-9. Customer confirms → create_booking WITH tenant_id
-10. After booking confirmation, ALWAYS show the FULL booking summary using the data returned by create_booking:
+8. Call check_availability → show next 6 time slots using the local_time field:
+   [[button:10:00 AM with Emily Watson]] [[button:10:30 AM with Emily Watson]]
+   ALWAYS use local_time from available_slots (NOT the raw ISO time field). Include staff name.
+   Add [[button:Show More Times]] if there are more than 6 slots.
+9. EXTRAS (check if the service has extras from get_services results):
+   If the service has extras defined:
+     Show: "Want to add anything to your [service]?" with each extra as a button:
+     [[button:Extra Name +$price +Xmin]] (allow multi-select)
+     [[button:Nothing to add]]
+   If no extras: skip silently.
+10. COUPON: Ask inline: "Got a promo code?"
+   [[button:Enter code]] [[button:Skip]]
+   If code entered: call apply_coupon → show result
+11. LOYALTY (call get_loyalty_info if customerId/userId available):
+   If customer has redeemable points:
+     Show: "You have [X points] = $[Y value]. Apply to this booking?"
+     [[button:Yes, save $Y]] [[button:No thanks]]
+   If no loyalty program or zero points: skip silently.
+12. SUMMARY CARD:
+   Show a clean summary before confirming:
+   **Service:** [Name]
+   **Extras:** [list or "None"]
+   **Staff:** [Name]
+   **Date & Time:** [...]
+   ───────────────
+   Subtotal: $XX.XX
+   Package discount: -$XX.XX (if package used)
+   Extras: +$XX.XX (if any)
+   Coupon ([code]): -$XX.XX (if applied)
+   Loyalty discount: -$XX.XX (if redeemed)
+   ───────────────
+   **TOTAL: $XX.XX**
+   [[button:Confirm Booking]] [[button:Change something]]
+13. Customer confirms → create_booking WITH tenant_id and all selections
+14. Show booking confirmation using FULL details returned by create_booking:
     - **Service name**
     - Business: business_name
     - Staff: staff_name
@@ -462,7 +596,15 @@ The flow is ADAPTIVE — skip any step the user already answered:
     - Time: local_start_time - local_end_time
     - Price: $total_price
     - Address: location_address (if available)
+    - "You'll earn [Z loyalty points] for this booking" (if loyalty program active)
     Then offer [[button:View My Bookings]] [[button:Book Another Service]]
+
+IMPORTANT RULES:
+- Never show steps 9-11 if there's nothing to show (no extras, no loyalty program, no points balance)
+- Never ask for a coupon if the tenant has no active coupons
+- Never mention loyalty if the tenant has no loyalty program configured
+- Always call get_packages, get_loyalty_info, and check service extras BEFORE presenting them
+- Keep each step to ONE question — don't combine multiple asks in one message
 
 Each step is ONE message. But SKIP steps where the answer is already known from context.
 

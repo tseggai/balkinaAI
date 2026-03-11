@@ -309,7 +309,14 @@ export async function handleGetServices(
     .order('name');
 
   if (error) return { success: false, error: error.message };
-  return { success: true, data };
+
+  // Add has_extras flag per service so the AI knows whether to offer extras step
+  const servicesWithFlag = ((data ?? []) as { id: string; service_extras: unknown[] | null; [key: string]: unknown }[]).map((svc) => ({
+    ...svc,
+    has_extras: Array.isArray(svc.service_extras) && svc.service_extras.length > 0,
+  }));
+
+  return { success: true, data: servicesWithFlag };
 }
 
 // ── get_service_details ─────────────────────────────────────────────────────
@@ -594,6 +601,11 @@ export async function handleBookAppointment(
   const startTime = input.start_time as string;
   const staffId = (input.staff_id as string) || null;
   const locationId = (input.location_id as string) || null;
+  const selectedExtras = (input.selected_extras as { extra_id: string; quantity?: number }[] | undefined) ?? [];
+  const couponCode = (input.coupon_code as string) || null;
+  const loyaltyPointsToRedeem = (input.loyalty_points_to_redeem as number) || 0;
+  const useCustomerPackage = (input.use_customer_package as boolean) || false;
+  const _packageId = (input.package_id as string) || null;
 
   if (!serviceId || !startTime) {
     return { success: false, error: 'service_id and start_time are required' };
@@ -740,7 +752,197 @@ export async function handleBookAppointment(
 
   if (apptErr) return { success: false, error: apptErr.message };
 
-  // 8. Link customer to chat session
+  const appointmentId = (appointment as { id: string }).id;
+
+  // 8a. Insert appointment_extras for each selected extra
+  let extrasTotal = 0;
+  if (selectedExtras.length > 0) {
+    // Look up extra prices
+    const extraIds = selectedExtras.map((e) => e.extra_id);
+    const { data: extrasData } = await supabase
+      .from('service_extras')
+      .select('id, price')
+      .in('id', extraIds);
+
+    const extraPriceMap = new Map<string, number>();
+    for (const ex of (extrasData ?? []) as { id: string; price: number }[]) {
+      extraPriceMap.set(ex.id, ex.price);
+    }
+
+    const extrasInserts = selectedExtras.map((e) => {
+      const price = extraPriceMap.get(e.extra_id) ?? 0;
+      const qty = e.quantity ?? 1;
+      extrasTotal += price * qty;
+      return {
+        appointment_id: appointmentId,
+        extra_id: e.extra_id,
+        quantity: qty,
+        price_at_booking: price,
+      };
+    });
+
+    await supabase.from('appointment_extras').insert(extrasInserts as never[]);
+  }
+
+  // 8b. Validate and link coupon if provided
+  let couponDiscount = 0;
+  if (couponCode) {
+    const { data: coupon } = await supabase
+      .from('coupons')
+      .select('id, discount_type, discount_value, expires_at, usage_count, usage_limit')
+      .eq('tenant_id', tenantId)
+      .eq('code', couponCode)
+      .limit(1)
+      .single();
+
+    if (coupon) {
+      const c = coupon as { id: string; discount_type: string; discount_value: number; expires_at: string | null; usage_count: number; usage_limit: number | null };
+      const isValid = (!c.expires_at || new Date(c.expires_at) >= new Date()) &&
+        (c.usage_limit === null || c.usage_count < c.usage_limit);
+
+      if (isValid) {
+        couponDiscount = c.discount_type === 'percentage'
+          ? (svc.price * c.discount_value) / 100
+          : c.discount_value;
+        couponDiscount = Math.min(couponDiscount, svc.price);
+
+        // Record coupon usage
+        await supabase.from('coupon_usage').insert({
+          coupon_id: c.id,
+          appointment_id: appointmentId,
+          customer_id: customerId,
+          discount_amount: couponDiscount,
+        } as never);
+
+        // Increment usage count
+        await supabase.from('coupons').update({ usage_count: c.usage_count + 1 } as never).eq('id', c.id);
+
+        // Store coupon_id on appointment
+        await supabase.from('appointments').update({ coupon_id: c.id } as never).eq('id', appointmentId);
+      }
+    }
+  }
+
+  // 8c. Handle loyalty points redemption
+  let loyaltyDiscount = 0;
+  if (loyaltyPointsToRedeem > 0 && customerId) {
+    const { data: program } = await supabase
+      .from('loyalty_programs')
+      .select('points_to_currency_rate, is_active')
+      .eq('tenant_id', tenantId)
+      .limit(1)
+      .single();
+
+    if (program) {
+      const lp = program as { points_to_currency_rate: number; is_active: boolean };
+      if (lp.is_active) {
+        loyaltyDiscount = Math.min(
+          loyaltyPointsToRedeem * lp.points_to_currency_rate,
+          svc.price + extrasTotal - couponDiscount,
+        );
+
+        // Insert redeem transaction
+        await supabase.from('loyalty_transactions').insert({
+          customer_id: customerId,
+          tenant_id: tenantId,
+          appointment_id: appointmentId,
+          type: 'redeem',
+          points: -loyaltyPointsToRedeem,
+          description: 'Points redeemed for booking discount',
+        } as never);
+
+        // Update points balance — decrement directly
+        const { data: currentPts } = await supabase
+          .from('customer_loyalty_points')
+          .select('points_balance')
+          .eq('customer_id', customerId)
+          .eq('tenant_id', tenantId)
+          .limit(1)
+          .single();
+
+        if (currentPts) {
+          const newBalance = (currentPts as { points_balance: number }).points_balance - loyaltyPointsToRedeem;
+          await supabase
+            .from('customer_loyalty_points')
+            .update({ points_balance: Math.max(0, newBalance) } as never)
+            .eq('customer_id', customerId)
+            .eq('tenant_id', tenantId);
+        }
+      }
+    }
+  }
+
+  // 8d. After successful booking: earn loyalty points
+  let pointsEarned = 0;
+  if (customerId) {
+    const { data: program } = await supabase
+      .from('loyalty_programs')
+      .select('points_per_booking, points_per_dollar, is_active')
+      .eq('tenant_id', tenantId)
+      .limit(1)
+      .single();
+
+    if (program) {
+      const lp = program as { points_per_booking: number; points_per_dollar: number | null; is_active: boolean };
+      if (lp.is_active) {
+        pointsEarned = (lp.points_per_booking ?? 0) + Math.floor((lp.points_per_dollar ?? 0) * svc.price);
+
+        if (pointsEarned > 0) {
+          await supabase.from('loyalty_transactions').insert({
+            customer_id: customerId,
+            tenant_id: tenantId,
+            appointment_id: appointmentId,
+            type: 'earn',
+            points: pointsEarned,
+            description: 'Points earned from booking',
+          } as never);
+        }
+      }
+    }
+  }
+
+  // 8e. If useCustomerPackage: decrement sessions_remaining
+  if (useCustomerPackage && customerId) {
+    // Find the customer's active package service entry and decrement
+    const { data: cpSvc } = await supabase
+      .from('customer_package_services')
+      .select('id, sessions_remaining, customer_package_id')
+      .eq('service_id', serviceId)
+      .gt('sessions_remaining', 0)
+      .limit(1)
+      .single();
+
+    if (cpSvc) {
+      const entry = cpSvc as { id: string; sessions_remaining: number; customer_package_id: string };
+      // Verify the customer_package belongs to this customer/tenant
+      const { data: cpCheck } = await supabase
+        .from('customer_packages')
+        .select('id')
+        .eq('id', entry.customer_package_id)
+        .eq('customer_id', customerId)
+        .eq('tenant_id', tenantId)
+        .limit(1)
+        .single();
+
+      if (cpCheck) {
+        await supabase
+          .from('customer_package_services')
+          .update({ sessions_remaining: entry.sessions_remaining - 1 } as never)
+          .eq('id', entry.id);
+      }
+    }
+  }
+
+  // Update appointment total with extras, coupon, loyalty adjustments
+  const finalTotal = svc.price + extrasTotal - couponDiscount - loyaltyDiscount;
+  if (extrasTotal > 0 || couponDiscount > 0 || loyaltyDiscount > 0) {
+    await supabase.from('appointments').update({
+      total_price: finalTotal,
+      balance_due: finalTotal - (depositAmount ?? 0),
+    } as never).eq('id', appointmentId);
+  }
+
+  // 9. Link customer to chat session
   if (customerId) {
     await supabase
       .from('chat_sessions')
@@ -748,7 +950,7 @@ export async function handleBookAppointment(
       .eq('id', sessionInfo.chatSessionId);
   }
 
-  // 9. Fetch staff name and business name for the response
+  // 10. Fetch staff name and business name for the response
   let staffName: string | null = null;
   if (finalStaffId) {
     const { data: staffData } = await supabase
@@ -787,7 +989,7 @@ export async function handleBookAppointment(
   return {
     success: true,
     data: {
-      appointment_id: (appointment as { id: string }).id,
+      appointment_id: appointmentId,
       service_name: (service as { name: string }).name,
       staff_name: staffName,
       business_name: businessName,
@@ -797,9 +999,17 @@ export async function handleBookAppointment(
       local_end_time: localEndStr,
       local_date: localDateStr,
       location_address: locationAddress,
-      total_price: svc.price,
+      subtotal: svc.price,
+      extras_total: extrasTotal,
+      coupon_discount: couponDiscount,
+      coupon_code: couponCode,
+      loyalty_discount: loyaltyDiscount,
+      loyalty_points_redeemed: loyaltyPointsToRedeem,
+      loyalty_points_earned: pointsEarned,
+      total_price: finalTotal,
       deposit_amount: depositAmount,
-      balance_due: balanceDue,
+      balance_due: finalTotal - (depositAmount ?? 0),
+      used_package: useCustomerPackage,
       status: 'confirmed',
     },
   };
@@ -955,16 +1165,57 @@ export async function handleGetBookingDetails(
 export async function handleGetPackages(
   supabase: AdminClient,
   tenantId: string,
-  _input: Record<string, unknown>,
+  input: Record<string, unknown>,
 ): Promise<ToolResult> {
-  const { data, error } = await supabase
+  const customerId = input.customer_id as string | undefined;
+  const serviceId = input.service_id as string | undefined;
+
+  // Fetch available packages for this tenant
+  const { data: packagesData, error } = await supabase
     .from('packages')
-    .select('*, package_services(quantity, services(name, price, duration_minutes))')
+    .select('*, package_services(quantity, service_id, services(name, price, duration_minutes))')
     .eq('tenant_id', tenantId)
     .eq('is_active', true);
-
   if (error) return { success: false, error: error.message };
-  return { success: true, data: data ?? [] };
+
+  let availablePackages = (packagesData ?? []) as { id: string; package_services: { service_id: string; quantity: number; services: { name: string } | null }[]; [key: string]: unknown }[];
+
+  // If serviceId provided, filter to packages that include this service
+  if (serviceId) {
+    availablePackages = availablePackages.filter((pkg) =>
+      pkg.package_services?.some((ps) => ps.service_id === serviceId)
+    );
+  }
+
+  // If customerId provided, also fetch customer-owned packages
+  let customerPackages: unknown[] = [];
+  if (customerId) {
+    const { data: custPkgs } = await supabase
+      .from('customer_packages')
+      .select('*, package:packages(name, price), sessions:customer_package_services(service_id, sessions_remaining, services(name))')
+      .eq('customer_id', customerId)
+      .eq('tenant_id', tenantId)
+      .gt('expires_at', new Date().toISOString());
+
+    let ownedPackages = (custPkgs ?? []) as { sessions: { service_id: string; sessions_remaining: number }[]; [key: string]: unknown }[];
+
+    // If serviceId provided, filter to owned packages that cover this service with remaining sessions
+    if (serviceId) {
+      ownedPackages = ownedPackages.filter((cp) =>
+        cp.sessions?.some((s) => s.service_id === serviceId && s.sessions_remaining > 0)
+      );
+    }
+
+    customerPackages = ownedPackages;
+  }
+
+  return {
+    success: true,
+    data: {
+      available_packages: availablePackages,
+      customer_packages: customerPackages,
+    },
+  };
 }
 
 // ── get_loyalty_info ────────────────────────────────────────────────────────
@@ -975,6 +1226,7 @@ export async function handleGetLoyaltyInfo(
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
   const customerId = input.customer_id as string;
+  const servicePrice = input.service_price as number | undefined;
   if (!customerId) return { success: false, error: 'customer_id is required' };
 
   // Fetch the loyalty program for this tenant
@@ -986,20 +1238,21 @@ export async function handleGetLoyaltyInfo(
     .single();
 
   if (programErr || !program) {
-    return { success: true, data: { active: false } };
+    return { success: true, data: { loyalty_program_active: false } };
   }
 
   const loyaltyProgram = program as {
     id: string;
     is_active: boolean;
     points_per_booking: number;
+    points_per_dollar: number | null;
     points_to_currency_rate: number;
     tiers: unknown;
     minimum_redemption_points: number;
   };
 
   if (!loyaltyProgram.is_active) {
-    return { success: true, data: { active: false } };
+    return { success: true, data: { loyalty_program_active: false } };
   }
 
   // Fetch the customer's loyalty points for this tenant
@@ -1017,27 +1270,31 @@ export async function handleGetLoyaltyInfo(
     lifetime_points: number;
   } | null;
 
+  const pointsBalance = pointsData?.points_balance ?? 0;
+  const redeemableValue = pointsBalance * loyaltyProgram.points_to_currency_rate;
+
+  // Calculate points the customer would earn for this service
+  let pointsToEarn: number | null = null;
+  if (servicePrice != null) {
+    const perBooking = loyaltyProgram.points_per_booking ?? 0;
+    const perDollar = loyaltyProgram.points_per_dollar ?? 0;
+    pointsToEarn = perBooking + Math.floor(perDollar * servicePrice);
+  }
+
   return {
     success: true,
     data: {
-      active: true,
+      loyalty_program_active: true,
+      points_balance: pointsBalance,
+      redeemable_value_usd: Math.round(redeemableValue * 100) / 100,
+      tier: pointsData?.tier ?? null,
+      points_to_earn_for_this_service: pointsToEarn,
       program: {
         points_per_booking: loyaltyProgram.points_per_booking,
+        points_per_dollar: loyaltyProgram.points_per_dollar ?? 0,
         points_to_currency_rate: loyaltyProgram.points_to_currency_rate,
-        tiers: loyaltyProgram.tiers,
         minimum_redemption_points: loyaltyProgram.minimum_redemption_points,
       },
-      customer: pointsData
-        ? {
-            points_balance: pointsData.points_balance,
-            tier: pointsData.tier,
-            lifetime_points: pointsData.lifetime_points,
-          }
-        : {
-            points_balance: 0,
-            tier: null,
-            lifetime_points: 0,
-          },
     },
   };
 }
