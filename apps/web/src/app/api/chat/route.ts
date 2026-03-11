@@ -67,7 +67,7 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'check_availability',
-      description: 'Check available time slots for a service on a given date. Returns available times with staff. Each slot has a local_time field (e.g. "10:00 AM") — always use this for display instead of the raw ISO time field.',
+      description: 'Check available time slots for a service on a given date. Returns max 6 slots per call with has_more flag. Use offset to paginate. Each slot has a local_time field (e.g. "10:00 AM") — always use this for display instead of the raw ISO time field.',
       parameters: {
         type: 'object',
         properties: {
@@ -75,6 +75,7 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
           service_id: { type: 'string', description: 'UUID of the service' },
           staff_id: { type: 'string', description: 'UUID of preferred staff member (optional)' },
           date: { type: 'string', description: 'Date to check availability for (YYYY-MM-DD)' },
+          offset: { type: 'number', description: 'Starting index for pagination (default 0). Use previous offset + 6 to get next page.' },
         },
         required: ['service_id', 'date'],
       },
@@ -299,7 +300,8 @@ function buildTenantSystemPrompt(
 
   return `You are the booking assistant for "${tenantName}" on Balkina AI.
 
-Today: ${currentDate}.
+CURRENT DATE AND TIME: ${currentDate}
+Use this exact date and time for all availability checks, scheduling, and date references. Never guess or fabricate the current time. Always use the value above.
 
 ## Style
 - ULTRA concise. Max 1 short sentence of text, then buttons.
@@ -340,10 +342,11 @@ STEP 3: Ask staff preference with real staff names (call get_staff):
    ALWAYS show staff options. Never auto-assign without asking.
 STEP 4: Ask when (if not already known):
    [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-STEP 5: call check_availability → show next 6 time slots using the local_time field:
+STEP 5: call check_availability → show time slots using the local_time field:
    [[button:10:00 AM with Emily Watson]] [[button:10:30 AM with Emily Watson]]
    ALWAYS use local_time from available_slots (NOT the raw ISO time field). Include staff name.
-   Add [[button:Show More Times]] if there are more than 6 slots.
+   NEVER show more than 6 time slots at once. Always paginate using the offset parameter.
+   Add [[button:Show More Times]] ONLY when has_more is true in the response.
 STEP 6 — EXTRAS (check if the service has extras from get_services results):
    If the service has extras defined:
      Show: "Want to add anything to your [service]?" with each extra as a button:
@@ -474,10 +477,20 @@ function buildDiscoverySystemPrompt(
 
   return `You are Balkina AI — a concise appointment booking assistant. Help customers find businesses and book appointments in as few messages as possible.
 
-Today: ${currentDate}.
+CURRENT DATE AND TIME: ${currentDate}
+Use this exact date and time for all availability checks, scheduling, and date references. Never guess or fabricate the current time. Always use the value above.
 
 ## YOUR PURPOSE
 You are an APPOINTMENT BOOKING assistant. Everything you say should help the customer decide WHERE to book, WHAT service to get, and WHEN to go. You are NOT a general search engine or information service.
+
+## CRITICAL: When a customer says "book a [service]" without specifying a business:
+1. ALWAYS call find_businesses first to get the list of available businesses
+2. If multiple businesses offer the service, PRESENT THEM AS BUTTONS and ask which they prefer
+3. Only proceed to availability AFTER the customer confirms a business
+4. ALWAYS ask for a preferred date before showing time slots — never assume today
+5. Ask "Which day works for you?" with buttons: [[button:Today]] [[button:Tomorrow]] [[button:This Week]] [[button:Pick a Date]]
+6. Only then show time slots for the confirmed business + date
+NEVER skip straight to time slots. NEVER auto-select a business without asking.
 
 ## Synonym understanding
 ALL of these mean the same thing — the customer wants to see businesses they can book at:
@@ -554,10 +567,11 @@ The flow is ADAPTIVE — skip any step the user already answered:
    ALWAYS show staff options. Never auto-assign without asking.
 7. Ask when (if not already known):
    [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-8. Call check_availability → show next 6 time slots using the local_time field:
+8. Call check_availability → show time slots using the local_time field:
    [[button:10:00 AM with Emily Watson]] [[button:10:30 AM with Emily Watson]]
    ALWAYS use local_time from available_slots (NOT the raw ISO time field). Include staff name.
-   Add [[button:Show More Times]] if there are more than 6 slots.
+   NEVER show more than 6 time slots at once. Always paginate using the offset parameter.
+   Add [[button:Show More Times]] ONLY when has_more is true in the response.
 9. EXTRAS (check if the service has extras from get_services results):
    If the service has extras defined:
      Show: "Want to add anything to your [service]?" with each extra as a button:
@@ -918,6 +932,19 @@ export async function POST(request: Request) {
   const resolvedEmail = customerEmail ?? null;
   const resolvedUserId = userId ?? null;
 
+  // Compute the real current date and time fresh on every request
+  const now = new Date();
+  const currentDateTime = now.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
+
   const systemPrompt = tenantId
     ? buildTenantSystemPrompt(
         tenantName,
@@ -925,14 +952,14 @@ export async function POST(request: Request) {
         resolvedPhone,
         resolvedEmail,
         resolvedUserId,
-        new Date().toISOString().slice(0, 10),
+        currentDateTime,
       )
     : buildDiscoverySystemPrompt(
         resolvedName,
         resolvedPhone,
         resolvedEmail,
         resolvedUserId,
-        new Date().toISOString().slice(0, 10),
+        currentDateTime,
         userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
       );
 
@@ -1036,22 +1063,28 @@ export async function POST(request: Request) {
             // In discovery mode, the AI passes tenant_id from find_businesses results
             const effectiveTenantId = (parsedInput.tenant_id as string) || resolvedTenantId;
 
-            const result = await executeTool(
-              toolCall.name,
-              parsedInput,
-              supabase,
-              effectiveTenantId,
-              {
-                customerId: chatSession!.customer_id,
-                customerName:
-                  chatSession!.customer_name ?? customerName ?? null,
-                customerPhone:
-                  chatSession!.customer_phone ?? customerPhone ?? null,
-                chatSessionId: chatSession!.id,
-                userId: userId ?? null,
-              },
-              userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
-            );
+            let result: { success: boolean; data?: unknown; error?: string };
+            try {
+              result = await executeTool(
+                toolCall.name,
+                parsedInput,
+                supabase,
+                effectiveTenantId,
+                {
+                  customerId: chatSession!.customer_id,
+                  customerName:
+                    chatSession!.customer_name ?? customerName ?? null,
+                  customerPhone:
+                    chatSession!.customer_phone ?? customerPhone ?? null,
+                  chatSessionId: chatSession!.id,
+                  userId: userId ?? null,
+                },
+                userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
+              );
+            } catch (toolErr) {
+              console.error(`[chat] Tool "${toolCall.name}" execution failed:`, toolErr instanceof Error ? toolErr.stack : toolErr);
+              result = { success: false, error: `Tool ${toolCall.name} failed: ${toolErr instanceof Error ? toolErr.message : 'Unknown error'}` };
+            }
 
             toolResults.push({
               tool_use_id: toolCall.id,
