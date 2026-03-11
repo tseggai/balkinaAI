@@ -97,48 +97,70 @@ async function handleFindBusinessesInner(
   const query = ((input.query as string) || '').trim();
   const userLat = input.latitude as number | undefined;
   const userLng = input.longitude as number | undefined;
-  const radiusKm = (input.radius_km as number) || 50;
+  const radiusKm = (input.radius_km as number) || 200; // was 50 — widened for debugging
   const offset = (input.offset as number) || 0;
   const limit = (input.limit as number) || 8;
 
   const serviceType = ((input.service_type as string) || '').trim();
+
+  console.log('[find_businesses] START params:', JSON.stringify({ query, serviceType, userLat, userLng, radiusKm, offset, limit }));
 
   // If a service_type is specified, filter tenants that actually offer matching services
   if (serviceType) {
     const sanitizeForLike = (s: string) => s.replace(/%/g, '\\%').replace(/_/g, '\\_');
     const sanitizedType = sanitizeForLike(serviceType);
 
-    // Search for services matching the type by name or category
-    const { data: matchingServices, error: matchError } = await supabase
+    // Step 1: Find services matching the service type (two-step approach to avoid inner join issues)
+    const { data: matchingServices, error: svcError } = await supabase
       .from('services')
-      .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name, status, image_url, business_type)')
-      .eq('tenants.status', 'active')
-      .or(`name.ilike.%${sanitizedType}%,service_category.ilike.%${sanitizedType}%`)
-      .limit(100);
+      .select('tenant_id, name, price, duration_minutes')
+      .or(`name.ilike.%${sanitizedType}%,service_category.ilike.%${sanitizedType}%,description.ilike.%${sanitizedType}%`)
+      .limit(200);
 
-    console.log('[find_businesses] service_type query result:', { count: matchingServices?.length, error: matchError?.message });
+    console.log('[find_businesses] matching services for type:', serviceType, 'count:', matchingServices?.length, 'error:', svcError?.message);
 
-    // Build tenant map from matching services
-    const tenantMap = new Map<string, { id: string; name: string; image_url: string | null; business_type: string | null; matched_services: string[] }>();
-    for (const svc of (matchingServices ?? []) as unknown as { tenant_id: string; name: string; tenants: { id: string; name: string; image_url: string | null; business_type: string | null } }[]) {
-      if (svc.tenants) {
-        const existing = tenantMap.get(svc.tenants.id);
-        if (existing) {
-          existing.matched_services.push(svc.name);
-        } else {
-          tenantMap.set(svc.tenants.id, { id: svc.tenants.id, name: svc.tenants.name, image_url: svc.tenants.image_url, business_type: svc.tenants.business_type, matched_services: [svc.name] });
-        }
+    let serviceTenantMap: Map<string, { id: string; name: string; image_url: string | null; business_type: string | null; matched_services: string[] }>;
+
+    if (!matchingServices || matchingServices.length === 0) {
+      // Fall back to all tenants — don't return empty
+      console.log('[find_businesses] no service match, falling back to all active tenants');
+      serviceTenantMap = new Map();
+    } else {
+      // Collect matching tenant IDs and service names per tenant
+      const svcByTenant = new Map<string, string[]>();
+      for (const svc of matchingServices as { tenant_id: string; name: string }[]) {
+        const existing = svcByTenant.get(svc.tenant_id) ?? [];
+        existing.push(svc.name);
+        svcByTenant.set(svc.tenant_id, existing);
+      }
+      const matchingTenantIds = [...svcByTenant.keys()];
+      console.log('[find_businesses] matching tenant IDs:', matchingTenantIds.length);
+
+      // Step 2: Fetch those tenants with their details
+      const { data: tenants, error: tenantError } = await supabase
+        .from('tenants')
+        .select('id, name, image_url, business_type')
+        .in('id', matchingTenantIds)
+        .eq('status', 'active');
+
+      console.log('[find_businesses] tenants fetched:', tenants?.length, 'error:', tenantError?.message);
+
+      serviceTenantMap = new Map();
+      for (const t of (tenants ?? []) as { id: string; name: string; image_url: string | null; business_type: string | null }[]) {
+        serviceTenantMap.set(t.id, { id: t.id, name: t.name, image_url: t.image_url, business_type: t.business_type, matched_services: svcByTenant.get(t.id) ?? [] });
       }
     }
 
-    if (tenantMap.size > 0) {
-      let businesses: { id: string; name: string; image_url?: string | null; business_type?: string | null; matched_services?: string[]; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; lat: number | null; lng: number | null }[]; has_availability?: boolean }[] = Array.from(tenantMap.values());
+    if (serviceTenantMap.size > 0) {
+      let businesses: { id: string; name: string; image_url?: string | null; business_type?: string | null; matched_services?: string[]; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; lat: number | null; lng: number | null }[]; has_availability?: boolean }[] = Array.from(serviceTenantMap.values());
 
       // Fetch locations
       const bizIds = businesses.map((b) => b.id);
       const { data: bizLocations } = bizIds.length > 0
         ? await supabase.from('tenant_locations').select('tenant_id, name, address, lat, lng').in('tenant_id', bizIds)
         : { data: [] };
+
+      console.log('[find_businesses] bizLocations count:', bizLocations?.length);
 
       const bizLocMap = new Map<string, { name: string; address: string; lat: number | null; lng: number | null }[]>();
       for (const loc of (bizLocations ?? []) as { tenant_id: string; name: string; address: string; lat: number | null; lng: number | null }[]) {
@@ -155,21 +177,26 @@ async function handleFindBusinessesInner(
             locMap.set(loc.tenant_id, { lat: loc.lat, lng: loc.lng });
           }
         }
-        businesses = businesses
-          .map((b) => {
-            const loc = locMap.get(b.id);
-            if (!loc) {
-              // No lat/lng for this business — include it but without distance info
-              return { ...b, distance_km: undefined, distance_mi: undefined, estimated_drive_minutes: undefined, locations: bizLocMap.get(b.id) ?? [] };
-            }
-            const distance = haversineKm(userLat, userLng, loc.lat, loc.lng);
-            const distKm = Math.round(distance * 10) / 10;
-            const distMi = Math.round(distKm * 0.621371 * 10) / 10;
-            return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: bizLocMap.get(b.id) ?? [] };
-          })
-          // Only filter out businesses that HAVE coordinates and are outside radius; keep those without coords
+
+        const businessesWithDistance = businesses.map((b) => {
+          const loc = locMap.get(b.id);
+          if (!loc) {
+            return { ...b, distance_km: undefined, distance_mi: undefined, estimated_drive_minutes: undefined, locations: bizLocMap.get(b.id) ?? [] };
+          }
+          const distance = haversineKm(userLat, userLng, loc.lat, loc.lng);
+          const distKm = Math.round(distance * 10) / 10;
+          const distMi = Math.round(distKm * 0.621371 * 10) / 10;
+          return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: bizLocMap.get(b.id) ?? [] };
+        });
+
+        console.log('[find_businesses] businessesWithDistance count:', businessesWithDistance.length);
+        console.log('[find_businesses] sample distances:', businessesWithDistance.slice(0, 3).map(b => ({ name: b.name, dist: b.distance_km })));
+
+        businesses = businessesWithDistance
           .filter((b) => b.distance_km === undefined || b.distance_km <= radiusKm)
           .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
+
+        console.log('[find_businesses] after proximity filter count:', businesses.length, 'radiusKm used:', radiusKm);
       } else {
         businesses = businesses.map((b) => ({ ...b, locations: bizLocMap.get(b.id) ?? [] }));
       }
@@ -191,6 +218,8 @@ async function handleFindBusinessesInner(
       const paged = businesses.slice(offset, offset + limit);
       const hasMore = offset + limit < totalCount;
 
+      console.log('[find_businesses] returning:', paged.length, 'businesses (total:', totalCount, ')');
+
       return {
         success: true,
         data: {
@@ -205,6 +234,7 @@ async function handleFindBusinessesInner(
       };
     }
     // If no service-type matches found, fall through to general search below
+    console.log('[find_businesses] service_type path found no tenants, falling through to general search');
   }
 
   if (!query) {
@@ -238,6 +268,8 @@ async function handleFindBusinessesInner(
       locAllMap.set(loc.tenant_id, existing);
     }
 
+    console.log('[find_businesses] no-query locationsAll count:', locationsAll?.length);
+
     // If user location available, sort by proximity
     if (userLat && userLng && businesses.length > 0) {
       const locMap = new Map<string, { lat: number; lng: number }>();
@@ -246,7 +278,7 @@ async function handleFindBusinessesInner(
           locMap.set(loc.tenant_id, { lat: loc.lat, lng: loc.lng });
         }
       }
-      businesses = businesses
+      const businessesWithDistance = businesses
         .map((b) => {
           const loc = locMap.get(b.id);
           if (!loc) {
@@ -256,10 +288,17 @@ async function handleFindBusinessesInner(
           const distKm = Math.round(distance * 10) / 10;
           const distMi = Math.round(distKm * 0.621371 * 10) / 10;
           return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: locAllMap.get(b.id) ?? [] };
-        })
+        });
+
+      console.log('[find_businesses] no-query businessesWithDistance count:', businessesWithDistance.length);
+      console.log('[find_businesses] no-query sample distances:', businessesWithDistance.slice(0, 3).map(b => ({ name: b.name, dist: b.distance_km })));
+
+      businesses = businessesWithDistance
         // Only filter out businesses that HAVE coordinates and are outside radius; keep those without coords
         .filter((b) => b.distance_km === undefined || b.distance_km <= radiusKm)
         .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
+
+      console.log('[find_businesses] no-query after proximity filter count:', businesses.length, 'radiusKm used:', radiusKm);
     } else {
       businesses = businesses.map((b) => ({ ...b, locations: locAllMap.get(b.id) ?? [] }));
       locationNote = 'Showing all locations — enable location access for nearby results';
@@ -289,6 +328,8 @@ async function handleFindBusinessesInner(
     const totalCount = businesses.length;
     const paged = businesses.slice(offset, offset + limit);
     const hasMore = offset + limit < totalCount;
+
+    console.log('[find_businesses] no-query returning:', paged.length, 'businesses (total:', totalCount, ')');
 
     return { success: true, data: { businesses: paged, total_count: totalCount, offset, limit, has_more: hasMore, matching_services: [], location_note: locationNote } };
   }
