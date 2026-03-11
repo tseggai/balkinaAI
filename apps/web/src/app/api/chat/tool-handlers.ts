@@ -119,7 +119,7 @@ async function handleFindBusinessesInner(
 
     console.log('[find_businesses] matching services for type:', serviceType, 'count:', matchingServices?.length, 'error:', svcError?.message);
 
-    let serviceTenantMap: Map<string, { id: string; name: string; image_url: string | null; business_type: string | null; matched_services: string[] }>;
+    let serviceTenantMap: Map<string, { id: string; name: string; category?: string | null; matched_services: string[] }>;
 
     if (!matchingServices || matchingServices.length === 0) {
       // Fall back to all tenants — don't return empty
@@ -139,20 +139,21 @@ async function handleFindBusinessesInner(
       // Step 2: Fetch those tenants with their details
       const { data: tenants, error: tenantError } = await supabase
         .from('tenants')
-        .select('id, name, image_url, business_type')
+        .select('id, name, categories(name)')
         .in('id', matchingTenantIds)
         .eq('status', 'active');
 
       console.log('[find_businesses] tenants fetched:', tenants?.length, 'error:', tenantError?.message);
 
       serviceTenantMap = new Map();
-      for (const t of (tenants ?? []) as { id: string; name: string; image_url: string | null; business_type: string | null }[]) {
-        serviceTenantMap.set(t.id, { id: t.id, name: t.name, image_url: t.image_url, business_type: t.business_type, matched_services: svcByTenant.get(t.id) ?? [] });
+      for (const t of (tenants ?? []) as unknown as { id: string; name: string; categories: { name: string } | { name: string }[] | null }[]) {
+        const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
+        serviceTenantMap.set(t.id, { id: t.id, name: t.name, category: cat, matched_services: svcByTenant.get(t.id) ?? [] });
       }
     }
 
     if (serviceTenantMap.size > 0) {
-      let businesses: { id: string; name: string; image_url?: string | null; business_type?: string | null; matched_services?: string[]; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[] = Array.from(serviceTenantMap.values());
+      let businesses: { id: string; name: string; category?: string | null; matched_services?: string[]; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[] = Array.from(serviceTenantMap.values());
 
       // Fetch locations
       const bizIds = businesses.map((b) => b.id);
@@ -241,7 +242,7 @@ async function handleFindBusinessesInner(
     // Return all active businesses when no query is provided
     const { data, error } = await supabase
       .from('tenants')
-      .select('id, name, image_url, business_type')
+      .select('id, name, categories(name)')
       .eq('status', 'active')
       .limit(200);
 
@@ -249,7 +250,11 @@ async function handleFindBusinessesInner(
 
     if (error) return { success: false, error: error.message };
 
-    let businesses = (data ?? []) as { id: string; name: string; image_url: string | null; business_type: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[];
+    let businesses = (data ?? []).map((t: unknown) => {
+      const row = t as { id: string; name: string; categories: { name: string } | { name: string }[] | null };
+      const cat = Array.isArray(row.categories) ? row.categories[0]?.name ?? null : row.categories?.name ?? null;
+      return { id: row.id, name: row.name, category: cat };
+    }) as { id: string; name: string; category?: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[];
     let locationNote: string | undefined;
 
     // Fetch locations with addresses for all businesses
@@ -341,7 +346,7 @@ async function handleFindBusinessesInner(
   // 1. Search tenants by name
   const { data: tenantsByName } = await supabase
     .from('tenants')
-    .select('id, name, image_url, business_type')
+    .select('id, name, categories(name)')
     .eq('status', 'active')
     .ilike('name', `%${sanitized}%`)
     .limit(50);
@@ -373,7 +378,7 @@ async function handleFindBusinessesInner(
 
   const { data: serviceMatches } = await supabase
     .from('services')
-    .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name, image_url, business_type)')
+    .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name, categories(name))')
     .or(uniquePatterns.join(','))
     .eq('tenants.status', 'active')
     .limit(20);
@@ -387,15 +392,17 @@ async function handleFindBusinessesInner(
     .limit(50);
 
   // Merge all found tenants (deduplicate by id) and track matched services per business
-  const tenantMap = new Map<string, { id: string; name: string; image_url?: string | null; business_type?: string | null }>();
+  const tenantMap = new Map<string, { id: string; name: string; category?: string | null }>();
   const tenantMatchedServices = new Map<string, string[]>();
 
-  for (const t of (tenantsByName ?? []) as { id: string; name: string; image_url: string | null; business_type: string | null }[]) {
-    tenantMap.set(t.id, t);
+  for (const t of (tenantsByName ?? []) as unknown as { id: string; name: string; categories: { name: string } | { name: string }[] | null }[]) {
+    const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
+    tenantMap.set(t.id, { id: t.id, name: t.name, category: cat });
   }
-  for (const s of (serviceMatches ?? []) as unknown as { tenant_id: string; name: string; price: number; tenants: { id: string; name: string; image_url: string | null; business_type: string | null } }[]) {
+  for (const s of (serviceMatches ?? []) as unknown as { tenant_id: string; name: string; price: number; tenants: { id: string; name: string; categories: { name: string } | { name: string }[] | null } }[]) {
     if (s.tenants) {
-      tenantMap.set(s.tenants.id, { id: s.tenants.id, name: s.tenants.name, image_url: s.tenants.image_url, business_type: s.tenants.business_type });
+      const sCat = Array.isArray(s.tenants.categories) ? s.tenants.categories[0]?.name ?? null : s.tenants.categories?.name ?? null;
+      tenantMap.set(s.tenants.id, { id: s.tenants.id, name: s.tenants.name, category: sCat });
       const existing = tenantMatchedServices.get(s.tenants.id) ?? [];
       existing.push(s.name);
       tenantMatchedServices.set(s.tenants.id, existing);
@@ -405,7 +412,7 @@ async function handleFindBusinessesInner(
     if (!tenantMap.has(t.id)) tenantMap.set(t.id, { id: t.id, name: t.name });
   }
 
-  let businesses: { id: string; name: string; image_url?: string | null; business_type?: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; matched_services?: string[]; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[] }[] = Array.from(tenantMap.values()).map((t) => ({
+  let businesses: { id: string; name: string; category?: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; matched_services?: string[]; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[] }[] = Array.from(tenantMap.values()).map((t) => ({
     ...t,
     matched_services: tenantMatchedServices.get(t.id),
   }));
