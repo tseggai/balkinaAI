@@ -29,6 +29,13 @@ interface ChatMessage {
   isStreaming?: boolean;
 }
 
+type BookingCardType = 'summary' | 'confirmation' | 'package_offer' | 'loyalty_offer' | 'coupon_input' | 'extras_chips';
+
+interface DetectedCard {
+  type: BookingCardType;
+  content: string;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function generateId(): string {
@@ -197,6 +204,348 @@ const typingStyles = StyleSheet.create({
   },
 });
 
+// ── Booking Card Detection ──────────────────────────────────────────────────
+
+function detectBookingCard(content: string): DetectedCard | null {
+  // Summary card: contains TOTAL with price and service/staff/date lines
+  if (
+    (content.includes('**TOTAL:') || content.includes('**TOTAL ')) &&
+    content.includes('**Service:**')
+  ) {
+    return { type: 'summary', content };
+  }
+  // Confirmation: starts with a check mark and has "Booked" or "confirmed"
+  if (
+    (content.includes('\u2713') || content.includes('\u2705') || content.includes('Booked!') || content.includes('confirmed')) &&
+    content.includes("You'll earn") &&
+    content.includes('points')
+  ) {
+    return { type: 'confirmation', content };
+  }
+  // Package offer
+  if (
+    content.includes('package') &&
+    (content.includes('sessions remaining') || content.includes('part of a package'))
+  ) {
+    return { type: 'package_offer', content };
+  }
+  // Loyalty offer
+  if (content.includes('points') && content.includes('$') && content.includes('Apply')) {
+    return { type: 'loyalty_offer', content };
+  }
+  return null;
+}
+
+// ── Summary Card Component ─────────────────────────────────────────────────
+
+function SummaryCard({ text, onButtonPress }: { text: string; onButtonPress: (label: string) => void }) {
+  // Parse structured summary lines
+  const lines = text.split('\n').filter((l) => l.trim());
+  const detailLines: string[] = [];
+  const priceLines: string[] = [];
+  let totalLine = '';
+  let inPriceSection = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.includes('──') || trimmed.includes('───')) {
+      inPriceSection = true;
+      continue;
+    }
+    if (trimmed.startsWith('**TOTAL')) {
+      totalLine = trimmed.replace(/\*\*/g, '');
+      continue;
+    }
+    if (inPriceSection && (trimmed.includes('$') || trimmed.includes('-$') || trimmed.includes('+$'))) {
+      priceLines.push(trimmed.replace(/\*\*/g, ''));
+    } else if (!inPriceSection && trimmed.length > 0) {
+      detailLines.push(trimmed.replace(/\*\*/g, ''));
+    }
+  }
+
+  return (
+    <View style={cardStyles.summaryCard}>
+      {detailLines.map((line, i) => (
+        <Text key={`d-${i}`} style={cardStyles.summaryDetail}>{line}</Text>
+      ))}
+      <View style={cardStyles.divider} />
+      {priceLines.map((line, i) => (
+        <Text key={`p-${i}`} style={cardStyles.priceLine}>{line}</Text>
+      ))}
+      {totalLine ? (
+        <>
+          <View style={cardStyles.divider} />
+          <Text style={cardStyles.totalLine}>{totalLine}</Text>
+        </>
+      ) : null}
+      <TouchableOpacity
+        style={cardStyles.confirmBtn}
+        onPress={() => onButtonPress('Confirm Booking')}
+        activeOpacity={0.7}
+      >
+        <Text style={cardStyles.confirmBtnText}>Confirm Booking</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={cardStyles.changeBtn}
+        onPress={() => onButtonPress('Change something')}
+        activeOpacity={0.7}
+      >
+        <Text style={cardStyles.changeBtnText}>Change something</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ── Confirmation Card Component ────────────────────────────────────────────
+
+function ConfirmationCard({ text, onButtonPress }: { text: string; onButtonPress: (label: string) => void }) {
+  const lines = text.split('\n').filter((l) => l.trim());
+  // Extract points earned badge
+  const pointsMatch = text.match(/earn (\d+)\s*(loyalty\s*)?points/i);
+  const pointsEarned = pointsMatch?.[1];
+
+  return (
+    <View style={cardStyles.confirmationCard}>
+      <View style={cardStyles.checkCircle}>
+        <Ionicons name="checkmark" size={24} color="#fff" />
+      </View>
+      {lines.map((line, i) => {
+        const cleaned = line.replace(/\*\*/g, '').replace(/\[\[button:[^\]]+\]\]/g, '').trim();
+        if (!cleaned || cleaned.includes('earn') && cleaned.includes('points')) return null;
+        return (
+          <Text key={i} style={i === 0 ? cardStyles.confirmTitle : cardStyles.confirmDetail}>
+            {cleaned}
+          </Text>
+        );
+      })}
+      {pointsEarned ? (
+        <View style={cardStyles.pointsBadge}>
+          <Text style={cardStyles.pointsBadgeText}>+{pointsEarned} pts</Text>
+        </View>
+      ) : null}
+      <View style={cardStyles.confirmActions}>
+        <TouchableOpacity
+          style={cardStyles.confirmActionBtn}
+          onPress={() => onButtonPress('View My Bookings')}
+          activeOpacity={0.7}
+        >
+          <Text style={cardStyles.confirmActionText}>View My Bookings</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[cardStyles.confirmActionBtn, cardStyles.confirmActionBtnSecondary]}
+          onPress={() => onButtonPress('Book Another Service')}
+          activeOpacity={0.7}
+        >
+          <Text style={[cardStyles.confirmActionText, cardStyles.confirmActionTextSecondary]}>Book Another</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ── Package Offer Card Component ───────────────────────────────────────────
+
+function PackageOfferCard({ text, onButtonPress }: { text: string; onButtonPress: (label: string) => void }) {
+  const cleaned = text.replace(/\[\[button:[^\]]+\]\]/g, '').replace(/\*\*/g, '').trim();
+  return (
+    <View style={cardStyles.packageCard}>
+      <View style={cardStyles.packageHeader}>
+        <Ionicons name="gift-outline" size={20} color="#6366f1" />
+        <Text style={cardStyles.packageTitle}>Package Available</Text>
+      </View>
+      <Text style={cardStyles.packageText}>{cleaned}</Text>
+    </View>
+  );
+}
+
+// ── Loyalty Offer Card Component ───────────────────────────────────────────
+
+function LoyaltyOfferCard({ text, onButtonPress }: { text: string; onButtonPress: (label: string) => void }) {
+  const cleaned = text.replace(/\[\[button:[^\]]+\]\]/g, '').replace(/\*\*/g, '').trim();
+  return (
+    <View style={cardStyles.loyaltyCard}>
+      <View style={cardStyles.loyaltyHeader}>
+        <Text style={cardStyles.loyaltyIcon}>{"⭐"}</Text>
+        <Text style={cardStyles.loyaltyTitle}>Loyalty Points</Text>
+      </View>
+      <Text style={cardStyles.loyaltyText}>{cleaned}</Text>
+    </View>
+  );
+}
+
+const cardStyles = StyleSheet.create({
+  summaryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  summaryDetail: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 10,
+  },
+  priceLine: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 2,
+  },
+  totalLine: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  confirmBtn: {
+    backgroundColor: '#6366f1',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  confirmBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  changeBtn: {
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  changeBtnText: {
+    color: '#6366f1',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  confirmationCard: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    alignItems: 'center',
+  },
+  checkCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#22c55e',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  confirmTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#065f46',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  confirmDetail: {
+    fontSize: 14,
+    color: '#374151',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  pointsBadge: {
+    backgroundColor: '#fef3c7',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginTop: 8,
+  },
+  pointsBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#92400e',
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  confirmActionBtn: {
+    flex: 1,
+    backgroundColor: '#6366f1',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  confirmActionBtnSecondary: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#6366f1',
+  },
+  confirmActionText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  confirmActionTextSecondary: {
+    color: '#6366f1',
+  },
+  packageCard: {
+    backgroundColor: '#eef2ff',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+  },
+  packageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  packageTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#4338ca',
+  },
+  packageText: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  loyaltyCard: {
+    backgroundColor: '#fffbeb',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  loyaltyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  loyaltyIcon: {
+    fontSize: 18,
+  },
+  loyaltyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#92400e',
+  },
+  loyaltyText: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+});
+
 // ── Action Button ───────────────────────────────────────────────────────────
 
 function ActionButton({ label, onPress }: { label: string; onPress: (label: string) => void }) {
@@ -259,6 +608,9 @@ function MessageBubble({
     ? { text: message.content, buttons: [], links: [] }
     : parseMessageContent(message.content);
 
+  // Detect rich booking cards in assistant messages
+  const detectedCard = !isUser && !message.isStreaming ? detectBookingCard(text) : null;
+
   return (
     <Animated.View
       style={[
@@ -267,61 +619,92 @@ function MessageBubble({
         { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
       ]}
     >
-      {/* Text bubble */}
-      {(text || message.isStreaming) && (
-        <View
-          style={[
-            bubbleStyles.bubble,
-            isUser ? bubbleStyles.bubbleUser : bubbleStyles.bubbleAssistant,
-          ]}
-        >
-          {message.isStreaming && !message.content ? (
-            <TypingIndicator />
-          ) : (
-            <Text
+      {/* Rich card rendering for booking flow */}
+      {detectedCard?.type === 'summary' ? (
+        <SummaryCard text={text} onButtonPress={onButtonPress} />
+      ) : detectedCard?.type === 'confirmation' ? (
+        <ConfirmationCard text={text} onButtonPress={onButtonPress} />
+      ) : detectedCard?.type === 'package_offer' ? (
+        <>
+          <PackageOfferCard text={text} onButtonPress={onButtonPress} />
+          {buttons.length > 0 && (
+            <View style={bubbleStyles.buttonsRow}>
+              {buttons.map((btn, i) => (
+                <ActionButton key={`${btn}-${i}`} label={btn} onPress={onButtonPress} />
+              ))}
+            </View>
+          )}
+        </>
+      ) : detectedCard?.type === 'loyalty_offer' ? (
+        <>
+          <LoyaltyOfferCard text={text} onButtonPress={onButtonPress} />
+          {buttons.length > 0 && (
+            <View style={bubbleStyles.buttonsRow}>
+              {buttons.map((btn, i) => (
+                <ActionButton key={`${btn}-${i}`} label={btn} onPress={onButtonPress} />
+              ))}
+            </View>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Text bubble */}
+          {(text || message.isStreaming) && (
+            <View
               style={[
-                bubbleStyles.text,
-                isUser ? bubbleStyles.textUser : bubbleStyles.textAssistant,
+                bubbleStyles.bubble,
+                isUser ? bubbleStyles.bubbleUser : bubbleStyles.bubbleAssistant,
               ]}
             >
-              {isUser
-                ? text
-                : renderFormattedText(
-                    text,
-                    StyleSheet.flatten([
-                      bubbleStyles.text,
-                      bubbleStyles.textAssistant,
-                    ]),
-                  )}
-            </Text>
+              {message.isStreaming && !message.content ? (
+                <TypingIndicator />
+              ) : (
+                <Text
+                  style={[
+                    bubbleStyles.text,
+                    isUser ? bubbleStyles.textUser : bubbleStyles.textAssistant,
+                  ]}
+                >
+                  {isUser
+                    ? text
+                    : renderFormattedText(
+                        text,
+                        StyleSheet.flatten([
+                          bubbleStyles.text,
+                          bubbleStyles.textAssistant,
+                        ]),
+                      )}
+                </Text>
+              )}
+            </View>
           )}
-        </View>
-      )}
 
-      {/* Link buttons rendered below the bubble (open URL in browser) */}
-      {links.length > 0 && !message.isStreaming && (
-        <View style={bubbleStyles.buttonsRow}>
-          {links.map((link, i) => (
-            <TouchableOpacity
-              key={`link-${i}`}
-              style={bubbleStyles.linkButton}
-              onPress={() => Linking.openURL(link.url)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="navigate-outline" size={14} color="#4f46e5" style={{ marginRight: 4 }} />
-              <Text style={bubbleStyles.linkButtonText}>{link.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+          {/* Link buttons rendered below the bubble (open URL in browser) */}
+          {links.length > 0 && !message.isStreaming && (
+            <View style={bubbleStyles.buttonsRow}>
+              {links.map((link, i) => (
+                <TouchableOpacity
+                  key={`link-${i}`}
+                  style={bubbleStyles.linkButton}
+                  onPress={() => Linking.openURL(link.url)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="navigate-outline" size={14} color="#4f46e5" style={{ marginRight: 4 }} />
+                  <Text style={bubbleStyles.linkButtonText}>{link.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
-      {/* Action buttons rendered below the bubble */}
-      {buttons.length > 0 && !message.isStreaming && (
-        <View style={bubbleStyles.buttonsRow}>
-          {buttons.map((btn, i) => (
-            <ActionButton key={`${btn}-${i}`} label={btn} onPress={onButtonPress} />
-          ))}
-        </View>
+          {/* Action buttons rendered below the bubble */}
+          {buttons.length > 0 && !message.isStreaming && (
+            <View style={bubbleStyles.buttonsRow}>
+              {buttons.map((btn, i) => (
+                <ActionButton key={`${btn}-${i}`} label={btn} onPress={onButtonPress} />
+              ))}
+            </View>
+          )}
+        </>
       )}
     </Animated.View>
   );

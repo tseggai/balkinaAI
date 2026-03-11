@@ -14,6 +14,18 @@ import { supabase } from '@/lib/supabase';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+interface AppointmentExtra {
+  quantity: number;
+  price_at_booking: number;
+  extra: { name: string } | null;
+}
+
+interface AppointmentCoupon {
+  code: string;
+  discount_amount: number;
+  discount_type: string;
+}
+
 interface Appointment {
   id: string;
   start_time: string;
@@ -24,6 +36,8 @@ interface Appointment {
   staff: { name: string } | null;
   tenant_locations: { name: string } | null;
   tenants: { name: string } | null;
+  appointment_extras?: AppointmentExtra[];
+  coupon?: AppointmentCoupon | null;
 }
 
 type Tab = 'upcoming' | 'past';
@@ -167,7 +181,7 @@ export default function BookingsScreen() {
     let query = supabase
       .from('appointments')
       .select(
-        'id, start_time, end_time, status, total_price, services(name), staff(name), tenant_locations(name), tenants(name)',
+        'id, start_time, end_time, status, total_price, services(name), staff(name), tenant_locations(name), tenants(name), appointment_extras(quantity, price_at_booking, extra:service_extras(name)), coupon:coupons(code, discount_value, discount_type)',
       )
       .eq('customer_id', customerId)
       .order('start_time', { ascending: isUpcoming });
@@ -231,6 +245,24 @@ export default function BookingsScreen() {
           {item.services?.name ?? 'Service'}
         </Text>
 
+        {/* Show extras below service name */}
+        {item.appointment_extras && item.appointment_extras.length > 0 && (
+          <View>
+            {item.appointment_extras.map((extra, idx) => (
+              <Text key={idx} style={styles.extraLine}>
+                {'• '}{extra.extra?.name ?? 'Extra'}{extra.quantity > 1 ? ` ×${extra.quantity}` : ''}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {/* Show coupon if used */}
+        {item.coupon?.code ? (
+          <Text style={styles.couponLine}>
+            {'\uD83C\uDFF7\uFE0F'} {item.coupon.code} applied
+          </Text>
+        ) : null}
+
         {item.staff?.name ? (
           <Text style={styles.staffName}>with {item.staff.name}</Text>
         ) : null}
@@ -250,7 +282,7 @@ export default function BookingsScreen() {
           </View>
 
           <Text style={styles.price}>
-            ${(item.total_price ?? 0).toFixed(2)}
+            ${(item.total_price ?? 0).toFixed(2)}{item.coupon?.code ? ' (with discount)' : ''}
           </Text>
         </View>
       </View>
@@ -437,6 +469,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#374151',
     marginBottom: 2,
+  },
+  extraLine: {
+    fontSize: 13,
+    color: '#9ca3af',
+    marginBottom: 1,
+    paddingLeft: 4,
+  },
+  couponLine: {
+    fontSize: 13,
+    color: '#059669',
+    marginBottom: 2,
+    fontWeight: '500',
   },
   staffName: {
     fontSize: 13,
