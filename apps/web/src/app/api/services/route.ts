@@ -20,21 +20,23 @@ export async function GET() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('services')
-    .select('*, service_extras(*), service_staff(staff_id, staff(name))')
+    .select('*, service_extras(*), service_staff(staff_id, staff(name)), service_locations(location_id)')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ data: null, error: { message: error.message } }, { status: 500 });
 
-  // Map service_staff to include staff_name for easier consumption
+  // Map service_staff and service_locations for easier consumption
   const mapped = (data as Record<string, unknown>[] | null)?.map((service) => {
     const staffArr = service.service_staff as { staff_id: string; staff: { name: string } | null }[] | null;
+    const locArr = service.service_locations as { location_id: string }[] | null;
     return {
       ...service,
       service_staff: staffArr?.map((ss) => ({
         staff_id: ss.staff_id,
         staff_name: ss.staff?.name ?? 'Unknown',
       })) ?? [],
+      service_locations: locArr?.map((sl) => sl.location_id) ?? [],
     };
   }) ?? [];
 
@@ -105,6 +107,16 @@ export async function POST(request: Request) {
       (body.staff as string[]).map((staffId) => ({
         service_id: serviceData.id,
         staff_id: staffId,
+      })) as never
+    );
+  }
+
+  // Insert service_locations if provided
+  if (body.locations && Array.isArray(body.locations) && (body.locations as unknown[]).length > 0) {
+    await supabase.from('service_locations').insert(
+      (body.locations as string[]).map((locationId) => ({
+        service_id: serviceData.id,
+        location_id: locationId,
       })) as never
     );
   }
@@ -180,6 +192,20 @@ export async function PATCH(request: Request) {
         staff.map((staffId) => ({
           service_id: id,
           staff_id: staffId,
+        })) as never
+      );
+    }
+  }
+
+  // Replace locations if provided
+  const locations = body.locations as string[] | undefined;
+  if (locations && Array.isArray(locations)) {
+    await supabase.from('service_locations').delete().eq('service_id', id);
+    if (locations.length > 0) {
+      await supabase.from('service_locations').insert(
+        locations.map((locationId) => ({
+          service_id: id,
+          location_id: locationId,
         })) as never
       );
     }
