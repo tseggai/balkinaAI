@@ -66,6 +66,15 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/**
+ * Estimate driving time in minutes from distance in km.
+ * Uses ~30 km/h average for short urban distances, ~50 km/h for longer distances.
+ */
+function estimateDriveMinutes(distanceKm: number): number {
+  const avgSpeedKmh = distanceKm < 5 ? 30 : 50;
+  return Math.max(1, Math.round((distanceKm / avgSpeedKmh) * 60));
+}
+
 export async function handleFindBusinesses(
   supabase: AdminClient,
   _tenantId: string,
@@ -119,7 +128,8 @@ export async function handleFindBusinesses(
         .map((b) => {
           const loc = locMap.get(b.id);
           const distance = loc ? haversineKm(userLat, userLng, loc.lat, loc.lng) : 9999;
-          return { ...b, distance_km: Math.round(distance * 10) / 10, locations: locAllMap.get(b.id) ?? [] };
+          const distKm = Math.round(distance * 10) / 10;
+          return { ...b, distance_km: distKm, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: locAllMap.get(b.id) ?? [] };
         })
         .filter((b) => b.distance_km <= radiusKm)
         .sort((a, b) => a.distance_km - b.distance_km);
@@ -240,7 +250,8 @@ export async function handleFindBusinesses(
       .map((b) => {
         const loc = locMap.get(b.id);
         const distance = loc ? haversineKm(userLat, userLng, loc.lat, loc.lng) : 9999;
-        return { ...b, distance_km: Math.round(distance * 10) / 10, locations: bizLocMap.get(b.id) ?? [] };
+        const distKm = Math.round(distance * 10) / 10;
+        return { ...b, distance_km: distKm, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: bizLocMap.get(b.id) ?? [] };
       })
       .filter((b) => (b.distance_km ?? 9999) <= radiusKm)
       .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
@@ -483,7 +494,7 @@ export async function handleCheckAvailability(
   const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const dayOfWeek = dayNames[new Date(date).getDay()] as string;
 
-  const slots: { time: string; staff_id: string; staff_name: string }[] = [];
+  const slots: { time: string; local_time: string; staff_id: string; staff_name: string }[] = [];
 
   for (const staff of staffList as { id: string; name: string; availability_schedule: Record<string, unknown> }[]) {
     // Skip staff on holiday
@@ -542,8 +553,17 @@ export async function handleCheckAvailability(
       });
 
       if (!hasConflict) {
+        // Compute human-readable local start time (accounting for buffer before)
+        const serviceStartMinutes = minutes + bufferBefore;
+        const displayHour = Math.floor(serviceStartMinutes / 60);
+        const displayMin = serviceStartMinutes % 60;
+        const ampm = displayHour >= 12 ? 'PM' : 'AM';
+        const displayHour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour;
+        const localDisplay = `${displayHour12}:${String(displayMin).padStart(2, '0')} ${ampm}`;
+
         slots.push({
           time: slotStartUtc.toISOString(),
+          local_time: localDisplay,
           staff_id: staff.id,
           staff_name: staff.name,
         });
@@ -747,6 +767,23 @@ export async function handleBookAppointment(
     .single();
   businessName = (tenantData as { name: string } | null)?.name ?? null;
 
+  // 10. Fetch location address for the response
+  let locationAddress: string | null = null;
+  if (finalLocationId) {
+    const { data: locData } = await supabase
+      .from('tenant_locations')
+      .select('address')
+      .eq('id', finalLocationId)
+      .single();
+    locationAddress = (locData as { address: string } | null)?.address ?? null;
+  }
+
+  // Compute human-readable local times for the response
+  const bookingTimezone = await getTenantTimezone(supabase, tenantId);
+  const localStartStr = start.toLocaleString('en-US', { timeZone: bookingTimezone, hour: 'numeric', minute: '2-digit', hour12: true });
+  const localEndStr = end.toLocaleString('en-US', { timeZone: bookingTimezone, hour: 'numeric', minute: '2-digit', hour12: true });
+  const localDateStr = start.toLocaleDateString('en-US', { timeZone: bookingTimezone, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
   return {
     success: true,
     data: {
@@ -756,6 +793,10 @@ export async function handleBookAppointment(
       business_name: businessName,
       start_time: start.toISOString(),
       end_time: end.toISOString(),
+      local_start_time: localStartStr,
+      local_end_time: localEndStr,
+      local_date: localDateStr,
+      location_address: locationAddress,
       total_price: svc.price,
       deposit_amount: depositAmount,
       balance_due: balanceDue,
