@@ -224,6 +224,7 @@ const findBusinessesTool: OpenAI.ChatCompletionTool = {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Search query - service type, category, or business name. Use empty string to list ALL nearby businesses.' },
+        service_type: { type: 'string', description: 'Optional service type to filter businesses by (e.g. "haircut", "massage"). Only returns businesses with at least 1 active staff with schedule availability.' },
         latitude: { type: 'number', description: 'User latitude for proximity search (optional)' },
         longitude: { type: 'number', description: 'User longitude for proximity search (optional)' },
         radius_km: { type: 'number', description: 'Search radius in km (default 50)' },
@@ -282,6 +283,7 @@ function buildTenantSystemPrompt(
   customerEmail: string | null,
   userId: string | null,
   currentDate: string,
+  dateInfo?: { todayISO: string; tomorrowISO: string; endOfWeekISO: string },
 ): string {
   let customerSection: string;
   if (userId) {
@@ -302,6 +304,21 @@ function buildTenantSystemPrompt(
 
 CURRENT DATE AND TIME: ${currentDate}
 Use this exact date and time for all availability checks, scheduling, and date references. Never guess or fabricate the current time. Always use the value above.
+${dateInfo ? `
+TODAY IS: ${dateInfo.todayISO}
+TOMORROW IS: ${dateInfo.tomorrowISO}
+THIS WEEK runs from ${dateInfo.todayISO} through ${dateInfo.endOfWeekISO}.
+
+When customer says "tomorrow" → use EXACTLY ${dateInfo.tomorrowISO} as the date parameter in ALL tool calls.
+When customer says "today" → use EXACTLY ${dateInfo.todayISO}.
+When customer says "this week" → offer date chips for each remaining day of the week.
+ALWAYS pass dates to tools as YYYY-MM-DD strings. Never pass "tomorrow" as a string.
+` : ''}
+FORMATTING RULES — NEVER VIOLATE:
+1. NEVER use numbered lists (1. 2. 3.) anywhere in your responses. Use prose or chips only.
+2. NEVER use bare dash lines (-) as separators. Use a blank line instead.
+3. When presenting options, present them as chips ONLY — no list before or after the chips.
+4. Never say a list then show the same list as chips. Just show the chips with one intro sentence.
 
 ## Style
 - ULTRA concise. Max 1 short sentence of text, then buttons.
@@ -337,31 +354,44 @@ STEP 2: Customer picks a service →
      Show: "This service is also available as part of a package: [Package Name — X services, $Y]. Interested?"
      [[button:Yes, tell me more]] [[button:No, just this service]]
    Then continue to availability.
-STEP 3: Ask staff preference with real staff names (call get_staff):
-   [[button:StaffName1]] [[button:StaffName2]] [[button:No preference]]
-   ALWAYS show staff options. Never auto-assign without asking.
-STEP 4: Ask when (if not already known):
+STEP 3: Ask when (if not already known):
    [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-STEP 5: call check_availability → show time slots using the local_time field:
+STEP 4: call check_availability → show time slots using the local_time field:
    [[button:10:00 AM with Emily Watson]] [[button:10:30 AM with Emily Watson]]
    ALWAYS use local_time from available_slots (NOT the raw ISO time field). Include staff name.
    NEVER show more than 6 time slots at once. Always paginate using the offset parameter.
    Add [[button:Show More Times]] ONLY when has_more is true in the response.
-STEP 6 — EXTRAS (check if the service has extras from get_services results):
-   If the service has extras defined:
-     Show: "Want to add anything to your [service]?" with each extra as a button:
-     [[button:Extra Name +$price +Xmin]] (allow multi-select)
-     [[button:Nothing to add]]
-   If no extras: skip silently.
-STEP 7 — COUPON:
-   Ask inline: "Got a promo code?"
-   [[button:Enter code]] [[button:Skip]]
-   If code entered: call apply_coupon → show result
-STEP 8 — LOYALTY (call get_loyalty_info if customerId/userId available):
-   If customer has redeemable points:
-     Show: "You have [X points] = $[Y value]. Apply to this booking?"
-     [[button:Yes, save $Y]] [[button:No thanks]]
-   If no loyalty program or zero points: skip silently.
+STEP 5 — STAFF SELECTION (MANDATORY GATE):
+   After the customer selects a time slot, you MUST ask for staff preference BEFORE confirming.
+   Call get_staff for the tenant, then present:
+   "Who would you prefer?" with each available staff member as a chip plus [No preference].
+   [[button:StaffName1]] [[button:StaffName2]] [[button:No preference]]
+   EXCEPTION: Only skip this step if the service has exactly 1 staff member assigned.
+   In that case, auto-assign and inform: "You'll be with [Name] for this service."
+   Never skip staff selection for services with 2+ staff members.
+STEP 6 — ADD-ONS GATE (runs after staff is selected, before showing confirmation):
+   STEP 6A — EXTRAS: Call get_services with the specific serviceId to check has_extras.
+   If has_extras is TRUE: you MUST show the extras. Present as:
+   "Want to enhance your [service]? Here are available add-ons:"
+   [[button:Extra Name — +$price +Xmin]] for each extra, plus [[button:No thanks, continue]]
+   This step is MANDATORY when has_extras is true. Skipping it is an error.
+   STEP 6B — PACKAGES: Call get_packages with tenantId and serviceId.
+   If customer already owns a package covering this service:
+     Show "You have a package with X sessions remaining. Use one?"
+     [[button:Yes, use package]] [[button:No, pay full price]]
+   If packages exist but customer doesn't own one:
+     Show "This service is available in a package. Interested?"
+     [[button:Tell me more]] [[button:No thanks]]
+   If no packages: skip silently.
+   STEP 6C — LOYALTY: Call get_loyalty_info with customerId (if available) and servicePrice.
+   If loyalty_program_active is true:
+     If points_balance > 0 and redeemable: show "You have [X pts] = $[Y]. Apply?"
+     [[button:Yes save $Y]] [[button:Keep points]]
+     Always show at the end of confirmation: "You'll earn [Z pts] for this booking"
+   If inactive or no program: skip silently.
+   STEP 6D — COUPON: Only ask for a coupon if active_coupon_count > 0 for this tenant.
+   If yes: "Have a promo code?" [[button:Enter code]] [[button:Skip]]
+   If no active coupons: skip silently.
 STEP 9 — SUMMARY CARD:
    Show a clean summary before confirming:
    **Service:** [Name]
@@ -390,11 +420,12 @@ STEP 11: Show booking confirmation using FULL details returned by create_booking
    ALWAYS offer: [[button:View My Bookings]] [[button:Book Another Service]]
 
 IMPORTANT RULES:
-- Never show steps 6-8 if there's nothing to show (no extras, no loyalty program, no points balance)
+- Never show add-on steps 6A-6D if there's nothing to show (no extras, no loyalty program, no points balance)
 - Never ask for a coupon if the tenant has no active coupons
 - Never mention loyalty if the tenant has no loyalty program configured
 - Always call get_packages, get_loyalty_info, and check service extras BEFORE presenting them
 - Keep each step to ONE question — don't combine multiple asks in one message
+- When presenting a business's services and checking for extras/packages: if NO extras AND NO packages exist, say nothing about them. Don't mention their absence. If extras exist for SOME services: only mention extras when the customer selects a service that HAS extras. Never say "no packages available" in the same message as showing extras chips.
 
 Each step is ONE message. But SKIP steps where the answer is already known from context.
 
@@ -460,6 +491,7 @@ function buildDiscoverySystemPrompt(
   userId: string | null,
   currentDate: string,
   userLocation?: { latitude: number; longitude: number } | null,
+  dateInfo?: { todayISO: string; tomorrowISO: string; endOfWeekISO: string },
 ): string {
   let customerSection: string;
   if (userId) {
@@ -479,6 +511,21 @@ function buildDiscoverySystemPrompt(
 
 CURRENT DATE AND TIME: ${currentDate}
 Use this exact date and time for all availability checks, scheduling, and date references. Never guess or fabricate the current time. Always use the value above.
+${dateInfo ? `
+TODAY IS: ${dateInfo.todayISO}
+TOMORROW IS: ${dateInfo.tomorrowISO}
+THIS WEEK runs from ${dateInfo.todayISO} through ${dateInfo.endOfWeekISO}.
+
+When customer says "tomorrow" → use EXACTLY ${dateInfo.tomorrowISO} as the date parameter in ALL tool calls.
+When customer says "today" → use EXACTLY ${dateInfo.todayISO}.
+When customer says "this week" → offer date chips for each remaining day of the week.
+ALWAYS pass dates to tools as YYYY-MM-DD strings. Never pass "tomorrow" as a string.
+` : ''}
+FORMATTING RULES — NEVER VIOLATE:
+1. NEVER use numbered lists (1. 2. 3.) anywhere in your responses. Use prose or chips only.
+2. NEVER use bare dash lines (-) as separators. Use a blank line instead.
+3. When presenting options, present them as chips ONLY — no list before or after the chips.
+4. Never say a list then show the same list as chips. Just show the chips with one intro sentence.
 
 ## YOUR PURPOSE
 You are an APPOINTMENT BOOKING assistant. Everything you say should help the customer decide WHERE to book, WHAT service to get, and WHEN to go. You are NOT a general search engine or information service.
@@ -541,15 +588,16 @@ NEVER re-ask a question the user has already answered in this conversation.
 The flow is ADAPTIVE — skip any step the user already answered:
 1. Customer asks about businesses/services/providers → call find_businesses immediately WITH coordinates and their query.
    If the user already specified a date/time, remember it and skip asking later.
-2. Present matching businesses as buttons with distance. State how many you're showing out of total:
-   "Here are **8 of 15** service providers near you:"
+2. Present matching businesses as buttons with distance. Show the closest 8, sorted by distance. Do NOT say "X of Y" — do not mention total count unless asked.
    [[button:Shop Name (0.5 mi · ~1 min drive)]] [[button:Shop Name 2 (1.2 mi · ~3 min drive)]]
    Include the estimated_drive_minutes from tool results when available: "(X.X mi · ~Y min drive)".
-   When has_more is true in results, ALWAYS add [[button:Show More]] at the end.
+   When has_more is true in results, add [[button:Show more businesses]] at the end (no total count).
    Do NOT show services, staff, or times yet. Let the customer PICK a business first.
-3. When customer taps "Show More" → call find_businesses again with offset = previous offset + limit to get next page.
-   Present the next batch: "Here are **more** service providers:"
-   Again add [[button:Show More]] if has_more is still true.
+   Never present a business to the customer if find_businesses returns has_availability: false for it.
+   Never re-suggest a business that failed with "no availability" in the current session.
+3. When customer taps "Show more businesses" → call find_businesses again with offset = previous offset + limit to get next page.
+   Present the next batch as more buttons.
+   Again add [[button:Show more businesses]] if has_more is still true.
 4. Customer picks a business → call get_services for that business, present services:
    [[button:ServiceName — $price · duration]]
    If the user already said what service they want, auto-match it and skip this step.
@@ -562,31 +610,45 @@ The flow is ADAPTIVE — skip any step the user already answered:
      Show: "This service is also available as part of a package: [Package Name — X services, $Y]. Interested?"
      [[button:Yes, tell me more]] [[button:No, just this service]]
    Then continue to availability.
-6. Ask staff preference with real staff names (call get_staff):
-   [[button:StaffName1]] [[button:StaffName2]] [[button:No preference]]
-   ALWAYS show staff options. Never auto-assign without asking.
-7. Ask when (if not already known):
+6. Ask when (if not already known):
    [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-8. Call check_availability → show time slots using the local_time field:
+7. Call check_availability → show time slots using the local_time field:
    [[button:10:00 AM with Emily Watson]] [[button:10:30 AM with Emily Watson]]
    ALWAYS use local_time from available_slots (NOT the raw ISO time field). Include staff name.
    NEVER show more than 6 time slots at once. Always paginate using the offset parameter.
    Add [[button:Show More Times]] ONLY when has_more is true in the response.
-9. EXTRAS (check if the service has extras from get_services results):
-   If the service has extras defined:
-     Show: "Want to add anything to your [service]?" with each extra as a button:
-     [[button:Extra Name +$price +Xmin]] (allow multi-select)
-     [[button:Nothing to add]]
-   If no extras: skip silently.
-10. COUPON: Ask inline: "Got a promo code?"
-   [[button:Enter code]] [[button:Skip]]
-   If code entered: call apply_coupon → show result
-11. LOYALTY (call get_loyalty_info if customerId/userId available):
-   If customer has redeemable points:
-     Show: "You have [X points] = $[Y value]. Apply to this booking?"
-     [[button:Yes, save $Y]] [[button:No thanks]]
-   If no loyalty program or zero points: skip silently.
-12. SUMMARY CARD:
+8. STAFF SELECTION (MANDATORY GATE):
+   After the customer selects a time slot, you MUST ask for staff preference BEFORE confirming.
+   Call get_staff for the tenant, then present:
+   "Who would you prefer?" with each available staff member as a chip plus [No preference].
+   [[button:StaffName1]] [[button:StaffName2]] [[button:No preference]]
+   EXCEPTION: Only skip this step if the service has exactly 1 staff member assigned.
+   In that case, auto-assign and inform: "You'll be with [Name] for this service."
+   Never skip staff selection for services with 2+ staff members.
+9. ADD-ONS GATE (runs after staff is selected, before showing confirmation):
+   9A — EXTRAS: Call get_services with the specific serviceId to check has_extras.
+   If has_extras is TRUE: you MUST show the extras. Present as:
+   "Want to enhance your [service]? Here are available add-ons:"
+   [[button:Extra Name — +$price +Xmin]] for each extra, plus [[button:No thanks, continue]]
+   This step is MANDATORY when has_extras is true. Skipping it is an error.
+   9B — PACKAGES: Call get_packages with tenantId and serviceId.
+   If customer already owns a package covering this service:
+     Show "You have a package with X sessions remaining. Use one?"
+     [[button:Yes, use package]] [[button:No, pay full price]]
+   If packages exist but customer doesn't own one:
+     Show "This service is available in a package. Interested?"
+     [[button:Tell me more]] [[button:No thanks]]
+   If no packages: skip silently.
+   9C — LOYALTY: Call get_loyalty_info with customerId (if available) and servicePrice.
+   If loyalty_program_active is true:
+     If points_balance > 0 and redeemable: show "You have [X pts] = $[Y]. Apply?"
+     [[button:Yes save $Y]] [[button:Keep points]]
+     Always show at the end of confirmation: "You'll earn [Z pts] for this booking"
+   If inactive or no program: skip silently.
+   9D — COUPON: Only ask for a coupon if active_coupon_count > 0 for this tenant.
+   If yes: "Have a promo code?" [[button:Enter code]] [[button:Skip]]
+   If no active coupons: skip silently.
+10. SUMMARY CARD:
    Show a clean summary before confirming:
    **Service:** [Name]
    **Extras:** [list or "None"]
@@ -601,8 +663,8 @@ The flow is ADAPTIVE — skip any step the user already answered:
    ───────────────
    **TOTAL: $XX.XX**
    [[button:Confirm Booking]] [[button:Change something]]
-13. Customer confirms → create_booking WITH tenant_id and all selections
-14. Show booking confirmation using FULL details returned by create_booking:
+11. Customer confirms → create_booking WITH tenant_id and all selections
+12. Show booking confirmation using FULL details returned by create_booking:
     - **Service name**
     - Business: business_name
     - Staff: staff_name
@@ -614,11 +676,12 @@ The flow is ADAPTIVE — skip any step the user already answered:
     Then offer [[button:View My Bookings]] [[button:Book Another Service]]
 
 IMPORTANT RULES:
-- Never show steps 9-11 if there's nothing to show (no extras, no loyalty program, no points balance)
+- Never show add-on steps 9A-9D if there's nothing to show (no extras, no loyalty program, no points balance)
 - Never ask for a coupon if the tenant has no active coupons
 - Never mention loyalty if the tenant has no loyalty program configured
 - Always call get_packages, get_loyalty_info, and check service extras BEFORE presenting them
 - Keep each step to ONE question — don't combine multiple asks in one message
+- When presenting a business's services and checking for extras/packages: if NO extras AND NO packages exist, say nothing about them. Don't mention their absence. If extras exist for SOME services: only mention extras when the customer selects a service that HAS extras. Never say "no packages available" in the same message as showing extras chips.
 
 Each step is ONE message. But SKIP steps where the answer is already known from context.
 
@@ -634,9 +697,12 @@ When find_businesses returns results, pay attention to the matched service names
 - Example: [[button:Happy Paws — Pet Nail Trim]] vs [[button:Luxe Nails — Manicure & Pedicure]]
 
 ## Staff selection
-ALWAYS present staff options before showing time slots. Let the customer choose:
-[[button:StaffName1]] [[button:StaffName2]] [[button:Any Available]]
-If the user says "give me staff options next time" — you should ALWAYS show staff choices going forward.
+STAFF SELECTION RULE: After the customer selects a time slot, you MUST ask for staff preference BEFORE confirming.
+Call get_staff for the tenant, then present: "Who would you prefer?" with each available staff member as a chip plus [No preference].
+[[button:StaffName1]] [[button:StaffName2]] [[button:No preference]]
+EXCEPTION: Only skip this step if the service has exactly 1 staff member assigned.
+In that case, auto-assign and inform: "You'll be with [Name] for this service."
+Never skip staff selection for services with 2+ staff members.
 
 ## Deposit handling
 If a service requires a deposit, CLEARLY state the amount and let the customer decide. NEVER redirect to a different service because of a deposit requirement.
@@ -680,8 +746,7 @@ When the customer asks for directions, how to get somewhere, or how far a place 
 ## Presenting results — CRITICAL FORMATTING RULES
 - In DISCOVERY mode (listing businesses): EVERY business MUST be a [[button:BusinessName (X.X mi · ~Y min drive)]].
   Include the estimated_drive_minutes from tool results when available.
-  State count: "Here are **8 of 15** service providers near you:"
-  Add [[button:Show More]] when has_more is true.
+  Do NOT state the total count. Just show the businesses. Add [[button:Show more businesses]] when has_more is true.
 - In BOOKING FLOW (after picking a business): services, time slots, and staff MUST be buttons.
 - In MULTI-APPOINTMENT or AVAILABILITY results: Use **bold** for business names, show distance, staff name, and available times inline. Example:
   "**Happy Paws** *(0.5 mi)* — 10:00 AM with **Emily Watson**"
@@ -945,6 +1010,32 @@ export async function POST(request: Request) {
     timeZoneName: 'short',
   });
 
+  // Compute explicit ISO date strings for today/tomorrow in PST
+  const pstParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(now);
+
+  const pstYear = pstParts.find(p => p.type === 'year')!.value;
+  const pstMonth = pstParts.find(p => p.type === 'month')!.value;
+  const pstDay = pstParts.find(p => p.type === 'day')!.value;
+  const todayISO = `${pstYear}-${pstMonth}-${pstDay}`;
+
+  const tomorrowDate = new Date(`${todayISO}T12:00:00-08:00`);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowISO = tomorrowDate.toISOString().split('T')[0];
+
+  // Compute end of week (Sunday)
+  const todayDateObj = new Date(`${todayISO}T12:00:00-08:00`);
+  const dayOfWeekNum = todayDateObj.getDay(); // 0=Sun
+  const daysUntilSunday = dayOfWeekNum === 0 ? 0 : 7 - dayOfWeekNum;
+  const endOfWeekDate = new Date(todayDateObj);
+  endOfWeekDate.setDate(endOfWeekDate.getDate() + daysUntilSunday);
+  const endOfWeekISO = endOfWeekDate.toISOString().split('T')[0];
+
+  const dateInfo = { todayISO, tomorrowISO: tomorrowISO!, endOfWeekISO: endOfWeekISO! };
+
   const systemPrompt = tenantId
     ? buildTenantSystemPrompt(
         tenantName,
@@ -953,6 +1044,7 @@ export async function POST(request: Request) {
         resolvedEmail,
         resolvedUserId,
         currentDateTime,
+        dateInfo,
       )
     : buildDiscoverySystemPrompt(
         resolvedName,
@@ -961,6 +1053,7 @@ export async function POST(request: Request) {
         resolvedUserId,
         currentDateTime,
         userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
+        dateInfo,
       );
 
   // 6. Stream response from OpenAI with tool loop

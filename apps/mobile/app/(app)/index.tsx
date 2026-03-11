@@ -45,6 +45,17 @@ function generateId(): string {
   });
 }
 
+// ── Clean AI messages (strip bare numbered/dash lines) ──────────────────────
+
+function cleanAIMessage(text: string): string {
+  // Remove bare numbered lines like "1.\n2.\n3." that have no content
+  return text
+    .replace(/^\d+\.\s*$/gm, '') // remove "1." lines with no text after
+    .replace(/^-\s*$/gm, '')      // remove bare "-" lines
+    .replace(/\n{3,}/g, '\n\n')   // collapse triple+ newlines to double
+    .trim();
+}
+
 // ── Parse [[button:...]] and [[link:Label|URL]] from message content ─────────
 
 interface ParsedLink {
@@ -304,40 +315,89 @@ function ConfirmationCard({ text, onButtonPress }: { text: string; onButtonPress
   const pointsMatch = text.match(/earn (\d+)\s*(loyalty\s*)?points/i);
   const pointsEarned = pointsMatch?.[1];
 
+  // Parse detail lines into label:value pairs, extract address for directions
+  const detailLines: { label: string; value: string }[] = [];
+  let titleLine = '';
+  let address = '';
+
+  for (const line of lines) {
+    const cleaned = line.replace(/\*\*/g, '').replace(/\[\[button:[^\]]+\]\]/g, '').trim();
+    if (!cleaned) continue;
+    if (cleaned.toLowerCase().includes('earn') && cleaned.toLowerCase().includes('points')) continue;
+    if (cleaned.toLowerCase().includes('would you like') || cleaned.toLowerCase().includes('book another')) continue;
+
+    // Check for "Label: Value" pattern
+    const colonMatch = cleaned.match(/^([^:]+):\s*(.+)$/);
+    if (colonMatch) {
+      const label = colonMatch[1]!.trim();
+      const value = colonMatch[2]!.trim();
+      if (label.toLowerCase() === 'address') {
+        address = value;
+        continue; // Don't show address as text — show directions button instead
+      }
+      detailLines.push({ label, value });
+    } else if (!titleLine) {
+      titleLine = cleaned;
+    }
+  }
+
+  const openDirections = () => {
+    if (!address) return;
+    const encoded = encodeURIComponent(address);
+    const url = Platform.OS === 'ios'
+      ? `maps://maps.apple.com/?daddr=${encoded}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
+    Linking.openURL(url);
+  };
+
   return (
     <View style={cardStyles.confirmationCard}>
       <View style={cardStyles.checkCircle}>
         <Ionicons name="checkmark" size={24} color="#fff" />
       </View>
-      {lines.map((line, i) => {
-        const cleaned = line.replace(/\*\*/g, '').replace(/\[\[button:[^\]]+\]\]/g, '').trim();
-        if (!cleaned || cleaned.includes('earn') && cleaned.includes('points')) return null;
-        return (
-          <Text key={i} style={i === 0 ? cardStyles.confirmTitle : cardStyles.confirmDetail}>
-            {cleaned}
-          </Text>
-        );
-      })}
+      {titleLine ? (
+        <Text style={cardStyles.confirmTitle}>{titleLine}</Text>
+      ) : null}
+      <View style={{ width: '100%', marginTop: 8 }}>
+        {detailLines.map((line, i) => (
+          <View key={i} style={{ flexDirection: 'row', marginBottom: 4 }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#374151' }}>{line.label}: </Text>
+            <Text style={{ fontSize: 14, color: '#374151', flexShrink: 1 }}>{line.value}</Text>
+          </View>
+        ))}
+      </View>
+      {address ? (
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, backgroundColor: '#eef2ff', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignSelf: 'flex-start' }}
+          onPress={openDirections}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="navigate-outline" size={16} color="#4f46e5" style={{ marginRight: 6 }} />
+          <Text style={{ fontSize: 14, fontWeight: '600', color: '#4f46e5' }}>Get Directions</Text>
+        </TouchableOpacity>
+      ) : null}
       {pointsEarned ? (
         <View style={cardStyles.pointsBadge}>
           <Text style={cardStyles.pointsBadgeText}>+{pointsEarned} pts</Text>
         </View>
       ) : null}
-      <View style={cardStyles.confirmActions}>
-        <TouchableOpacity
-          style={cardStyles.confirmActionBtn}
-          onPress={() => onButtonPress('View My Bookings')}
-          activeOpacity={0.7}
-        >
-          <Text style={cardStyles.confirmActionText}>View My Bookings</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[cardStyles.confirmActionBtn, cardStyles.confirmActionBtnSecondary]}
-          onPress={() => onButtonPress('Book Another Service')}
-          activeOpacity={0.7}
-        >
-          <Text style={[cardStyles.confirmActionText, cardStyles.confirmActionTextSecondary]}>Book Another</Text>
-        </TouchableOpacity>
+      <View style={{ borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 12, marginTop: 16, width: '100%' }}>
+        <View style={cardStyles.confirmActions}>
+          <TouchableOpacity
+            style={cardStyles.confirmActionBtn}
+            onPress={() => onButtonPress('View My Bookings')}
+            activeOpacity={0.7}
+          >
+            <Text style={cardStyles.confirmActionText}>View My Bookings</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[cardStyles.confirmActionBtn, cardStyles.confirmActionBtnSecondary]}
+            onPress={() => onButtonPress('Book Another Service')}
+            activeOpacity={0.7}
+          >
+            <Text style={[cardStyles.confirmActionText, cardStyles.confirmActionTextSecondary]}>Book Another</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -434,7 +494,7 @@ const cardStyles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#bbf7d0',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   checkCircle: {
     width: 44,
@@ -449,13 +509,13 @@ const cardStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#065f46',
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 4,
   },
   confirmDetail: {
     fontSize: 14,
     color: '#374151',
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 2,
   },
   pointsBadge: {
@@ -606,7 +666,7 @@ function MessageBubble({
   const isUser = message.role === 'user';
   const { text, buttons, links } = isUser
     ? { text: message.content, buttons: [], links: [] }
-    : parseMessageContent(message.content);
+    : parseMessageContent(cleanAIMessage(message.content));
 
   // Detect rich booking cards in assistant messages
   const detectedCard = !isUser && !message.isStreaming ? detectBookingCard(text) : null;

@@ -87,6 +87,8 @@ export async function handleFindBusinesses(
   const offset = (input.offset as number) || 0;
   const limit = (input.limit as number) || 8;
 
+  const _serviceType = ((input.service_type as string) || '').trim();
+
   if (!query) {
     // Return all active businesses when no query is provided
     const { data, error } = await supabase
@@ -137,6 +139,27 @@ export async function handleFindBusinesses(
       businesses = businesses.map((b) => ({ ...b, locations: locAllMap.get(b.id) ?? [] }));
       locationNote = 'Showing all locations — enable location access for nearby results';
     }
+
+    // Check availability: each business needs at least 1 active staff with schedule
+    const bizIdsForAvail = businesses.map((b: { id: string }) => b.id);
+    const { data: staffForAvail } = bizIdsForAvail.length > 0
+      ? await supabase
+          .from('staff')
+          .select('tenant_id, availability_schedule')
+          .in('tenant_id', bizIdsForAvail)
+      : { data: [] };
+
+    const tenantsWithStaff = new Set<string>();
+    for (const s of (staffForAvail ?? []) as { tenant_id: string; availability_schedule: Record<string, unknown> | null }[]) {
+      if (s.availability_schedule && Object.keys(s.availability_schedule).length > 0) {
+        tenantsWithStaff.add(s.tenant_id);
+      }
+    }
+
+    businesses = businesses.map((b) => ({
+      ...b,
+      has_availability: tenantsWithStaff.has(b.id),
+    })) as typeof businesses;
 
     const totalCount = businesses.length;
     const paged = businesses.slice(offset, offset + limit);
@@ -259,6 +282,27 @@ export async function handleFindBusinesses(
     businesses = businesses.map((b) => ({ ...b, locations: bizLocMap.get(b.id) ?? [] }));
     locationNote = 'Showing all locations — enable location access for nearby results';
   }
+
+  // Check availability: each business needs at least 1 active staff with schedule
+  const bizIdsForAvailQuery = businesses.map((b) => b.id);
+  const { data: staffForAvailQuery } = bizIdsForAvailQuery.length > 0
+    ? await supabase
+        .from('staff')
+        .select('tenant_id, availability_schedule')
+        .in('tenant_id', bizIdsForAvailQuery)
+    : { data: [] };
+
+  const tenantsWithStaffQuery = new Set<string>();
+  for (const s of (staffForAvailQuery ?? []) as { tenant_id: string; availability_schedule: Record<string, unknown> | null }[]) {
+    if (s.availability_schedule && Object.keys(s.availability_schedule).length > 0) {
+      tenantsWithStaffQuery.add(s.tenant_id);
+    }
+  }
+
+  businesses = businesses.map((b) => ({
+    ...b,
+    has_availability: tenantsWithStaffQuery.has(b.id),
+  }));
 
   const totalCount = businesses.length;
   const paged = businesses.slice(offset, offset + limit);
