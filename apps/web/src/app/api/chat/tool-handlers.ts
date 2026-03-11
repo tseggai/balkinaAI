@@ -378,6 +378,8 @@ export async function handleCheckAvailability(
   const serviceId = input.service_id as string;
   const date = input.date as string; // YYYY-MM-DD
   const staffId = input.staff_id as string | undefined;
+  const offset = (input.offset as number) || 0;
+  const MAX_SLOTS = 6;
 
   if (!serviceId || !date) {
     return { success: false, error: 'service_id and date are required' };
@@ -578,12 +580,21 @@ export async function handleCheckAvailability(
     }
   }
 
+  // Paginate: return max 6 slots per call
+  const totalSlots = slots.length;
+  const pagedSlots = slots.slice(offset, offset + MAX_SLOTS);
+  const hasMore = offset + MAX_SLOTS < totalSlots;
+
   return {
     success: true,
     data: {
       date,
       service_duration_minutes: svc.duration_minutes,
-      available_slots: slots,
+      available_slots: pagedSlots,
+      total_slots: totalSlots,
+      offset,
+      has_more: hasMore,
+      next_offset: hasMore ? offset + MAX_SLOTS : null,
       customer_appointments_on_this_day: customerAppointments.length > 0 ? customerAppointments : undefined,
     },
   };
@@ -1756,7 +1767,7 @@ export async function executeTool(
     }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Tool execution failed';
-    console.error(`[chat] Tool "${toolName}" threw an error:`, err);
-    return { success: false, error: errorMessage };
+    console.error(`[chat] Tool "${toolName}" threw an error:`, err instanceof Error ? err.stack : err);
+    return { success: false, error: `Tool "${toolName}" encountered an error: ${errorMessage}. Please try again.` };
   }
 }
