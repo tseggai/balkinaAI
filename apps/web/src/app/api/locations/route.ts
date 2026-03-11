@@ -32,13 +32,13 @@ export async function POST(request: Request) {
   const supabase = createAdminClient();
 
   // Geocode via Google Maps if address provided
-  let lat: number | null = (body.lat as number) ?? null;
-  let lng: number | null = (body.lng as number) ?? null;
-  if (body.address && !lat && !lng) {
+  let latitude: number | null = (body.latitude as number) ?? (body.lat as number) ?? null;
+  let longitude: number | null = (body.longitude as number) ?? (body.lng as number) ?? null;
+  if (body.address && !latitude && !longitude) {
     const coords = await geocodeAddress(body.address as string);
     if (coords) {
-      lat = coords.lat;
-      lng = coords.lng;
+      latitude = coords.lat;
+      longitude = coords.lng;
     }
   }
 
@@ -48,8 +48,8 @@ export async function POST(request: Request) {
       tenant_id: tenantId,
       name: body.name,
       address: body.address,
-      lat,
-      lng,
+      latitude,
+      longitude,
       timezone: body.timezone ?? 'UTC',
       phone: body.phone ?? null,
       description: body.description ?? null,
@@ -74,11 +74,11 @@ export async function PATCH(request: Request) {
   if (!id) return NextResponse.json({ data: null, error: { message: 'Missing id' } }, { status: 400 });
 
   // Re-geocode if address changed
-  if (updates.address && !updates.lat && !updates.lng) {
+  if (updates.address && !updates.latitude && !updates.longitude) {
     const coords = await geocodeAddress(updates.address as string);
     if (coords) {
-      updates.lat = coords.lat;
-      updates.lng = coords.lng;
+      updates.latitude = coords.lat;
+      updates.longitude = coords.lng;
     }
   }
 

@@ -50,8 +50,8 @@ export interface TenantLocation {
   tenant_id: UUID;
   name: string;
   address: string;
-  lat: number | null;
-  lng: number | null;
+  latitude: number | null;
+  longitude: number | null;
   timezone: string;
   created_at: Timestamp;
 }

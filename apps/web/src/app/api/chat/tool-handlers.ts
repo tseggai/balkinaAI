@@ -152,29 +152,29 @@ async function handleFindBusinessesInner(
     }
 
     if (serviceTenantMap.size > 0) {
-      let businesses: { id: string; name: string; image_url?: string | null; business_type?: string | null; matched_services?: string[]; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; lat: number | null; lng: number | null }[]; has_availability?: boolean }[] = Array.from(serviceTenantMap.values());
+      let businesses: { id: string; name: string; image_url?: string | null; business_type?: string | null; matched_services?: string[]; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[] = Array.from(serviceTenantMap.values());
 
       // Fetch locations
       const bizIds = businesses.map((b) => b.id);
       const { data: bizLocations } = bizIds.length > 0
-        ? await supabase.from('tenant_locations').select('tenant_id, name, address, lat, lng').in('tenant_id', bizIds)
+        ? await supabase.from('tenant_locations').select('tenant_id, name, address, latitude, longitude').in('tenant_id', bizIds)
         : { data: [] };
 
       console.log('[find_businesses] bizLocations count:', bizLocations?.length);
 
-      const bizLocMap = new Map<string, { name: string; address: string; lat: number | null; lng: number | null }[]>();
-      for (const loc of (bizLocations ?? []) as { tenant_id: string; name: string; address: string; lat: number | null; lng: number | null }[]) {
+      const bizLocMap = new Map<string, { name: string; address: string; latitude: number | null; longitude: number | null }[]>();
+      for (const loc of (bizLocations ?? []) as { tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
         const existing = bizLocMap.get(loc.tenant_id) ?? [];
-        existing.push({ name: loc.name, address: loc.address, lat: loc.lat, lng: loc.lng });
+        existing.push({ name: loc.name, address: loc.address, latitude: loc.latitude, longitude: loc.longitude });
         bizLocMap.set(loc.tenant_id, existing);
       }
 
       // Sort by proximity if user location available
       if (userLat && userLng) {
-        const locMap = new Map<string, { lat: number; lng: number }>();
-        for (const loc of (bizLocations ?? []) as { tenant_id: string; lat: number | null; lng: number | null }[]) {
-          if (loc.lat && loc.lng && !locMap.has(loc.tenant_id)) {
-            locMap.set(loc.tenant_id, { lat: loc.lat, lng: loc.lng });
+        const locMap = new Map<string, { latitude: number; longitude: number }>();
+        for (const loc of (bizLocations ?? []) as { tenant_id: string; latitude: number | null; longitude: number | null }[]) {
+          if (loc.latitude && loc.longitude && !locMap.has(loc.tenant_id)) {
+            locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude });
           }
         }
 
@@ -183,7 +183,7 @@ async function handleFindBusinessesInner(
           if (!loc) {
             return { ...b, distance_km: undefined, distance_mi: undefined, estimated_drive_minutes: undefined, locations: bizLocMap.get(b.id) ?? [] };
           }
-          const distance = haversineKm(userLat, userLng, loc.lat, loc.lng);
+          const distance = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
           const distKm = Math.round(distance * 10) / 10;
           const distMi = Math.round(distKm * 0.621371 * 10) / 10;
           return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: bizLocMap.get(b.id) ?? [] };
@@ -249,7 +249,7 @@ async function handleFindBusinessesInner(
 
     if (error) return { success: false, error: error.message };
 
-    let businesses = (data ?? []) as { id: string; name: string; image_url: string | null; business_type: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; lat: number | null; lng: number | null }[]; has_availability?: boolean }[];
+    let businesses = (data ?? []) as { id: string; name: string; image_url: string | null; business_type: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[];
     let locationNote: string | undefined;
 
     // Fetch locations with addresses for all businesses
@@ -257,14 +257,14 @@ async function handleFindBusinessesInner(
     const { data: locationsAll } = tenantIdsAll.length > 0
       ? await supabase
           .from('tenant_locations')
-          .select('tenant_id, name, address, lat, lng')
+          .select('tenant_id, name, address, latitude, longitude')
           .in('tenant_id', tenantIdsAll)
       : { data: [] };
 
-    const locAllMap = new Map<string, { name: string; address: string; lat: number | null; lng: number | null }[]>();
-    for (const loc of (locationsAll ?? []) as { tenant_id: string; name: string; address: string; lat: number | null; lng: number | null }[]) {
+    const locAllMap = new Map<string, { name: string; address: string; latitude: number | null; longitude: number | null }[]>();
+    for (const loc of (locationsAll ?? []) as { tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
       const existing = locAllMap.get(loc.tenant_id) ?? [];
-      existing.push({ name: loc.name, address: loc.address, lat: loc.lat, lng: loc.lng });
+      existing.push({ name: loc.name, address: loc.address, latitude: loc.latitude, longitude: loc.longitude });
       locAllMap.set(loc.tenant_id, existing);
     }
 
@@ -272,10 +272,10 @@ async function handleFindBusinessesInner(
 
     // If user location available, sort by proximity
     if (userLat && userLng && businesses.length > 0) {
-      const locMap = new Map<string, { lat: number; lng: number }>();
-      for (const loc of (locationsAll ?? []) as { tenant_id: string; lat: number | null; lng: number | null }[]) {
-        if (loc.lat && loc.lng && !locMap.has(loc.tenant_id)) {
-          locMap.set(loc.tenant_id, { lat: loc.lat, lng: loc.lng });
+      const locMap = new Map<string, { latitude: number; longitude: number }>();
+      for (const loc of (locationsAll ?? []) as { tenant_id: string; latitude: number | null; longitude: number | null }[]) {
+        if (loc.latitude && loc.longitude && !locMap.has(loc.tenant_id)) {
+          locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude });
         }
       }
       const businessesWithDistance = businesses
@@ -284,7 +284,7 @@ async function handleFindBusinessesInner(
           if (!loc) {
             return { ...b, distance_km: undefined, distance_mi: undefined, estimated_drive_minutes: undefined, locations: locAllMap.get(b.id) ?? [] };
           }
-          const distance = haversineKm(userLat, userLng, loc.lat, loc.lng);
+          const distance = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
           const distKm = Math.round(distance * 10) / 10;
           const distMi = Math.round(distKm * 0.621371 * 10) / 10;
           return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: locAllMap.get(b.id) ?? [] };
@@ -405,7 +405,7 @@ async function handleFindBusinessesInner(
     if (!tenantMap.has(t.id)) tenantMap.set(t.id, { id: t.id, name: t.name });
   }
 
-  let businesses: { id: string; name: string; image_url?: string | null; business_type?: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; matched_services?: string[]; locations?: { name: string; address: string; lat: number | null; lng: number | null }[] }[] = Array.from(tenantMap.values()).map((t) => ({
+  let businesses: { id: string; name: string; image_url?: string | null; business_type?: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; matched_services?: string[]; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[] }[] = Array.from(tenantMap.values()).map((t) => ({
     ...t,
     matched_services: tenantMatchedServices.get(t.id),
   }));
@@ -416,23 +416,23 @@ async function handleFindBusinessesInner(
   const { data: bizLocations } = bizIds.length > 0
     ? await supabase
         .from('tenant_locations')
-        .select('tenant_id, name, address, lat, lng')
+        .select('tenant_id, name, address, latitude, longitude')
         .in('tenant_id', bizIds)
     : { data: [] };
 
-  const bizLocMap = new Map<string, { name: string; address: string; lat: number | null; lng: number | null }[]>();
-  for (const loc of (bizLocations ?? []) as { tenant_id: string; name: string; address: string; lat: number | null; lng: number | null }[]) {
+  const bizLocMap = new Map<string, { name: string; address: string; latitude: number | null; longitude: number | null }[]>();
+  for (const loc of (bizLocations ?? []) as { tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
     const existing = bizLocMap.get(loc.tenant_id) ?? [];
-    existing.push({ name: loc.name, address: loc.address, lat: loc.lat, lng: loc.lng });
+    existing.push({ name: loc.name, address: loc.address, latitude: loc.latitude, longitude: loc.longitude });
     bizLocMap.set(loc.tenant_id, existing);
   }
 
   // Sort by proximity if user location is available
   if (userLat && userLng && businesses.length > 0) {
-    const locMap = new Map<string, { lat: number; lng: number }>();
-    for (const loc of (bizLocations ?? []) as { tenant_id: string; lat: number | null; lng: number | null }[]) {
-      if (loc.lat && loc.lng && !locMap.has(loc.tenant_id)) {
-        locMap.set(loc.tenant_id, { lat: loc.lat, lng: loc.lng });
+    const locMap = new Map<string, { latitude: number; longitude: number }>();
+    for (const loc of (bizLocations ?? []) as { tenant_id: string; latitude: number | null; longitude: number | null }[]) {
+      if (loc.latitude && loc.longitude && !locMap.has(loc.tenant_id)) {
+        locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude });
       }
     }
     businesses = businesses
@@ -441,7 +441,7 @@ async function handleFindBusinessesInner(
         if (!loc) {
           return { ...b, distance_km: undefined, distance_mi: undefined, estimated_drive_minutes: undefined, locations: bizLocMap.get(b.id) ?? [] };
         }
-        const distance = haversineKm(userLat, userLng, loc.lat, loc.lng);
+        const distance = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
         const distKm = Math.round(distance * 10) / 10;
         const distMi = Math.round(distKm * 0.621371 * 10) / 10;
         return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: bizLocMap.get(b.id) ?? [] };
@@ -501,7 +501,7 @@ export async function handleGetLocations(
 ): Promise<ToolResult> {
   const { data, error } = await supabase
     .from('tenant_locations')
-    .select('id, name, address, lat, lng, timezone')
+    .select('id, name, address, latitude, longitude, timezone')
     .eq('tenant_id', tenantId)
     .order('name');
 
@@ -1929,14 +1929,14 @@ export async function handleGetDirections(
   if (locationId) {
     const { data: loc } = await supabase
       .from('tenant_locations')
-      .select('name, address, lat, lng')
+      .select('name, address, latitude, longitude')
       .eq('id', locationId)
       .single();
 
     if (loc) {
-      const location = loc as { name: string; address: string; lat: number | null; lng: number | null };
-      destLat = location.lat;
-      destLng = location.lng;
+      const location = loc as { name: string; address: string; latitude: number | null; longitude: number | null };
+      destLat = location.latitude;
+      destLng = location.longitude;
       destAddress = location.address;
       destName = location.name;
     }
@@ -1946,15 +1946,15 @@ export async function handleGetDirections(
   if (!destAddress && tenantId) {
     const { data: loc } = await supabase
       .from('tenant_locations')
-      .select('name, address, lat, lng')
+      .select('name, address, latitude, longitude')
       .eq('tenant_id', tenantId)
       .limit(1)
       .single();
 
     if (loc) {
-      const location = loc as { name: string; address: string; lat: number | null; lng: number | null };
-      destLat = location.lat;
-      destLng = location.lng;
+      const location = loc as { name: string; address: string; latitude: number | null; longitude: number | null };
+      destLat = location.latitude;
+      destLng = location.longitude;
       destAddress = location.address;
       destName = location.name;
     }
