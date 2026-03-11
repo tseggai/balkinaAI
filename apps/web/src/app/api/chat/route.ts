@@ -28,10 +28,13 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_services',
-      description: 'List all services available at a business with pricing and duration.',
+      description: 'List all services available at a business with pricing, duration, extras, and assigned staff. Pass service_id to get details for a specific service.',
       parameters: {
         type: 'object',
-        properties: { ...tenantIdProp },
+        properties: {
+          ...tenantIdProp,
+          service_id: { type: 'string', description: 'UUID of a specific service to get full details including extras and assigned staff. Always pass this when a service has been selected.' },
+        },
         required: [],
       },
     },
@@ -55,10 +58,13 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_staff',
-      description: 'List all staff members at a business.',
+      description: 'List staff members. When service_id is provided, returns ONLY staff assigned to that service. Always pass service_id when a service has been selected.',
       parameters: {
         type: 'object',
-        properties: { ...tenantIdProp },
+        properties: {
+          ...tenantIdProp,
+          service_id: { type: 'string', description: 'The service ID to get assigned staff for. Always pass this when a service has been selected.' },
+        },
         required: [],
       },
     },
@@ -67,14 +73,14 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'check_availability',
-      description: 'Check available time slots for a service on a given date. Returns max 6 slots per call with has_more flag. Use offset to paginate. Each slot has a local_time field (e.g. "10:00 AM") — always use this for display instead of the raw ISO time field.',
+      description: 'Check available time slots for a service on a given date. Returns max 6 slots per call with has_more flag. Use offset to paginate. Each slot has a local_time field (e.g. "10:00 AM") — always use this for display instead of the raw ISO time field. Only returns slots for staff ASSIGNED to the service.',
       parameters: {
         type: 'object',
         properties: {
           ...tenantIdProp,
-          service_id: { type: 'string', description: 'UUID of the service' },
-          staff_id: { type: 'string', description: 'UUID of preferred staff member (optional)' },
-          date: { type: 'string', description: 'Date to check availability for (YYYY-MM-DD)' },
+          service_id: { type: 'string', description: 'UUID of the service (REQUIRED). Available slots only come from staff assigned to this service.' },
+          staff_id: { type: 'string', description: 'UUID of preferred staff member (optional). Must be a staff member assigned to the service.' },
+          date: { type: 'string', description: 'Date to check availability for in YYYY-MM-DD format. NEVER pass "tomorrow" — always resolve to actual date.' },
           offset: { type: 'number', description: 'Starting index for pagination (default 0). Use previous offset + 6 to get next page.' },
         },
         required: ['service_id', 'date'],
@@ -478,6 +484,16 @@ MULTI-INTENT REQUESTS: When a user makes a compound request (e.g. "book X and fi
 ## Data integrity
 DATA INTEGRITY: Only present businesses, staff, services, prices, and availability that are returned by tool calls. Never invent or fabricate any data. If a tool returns no results, say exactly that.
 
+DATA INTEGRITY RULES — NEVER VIOLATE:
+1. After the customer selects a service, ALWAYS store the serviceId from the get_services response.
+2. When calling get_staff, ALWAYS pass the service_id of the selected service. Never call get_staff with tenantId only after a service has been selected.
+3. When calling check_availability, ALWAYS pass the service_id. Available slots must only come from staff assigned to that service.
+4. When showing extras, call get_services with the specific service_id and show ONLY the extras array from that response. Never show extras from a different service or tenant.
+5. Never mix data between tenants. All tool calls after a tenant is selected must include that tenantId.
+
+LOYALTY POINTS DISPLAY:
+If get_loyalty_info returns points_to_earn = 0 or loyalty_program_active = false, do NOT mention loyalty points at all in the confirmation. Only show "You'll earn X points" when X > 0.
+
 ## Boundaries
 - Only help with booking at ${tenantName}
 - No medical, legal, or financial advice
@@ -778,6 +794,22 @@ MULTI-INTENT REQUESTS: When a user makes a compound request (e.g. "book X and fi
 
 ## Data integrity
 DATA INTEGRITY: Only present businesses, staff, services, prices, and availability that are returned by tool calls. Never invent or fabricate any data. If a tool returns no results, say exactly that.
+
+DATA INTEGRITY RULES — NEVER VIOLATE:
+1. After the customer selects a service, ALWAYS store the serviceId from the get_services response.
+2. When calling get_staff, ALWAYS pass the service_id of the selected service. Never call get_staff with tenantId only after a service has been selected.
+3. When calling check_availability, ALWAYS pass the service_id. Available slots must only come from staff assigned to that service.
+4. When showing extras, call get_services with the specific service_id and show ONLY the extras array from that response. Never show extras from a different service or tenant.
+5. Never mix data between tenants. All tool calls after a tenant is selected must include that tenantId.
+
+TOOL CALL RULES:
+- ALWAYS call find_businesses fresh when the user's service request changes.
+- NEVER reuse a previous find_businesses result for a different service type.
+- If the user says "list all service providers" with no service type, call find_businesses with no service_type filter to return ALL nearby businesses.
+- If the user says "book a massage", call find_businesses with service_type="massage". These are different calls that must return different results.
+
+LOYALTY POINTS DISPLAY:
+If get_loyalty_info returns points_to_earn = 0 or loyalty_program_active = false, do NOT mention loyalty points at all in the confirmation. Only show "You'll earn X points" when X > 0.
 
 ## Boundaries
 - Only help with finding businesses and booking on Balkina AI

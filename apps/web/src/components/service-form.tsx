@@ -108,6 +108,13 @@ interface Service {
   timesheet: Record<string, unknown> | null;
   service_extras?: ServiceExtra[];
   service_staff?: ServiceStaffMember[];
+  service_locations?: string[];
+}
+
+interface LocationOption {
+  id: string;
+  name: string;
+  address: string;
 }
 
 interface StaffOption {
@@ -251,6 +258,13 @@ export function ServiceForm({
   const [newCategoryInput, setNewCategoryInput] = useState('');
   const [savingCategory, setSavingCategory] = useState(false);
 
+  // --- Location state ---
+  const [allLocations, setAllLocations] = useState<LocationOption[]>([]);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>(
+    service?.service_locations ?? []
+  );
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+
   // --- Recurring state ---
   const [recurringInterval, setRecurringInterval] = useState('week');
   const [recurringCount, setRecurringCount] = useState('1');
@@ -289,6 +303,14 @@ export function ServiceForm({
       .then((json) => {
         const cats = (json.data ?? []) as { id: string; name: string }[];
         setAllCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
+      })
+      .catch(() => {});
+
+    fetch('/api/locations')
+      .then((res) => res.json())
+      .then((json) => {
+        const locs = (json.data ?? []) as LocationOption[];
+        setAllLocations(locs);
       })
       .catch(() => {});
   }, []);
@@ -372,6 +394,7 @@ export function ServiceForm({
       timesheet: timesheetEnabled ? timesheet : null,
       staff: selectedStaff.map((s) => s.staff_id),
       extras: extras.filter((ex) => ex.name.trim()),
+      locations: selectedLocations,
     };
 
     const res = await fetch('/api/services', {
@@ -502,6 +525,58 @@ export function ServiceForm({
               className="w-full rounded-[.3rem] border border-transparent bg-transparent px-0 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3"
             />
           </div>
+
+          {/* Row 3b: Locations multi-select */}
+          {allLocations.length > 0 && (
+            <div>
+              <span className="text-xs text-gray-400">Locations</span>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowLocationDropdown(!showLocationDropdown)}
+                  className="flex w-full items-center justify-between rounded-[.3rem] border border-transparent bg-transparent px-0 py-2 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3"
+                >
+                  <span className="text-gray-600">
+                    {selectedLocations.length === 0
+                      ? 'All locations'
+                      : `${selectedLocations.length} location${selectedLocations.length > 1 ? 's' : ''} selected`}
+                  </span>
+                  <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </button>
+                {showLocationDropdown && (
+                  <div className="absolute left-0 top-full z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                    {allLocations.map((loc) => (
+                      <label
+                        key={loc.id}
+                        className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-gray-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedLocations.includes(loc.id)}
+                          onChange={() => {
+                            setSelectedLocations((prev) =>
+                              prev.includes(loc.id)
+                                ? prev.filter((id) => id !== loc.id)
+                                : [...prev, loc.id]
+                            );
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">{loc.name}</span>
+                          {loc.address && (
+                            <span className="ml-1 text-xs text-gray-400">{loc.address}</span>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Row 4: Price + Capacity (50% each) */}
           <div className="grid grid-cols-2 gap-3">
@@ -739,6 +814,58 @@ export function ServiceForm({
             className="w-full rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
+
+        {/* Row 3b: Locations multi-select */}
+        {allLocations.length > 0 && (
+          <div>
+            <span className="text-xs text-gray-400">Locations</span>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowLocationDropdown(!showLocationDropdown)}
+                className="flex w-full items-center justify-between rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 py-2 text-sm"
+              >
+                <span className="text-gray-600">
+                  {selectedLocations.length === 0
+                    ? 'All locations'
+                    : `${selectedLocations.length} location${selectedLocations.length > 1 ? 's' : ''} selected`}
+                </span>
+                <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </button>
+              {showLocationDropdown && (
+                <div className="absolute left-0 top-full z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                  {allLocations.map((loc) => (
+                    <label
+                      key={loc.id}
+                      className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedLocations.includes(loc.id)}
+                        onChange={() => {
+                          setSelectedLocations((prev) =>
+                            prev.includes(loc.id)
+                              ? prev.filter((id) => id !== loc.id)
+                              : [...prev, loc.id]
+                          );
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">{loc.name}</span>
+                        {loc.address && (
+                          <span className="ml-1 text-xs text-gray-400">{loc.address}</span>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Row 4: Price + Capacity (50% each) */}
         <div className="grid grid-cols-2 gap-3">

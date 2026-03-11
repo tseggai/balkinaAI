@@ -87,7 +87,103 @@ export async function handleFindBusinesses(
   const offset = (input.offset as number) || 0;
   const limit = (input.limit as number) || 8;
 
-  const _serviceType = ((input.service_type as string) || '').trim();
+  const serviceType = ((input.service_type as string) || '').trim();
+
+  // If a service_type is specified, filter tenants that actually offer matching services
+  if (serviceType) {
+    const sanitizeForLike = (s: string) => s.replace(/%/g, '\\%').replace(/_/g, '\\_');
+    const sanitizedType = sanitizeForLike(serviceType);
+
+    // Search for services matching the type by name or category
+    const { data: matchingServices } = await supabase
+      .from('services')
+      .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name, status)')
+      .eq('tenants.status', 'active')
+      .or(`name.ilike.%${sanitizedType}%,service_category.ilike.%${sanitizedType}%`)
+      .limit(100);
+
+    // Build tenant map from matching services
+    const tenantMap = new Map<string, { id: string; name: string; matched_services: string[] }>();
+    for (const svc of (matchingServices ?? []) as unknown as { tenant_id: string; name: string; tenants: { id: string; name: string } }[]) {
+      if (svc.tenants) {
+        const existing = tenantMap.get(svc.tenants.id);
+        if (existing) {
+          existing.matched_services.push(svc.name);
+        } else {
+          tenantMap.set(svc.tenants.id, { id: svc.tenants.id, name: svc.tenants.name, matched_services: [svc.name] });
+        }
+      }
+    }
+
+    if (tenantMap.size > 0) {
+      let businesses: { id: string; name: string; matched_services?: string[]; distance_km?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; lat: number | null; lng: number | null }[]; has_availability?: boolean }[] = Array.from(tenantMap.values());
+
+      // Fetch locations
+      const bizIds = businesses.map((b) => b.id);
+      const { data: bizLocations } = bizIds.length > 0
+        ? await supabase.from('tenant_locations').select('tenant_id, name, address, lat, lng').in('tenant_id', bizIds)
+        : { data: [] };
+
+      const bizLocMap = new Map<string, { name: string; address: string; lat: number | null; lng: number | null }[]>();
+      for (const loc of (bizLocations ?? []) as { tenant_id: string; name: string; address: string; lat: number | null; lng: number | null }[]) {
+        const existing = bizLocMap.get(loc.tenant_id) ?? [];
+        existing.push({ name: loc.name, address: loc.address, lat: loc.lat, lng: loc.lng });
+        bizLocMap.set(loc.tenant_id, existing);
+      }
+
+      // Sort by proximity if user location available
+      if (userLat && userLng) {
+        const locMap = new Map<string, { lat: number; lng: number }>();
+        for (const loc of (bizLocations ?? []) as { tenant_id: string; lat: number | null; lng: number | null }[]) {
+          if (loc.lat && loc.lng && !locMap.has(loc.tenant_id)) {
+            locMap.set(loc.tenant_id, { lat: loc.lat, lng: loc.lng });
+          }
+        }
+        businesses = businesses
+          .map((b) => {
+            const loc = locMap.get(b.id);
+            const distance = loc ? haversineKm(userLat, userLng, loc.lat, loc.lng) : 9999;
+            const distKm = Math.round(distance * 10) / 10;
+            return { ...b, distance_km: distKm, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: bizLocMap.get(b.id) ?? [] };
+          })
+          .filter((b) => (b.distance_km ?? 9999) <= radiusKm)
+          .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
+      } else {
+        businesses = businesses.map((b) => ({ ...b, locations: bizLocMap.get(b.id) ?? [] }));
+      }
+
+      // Check availability
+      const bizIdsForAvail = businesses.map((b) => b.id);
+      const { data: staffForAvail } = bizIdsForAvail.length > 0
+        ? await supabase.from('staff').select('tenant_id, availability_schedule').in('tenant_id', bizIdsForAvail)
+        : { data: [] };
+      const tenantsWithStaffSet = new Set<string>();
+      for (const s of (staffForAvail ?? []) as { tenant_id: string; availability_schedule: Record<string, unknown> | null }[]) {
+        if (s.availability_schedule && Object.keys(s.availability_schedule).length > 0) {
+          tenantsWithStaffSet.add(s.tenant_id);
+        }
+      }
+      businesses = businesses.map((b) => ({ ...b, has_availability: tenantsWithStaffSet.has(b.id) }));
+
+      const totalCount = businesses.length;
+      const paged = businesses.slice(offset, offset + limit);
+      const hasMore = offset + limit < totalCount;
+
+      return {
+        success: true,
+        data: {
+          businesses: paged,
+          total_count: totalCount,
+          offset,
+          limit,
+          has_more: hasMore,
+          matching_services: [],
+          location_note: userLat && userLng ? undefined : 'Showing all locations — enable location access for nearby results',
+        },
+      };
+    }
+    // If no service-type matches found, fall through to general search below
+  }
 
   if (!query) {
     // Return all active businesses when no query is provided
@@ -344,23 +440,58 @@ export async function handleGetLocations(
 export async function handleGetServices(
   supabase: AdminClient,
   tenantId: string,
-  _input: Record<string, unknown>,
+  input: Record<string, unknown>,
 ): Promise<ToolResult> {
-  const { data, error } = await supabase
-    .from('services')
-    .select('id, name, duration_minutes, price, deposit_enabled, deposit_type, deposit_amount, service_extras(id, name, price, duration_minutes)')
-    .eq('tenant_id', tenantId)
-    .order('name');
+  const serviceId = input.service_id as string | undefined;
 
+  // Base query — always scope to tenant
+  let query = supabase
+    .from('services')
+    .select(`
+      id, name, price, duration_minutes, description,
+      deposit_enabled, deposit_amount, deposit_type,
+      service_category, service_subcategory,
+      service_extras (id, name, price, duration_minutes),
+      service_staff (
+        staff_id,
+        staff:staff_id (id, name, image_url)
+      )
+    `)
+    .eq('tenant_id', tenantId)
+    .eq('visibility', 'public');
+
+  if (serviceId) {
+    query = query.eq('id', serviceId);
+  }
+
+  const { data: services, error } = await query;
   if (error) return { success: false, error: error.message };
 
-  // Add has_extras flag per service so the AI knows whether to offer extras step
-  const servicesWithFlag = ((data ?? []) as { id: string; service_extras: unknown[] | null; [key: string]: unknown }[]).map((svc) => ({
-    ...svc,
-    has_extras: Array.isArray(svc.service_extras) && svc.service_extras.length > 0,
+  const mapped = ((services ?? []) as unknown as {
+    id: string; name: string; price: number; duration_minutes: number;
+    description: string | null; deposit_enabled: boolean; deposit_amount: number | null;
+    deposit_type: string | null; service_category: string | null; service_subcategory: string | null;
+    service_extras: { id: string; name: string; price: number; duration_minutes: number }[] | null;
+    service_staff: { staff_id: string; staff: { id: string; name: string; image_url: string | null } | null }[] | null;
+  }[]).map((s) => ({
+    id: s.id,
+    name: s.name,
+    price: s.price,
+    duration_minutes: s.duration_minutes,
+    description: s.description,
+    deposit_enabled: s.deposit_enabled,
+    deposit_amount: s.deposit_amount,
+    deposit_type: s.deposit_type,
+    category: s.service_category,
+    // Extras scoped to THIS service only
+    extras: s.service_extras ?? [],
+    has_extras: (s.service_extras ?? []).length > 0,
+    // Staff assigned to THIS service only
+    staff: (s.service_staff ?? []).map((ss) => ss.staff).filter(Boolean),
+    staff_ids: (s.service_staff ?? []).map((ss) => ss.staff_id),
   }));
 
-  return { success: true, data: servicesWithFlag };
+  return { success: true, data: mapped };
 }
 
 // ── get_service_details ─────────────────────────────────────────────────────
@@ -381,14 +512,17 @@ export async function handleGetServiceDetails(
 
   if (error) return { success: false, error: error.message };
 
-  // Also fetch staff that can perform this service (all staff for this tenant)
+  // Fetch staff assigned to THIS service via service_staff junction table
   const service = data as { tenant_id: string } | null;
   if (service) {
-    const { data: staffData } = await supabase
-      .from('staff')
-      .select('id, name')
-      .eq('tenant_id', service.tenant_id);
-    return { success: true, data: { ...service, available_staff: staffData ?? [] } };
+    const { data: serviceStaffData } = await supabase
+      .from('service_staff')
+      .select('staff:staff_id(id, name, image_url)')
+      .eq('service_id', serviceId);
+    const assignedStaff = ((serviceStaffData ?? []) as unknown as { staff: { id: string; name: string; image_url: string | null } | null }[])
+      .map((ss) => ss.staff)
+      .filter(Boolean);
+    return { success: true, data: { ...service, available_staff: assignedStaff } };
   }
 
   return { success: true, data };
@@ -399,11 +533,30 @@ export async function handleGetServiceDetails(
 export async function handleGetStaff(
   supabase: AdminClient,
   tenantId: string,
-  _input: Record<string, unknown>,
+  input: Record<string, unknown>,
 ): Promise<ToolResult> {
+  const serviceId = input.service_id as string | undefined;
+
+  if (serviceId) {
+    // Return only staff assigned to this specific service
+    const { data, error } = await supabase
+      .from('service_staff')
+      .select('staff:staff_id(id, name, image_url, availability_schedule)')
+      .eq('service_id', serviceId);
+
+    if (error) return { success: false, error: error.message };
+
+    const staffList = ((data ?? []) as unknown as { staff: { id: string; name: string; image_url: string | null; availability_schedule: unknown } | null }[])
+      .map((ss) => ss.staff)
+      .filter(Boolean);
+
+    return { success: true, data: staffList };
+  }
+
+  // Fallback: all active staff for tenant
   const { data, error } = await supabase
     .from('staff')
-    .select('id, name, availability_schedule')
+    .select('id, name, image_url, availability_schedule')
     .eq('tenant_id', tenantId)
     .order('name');
 
@@ -427,6 +580,11 @@ export async function handleCheckAvailability(
 
   if (!serviceId || !date) {
     return { success: false, error: 'service_id and date are required' };
+  }
+
+  // Validate date format — must be YYYY-MM-DD
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { success: false, error: `Date must be in YYYY-MM-DD format. Received: ${date}` };
   }
 
   // 1. Get service details including buffer times
@@ -455,19 +613,28 @@ export async function handleCheckAvailability(
     return { success: true, data: { date, service_duration_minutes: svc.duration_minutes, available_slots: [], message: 'This service is not available on this date.' } };
   }
 
-  // 3. Get staff for this tenant
-  let staffQuery = supabase
-    .from('staff')
-    .select('id, name, availability_schedule')
-    .eq('tenant_id', tenantId);
+  // 3. Get staff assigned to THIS service only via service_staff junction
+  const { data: serviceStaffRows } = await supabase
+    .from('service_staff')
+    .select('staff_id, staff:staff_id(id, name, availability_schedule)')
+    .eq('service_id', serviceId);
 
-  if (staffId) {
-    staffQuery = staffQuery.eq('id', staffId);
+  let eligibleStaff = ((serviceStaffRows ?? []) as unknown as { staff_id: string; staff: { id: string; name: string; availability_schedule: Record<string, unknown> } | null }[])
+    .map((ss) => ss.staff)
+    .filter(Boolean) as { id: string; name: string; availability_schedule: Record<string, unknown> }[];
+
+  if (eligibleStaff.length === 0) {
+    return { success: true, data: { available_slots: [], message: 'No staff assigned to this service', date, service_duration_minutes: svc.duration_minutes } };
   }
 
-  const { data: staffList } = await staffQuery;
-  if (!staffList || staffList.length === 0) {
-    return { success: true, data: { available_slots: [], message: 'No staff available' } };
+  // Filter to requested staff if specified
+  if (staffId) {
+    eligibleStaff = eligibleStaff.filter((s) => s.id === staffId);
+  }
+
+  const staffList = eligibleStaff;
+  if (staffList.length === 0) {
+    return { success: true, data: { available_slots: [], message: 'Requested staff is not assigned to this service' } };
   }
 
   // 4. Check staff_special_days and staff_holidays for this date
