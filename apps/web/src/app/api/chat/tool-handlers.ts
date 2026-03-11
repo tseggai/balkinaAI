@@ -80,6 +80,20 @@ export async function handleFindBusinesses(
   _tenantId: string,
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
+  console.log('[find_businesses] called with params:', JSON.stringify(input));
+
+  try {
+    return await handleFindBusinessesInner(supabase, input);
+  } catch (err) {
+    console.error('[find_businesses] CRASHED:', err);
+    return { success: false, error: `find_businesses failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+async function handleFindBusinessesInner(
+  supabase: AdminClient,
+  input: Record<string, unknown>,
+): Promise<ToolResult> {
   const query = ((input.query as string) || '').trim();
   const userLat = input.latitude as number | undefined;
   const userLng = input.longitude as number | undefined;
@@ -95,12 +109,14 @@ export async function handleFindBusinesses(
     const sanitizedType = sanitizeForLike(serviceType);
 
     // Search for services matching the type by name or category
-    const { data: matchingServices } = await supabase
+    const { data: matchingServices, error: matchError } = await supabase
       .from('services')
       .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name, status, image_url, business_type)')
       .eq('tenants.status', 'active')
       .or(`name.ilike.%${sanitizedType}%,service_category.ilike.%${sanitizedType}%`)
       .limit(100);
+
+    console.log('[find_businesses] service_type query result:', { count: matchingServices?.length, error: matchError?.message });
 
     // Build tenant map from matching services
     const tenantMap = new Map<string, { id: string; name: string; image_url: string | null; business_type: string | null; matched_services: string[] }>();
@@ -142,12 +158,17 @@ export async function handleFindBusinesses(
         businesses = businesses
           .map((b) => {
             const loc = locMap.get(b.id);
-            const distance = loc ? haversineKm(userLat, userLng, loc.lat, loc.lng) : 9999;
+            if (!loc) {
+              // No lat/lng for this business — include it but without distance info
+              return { ...b, distance_km: undefined, distance_mi: undefined, estimated_drive_minutes: undefined, locations: bizLocMap.get(b.id) ?? [] };
+            }
+            const distance = haversineKm(userLat, userLng, loc.lat, loc.lng);
             const distKm = Math.round(distance * 10) / 10;
             const distMi = Math.round(distKm * 0.621371 * 10) / 10;
             return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: bizLocMap.get(b.id) ?? [] };
           })
-          .filter((b) => (b.distance_km ?? 9999) <= radiusKm)
+          // Only filter out businesses that HAVE coordinates and are outside radius; keep those without coords
+          .filter((b) => b.distance_km === undefined || b.distance_km <= radiusKm)
           .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
       } else {
         businesses = businesses.map((b) => ({ ...b, locations: bizLocMap.get(b.id) ?? [] }));
@@ -194,6 +215,8 @@ export async function handleFindBusinesses(
       .eq('status', 'active')
       .limit(200);
 
+    console.log('[find_businesses] no-query result:', { count: data?.length, error: error?.message });
+
     if (error) return { success: false, error: error.message };
 
     let businesses = (data ?? []) as { id: string; name: string; image_url: string | null; business_type: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; lat: number | null; lng: number | null }[]; has_availability?: boolean }[];
@@ -226,12 +249,16 @@ export async function handleFindBusinesses(
       businesses = businesses
         .map((b) => {
           const loc = locMap.get(b.id);
-          const distance = loc ? haversineKm(userLat, userLng, loc.lat, loc.lng) : 9999;
+          if (!loc) {
+            return { ...b, distance_km: undefined, distance_mi: undefined, estimated_drive_minutes: undefined, locations: locAllMap.get(b.id) ?? [] };
+          }
+          const distance = haversineKm(userLat, userLng, loc.lat, loc.lng);
           const distKm = Math.round(distance * 10) / 10;
           const distMi = Math.round(distKm * 0.621371 * 10) / 10;
           return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: locAllMap.get(b.id) ?? [] };
         })
-        .filter((b) => (b.distance_km ?? 9999) <= radiusKm)
+        // Only filter out businesses that HAVE coordinates and are outside radius; keep those without coords
+        .filter((b) => b.distance_km === undefined || b.distance_km <= radiusKm)
         .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
     } else {
       businesses = businesses.map((b) => ({ ...b, locations: locAllMap.get(b.id) ?? [] }));
@@ -370,12 +397,15 @@ export async function handleFindBusinesses(
     businesses = businesses
       .map((b) => {
         const loc = locMap.get(b.id);
-        const distance = loc ? haversineKm(userLat, userLng, loc.lat, loc.lng) : 9999;
+        if (!loc) {
+          return { ...b, distance_km: undefined, distance_mi: undefined, estimated_drive_minutes: undefined, locations: bizLocMap.get(b.id) ?? [] };
+        }
+        const distance = haversineKm(userLat, userLng, loc.lat, loc.lng);
         const distKm = Math.round(distance * 10) / 10;
         const distMi = Math.round(distKm * 0.621371 * 10) / 10;
         return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: bizLocMap.get(b.id) ?? [] };
       })
-      .filter((b) => (b.distance_km ?? 9999) <= radiusKm)
+      .filter((b) => b.distance_km === undefined || b.distance_km <= radiusKm)
       .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
   } else {
     businesses = businesses.map((b) => ({ ...b, locations: bizLocMap.get(b.id) ?? [] }));
