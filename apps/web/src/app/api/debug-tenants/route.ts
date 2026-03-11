@@ -8,7 +8,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('tenants')
-    .select(`id, name, status, tenant_locations(address, lat, lng)`)
+    .select(`id, name, status, tenant_locations(address, latitude, longitude)`)
     .eq('status', 'active');
 
   const { data: allTenants, error: allError } = await supabase

@@ -124,8 +124,8 @@ export interface Database {
           tenant_id: string;
           name: string;
           address: string;
-          lat: number | null;
-          lng: number | null;
+          latitude: number | null;
+          longitude: number | null;
           timezone: string;
           booking_limit_enabled: boolean;
           booking_limit_capacity: number | null;
@@ -137,8 +137,8 @@ export interface Database {
           tenant_id: string;
           name: string;
           address: string;
-          lat?: number | null;
-          lng?: number | null;
+          latitude?: number | null;
+          longitude?: number | null;
           timezone?: string;
           booking_limit_enabled?: boolean;
           booking_limit_capacity?: number | null;
@@ -150,8 +150,8 @@ export interface Database {
           tenant_id?: string;
           name?: string;
           address?: string;
-          lat?: number | null;
-          lng?: number | null;
+          latitude?: number | null;
+          longitude?: number | null;
           timezone?: string;
           booking_limit_enabled?: boolean;
           booking_limit_capacity?: number | null;

@@ -35,8 +35,8 @@ interface Location {
   id: string;
   name: string;
   address: string;
-  lat: number | null;
-  lng: number | null;
+  latitude: number | null;
+  longitude: number | null;
   timezone: string;
   phone: string | null;
   description: string | null;
@@ -190,8 +190,8 @@ export default function LocationsPage() {
     setName(loc.name);
     setAddress(loc.address);
     setTimezone(loc.timezone ?? '');
-    setLat(loc.lat);
-    setLng(loc.lng);
+    setLat(loc.latitude);
+    setLng(loc.longitude);
     setPhone(loc.phone ?? '');
     setDescription(loc.description ?? '');
     setImageUrl(loc.image_url ?? '');
@@ -237,8 +237,8 @@ export default function LocationsPage() {
       name,
       address,
       timezone: timezone || 'UTC',
-      lat: lat ?? null,
-      lng: lng ?? null,
+      latitude: lat ?? null,
+      longitude: lng ?? null,
       phone: phone || null,
       description: description || null,
       image_url: imageUrl || null,
