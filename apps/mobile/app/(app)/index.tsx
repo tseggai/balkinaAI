@@ -1093,6 +1093,9 @@ export default function ChatScreen() {
           body.userLongitude = userCoords.longitude;
         }
 
+        console.log('[chat] sending to:', `${API_BASE}/api/chat`);
+        console.log('[chat] userCoords:', userCoords);
+
         const res = await fetch(`${API_BASE}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
