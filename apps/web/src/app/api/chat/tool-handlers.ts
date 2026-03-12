@@ -54,7 +54,7 @@ async function getTenantTimezone(supabase: AdminClient, tenantId: string): Promi
 // ── Incompatible keyword map for semantic service-type filtering ─────────────
 
 const INCOMPATIBLE_KEYWORDS: Record<string, string[]> = {
-  haircut: ['pet', 'dog', 'cat', 'groom', 'paw', 'nail', 'manicure', 'pedicure', 'massage', 'spa', 'yoga', 'dental', 'therapy', 'chiro', 'coach', 'music', 'auto'],
+  haircut: ['pet', 'dog', 'cat', 'pet groom', 'paw', 'nail', 'manicure', 'pedicure', 'massage', 'spa', 'yoga', 'dental', 'therapy', 'chiro', 'coach', 'music', 'auto'],
   massage: ['haircut', 'fade', 'beard', 'pet', 'dog', 'nail', 'manicure', 'dental', 'chiro', 'auto', 'music', 'yoga'],
   manicure: ['haircut', 'fade', 'beard', 'pet', 'dog', 'massage', 'dental', 'chiro', 'auto', 'music', 'yoga', 'therapy'],
   facial: ['haircut', 'fade', 'beard', 'pet', 'dog', 'nail', 'massage', 'dental', 'chiro', 'auto', 'music', 'yoga'],
@@ -121,11 +121,42 @@ async function handleFindBusinessesInner(
     const sanitizeForLike = (s: string) => s.replace(/%/g, '\\%').replace(/_/g, '\\_');
     const sanitizedType = sanitizeForLike(serviceType);
 
-    // Step 1: Find services matching the service type (two-step approach to avoid inner join issues)
+    // Step 1: Find services matching the service type with flexible patterns
+    // Build patterns: exact match, compound splits (e.g., "haircut" → "hair%cut"), word splits
+    const svcPatterns: string[] = [
+      `name.ilike.%${sanitizedType}%`,
+      `service_category.ilike.%${sanitizedType}%`,
+      `description.ilike.%${sanitizedType}%`,
+    ];
+
+    // Compound word splitting: "haircut" → %hair%cut% (catches "Hair Cut", "HairCut", etc.)
+    const typeNoSpaces = serviceType.replace(/\s+/g, '');
+    if (!serviceType.includes(' ') && serviceType.length > 4) {
+      for (let i = 3; i <= serviceType.length - 2; i++) {
+        const left = sanitizeForLike(serviceType.slice(0, i));
+        const right = sanitizeForLike(serviceType.slice(i));
+        svcPatterns.push(`name.ilike.%${left}%${right}%`);
+      }
+    }
+
+    // Multi-word service types: "hair cut" → %hair%, %cut%
+    const typeWords = serviceType.split(/\s+/).filter((w: string) => w.length >= 2);
+    if (typeWords.length > 1) {
+      for (const w of typeWords) {
+        svcPatterns.push(`name.ilike.%${sanitizeForLike(w)}%`);
+      }
+      // Also try joined version: "hair cut" → %haircut%
+      const joined = sanitizeForLike(typeNoSpaces);
+      svcPatterns.push(`name.ilike.%${joined}%`);
+    }
+
+    const uniqueSvcPatterns = [...new Set(svcPatterns)];
+    console.log('[find_businesses] service_type patterns:', uniqueSvcPatterns.length);
+
     const { data: matchingServices, error: svcError } = await supabase
       .from('services')
       .select('tenant_id, name, price, duration_minutes')
-      .or(`name.ilike.%${sanitizedType}%,service_category.ilike.%${sanitizedType}%,description.ilike.%${sanitizedType}%`)
+      .or(uniqueSvcPatterns.join(','))
       .limit(200);
 
     console.log('[find_businesses] matching services for type:', serviceType, 'count:', matchingServices?.length, 'error:', svcError?.message);
