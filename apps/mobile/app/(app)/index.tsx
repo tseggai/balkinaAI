@@ -1216,39 +1216,51 @@ export default function ChatScreen() {
           return;
         }
 
-        // Stream response in real-time using ReadableStream
-        const reader = res.body?.getReader();
-        const decoder = new TextDecoder();
         let fullText = '';
-        let buffer = '';
 
+        // Parse SSE lines from response text
+        const parseSSELines = (raw: string) => {
+          const lines = raw.split('\n');
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const jsonStr = line.slice(6).trim();
+            if (!jsonStr) continue;
+            try {
+              const event = JSON.parse(jsonStr) as { type: string; content?: string; name?: string };
+              if (event.type === 'text') {
+                fullText += event.content ?? '';
+              } else if (event.type === 'error' && event.content) {
+                fullText = `Sorry, something went wrong: ${event.content}`;
+              }
+            } catch {
+              // skip malformed JSON chunks
+            }
+          }
+        };
+
+        // Try streaming with ReadableStream, fall back to res.text()
+        const reader = res.body?.getReader?.();
         if (reader) {
+          const decoder = new TextDecoder();
+          let buffer = '';
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
-            buffer = lines.pop() ?? ''; // Keep incomplete line in buffer
+            buffer = lines.pop() ?? '';
 
+            let chunkText = '';
             for (const line of lines) {
               if (!line.startsWith('data: ')) continue;
               const jsonStr = line.slice(6).trim();
               if (!jsonStr) continue;
-
               try {
                 const event = JSON.parse(jsonStr) as { type: string; content?: string; name?: string };
                 if (event.type === 'text') {
                   fullText += event.content ?? '';
-                  // Update message in real-time as text streams in
-                  const streamedText = fullText;
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantId
-                        ? { ...m, content: streamedText, isStreaming: true }
-                        : m,
-                    ),
-                  );
+                  chunkText = fullText;
                 } else if (event.type === 'error' && event.content) {
                   fullText = `Sorry, something went wrong: ${event.content}`;
                 }
@@ -1256,7 +1268,21 @@ export default function ChatScreen() {
                 // skip malformed JSON chunks
               }
             }
+            if (chunkText) {
+              const streamedText = chunkText;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? { ...m, content: streamedText, isStreaming: true }
+                    : m,
+                ),
+              );
+            }
           }
+        } else {
+          // Fallback for environments without ReadableStream (React Native)
+          const respText = await res.text();
+          parseSSELines(respText);
         }
 
         setMessages((prev) =>
