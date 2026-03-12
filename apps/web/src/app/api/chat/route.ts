@@ -428,9 +428,9 @@ ${userLocation ? `User location: ${userLocation.latitude}, ${userLocation.longit
 Extract all info from user's message first (service type, business, date, time, staff). Never re-ask answered questions.
 Synonyms for "show businesses": "near me", "around me", "what's nearby", "show me everything", etc. → call find_businesses.
 
-1. COMBINED STEP — call find_businesses, then call get_services (with tenant_id) for EACH returned business in the SAME tool round. Render as ONE business_with_services card.
-   CRITICAL field mapping from find_businesses result: id → id, name → name, image_url → image_url (use logo_url value), distance_mi → distance_mi, estimated_drive_minutes → drive_minutes, category → category.
-   Include ALL services from get_services for each business — never truncate. Example:
+1. Call find_businesses — it returns each business with an all_services array containing ALL their services (id, name, price, duration_minutes, deposit_enabled, deposit_amount). Do NOT call get_services separately. Render as ONE business_with_services card.
+   CRITICAL field mapping from find_businesses result: id → id, name → name, image_url → image_url (use logo_url value), distance_mi → distance_mi, estimated_drive_minutes → drive_minutes, category → category, all_services → services.
+   Include ALL services from all_services for each business — never truncate. Example:
    [[CARD:{"type":"business_with_services","items":[{"id":"tenant-uuid","name":"Biz Name","image_url":"https://...","distance_mi":0.8,"drive_minutes":3,"category":"barbershop","services":[{"id":"svc-uuid","name":"Haircut","price":25,"duration_minutes":30},{"id":"svc-uuid2","name":"Beard Trim","price":15,"duration_minutes":20}]}]}]]
    Max 5 businesses sorted by distance. Add [[button:Show more businesses]] if has_more. Skip businesses with has_availability: false.
    User taps a service chip → app sends "[service name] at [business name]".

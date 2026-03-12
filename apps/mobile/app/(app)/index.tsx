@@ -111,6 +111,7 @@ interface PackageCardData {
   image_url?: string;
   price: number;
   services_count: number;
+  service_names: string[];
   expiration_label?: string;
   customer_owned: boolean;
   sessions_remaining?: number;
@@ -758,7 +759,11 @@ function PackageCardRow({ items, onTap }: { items: PackageCardData[]; onTap: (na
             ) : (
               <>
                 <Text style={richCardStyles.packagePrice}>${pkg.price}</Text>
-                <Text style={richCardStyles.packageCount}>{pkg.services_count} services</Text>
+                {pkg.service_names && pkg.service_names.length > 0 ? (
+                  <Text style={richCardStyles.packageCount} numberOfLines={2}>{pkg.service_names.join(', ')}</Text>
+                ) : (
+                  <Text style={richCardStyles.packageCount}>{pkg.services_count} services</Text>
+                )}
               </>
             )}
           </View>
@@ -889,6 +894,9 @@ function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData;
                   ) : (
                     <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>${pkg.price}</Text>
                   )}
+                  {pkg.service_names && pkg.service_names.length > 0 ? (
+                    <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]} numberOfLines={2}>{pkg.service_names.join(', ')}</Text>
+                  ) : null}
                 </TouchableOpacity>
               );
             })}
@@ -1628,8 +1636,8 @@ export default function ChatScreen() {
         return;
       }
       const data = (await res.json()) as {
-        packages: { id: string; name: string; price?: number; image_url?: string; package_services: { quantity: number }[] }[];
-        customer_packages: { id: string; package: { name: string; price: number } | null; sessions: { sessions_remaining: number }[] }[];
+        packages: { id: string; name: string; price?: number; image_url?: string; package_services: { quantity: number; services: { name: string } | null }[] }[];
+        customer_packages: { id: string; package: { name: string; price: number } | null; sessions: { sessions_remaining: number; services: { name: string } | null }[] }[];
         extras: { id: string; name: string; price: number; duration_minutes: number }[];
       };
 
@@ -1650,6 +1658,7 @@ export default function ChatScreen() {
           image_url: p.image_url,
           price: (p.price as number) ?? 0,
           services_count: p.package_services?.reduce((sum, ps) => sum + ps.quantity, 0) ?? 1,
+          service_names: (p.package_services ?? []).map((ps) => ps.services?.name).filter((n): n is string => !!n),
           customer_owned: false,
         })),
         ...data.customer_packages.map((cp) => ({
@@ -1658,6 +1667,7 @@ export default function ChatScreen() {
           name: cp.package?.name ?? 'Package',
           price: cp.package?.price ?? 0,
           services_count: 0,
+          service_names: (cp.sessions ?? []).map((s) => s.services?.name).filter((n): n is string => !!n),
           customer_owned: true,
           sessions_remaining: cp.sessions?.[0]?.sessions_remaining ?? 0,
         })),
@@ -1806,15 +1816,77 @@ export default function ChatScreen() {
         }
       }
 
-      // Handle "Confirm Booking" from summary card — send to GPT for create_booking
+      // Handle "Confirm Booking" from summary card — call booking API directly
       if (userText === 'Confirm Booking' && bookingState.serviceId && bookingState.date && bookingState.timeSlot) {
-        // Let this go through to GPT — it needs to execute create_booking tool
-        return false;
+        addUserMessage(userText);
+        setIsLoading(true);
+        try {
+          const createRes = await fetch(`${API_BASE}/api/booking/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tenantId: bookingState.tenantId,
+              serviceId: bookingState.serviceId,
+              staffId: bookingState.staffId,
+              staffName: bookingState.staffName,
+              date: bookingState.date,
+              timeSlot: bookingState.timeSlot,
+              timeSlotIso: bookingState.timeSlotIso,
+              packageName: bookingState.selectedPackage,
+              extras: bookingState.selectedExtras,
+              userId,
+              customerName,
+              customerPhone,
+              customerEmail,
+            }),
+          });
+          if (!createRes.ok) {
+            const errBody = (await createRes.json().catch(() => ({}))) as { error?: string };
+            addAssistantMessage(`Sorry, booking failed: ${errBody.error ?? 'Please try again.'}`);
+            setIsLoading(false);
+            return true;
+          }
+          const result = (await createRes.json()) as {
+            success: boolean;
+            service_name: string;
+            staff_name: string | null;
+            business_name: string;
+            date: string;
+            time: string;
+            address: string;
+            total: number;
+            latitude?: number;
+            longitude?: number;
+          };
+
+          const confirmedCard: ConfirmedCardData = {
+            type: 'confirmed_card',
+            service: result.service_name,
+            package: bookingState.selectedPackage ?? undefined,
+            extras: bookingState.selectedExtras,
+            business: result.business_name,
+            staff: result.staff_name ?? bookingState.staffName ?? 'Anyone',
+            date: result.date,
+            time: result.time,
+            address: result.address,
+            total: result.total,
+            points_earned: 0,
+            latitude: result.latitude,
+            longitude: result.longitude,
+          };
+
+          addAssistantMessage(`Your booking is confirmed!\n\n[[CARD:${JSON.stringify(confirmedCard)}]]`);
+          setBookingState(INITIAL_BOOKING_STATE);
+        } catch {
+          addAssistantMessage('Connection error while creating booking. Please try again.');
+        }
+        setIsLoading(false);
+        return true;
       }
 
       return false;
     },
-    [bookingState, getDateButtons, parseDateLabel, addUserMessage, fetchStaffAvailability, fetchBookingOptions, showSummaryCard],
+    [bookingState, getDateButtons, parseDateLabel, addUserMessage, addAssistantMessage, fetchStaffAvailability, fetchBookingOptions, showSummaryCard, userId, customerName, customerPhone, customerEmail],
   );
 
   const sendMessage = useCallback(
