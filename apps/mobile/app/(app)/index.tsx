@@ -706,18 +706,18 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
 
 const richCardStyles = StyleSheet.create({
   // Business cards
-  businessCard: { width: 120, height: 140, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
-  businessImage: { width: 120, height: 60, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
-  businessImg: { width: 120, height: 60, resizeMode: 'cover' },
+  businessCard: { width: 160, height: 170, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
+  businessImage: { width: 160, height: 100, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
+  businessImg: { width: 160, height: 100, resizeMode: 'cover' },
   businessEmoji: { fontSize: 24 },
   businessInfo: { padding: 6, flex: 1 },
   businessName: { fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 16 },
   businessDistance: { fontSize: 11, color: '#6b7280', marginTop: 2 },
   businessDrive: { fontSize: 11, color: '#9ca3af' },
   // Service cards
-  serviceCard: { width: 130, height: 150, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
-  serviceImage: { width: 130, height: 65, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
-  serviceImg: { width: 130, height: 65, resizeMode: 'cover' },
+  serviceCard: { width: 170, height: 175, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
+  serviceImage: { width: 170, height: 100, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
+  serviceImg: { width: 170, height: 100, resizeMode: 'cover' },
   serviceEmoji: { fontSize: 24 },
   serviceInfo: { padding: 6, flex: 1 },
   serviceName: { fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 16 },
@@ -726,9 +726,9 @@ const richCardStyles = StyleSheet.create({
   depositBadge: { backgroundColor: '#fef3c7', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, marginTop: 2, alignSelf: 'flex-start' },
   depositText: { fontSize: 10, color: '#92400e', fontWeight: '600' },
   // Staff cards
-  staffCard: { width: 100, height: 120, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, alignItems: 'center', paddingTop: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
-  staffAvatar: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  staffAvatarImg: { width: 50, height: 50, borderRadius: 25 },
+  staffCard: { width: 115, height: 130, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, alignItems: 'center', paddingTop: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
+  staffAvatar: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  staffAvatarImg: { width: 64, height: 64, borderRadius: 32 },
   staffInitials: { color: '#fff', fontSize: 18, fontWeight: '700' },
   staffName: { fontSize: 12, fontWeight: '600', color: '#111827', marginTop: 6, textAlign: 'center', paddingHorizontal: 4 },
   staffSlots: { fontSize: 10, color: '#9ca3af', marginTop: 2 },
@@ -965,7 +965,7 @@ function MessageBubble({
 }
 
 const bubbleStyles = StyleSheet.create({
-  wrapper: { paddingHorizontal: 12, marginVertical: 3, maxWidth: '88%' },
+  wrapper: { paddingHorizontal: 12, marginVertical: 2, maxWidth: '88%' },
   wrapperUser: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   wrapperAssistant: { alignSelf: 'flex-start', alignItems: 'flex-start' },
   bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
@@ -1240,6 +1240,7 @@ export default function ChatScreen() {
           )}
           contentContainerStyle={styles.messagesList}
           inverted
+          keyboardShouldPersistTaps="handled"
         />
 
         <View style={styles.inputBar}>
