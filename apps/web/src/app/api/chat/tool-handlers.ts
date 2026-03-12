@@ -804,12 +804,12 @@ export async function handleCheckAvailability(
     staffSpecialMap.set(ssd.staff_id, ssd);
   }
 
+  // staff_holidays table has a single `date` column (not start_date/end_date)
   const { data: staffHolidays } = await supabase
     .from('staff_holidays')
     .select('staff_id')
     .in('staff_id', staffIds)
-    .lte('start_date', date)
-    .gte('end_date', date);
+    .eq('date', date);
 
   const holidayStaffIds = new Set(((staffHolidays ?? []) as { staff_id: string }[]).map((h) => h.staff_id));
 

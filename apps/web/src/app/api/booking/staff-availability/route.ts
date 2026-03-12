@@ -8,6 +8,12 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
 // ── Timezone helpers (shared with tool-handlers) ────────────────────────────
 
 function getTimezoneOffsetMinutes(timezone: string, refDate: Date): number {
@@ -20,6 +26,10 @@ function localTimeToUTC(dateStr: string, timeStr: string, timezone: string): Dat
   const asUtc = new Date(`${dateStr}T${timeStr}:00.000Z`);
   const offsetMs = getTimezoneOffsetMinutes(timezone, asUtc) * 60000;
   return new Date(asUtc.getTime() - offsetMs);
+}
+
+export async function OPTIONS() {
+  return new Response(null, { headers: CORS_HEADERS });
 }
 
 export async function POST(request: Request) {
@@ -36,11 +46,11 @@ export async function POST(request: Request) {
     const { tenantId, serviceId, date, staffId, customerId, userId } = body;
 
     if (!tenantId || !serviceId || !date) {
-      return NextResponse.json({ error: 'tenantId, serviceId, and date are required' }, { status: 400 });
+      return NextResponse.json({ error: 'tenantId, serviceId, and date are required' }, { status: 400, headers: CORS_HEADERS });
     }
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return NextResponse.json({ error: 'date must be YYYY-MM-DD' }, { status: 400 });
+      return NextResponse.json({ error: 'date must be YYYY-MM-DD' }, { status: 400, headers: CORS_HEADERS });
     }
 
     const supabase = createAdminClient();
@@ -53,7 +63,8 @@ export async function POST(request: Request) {
       .single();
 
     if (svcErr || !service) {
-      return NextResponse.json({ error: 'Service not found' }, { status: 404 });
+      console.error('[booking/staff-availability] Service not found:', serviceId, svcErr?.message);
+      return NextResponse.json({ error: 'Service not found' }, { status: 404, headers: CORS_HEADERS });
     }
 
     const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null };
@@ -78,10 +89,10 @@ export async function POST(request: Request) {
         .from('service_staff')
         .select('staff_id, staff:staff_id(id, name, image_url, availability_schedule)')
         .eq('service_id', serviceId),
-      // 5. Tenant timezone
+      // 5. Tenant timezone + address
       supabase
         .from('tenant_locations')
-        .select('timezone')
+        .select('timezone, address')
         .eq('tenant_id', tenantId)
         .limit(1)
         .single(),
@@ -96,7 +107,7 @@ export async function POST(request: Request) {
         date,
         service_duration_minutes: svc.duration_minutes,
         message: 'This service is not available on this date.',
-      });
+      }, { headers: CORS_HEADERS });
     }
 
     let eligibleStaff = ((serviceStaffResult.data ?? []) as unknown as { staff_id: string; staff: { id: string; name: string; image_url: string | null; availability_schedule: Record<string, unknown> } | null }[])
@@ -110,7 +121,7 @@ export async function POST(request: Request) {
         date,
         service_duration_minutes: svc.duration_minutes,
         message: 'No staff assigned to this service.',
-      });
+      }, { headers: CORS_HEADERS });
     }
 
     if (staffId) {
@@ -123,10 +134,12 @@ export async function POST(request: Request) {
         slots: [],
         date,
         message: 'Requested staff is not assigned to this service.',
-      });
+      }, { headers: CORS_HEADERS });
     }
 
-    const timezone = (timezoneResult.data as { timezone: string } | null)?.timezone || 'UTC';
+    const locationData = timezoneResult.data as { timezone: string; address: string | null } | null;
+    const timezone = locationData?.timezone || 'UTC';
+    const address = locationData?.address || null;
     const staffIds = eligibleStaff.map((s) => s.id);
 
     // 4. Staff special days, holidays, and existing appointments — in parallel
@@ -139,12 +152,12 @@ export async function POST(request: Request) {
         .select('staff_id, is_day_off, start_time, end_time, breaks')
         .in('staff_id', staffIds)
         .eq('date', date),
+      // staff_holidays table has a single `date` column (not start_date/end_date)
       supabase
         .from('staff_holidays')
         .select('staff_id')
         .in('staff_id', staffIds)
-        .lte('start_date', date)
-        .gte('end_date', date),
+        .eq('date', date),
       supabase
         .from('appointments')
         .select('staff_id, start_time, end_time')
@@ -281,10 +294,11 @@ export async function POST(request: Request) {
       service_duration_minutes: svc.duration_minutes,
       staff: staffWithSlots,
       anyone_slots: anyoneSlots,
+      address,
       customer_appointments: customerApptResult.length > 0 ? customerApptResult : undefined,
-    });
+    }, { headers: CORS_HEADERS });
   } catch (err) {
     console.error('[booking/staff-availability] error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: CORS_HEADERS });
   }
 }

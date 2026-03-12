@@ -8,6 +8,16 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+export async function OPTIONS() {
+  return new Response(null, { headers: CORS_HEADERS });
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
@@ -19,7 +29,7 @@ export async function POST(request: Request) {
     const { tenantId, serviceId, customerId } = body;
 
     if (!tenantId || !serviceId) {
-      return NextResponse.json({ error: 'tenantId and serviceId are required' }, { status: 400 });
+      return NextResponse.json({ error: 'tenantId and serviceId are required' }, { status: 400, headers: CORS_HEADERS });
     }
 
     const supabase = createAdminClient();
@@ -81,7 +91,7 @@ export async function POST(request: Request) {
     ]);
 
     if (serviceResult.error || !serviceResult.data) {
-      return NextResponse.json({ error: 'Service not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Service not found' }, { status: 404, headers: CORS_HEADERS });
     }
 
     const serviceData = serviceResult.data as Record<string, unknown> & {
@@ -93,9 +103,9 @@ export async function POST(request: Request) {
       packages: packagesResult.data ?? [],
       customer_packages: customerPackagesResult.data ?? [],
       extras: serviceData.service_extras ?? [],
-    });
+    }, { headers: CORS_HEADERS });
   } catch (err) {
     console.error('[booking/options] error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: CORS_HEADERS });
   }
 }
