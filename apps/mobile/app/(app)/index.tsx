@@ -115,6 +115,38 @@ interface ConfirmedCardData {
   longitude?: number;
 }
 
+interface ServiceChipData {
+  id: string;
+  name: string;
+  price: number;
+  duration_minutes: number;
+  deposit_enabled?: boolean;
+  deposit_amount?: number;
+}
+
+interface BusinessWithServicesData {
+  type: 'business_with_services';
+  items: Array<BusinessCardData & { services: ServiceChipData[] }>;
+}
+
+interface TimeSlotData {
+  time: string;
+  iso: string;
+  staff_name?: string;
+}
+
+interface StaffWithSlotsData {
+  type: 'staff_with_slots';
+  items: Array<StaffCardData & { slots: TimeSlotData[] }>;
+  anyone_slots?: Array<TimeSlotData & { staff_name: string }>;
+}
+
+interface BookingOptionsData {
+  type: 'booking_options';
+  packages: PackageCardData[];
+  extras: Array<{ id: string; name: string; price: number; duration_minutes: number }>;
+}
+
 type CardData =
   | { type: 'business_cards'; items: BusinessCardData[] }
   | { type: 'service_cards'; items: ServiceCardData[] }
@@ -122,7 +154,10 @@ type CardData =
   | { type: 'package_cards'; items: PackageCardData[] }
   | ExtrasGridData
   | SummaryCardData
-  | ConfirmedCardData;
+  | ConfirmedCardData
+  | BusinessWithServicesData
+  | StaffWithSlotsData
+  | BookingOptionsData;
 
 interface ParsedSegment {
   kind: 'text' | 'card';
@@ -477,6 +512,63 @@ function ServiceCardRow({ items, onTap }: { items: ServiceCardData[]; onTap: (na
   );
 }
 
+// ── Business With Services Row (combined card) ──────────────────────────────
+
+function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesData; onTap: (msg: string) => void }) {
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const selectedBiz = data.items[selectedIdx];
+  const services = selectedBiz?.services ?? [];
+
+  return (
+    <View style={{ marginTop: 4, marginBottom: 2 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
+        {data.items.map((biz, idx) => (
+          <TouchableOpacity
+            key={biz.id}
+            style={[
+              richCardStyles.businessCard,
+              idx === selectedIdx && { borderWidth: 2, borderColor: '#6366f1' },
+            ]}
+            onPress={() => setSelectedIdx(idx)}
+            activeOpacity={0.7}
+          >
+            <View style={richCardStyles.businessImage}>
+              {biz.image_url ? (
+                <Image source={{ uri: biz.image_url }} style={richCardStyles.businessImg} />
+              ) : (
+                <Text style={richCardStyles.businessEmoji}>🏢</Text>
+              )}
+            </View>
+            <View style={richCardStyles.businessInfo}>
+              <Text style={richCardStyles.businessName} numberOfLines={2}>{biz.name}</Text>
+              <Text style={richCardStyles.businessDistance}>{biz.distance_mi} mi</Text>
+              <Text style={richCardStyles.businessDrive}>{biz.drive_minutes} min drive</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      {services.length > 0 && selectedBiz ? (
+        <View style={combinedStyles.serviceChipsContainer}>
+          {services.map((svc) => (
+            <TouchableOpacity
+              key={svc.id}
+              style={combinedStyles.serviceChip}
+              onPress={() => onTap(`${svc.name} at ${selectedBiz.name}`)}
+              activeOpacity={0.7}
+            >
+              <Text style={combinedStyles.serviceChipName}>{svc.name}</Text>
+              <Text style={combinedStyles.serviceChipDetail}>
+                ${svc.price} · {svc.duration_minutes}min
+                {svc.deposit_enabled && svc.deposit_amount ? ` · $${svc.deposit_amount} dep` : ''}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 // ── Staff Card Row ───────────────────────────────────────────────────────────
 
 function StaffCardRow({ items, onTap }: { items: StaffCardData[]; onTap: (name: string) => void }) {
@@ -512,6 +604,84 @@ function StaffCardRow({ items, onTap }: { items: StaffCardData[]; onTap: (name: 
         <Text style={richCardStyles.staffSlots}> </Text>
       </TouchableOpacity>
     </ScrollView>
+  );
+}
+
+// ── Staff With Slots Row (combined card) ─────────────────────────────────────
+
+function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (msg: string) => void }) {
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  // -1 means "Anyone" is selected
+  const isAnyone = selectedIdx === -1;
+  const selectedStaff = isAnyone ? null : data.items[selectedIdx];
+  const slots = isAnyone
+    ? (data.anyone_slots ?? [])
+    : (selectedStaff?.slots ?? []);
+
+  return (
+    <View style={{ marginTop: 4, marginBottom: 2 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
+        {data.items.map((staff, idx) => (
+          <TouchableOpacity
+            key={staff.id}
+            style={[
+              richCardStyles.staffCard,
+              idx === selectedIdx && !isAnyone && { opacity: 1 },
+              idx !== selectedIdx && !isAnyone && { opacity: 0.5 },
+              isAnyone && { opacity: 0.5 },
+            ]}
+            onPress={() => setSelectedIdx(idx)}
+            activeOpacity={0.7}
+          >
+            <View style={[richCardStyles.staffAvatar, { backgroundColor: nameToColor(staff.name) }]}>
+              {staff.image_url ? (
+                <Image source={{ uri: staff.image_url }} style={richCardStyles.staffAvatarImg} />
+              ) : (
+                <Text style={richCardStyles.staffInitials}>{getInitials(staff.name)}</Text>
+              )}
+            </View>
+            <Text style={richCardStyles.staffName} numberOfLines={1}>{staff.name}</Text>
+            <Text style={richCardStyles.staffSlots}>{staff.available_slots_count} slots</Text>
+          </TouchableOpacity>
+        ))}
+        {data.anyone_slots && data.anyone_slots.length > 0 ? (
+          <TouchableOpacity
+            style={[
+              richCardStyles.staffCard,
+              isAnyone ? { opacity: 1 } : { opacity: 0.5 },
+            ]}
+            onPress={() => setSelectedIdx(-1)}
+            activeOpacity={0.7}
+          >
+            <View style={[richCardStyles.staffAvatar, { backgroundColor: '#9ca3af' }]}>
+              <Ionicons name="people-outline" size={22} color="#fff" />
+            </View>
+            <Text style={richCardStyles.staffName}>Anyone</Text>
+            <Text style={richCardStyles.staffSlots}> </Text>
+          </TouchableOpacity>
+        ) : null}
+      </ScrollView>
+      {slots.length > 0 ? (
+        <View style={combinedStyles.slotsContainer}>
+          {slots.map((slot, i) => {
+            const staffLabel = isAnyone && slot.staff_name ? ` with ${slot.staff_name}` : selectedStaff ? ` with ${selectedStaff.name}` : '';
+            return (
+              <TouchableOpacity
+                key={`${slot.time}-${i}`}
+                style={combinedStyles.slotChip}
+                onPress={() => onTap(`${slot.time}${staffLabel}`)}
+                activeOpacity={0.7}
+              >
+                <Text style={combinedStyles.slotChipText}>{slot.time}</Text>
+                {isAnyone && slot.staff_name ? (
+                  <Text style={combinedStyles.slotStaffLabel}>{slot.staff_name}</Text>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -615,6 +785,101 @@ function ExtrasGridComponent({ data, onSubmit }: { data: ExtrasGridData; onSubmi
       </View>
       <TouchableOpacity style={richCardStyles.extrasDoneBtn} onPress={handleDone} activeOpacity={0.7}>
         <Text style={richCardStyles.extrasDoneBtnText}>Done adding extras →</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ── Booking Options (combined packages + extras) ────────────────────────────
+
+function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData; onSubmit: (msg: string) => void }) {
+  const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
+  const [selectedExtras, setSelectedExtras] = useState<Set<string>>(new Set());
+
+  const toggleExtra = (id: string) => {
+    setSelectedExtras((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDone = () => {
+    const parts: string[] = [];
+    if (selectedPackage) {
+      parts.push(`Package: ${selectedPackage}`);
+    }
+    const extraNames = data.extras.filter((e) => selectedExtras.has(e.id)).map((e) => e.name);
+    if (extraNames.length > 0) {
+      parts.push(`Extras: ${extraNames.join(', ')}`);
+    }
+    if (parts.length === 0) {
+      onSubmit('No packages or extras');
+    } else {
+      onSubmit(parts.join('. '));
+    }
+  };
+
+  return (
+    <View style={combinedStyles.bookingOptionsContainer}>
+      {data.packages.length > 0 ? (
+        <>
+          <Text style={combinedStyles.sectionLabel}>Package deals</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 8 }}>
+            {data.packages.map((pkg) => {
+              const isSelected = selectedPackage === pkg.name;
+              return (
+                <TouchableOpacity
+                  key={pkg.id}
+                  style={[combinedStyles.packageChip, isSelected && combinedStyles.packageChipSelected]}
+                  onPress={() => setSelectedPackage(isSelected ? null : pkg.name)}
+                  activeOpacity={0.7}
+                >
+                  {pkg.customer_owned ? (
+                    <View style={richCardStyles.ownedBadge}>
+                      <Text style={richCardStyles.ownedBadgeText}>OWNED</Text>
+                    </View>
+                  ) : null}
+                  <Text style={[combinedStyles.packageChipName, isSelected && combinedStyles.packageChipNameSelected]}>{pkg.name}</Text>
+                  {pkg.customer_owned && pkg.sessions_remaining != null ? (
+                    <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>{pkg.sessions_remaining} left</Text>
+                  ) : (
+                    <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>${pkg.price}</Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </>
+      ) : null}
+      {data.extras.length > 0 ? (
+        <>
+          <Text style={combinedStyles.sectionLabel}>Add extras</Text>
+          <View style={richCardStyles.extrasGrid}>
+            {data.extras.map((extra) => {
+              const isSelected = selectedExtras.has(extra.id);
+              return (
+                <TouchableOpacity
+                  key={extra.id}
+                  style={[richCardStyles.extrasChip, isSelected && richCardStyles.extrasChipSelected]}
+                  onPress={() => toggleExtra(extra.id)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[richCardStyles.extrasChipName, isSelected && richCardStyles.extrasChipNameSelected]}>{extra.name}</Text>
+                  <Text style={[richCardStyles.extrasChipDetail, isSelected && richCardStyles.extrasChipDetailSelected]}>
+                    +${extra.price} · +{extra.duration_minutes}min
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
+      <TouchableOpacity style={richCardStyles.extrasDoneBtn} onPress={handleDone} activeOpacity={0.7}>
+        <Text style={richCardStyles.extrasDoneBtnText}>
+          {selectedPackage || selectedExtras.size > 0 ? 'Continue with selections →' : 'Skip →'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -886,6 +1151,28 @@ const richCardStyles = StyleSheet.create({
   confirmedActionTextSecondary: { color: '#fff' },
 });
 
+const combinedStyles = StyleSheet.create({
+  // Service chips below business cards
+  serviceChipsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, paddingHorizontal: 2 },
+  serviceChip: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#e5e7eb', paddingHorizontal: 12, paddingVertical: 8 },
+  serviceChipName: { fontSize: 14, fontWeight: '600', color: '#374151' },
+  serviceChipDetail: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  // Time slots below staff cards
+  slotsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, paddingHorizontal: 2 },
+  slotChip: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6366f1', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, alignItems: 'center' as const },
+  slotChipText: { fontSize: 14, fontWeight: '600', color: '#6366f1' },
+  slotStaffLabel: { fontSize: 11, color: '#9ca3af', marginTop: 1 },
+  // Booking options (packages + extras combined)
+  bookingOptionsContainer: { marginVertical: 6 },
+  sectionLabel: { fontSize: 13, fontWeight: '600', color: '#6b7280', marginBottom: 6, marginTop: 4 },
+  packageChip: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#e5e7eb', paddingHorizontal: 14, paddingVertical: 10, marginRight: 8 },
+  packageChipSelected: { borderColor: '#6366f1', backgroundColor: '#eef2ff' },
+  packageChipName: { fontSize: 14, fontWeight: '600', color: '#374151' },
+  packageChipNameSelected: { color: '#4338ca' },
+  packageChipDetail: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  packageChipDetailSelected: { color: '#6366f1' },
+});
+
 // ── Action Button ───────────────────────────────────────────────────────────
 
 function ActionButton({ label, onPress }: { label: string; onPress: (label: string) => void }) {
@@ -923,6 +1210,12 @@ function CardRenderer({ card, onButtonPress, onSubmit }: { card: CardData; onBut
       return <RichSummaryCard data={card} onButtonPress={onButtonPress} />;
     case 'confirmed_card':
       return <RichConfirmedCard data={card} onButtonPress={onButtonPress} />;
+    case 'business_with_services':
+      return <BusinessWithServicesRow data={card as BusinessWithServicesData} onTap={onButtonPress} />;
+    case 'staff_with_slots':
+      return <StaffWithSlotsRow data={card as StaffWithSlotsData} onTap={onButtonPress} />;
+    case 'booking_options':
+      return <BookingOptionsComponent data={card as BookingOptionsData} onSubmit={onSubmit} />;
     default:
       return null;
   }
