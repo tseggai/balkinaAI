@@ -623,7 +623,9 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
 
   return (
     <View style={richCardStyles.confirmedCard}>
-      <Text style={richCardStyles.confirmedCheck}>✅</Text>
+      <View style={richCardStyles.confirmedCheckCircle}>
+        <Ionicons name="checkmark" size={28} color="#fff" />
+      </View>
       <Text style={richCardStyles.confirmedTitle}>Appointment Confirmed!</Text>
 
       <View style={{ width: '100%', marginTop: 8 }}>
@@ -771,9 +773,10 @@ const richCardStyles = StyleSheet.create({
   changeBtn: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6366f1', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 8 },
   changeBtnText: { color: '#6366f1', fontSize: 14, fontWeight: '600' },
   // Confirmed card
-  confirmedCard: { backgroundColor: '#f0fdf4', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#bbf7d0', alignItems: 'center' },
-  confirmedCheck: { fontSize: 32 },
-  confirmedTitle: { fontSize: 18, fontWeight: '700', color: '#065f46', marginTop: 4, marginBottom: 4 },
+  confirmedCard: { backgroundColor: '#dcfce7', borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: '#86efac', alignItems: 'center' },
+  confirmedCheck: { fontSize: 40 },
+  confirmedCheckCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#16a34a', justifyContent: 'center', alignItems: 'center' },
+  confirmedTitle: { fontSize: 18, fontWeight: '700', color: '#065f46', marginTop: 6, marginBottom: 6 },
   confirmedRow: { flexDirection: 'row', marginBottom: 4, width: '100%' },
   confirmedLabel: { fontSize: 14, fontWeight: '700', color: '#374151', marginRight: 4 },
   confirmedValue: { fontSize: 14, color: '#374151', flexShrink: 1 },
@@ -965,7 +968,7 @@ function MessageBubble({
 }
 
 const bubbleStyles = StyleSheet.create({
-  wrapper: { paddingHorizontal: 12, marginVertical: 2, maxWidth: '88%' },
+  wrapper: { paddingHorizontal: 12, marginVertical: 1, maxWidth: '88%' },
   wrapperUser: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   wrapperAssistant: { alignSelf: 'flex-start', alignItems: 'flex-start' },
   bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
@@ -1241,6 +1244,10 @@ export default function ChatScreen() {
           contentContainerStyle={styles.messagesList}
           inverted
           keyboardShouldPersistTaps="handled"
+          removeClippedSubviews={false}
+          windowSize={21}
+          maxToRenderPerBatch={20}
+          style={styles.flex}
         />
 
         <View style={styles.inputBar}>
@@ -1283,7 +1290,7 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 34, fontWeight: '700', color: '#111827', marginBottom: 8 },
   subtitle: { fontSize: 18, color: '#6b7280', marginBottom: 32 },
   chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
-  messagesList: { paddingVertical: 12 },
+  messagesList: { paddingVertical: 4 },
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f3f4f6', gap: 8 },
   textInput: { flex: 1, minHeight: 40, maxHeight: 100, backgroundColor: '#f9fafb', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 16, color: '#111827', borderWidth: 1, borderColor: '#e5e7eb' },
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#6366f1', justifyContent: 'center', alignItems: 'center' },

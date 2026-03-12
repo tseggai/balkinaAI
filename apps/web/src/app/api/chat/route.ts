@@ -289,7 +289,7 @@ function buildTenantSystemPrompt(
   customerEmail: string | null,
   userId: string | null,
   currentDate: string,
-  dateInfo?: { todayISO: string; tomorrowISO: string; endOfWeekISO: string },
+  dateInfo?: { todayISO: string; tomorrowISO: string; endOfWeekISO: string; nextWeekMondayISO: string; nextWeekSundayISO: string; currentHourPST: number },
 ): string {
   let customerSection: string;
   if (userId) {
@@ -332,7 +332,7 @@ You MUST use structured [[CARD:...]] blocks for ALL of the following. NEVER use 
 RULES:
 - Put intro text BEFORE the [[CARD:...]] block on a separate line, never after
 - Use REAL data from tool results only — never invent IDs, prices, or names
-- [[button:...]] chips are ONLY for: date selection (Today/Tomorrow/This Week/Pick a Date), time slots, yes/no confirmations, and Show More
+- [[button:...]] chips are ONLY for: date selection (Today/Tomorrow/Next Week/Pick a Date), time slots, yes/no confirmations, and Show More
 - NEVER use [[button:...]] for services, staff, or packages — always use [[CARD:...]]
 - Always populate image_url from the database record — never leave it null if the record has one
 
@@ -345,7 +345,7 @@ Here are the services at ${tenantName}:
 
 User: [selects a service]
 Assistant: Which day works for you?
-[[button:Today]] [[button:Tomorrow]] [[button:This Week]] [[button:Pick a Date]]
+[[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
 
 User: Tomorrow
 Assistant: [call get_staff tool first, then use REAL data from tool result]
@@ -367,16 +367,20 @@ Use this exact date and time for all availability checks, scheduling, and date r
 ${dateInfo ? `
 TODAY IS: ${dateInfo.todayISO}
 TOMORROW IS: ${dateInfo.tomorrowISO}
-THIS WEEK runs from ${dateInfo.todayISO} through ${dateInfo.endOfWeekISO}.
+NEXT WEEK runs from ${dateInfo.nextWeekMondayISO} (Monday) through ${dateInfo.nextWeekSundayISO} (Sunday).
+CURRENT HOUR (PST): ${dateInfo.currentHourPST}
 
 When customer says "tomorrow" → use EXACTLY ${dateInfo.tomorrowISO} as the date parameter in ALL tool calls.
 When customer says "today" → use EXACTLY ${dateInfo.todayISO}.
-When customer says "this week" → offer date chips for each remaining day of the week.
+When customer says "next week" → offer date chips for each day of next week (Mon through Sun).
 ALWAYS pass dates to tools as YYYY-MM-DD strings. Never pass "tomorrow" as a string.
 
-DATE FORMAT: When showing individual day buttons for "This Week", format them as readable day names:
-[[button:Wed Mar 11]] [[button:Thu Mar 12]] [[button:Fri Mar 13]]
-NOT as [[button:2026-03-11]]. Always use short day name + month + day number for date buttons.
+TODAY BUTTON RULE: If the current hour (PST) is 17 (5 PM) or later, do NOT show the [[button:Today]] option in date selection. Most businesses close by 6 PM so there are unlikely to be available slots. Instead show only:
+[[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
+
+DATE FORMAT: When showing individual day buttons for "Next Week", format them as readable day names:
+[[button:Mon Mar 16]] [[button:Tue Mar 17]] [[button:Wed Mar 18]]
+NOT as [[button:2026-03-16]]. Always use short day name + month + day number for date buttons.
 ` : ''}
 FORMATTING RULES — NEVER VIOLATE:
 1. NEVER use numbered lists (1. 2. 3.) anywhere in your responses. Use prose or chips only.
@@ -425,7 +429,7 @@ STEP 2 — DATE SELECTION
 After customer picks a service, ask:
    "Which day works for you?"
    Always emit exactly:
-   [[button:Today]] [[button:Tomorrow]] [[button:This Week]] [[button:Pick a Date]]
+   [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
 
 STEP 3 — STAFF SELECTION (MANDATORY BEFORE TIME)
 After customer selects a date, call get_staff with BOTH tenantId AND serviceId AND date.
@@ -443,16 +447,21 @@ After customer selects staff (or "Anyone"), call check_availability with tenantI
    Show max 6 slots. Include [[button:Show More Times]] if more exist.
    ALWAYS use local_time from available_slots (NOT the raw ISO time field).
 
-STEP 5 — PACKAGES (conditional)
-After time selected, call get_packages with tenantId, serviceId, customerId.
-   If packages exist: present them as package_cards:
+STEP 5 — PACKAGES (MANDATORY CHECK — never skip)
+After time selected, you MUST call get_packages with tenantId, serviceId, customerId.
+   If packages exist: present them as package_cards and WAIT for user response:
+   "Would you like to add a package deal?"
    [[CARD:{"type":"package_cards","items":[...]}]]
-   If no packages: skip silently to STEP 6.
+   Do NOT proceed until the user responds.
+   If no packages returned: skip silently to STEP 6.
 
-STEP 6 — EXTRAS (conditional)
-Check has_extras from the get_services result for the selected service.
-   If has_extras is true: present extras as extras_grid.
-   If no extras: skip silently to STEP 7.
+STEP 6 — EXTRAS (MANDATORY CHECK — never skip)
+After packages step, you MUST call get_service_details with the selected service_id.
+   If the service has extras (service_extras array is non-empty): present ALL extras as extras_grid and WAIT for user response:
+   "Would you like to add any extras?"
+   [[CARD:{"type":"extras_grid","extras":[...]}]]
+   Do NOT proceed until the user responds.
+   If no extras returned: skip silently to STEP 7.
 
 STEP 7 — COUPON (conditional)
 Only ask if active_coupon_count > 0 for this tenant.
@@ -513,7 +522,7 @@ MANDATORY GATES — never skip these:
 
 PACKAGES GATE: After time is selected, ALWAYS call get_packages with tenantId + serviceId + customerId. If any packages are returned, show package cards and wait for user response. Do NOT proceed to extras or summary until user has responded to packages.
 
-EXTRAS GATE: After time is selected, ALWAYS call get_services again with the serviceId. Check has_extras field. If true, show extras grid and wait for user response before proceeding. Do NOT proceed to summary until user has responded to extras (even if they say "no extras").
+EXTRAS GATE: After packages step, ALWAYS call get_service_details with the selected service_id to fetch extras. If service_extras array is non-empty, show extras grid and WAIT for user response before proceeding. Do NOT proceed to summary until user has responded to extras (even if they say "no extras"). NEVER skip this check.
 
 SUMMARY GATE: ALWAYS show summary_card and wait for user to tap "Confirm Booking" before calling book_appointment. NEVER call book_appointment without first showing a summary_card and receiving explicit confirmation. NEVER skip the summary step under any circumstances.
 
@@ -589,7 +598,7 @@ function buildDiscoverySystemPrompt(
   userId: string | null,
   currentDate: string,
   userLocation?: { latitude: number; longitude: number } | null,
-  dateInfo?: { todayISO: string; tomorrowISO: string; endOfWeekISO: string },
+  dateInfo?: { todayISO: string; tomorrowISO: string; endOfWeekISO: string; nextWeekMondayISO: string; nextWeekSundayISO: string; currentHourPST: number },
 ): string {
   let customerSection: string;
   if (userId) {
@@ -634,7 +643,7 @@ You MUST use structured [[CARD:...]] blocks for ALL of the following. NEVER use 
 RULES:
 - Put intro text BEFORE the [[CARD:...]] block on a separate line, never after
 - Use REAL data from tool results only — never invent IDs, prices, or names
-- [[button:...]] chips are ONLY for: date selection (Today/Tomorrow/This Week/Pick a Date), time slots, yes/no confirmations, and Show More
+- [[button:...]] chips are ONLY for: date selection (Today/Tomorrow/Next Week/Pick a Date), time slots, yes/no confirmations, and Show More
 - NEVER use [[button:...]] for businesses, services, staff, or packages — always use [[CARD:...]]
 - Always populate image_url from the database record — never leave it null if the record has one
 
@@ -652,7 +661,7 @@ Here are the services at [business name]:
 
 User: [selects a service]
 Assistant: Which day works for you?
-[[button:Today]] [[button:Tomorrow]] [[button:This Week]] [[button:Pick a Date]]
+[[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
 
 User: Tomorrow
 Assistant: [call get_staff tool first, then use REAL data from tool result]
@@ -675,16 +684,20 @@ Use this exact date and time for all availability checks, scheduling, and date r
 ${dateInfo ? `
 TODAY IS: ${dateInfo.todayISO}
 TOMORROW IS: ${dateInfo.tomorrowISO}
-THIS WEEK runs from ${dateInfo.todayISO} through ${dateInfo.endOfWeekISO}.
+NEXT WEEK runs from ${dateInfo.nextWeekMondayISO} (Monday) through ${dateInfo.nextWeekSundayISO} (Sunday).
+CURRENT HOUR (PST): ${dateInfo.currentHourPST}
 
 When customer says "tomorrow" → use EXACTLY ${dateInfo.tomorrowISO} as the date parameter in ALL tool calls.
 When customer says "today" → use EXACTLY ${dateInfo.todayISO}.
-When customer says "this week" → offer date chips for each remaining day of the week.
+When customer says "next week" → offer date chips for each day of next week (Mon through Sun).
 ALWAYS pass dates to tools as YYYY-MM-DD strings. Never pass "tomorrow" as a string.
 
-DATE FORMAT: When showing individual day buttons for "This Week", format them as readable day names:
-[[button:Wed Mar 11]] [[button:Thu Mar 12]] [[button:Fri Mar 13]]
-NOT as [[button:2026-03-11]]. Always use short day name + month + day number for date buttons.
+TODAY BUTTON RULE: If the current hour (PST) is 17 (5 PM) or later, do NOT show the [[button:Today]] option in date selection. Most businesses close by 6 PM so there are unlikely to be available slots. Instead show only:
+[[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
+
+DATE FORMAT: When showing individual day buttons for "Next Week", format them as readable day names:
+[[button:Mon Mar 16]] [[button:Tue Mar 17]] [[button:Wed Mar 18]]
+NOT as [[button:2026-03-16]]. Always use short day name + month + day number for date buttons.
 ` : ''}
 FORMATTING RULES — NEVER VIOLATE:
 1. NEVER use numbered lists (1. 2. 3.) anywhere in your responses. Use prose or chips only.
@@ -708,7 +721,7 @@ You are an APPOINTMENT BOOKING assistant. Everything you say should help the cus
 2. If multiple businesses offer the service, present them as business_cards and ask which they prefer
 3. Only proceed to availability AFTER the customer confirms a business
 4. ALWAYS ask for a preferred date before showing time slots — never assume today
-5. Ask "Which day works for you?" with buttons: [[button:Today]] [[button:Tomorrow]] [[button:This Week]] [[button:Pick a Date]]
+5. Ask "Which day works for you?" with buttons: [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
 6. Only then show time slots for the confirmed business + date
 NEVER skip straight to time slots. NEVER auto-select a business without asking.
 
@@ -782,7 +795,7 @@ STEP 3 — DATE SELECTION
 After user selects a service, ask:
 "Which day works for you?"
 Always emit exactly:
-[[button:Today]] [[button:Tomorrow]] [[button:This Week]] [[button:Pick a Date]]
+[[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
 
 STEP 4 — STAFF SELECTION (MANDATORY BEFORE TIME)
 After user selects a date, call get_staff with BOTH tenantId AND serviceId AND date.
@@ -800,17 +813,21 @@ Emit time buttons: [[button:10:00 AM]] [[button:10:30 AM]] etc.
 Show max 6 slots. Include [[button:Show More Times]] if more exist.
 ALWAYS use local_time from available_slots (NOT raw ISO time field).
 
-STEP 6 — PACKAGES (conditional)
-After time selected, call get_packages with tenantId, serviceId, customerId.
-If packages exist: present them as package_cards:
+STEP 6 — PACKAGES (MANDATORY CHECK — never skip)
+After time selected, you MUST call get_packages with tenantId, serviceId, customerId.
+If packages exist: present them as package_cards and WAIT for user response:
+"Would you like to add a package deal?"
 [[CARD:{"type":"package_cards","items":[...]}]]
-If no packages: skip silently to STEP 7.
+Do NOT proceed until the user responds.
+If no packages returned: skip silently to STEP 7.
 
-STEP 7 — EXTRAS (conditional)
-Check has_extras from the get_services result for the selected service.
-If has_extras is true: present extras as extras_grid:
+STEP 7 — EXTRAS (MANDATORY CHECK — never skip)
+After packages step, you MUST call get_service_details with the selected service_id.
+If the service has extras (service_extras array is non-empty): present ALL extras as extras_grid and WAIT for user response:
+"Would you like to add any extras?"
 [[CARD:{"type":"extras_grid","extras":[...]}]]
-If no extras: skip silently to STEP 8.
+Do NOT proceed until the user responds.
+If no extras returned: skip silently to STEP 8.
 
 STEP 8 — COUPON (conditional)
 Only ask if active_coupon_count > 0 for this tenant.
@@ -872,7 +889,7 @@ MANDATORY GATES — never skip these:
 
 PACKAGES GATE: After time is selected, ALWAYS call get_packages with tenantId + serviceId + customerId. If any packages are returned, show package cards and wait for user response. Do NOT proceed to extras or summary until user has responded to packages.
 
-EXTRAS GATE: After time is selected, ALWAYS call get_services again with the serviceId. Check has_extras field. If true, show extras grid and wait for user response before proceeding. Do NOT proceed to summary until user has responded to extras (even if they say "no extras").
+EXTRAS GATE: After packages step, ALWAYS call get_service_details with the selected service_id to fetch extras. If service_extras array is non-empty, show extras grid and WAIT for user response before proceeding. Do NOT proceed to summary until user has responded to extras (even if they say "no extras"). NEVER skip this check.
 
 SUMMARY GATE: ALWAYS show summary_card and wait for user to tap "Confirm Booking" before calling book_appointment. NEVER call book_appointment without first showing a summary_card and receiving explicit confirmation. NEVER skip the summary step under any circumstances.
 
@@ -1246,7 +1263,19 @@ export async function POST(request: Request) {
   endOfWeekDate.setDate(endOfWeekDate.getDate() + daysUntilSunday);
   const endOfWeekISO = endOfWeekDate.toISOString().split('T')[0];
 
-  const dateInfo = { todayISO, tomorrowISO: tomorrowISO!, endOfWeekISO: endOfWeekISO! };
+  // Compute next week (Monday to Sunday of the following week)
+  const nextWeekMonday = new Date(todayDateObj);
+  nextWeekMonday.setDate(nextWeekMonday.getDate() + (7 - dayOfWeekNum + 1)); // Next Monday
+  if (dayOfWeekNum === 0) nextWeekMonday.setDate(nextWeekMonday.getDate() - 7 + 1); // If today is Sunday, next Monday is tomorrow
+  const nextWeekMondayISO = nextWeekMonday.toISOString().split('T')[0]!;
+  const nextWeekSunday = new Date(nextWeekMonday);
+  nextWeekSunday.setDate(nextWeekSunday.getDate() + 6);
+  const nextWeekSundayISO = nextWeekSunday.toISOString().split('T')[0]!;
+
+  // Get current hour in PST to determine if "Today" should be shown
+  const pstHour = parseInt(pstParts.find(p => p.type === 'hour')!.value, 10);
+
+  const dateInfo = { todayISO, tomorrowISO: tomorrowISO!, endOfWeekISO: endOfWeekISO!, nextWeekMondayISO, nextWeekSundayISO, currentHourPST: pstHour };
 
   const systemPrompt = tenantId
     ? buildTenantSystemPrompt(
