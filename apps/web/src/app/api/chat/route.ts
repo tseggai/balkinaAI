@@ -338,7 +338,7 @@ ${customerSection}
 ## Booking Flow (strict order, one step per message, skip steps already answered)
 Extract all info from user's message first (service, date, time, staff). Never re-ask answered questions.
 
-1. get_services → service_cards (show ALL for this business)
+1. get_services → service_cards (include ALL services — never truncate. Map image_url from each service's image_url field)
 2. Ask date → [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
 3. COMBINED STEP — call get_staff AND check_availability for EACH staff in the SAME tool round. Render as ONE staff_with_slots card:
    [[CARD:{"type":"staff_with_slots","items":[{"id":"staff-uuid","name":"Marcus","image_url":null,"available_slots_count":4,"slots":[{"time":"10:00 AM","iso":"2026-03-13T18:00:00Z"},{"time":"10:30 AM","iso":"2026-03-13T18:30:00Z"}]}],"anyone_slots":[{"time":"10:00 AM","iso":"...","staff_name":"Marcus"},{"time":"11:00 AM","iso":"...","staff_name":"Emily"}]}]]
@@ -428,8 +428,10 @@ ${userLocation ? `User location: ${userLocation.latitude}, ${userLocation.longit
 Extract all info from user's message first (service type, business, date, time, staff). Never re-ask answered questions.
 Synonyms for "show businesses": "near me", "around me", "what's nearby", "show me everything", etc. → call find_businesses.
 
-1. COMBINED STEP — call find_businesses, then call get_services for EACH returned business in the SAME tool round. Render as ONE business_with_services card:
-   [[CARD:{"type":"business_with_services","items":[{"id":"tenant-uuid","name":"Biz Name","image_url":null,"distance_mi":0.8,"drive_minutes":3,"category":"barbershop","services":[{"id":"svc-uuid","name":"Haircut","price":25,"duration_minutes":30}]}]}]]
+1. COMBINED STEP — call find_businesses, then call get_services (with tenant_id) for EACH returned business in the SAME tool round. Render as ONE business_with_services card.
+   CRITICAL field mapping from find_businesses result: id → id, name → name, image_url → image_url (use logo_url value), distance_mi → distance_mi, estimated_drive_minutes → drive_minutes, category → category.
+   Include ALL services from get_services for each business — never truncate. Example:
+   [[CARD:{"type":"business_with_services","items":[{"id":"tenant-uuid","name":"Biz Name","image_url":"https://...","distance_mi":0.8,"drive_minutes":3,"category":"barbershop","services":[{"id":"svc-uuid","name":"Haircut","price":25,"duration_minutes":30},{"id":"svc-uuid2","name":"Beard Trim","price":15,"duration_minutes":20}]}]}]]
    Max 5 businesses sorted by distance. Add [[button:Show more businesses]] if has_more. Skip businesses with has_availability: false.
    User taps a service chip → app sends "[service name] at [business name]".
    If user already specified a service type, auto-match from the services list.

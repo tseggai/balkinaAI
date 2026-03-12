@@ -1577,6 +1577,7 @@ export default function ChatScreen() {
       const data = (await res.json()) as {
         staff: { id: string; name: string; image_url: string | null; available_slots_count: number; slots: { time: string; iso: string }[] }[];
         anyone_slots: { time: string; iso: string; staff_name: string }[];
+        address?: string | null;
         message?: string;
       };
 
@@ -1584,6 +1585,11 @@ export default function ChatScreen() {
         addAssistantMessage(data.message || 'No availability found for this date. Please try another date.');
         setIsLoading(false);
         return;
+      }
+
+      // Capture address for summary card
+      if (data.address) {
+        setBookingState((prev) => ({ ...prev, address: data.address! }));
       }
 
       // Build a staff_with_slots card
