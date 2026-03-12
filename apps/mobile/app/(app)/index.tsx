@@ -416,7 +416,7 @@ const typingStyles = StyleSheet.create({
 
 function BusinessCardRow({ items, onTap }: { items: BusinessCardData[]; onTap: (name: string) => void }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2, flexGrow: 0 }}>
       {items.map((biz) => (
         <TouchableOpacity
           key={biz.id}
@@ -446,7 +446,7 @@ function BusinessCardRow({ items, onTap }: { items: BusinessCardData[]; onTap: (
 
 function ServiceCardRow({ items, onTap }: { items: ServiceCardData[]; onTap: (name: string) => void }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2, flexGrow: 0 }}>
       {items.map((svc) => (
         <TouchableOpacity
           key={svc.id}
@@ -481,7 +481,7 @@ function ServiceCardRow({ items, onTap }: { items: ServiceCardData[]; onTap: (na
 
 function StaffCardRow({ items, onTap }: { items: StaffCardData[]; onTap: (name: string) => void }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2, flexGrow: 0 }}>
       {items.map((staff) => (
         <TouchableOpacity
           key={staff.id}
@@ -519,7 +519,7 @@ function StaffCardRow({ items, onTap }: { items: StaffCardData[]; onTap: (name: 
 
 function PackageCardRow({ items, onTap }: { items: PackageCardData[]; onTap: (name: string) => void }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2, flexGrow: 0 }}>
       {items.map((pkg) => (
         <TouchableOpacity
           key={pkg.id}
@@ -1069,7 +1069,7 @@ function MessageBubble({
 }
 
 const bubbleStyles = StyleSheet.create({
-  wrapper: { paddingHorizontal: 12, marginVertical: 1, maxWidth: '88%' },
+  wrapper: { paddingHorizontal: 12, marginVertical: 1, maxWidth: '88%', flexGrow: 0, flexShrink: 0 },
   wrapperUser: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   wrapperAssistant: { alignSelf: 'flex-start', alignItems: 'flex-start' },
   bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
@@ -1390,7 +1390,7 @@ export default function ChatScreen() {
           renderItem={({ item }) => (
             <MessageBubble message={item} onButtonPress={handleButtonPress} />
           )}
-          contentContainerStyle={styles.messagesList}
+          contentContainerStyle={[styles.messagesList, { flexGrow: 1 }]}
           inverted
           keyboardShouldPersistTaps="handled"
           removeClippedSubviews={false}
