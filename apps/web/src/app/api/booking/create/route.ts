@@ -98,41 +98,91 @@ export async function POST(request: Request) {
 
     const supabase = createAdminClient();
 
-    // 1. Get service details
-    const { data: service, error: svcErr } = await supabase
-      .from('services')
-      .select('*')
-      .eq('id', serviceId)
-      .single();
+    // ── Phase 3: Parallel initial queries ──────────────────────────────────────
+    // Service, customer, location, staff, and tenant name are all independent.
+    const [serviceResult, customerResult, locationResult, staffResult, tenantResult] = await Promise.all([
+      // 1. Service details
+      supabase.from('services').select('*').eq('id', serviceId).single(),
 
-    if (svcErr || !service) {
+      // 4. Find or create customer
+      (async () => {
+        if (userId) {
+          const { data } = await supabase.from('customers').select('id').eq('user_id', userId).limit(1).maybeSingle();
+          if (data) return { id: (data as { id: string }).id, error: null };
+        }
+        if (customerPhone) {
+          const { data } = await supabase.from('customers').select('id').eq('phone', customerPhone).limit(1).maybeSingle();
+          if (data) return { id: (data as { id: string }).id, error: null };
+        }
+        const email = `chat_${Date.now()}@widget.balkina.ai`;
+        const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
+          email, email_confirm: true,
+          user_metadata: { display_name: customerName ?? 'Guest', source: 'chat_widget' },
+        });
+        if (authErr || !authUser.user) return { id: null, error: authErr?.message ?? 'Unknown' };
+        await supabase.from('customers').insert({
+          id: authUser.user.id, display_name: customerName, phone: customerPhone,
+          email: customerEmail ?? null, user_id: userId ?? null,
+        } as never);
+        return { id: authUser.user.id, error: null };
+      })(),
+
+      // 5. Location (includes timezone, address, coordinates)
+      supabase.from('tenant_locations').select('id, address, latitude, longitude, timezone')
+        .eq('tenant_id', tenantId).limit(1),
+
+      // 6. Staff
+      (async () => {
+        if (staffId) {
+          const { data } = await supabase.from('staff').select('id, name').eq('id', staffId).single();
+          const s = data as { id: string; name: string } | null;
+          return { id: s?.id ?? staffId, name: body.staffName || s?.name || null };
+        }
+        const { data } = await supabase.from('staff').select('id, name').eq('tenant_id', tenantId).limit(1);
+        const s = (data as { id: string; name: string }[] | null)?.[0];
+        return { id: s?.id ?? null, name: body.staffName || s?.name || null };
+      })(),
+
+      // 8. Tenant name
+      supabase.from('tenants').select('name').eq('id', tenantId).single(),
+    ]);
+
+    // Unpack service
+    if (serviceResult.error || !serviceResult.data) {
       return NextResponse.json({ error: 'Service not found' }, { status: 404, headers: CORS_HEADERS });
     }
-
-    const svc = service as {
-      name: string;
-      duration_minutes: number;
-      price: number;
-      deposit_enabled: boolean;
-      deposit_type: string | null;
-      deposit_amount: number | null;
-      tenant_id: string;
+    const svc = serviceResult.data as {
+      name: string; duration_minutes: number; price: number;
+      deposit_enabled: boolean; deposit_type: string | null; deposit_amount: number | null; tenant_id: string;
     };
 
-    // 2. Parse start time
+    // Unpack customer
+    if (!customerResult.id) {
+      return NextResponse.json(
+        { error: `Failed to create customer: ${customerResult.error ?? 'Unknown'}` },
+        { status: 500, headers: CORS_HEADERS },
+      );
+    }
+    const customerId = customerResult.id;
+
+    // Unpack location
+    const loc = (locationResult.data as { id: string; address: string; latitude: number | null; longitude: number | null; timezone: string }[] | null)?.[0];
+    const locationId = loc?.id ?? null;
+    const tz = loc?.timezone || 'America/Los_Angeles';
+
+    // Unpack staff
+    const finalStaffId = staffResult.id;
+    const staffName = staffResult.name;
+
+    // Unpack tenant
+    const businessName = (tenantResult.data as { name: string } | null)?.name ?? 'Business';
+
+    // 2. Parse start time (timezone already available from location query)
     let start: Date;
     if (timeSlotIso) {
       start = new Date(timeSlotIso);
     } else {
-      // Get tenant timezone
-      const { data: locData } = await supabase
-        .from('tenant_locations')
-        .select('timezone')
-        .eq('tenant_id', tenantId)
-        .limit(1)
-        .single();
-      const timezone = (locData as { timezone: string } | null)?.timezone || 'America/Los_Angeles';
-      start = localTimeToUTC(date, timeSlot, timezone);
+      start = localTimeToUTC(date, timeSlot, tz);
     }
     const end = new Date(start.getTime() + svc.duration_minutes * 60000);
 
@@ -141,80 +191,6 @@ export async function POST(request: Request) {
     if (svc.deposit_enabled && svc.deposit_amount) {
       depositAmount =
         svc.deposit_type === 'percentage' ? (svc.price * svc.deposit_amount) / 100 : svc.deposit_amount;
-    }
-
-    // 4. Find or create customer
-    let customerId: string | null = null;
-
-    if (userId) {
-      const { data: byUserId } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('user_id', userId)
-        .limit(1)
-        .maybeSingle();
-      if (byUserId) customerId = (byUserId as { id: string }).id;
-    }
-
-    if (!customerId && customerPhone) {
-      const { data: byPhone } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('phone', customerPhone)
-        .limit(1)
-        .maybeSingle();
-      if (byPhone) customerId = (byPhone as { id: string }).id;
-    }
-
-    if (!customerId) {
-      const email = `chat_${Date.now()}@widget.balkina.ai`;
-      const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
-        email,
-        email_confirm: true,
-        user_metadata: { display_name: customerName ?? 'Guest', source: 'chat_widget' },
-      });
-      if (authErr || !authUser.user) {
-        return NextResponse.json(
-          { error: `Failed to create customer: ${authErr?.message ?? 'Unknown'}` },
-          { status: 500, headers: CORS_HEADERS },
-        );
-      }
-      customerId = authUser.user.id;
-      await supabase.from('customers').insert({
-        id: customerId,
-        display_name: customerName,
-        phone: customerPhone,
-        email: customerEmail ?? null,
-        user_id: userId ?? null,
-      } as never);
-    }
-
-    // 5. Get location
-    let locationId: string | null = null;
-    const { data: locations } = await supabase
-      .from('tenant_locations')
-      .select('id, address, latitude, longitude')
-      .eq('tenant_id', tenantId)
-      .limit(1);
-    const loc = (locations as { id: string; address: string; latitude: number | null; longitude: number | null }[] | null)?.[0];
-    locationId = loc?.id ?? null;
-
-    // 6. Get staff if not specified
-    let finalStaffId = staffId || null;
-    let staffName = body.staffName || null;
-    if (!finalStaffId) {
-      const { data: staffMembers } = await supabase
-        .from('staff')
-        .select('id, name')
-        .eq('tenant_id', tenantId)
-        .limit(1);
-      const s = (staffMembers as { id: string; name: string }[] | null)?.[0];
-      finalStaffId = s?.id ?? null;
-      if (!staffName && s) staffName = s.name;
-    }
-    if (finalStaffId && !staffName) {
-      const { data: staffData } = await supabase.from('staff').select('name').eq('id', finalStaffId).single();
-      staffName = (staffData as { name: string } | null)?.name ?? null;
     }
 
     // 7. Create appointment
@@ -242,31 +218,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: apptErr.message }, { status: 500, headers: CORS_HEADERS });
     }
 
-    // 8. Get tenant name
-    const { data: tenantData } = await supabase.from('tenants').select('name').eq('id', tenantId).single();
-    const businessName = (tenantData as { name: string } | null)?.name ?? 'Business';
-
-    // 9. Format response with local times
-    const { data: tzData } = await supabase
-      .from('tenant_locations')
-      .select('timezone')
-      .eq('tenant_id', tenantId)
-      .limit(1)
-      .single();
-    const tz = (tzData as { timezone: string } | null)?.timezone || 'America/Los_Angeles';
-
+    // 9. Format response with local times (timezone already available)
     const localDate = start.toLocaleDateString('en-US', {
-      timeZone: tz,
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+      timeZone: tz, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     });
     const localTime = start.toLocaleString('en-US', {
-      timeZone: tz,
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
+      timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true,
     });
 
     return NextResponse.json(
