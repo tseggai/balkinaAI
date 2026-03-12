@@ -51,6 +51,26 @@ async function getTenantTimezone(supabase: AdminClient, tenantId: string): Promi
   return (data as { timezone: string } | null)?.timezone || 'UTC';
 }
 
+// ── Synonym map for search term expansion ────────────────────────────────────
+// Maps common search terms to additional terms to search for.
+const SEARCH_SYNONYMS: Record<string, string[]> = {
+  dentist: ['dental', 'dentistry', 'teeth', 'tooth'],
+  dental: ['dentist', 'dentistry', 'teeth', 'tooth'],
+  barber: ['haircut', 'hair cut', 'fade', 'barbershop'],
+  haircut: ['barber', 'hair cut', 'hair'],
+  therapist: ['therapy', 'counseling', 'counselor'],
+  therapy: ['therapist', 'counseling', 'counselor'],
+  chiropractor: ['chiropractic', 'chiro'],
+  chiropractic: ['chiropractor', 'chiro'],
+  nail: ['manicure', 'pedicure', 'nails'],
+  manicure: ['nail', 'nails', 'pedicure'],
+  pedicure: ['nail', 'nails', 'manicure'],
+  spa: ['massage', 'facial', 'wellness'],
+  doctor: ['medical', 'physician', 'clinic'],
+  vet: ['veterinary', 'veterinarian', 'pet', 'animal'],
+  veterinary: ['vet', 'veterinarian', 'pet', 'animal'],
+};
+
 // ── Incompatible keyword map for semantic service-type filtering ─────────────
 
 const INCOMPATIBLE_KEYWORDS: Record<string, string[]> = {
@@ -60,6 +80,7 @@ const INCOMPATIBLE_KEYWORDS: Record<string, string[]> = {
   facial: ['haircut', 'fade', 'beard', 'pet', 'dog', 'nail', 'massage', 'dental', 'chiro', 'auto', 'music', 'yoga'],
   yoga: ['haircut', 'fade', 'pet', 'dog', 'nail', 'massage', 'dental', 'chiro', 'auto', 'music'],
   dental: ['haircut', 'fade', 'pet', 'dog', 'nail', 'massage', 'yoga', 'chiro', 'auto', 'music', 'therapy'],
+  dentist: ['haircut', 'fade', 'pet', 'dog', 'nail', 'massage', 'yoga', 'chiro', 'auto', 'music', 'therapy'],
 };
 
 // ── find_businesses ──────────────────────────────────────────────────────────
@@ -123,11 +144,21 @@ async function handleFindBusinessesInner(
 
     // Step 1: Find services matching the service type with flexible patterns
     // Build patterns: exact match, compound splits (e.g., "haircut" → "hair%cut"), word splits
+    // Also expand with synonyms (e.g., "dentist" → also search "dental", "dentistry", "teeth")
     const svcPatterns: string[] = [
       `name.ilike.%${sanitizedType}%`,
       `service_category.ilike.%${sanitizedType}%`,
       `description.ilike.%${sanitizedType}%`,
     ];
+
+    // Add synonym patterns
+    const synonyms = SEARCH_SYNONYMS[serviceType.toLowerCase()] ?? [];
+    for (const syn of synonyms) {
+      const sanitizedSyn = sanitizeForLike(syn);
+      svcPatterns.push(`name.ilike.%${sanitizedSyn}%`);
+      svcPatterns.push(`service_category.ilike.%${sanitizedSyn}%`);
+      svcPatterns.push(`description.ilike.%${sanitizedSyn}%`);
+    }
 
     // Compound word splitting: "haircut" → %hair%cut% (catches "Hair Cut", "HairCut", etc.)
     const typeNoSpaces = serviceType.replace(/\s+/g, '');
@@ -462,6 +493,12 @@ async function handleFindBusinessesInner(
   //    - Individual words (multi-word queries): "hair salon" → %hair%, %salon%
   //    - Compound word splits: "haircut" → %hair%cut%, %hai%rcut% (catches "Hair Cut")
   const servicePatterns: string[] = [`name.ilike.%${sanitized}%`];
+
+  // Add synonym patterns for general query search
+  const querySynonyms = SEARCH_SYNONYMS[query.toLowerCase()] ?? [];
+  for (const syn of querySynonyms) {
+    servicePatterns.push(`name.ilike.%${sanitize(syn)}%`);
+  }
 
   const words = query.split(/\s+/).filter((w) => w.length >= 2);
   if (words.length > 1) {

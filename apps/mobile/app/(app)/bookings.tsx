@@ -37,7 +37,7 @@ interface Appointment {
   tenant_locations: { name: string } | null;
   tenants: { name: string } | null;
   appointment_extras?: AppointmentExtra[];
-  coupon?: AppointmentCoupon | null;
+  appointment_coupons?: AppointmentCoupon[];
 }
 
 type Tab = 'upcoming' | 'past';
@@ -181,7 +181,7 @@ export default function BookingsScreen() {
     let query = supabase
       .from('appointments')
       .select(
-        'id, start_time, end_time, status, total_price, services(name), staff(name), tenant_locations(name), tenants(name), appointment_extras(quantity, price_at_booking, extra:service_extras(name)), coupon:coupons(code, discount_value, discount_type)',
+        'id, start_time, end_time, status, total_price, services(name), staff(name), tenant_locations(name), tenants(name), appointment_extras(quantity, price_at_booking, extra:service_extras(name)), appointment_coupons(code, discount_amount, discount_type)',
       )
       .eq('customer_id', customerId)
       .order('start_time', { ascending: isUpcoming });
@@ -257,9 +257,9 @@ export default function BookingsScreen() {
         )}
 
         {/* Show coupon if used */}
-        {item.coupon?.code ? (
+        {item.appointment_coupons?.[0]?.code ? (
           <Text style={styles.couponLine}>
-            {'\uD83C\uDFF7\uFE0F'} {item.coupon.code} applied
+            {'\uD83C\uDFF7\uFE0F'} {item.appointment_coupons[0].code} applied
           </Text>
         ) : null}
 
@@ -282,7 +282,7 @@ export default function BookingsScreen() {
           </View>
 
           <Text style={styles.price}>
-            ${(item.total_price ?? 0).toFixed(2)}{item.coupon?.code ? ' (with discount)' : ''}
+            ${(item.total_price ?? 0).toFixed(2)}{item.appointment_coupons?.[0]?.code ? ' (with discount)' : ''}
           </Text>
         </View>
       </View>
