@@ -18,6 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
+import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
 
 const API_BASE = 'https://balkina-ai.vercel.app';
 
@@ -430,7 +431,7 @@ function renderFormattedText(
 // ── Color hash for initials ──────────────────────────────────────────────────
 
 function nameToColor(name: string): string {
-  const colors = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6'];
+  const colors = ['#6B7FC4', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6'];
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -570,7 +571,7 @@ function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesDa
             key={biz.id}
             style={[
               richCardStyles.businessCard,
-              idx === selectedIdx && { borderWidth: 2, borderColor: '#6366f1' },
+              idx === selectedIdx && { borderWidth: 2, borderColor: '#6B7FC4' },
             ]}
             onPress={() => setSelectedIdx(idx)}
             activeOpacity={0.7}
@@ -1034,7 +1035,7 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
   return (
     <View style={richCardStyles.confirmedCard}>
       <View style={richCardStyles.confirmedCheckCircle}>
-        <Ionicons name="checkmark" size={30} color="#16a34a" />
+        <Ionicons name="checkmark" size={30} color="#fff" />
       </View>
       <Text style={richCardStyles.confirmedTitle}>Appointment Confirmed!</Text>
 
@@ -1151,7 +1152,7 @@ const richCardStyles = StyleSheet.create({
   packageEmoji: { fontSize: 24 },
   packageInfo: { padding: 6 },
   packageName: { fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 16 },
-  packagePrice: { fontSize: 13, fontWeight: '600', color: '#6366f1', marginTop: 2 },
+  packagePrice: { fontSize: 13, fontWeight: '600', color: '#6B7FC4', marginTop: 2 },
   packageCount: { fontSize: 11, color: '#9ca3af' },
   packageSessions: { fontSize: 12, fontWeight: '600', color: '#16a34a', marginTop: 2 },
   ownedBadge: { backgroundColor: '#dcfce7', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, alignSelf: 'flex-start', marginBottom: 2 },
@@ -1160,12 +1161,12 @@ const richCardStyles = StyleSheet.create({
   extrasContainer: { marginVertical: 6 },
   extrasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   extrasChip: { width: '47%', backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#e5e7eb', padding: 10 },
-  extrasChipSelected: { borderColor: '#6366f1', backgroundColor: '#eef2ff' },
+  extrasChipSelected: { borderColor: '#6B7FC4', backgroundColor: '#eef2ff' },
   extrasChipName: { fontSize: 13, fontWeight: '600', color: '#374151' },
   extrasChipNameSelected: { color: '#4338ca' },
   extrasChipDetail: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
-  extrasChipDetailSelected: { color: '#6366f1' },
-  extrasDoneBtn: { backgroundColor: '#6366f1', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 10 },
+  extrasChipDetailSelected: { color: '#6B7FC4' },
+  extrasDoneBtn: { backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 10 },
   extrasDoneBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   // Summary card
   summaryCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
@@ -1178,27 +1179,27 @@ const richCardStyles = StyleSheet.create({
   summaryDeposit: { fontSize: 12, color: '#92400e', marginTop: 4 },
   summaryPoints: { fontSize: 13, fontWeight: '600', color: '#d97706', marginTop: 4 },
   divider: { borderTopWidth: 1, borderTopColor: '#e5e7eb', marginVertical: 12 },
-  confirmBtn: { backgroundColor: '#6366f1', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
+  confirmBtn: { backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
   confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  changeBtn: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6366f1', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 8 },
-  changeBtnText: { color: '#6366f1', fontSize: 14, fontWeight: '600' },
+  changeBtn: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6B7FC4', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 8 },
+  changeBtnText: { color: '#6B7FC4', fontSize: 14, fontWeight: '600' },
   // Confirmed card
-  confirmedCard: { backgroundColor: '#16a34a', borderRadius: 16, padding: 20, alignItems: 'center' },
+  confirmedCard: { backgroundColor: '#EBF0FA', borderRadius: 16, padding: 20, alignItems: 'center' },
   confirmedCheck: { fontSize: 40 },
-  confirmedCheckCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
-  confirmedTitle: { fontSize: 20, fontWeight: '700', color: '#fff', marginTop: 4, marginBottom: 8 },
+  confirmedCheckCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#6B7FC4', justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  confirmedTitle: { fontSize: 20, fontWeight: '700', color: '#111827', marginTop: 4, marginBottom: 8 },
   confirmedRow: { flexDirection: 'row', marginBottom: 5, width: '100%' },
-  confirmedLabel: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.85)', marginRight: 4 },
-  confirmedValue: { fontSize: 14, color: '#fff', flexShrink: 1 },
-  confirmedPoints: { fontSize: 13, fontWeight: '600', color: '#fef08a', marginTop: 8 },
-  directionsBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignSelf: 'flex-start' },
+  confirmedLabel: { fontSize: 14, fontWeight: '700', color: '#374151', marginRight: 4 },
+  confirmedValue: { fontSize: 14, color: '#111827', flexShrink: 1 },
+  confirmedPoints: { fontSize: 13, fontWeight: '600', color: '#6B7FC4', marginTop: 8 },
+  directionsBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 10, backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignSelf: 'flex-start' },
   directionsBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  confirmedDivider: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.3)', marginVertical: 12, width: '100%' },
+  confirmedDivider: { borderTopWidth: 1, borderTopColor: '#d1d5db', marginVertical: 12, width: '100%' },
   confirmedActions: { flexDirection: 'row', gap: 10, marginTop: 4, width: '100%' },
-  confirmedActionBtn: { flex: 1, backgroundColor: '#fff', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
-  confirmedActionBtnSecondary: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#fff' },
-  confirmedActionText: { color: '#16a34a', fontSize: 13, fontWeight: '600' },
-  confirmedActionTextSecondary: { color: '#fff' },
+  confirmedActionBtn: { flex: 1, backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  confirmedActionBtnSecondary: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#6B7FC4' },
+  confirmedActionText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  confirmedActionTextSecondary: { color: '#6B7FC4' },
 });
 
 const combinedStyles = StyleSheet.create({
@@ -1209,18 +1210,18 @@ const combinedStyles = StyleSheet.create({
   serviceChipDetail: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
   // Time slots below staff cards
   slotsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, paddingHorizontal: 2 },
-  slotChip: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6366f1', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, alignItems: 'center' as const },
-  slotChipText: { fontSize: 14, fontWeight: '600', color: '#6366f1' },
+  slotChip: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6B7FC4', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, alignItems: 'center' as const },
+  slotChipText: { fontSize: 14, fontWeight: '600', color: '#6B7FC4' },
   slotStaffLabel: { fontSize: 11, color: '#9ca3af', marginTop: 1 },
   // Booking options (packages + extras combined)
   bookingOptionsContainer: { marginVertical: 6 },
   sectionLabel: { fontSize: 13, fontWeight: '600', color: '#6b7280', marginBottom: 6, marginTop: 4 },
   packageChip: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#e5e7eb', paddingHorizontal: 14, paddingVertical: 10, marginRight: 8 },
-  packageChipSelected: { borderColor: '#6366f1', backgroundColor: '#eef2ff' },
+  packageChipSelected: { borderColor: '#6B7FC4', backgroundColor: '#eef2ff' },
   packageChipName: { fontSize: 14, fontWeight: '600', color: '#374151' },
   packageChipNameSelected: { color: '#4338ca' },
   packageChipDetail: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  packageChipDetailSelected: { color: '#6366f1' },
+  packageChipDetailSelected: { color: '#6B7FC4' },
 });
 
 // ── Action Button ───────────────────────────────────────────────────────────
@@ -1238,8 +1239,8 @@ function ActionButton({ label, onPress }: { label: string; onPress: (label: stri
 }
 
 const actionBtnStyles = StyleSheet.create({
-  btn: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6366f1', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
-  text: { fontSize: 14, fontWeight: '600', color: '#6366f1' },
+  btn: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6B7FC4', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  text: { fontSize: 14, fontWeight: '600', color: '#6B7FC4' },
 });
 
 // ── Render a single card segment ─────────────────────────────────────────────
@@ -1416,7 +1417,7 @@ const bubbleStyles = StyleSheet.create({
   wrapperUser: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   wrapperAssistant: { alignSelf: 'flex-start', alignItems: 'flex-start' },
   bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
-  bubbleUser: { backgroundColor: '#6366f1', borderBottomRightRadius: 4 },
+  bubbleUser: { backgroundColor: '#6B7FC4', borderBottomRightRadius: 4 },
   bubbleAssistant: { backgroundColor: '#f3f4f6', borderBottomLeftRadius: 4 },
   text: { fontSize: 16, lineHeight: 23 },
   textUser: { color: '#fff' },
@@ -1438,7 +1439,7 @@ function SuggestionChip({ label, onPress }: { label: string; onPress: () => void
 
 const chipStyles = StyleSheet.create({
   chip: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, marginRight: 8, marginBottom: 8 },
-  chipText: { fontSize: 15, fontWeight: '500', color: '#6366f1' },
+  chipText: { fontSize: 15, fontWeight: '500', color: '#6B7FC4' },
 });
 
 // ── Main Chat Screen ─────────────────────────────────────────────────────────
@@ -2118,26 +2119,25 @@ export default function ChatScreen() {
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
           <View style={styles.welcomeContainer}>
-            <Text style={styles.greeting}>Hi there 👋</Text>
+            <BalkinaLogo size="large" />
             <Text style={styles.subtitle}>What would you like to book today?</Text>
             <View style={styles.chipsContainer}>
               {categories.map((cat) => (
                 <SuggestionChip
                   key={cat.id}
-                  label={`Find a ${cat.name.toLowerCase()}`}
+                  label={cat.name}
                   onPress={() => handleButtonPress(`Find a ${cat.name.toLowerCase()}`)}
                 />
               ))}
               {categories.length === 0 && (
                 <>
-                  <SuggestionChip label="Book a haircut" onPress={() => handleButtonPress('Book a haircut')} />
-                  <SuggestionChip label="Find a dentist" onPress={() => handleButtonPress('Find a dentist')} />
+                  <SuggestionChip label="Barber" onPress={() => handleButtonPress('Find a barber')} />
+                  <SuggestionChip label="Dentist" onPress={() => handleButtonPress('Find a dentist')} />
+                  <SuggestionChip label="Massage" onPress={() => handleButtonPress('Find a massage therapist')} />
+                  <SuggestionChip label="Nail salon" onPress={() => handleButtonPress('Find a nail salon')} />
                 </>
               )}
             </View>
-            <TouchableOpacity style={styles.startOverLink} onPress={resetConversation} activeOpacity={0.6}>
-              <Text style={styles.startOverText}>Start over</Text>
-            </TouchableOpacity>
           </View>
           <View style={styles.inputBar}>
             <TextInput
@@ -2175,10 +2175,10 @@ export default function ChatScreen() {
       >
         <View style={styles.chatHeader}>
           <TouchableOpacity style={styles.resetBtn} onPress={resetConversation} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={18} color="#6366f1" />
+            <Ionicons name="arrow-back" size={18} color="#6B7FC4" />
             <Text style={styles.resetBtnText}>Start over</Text>
           </TouchableOpacity>
-          <Text style={styles.chatHeaderTitle}>Balkina AI</Text>
+          <BalkinaLogoInline />
           <View style={styles.resetBtnPlaceholder} />
         </View>
 
@@ -2236,16 +2236,16 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   welcomeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   greeting: { fontSize: 34, fontWeight: '700', color: '#111827', marginBottom: 8 },
-  subtitle: { fontSize: 18, color: '#6b7280', marginBottom: 32 },
+  subtitle: { fontSize: 18, color: '#6b7280', marginTop: 20, marginBottom: 28 },
   chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   messagesList: { paddingVertical: 4 },
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f3f4f6', gap: 8 },
   textInput: { flex: 1, minHeight: 40, maxHeight: 100, backgroundColor: '#f9fafb', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 16, color: '#111827', borderWidth: 1, borderColor: '#e5e7eb' },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#6366f1', justifyContent: 'center', alignItems: 'center' },
+  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#6B7FC4', justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { opacity: 0.5 },
   chatHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  resetBtnText: { fontSize: 14, fontWeight: '500', color: '#6366f1' },
+  resetBtnText: { fontSize: 14, fontWeight: '500', color: '#6B7FC4' },
   resetBtnPlaceholder: { width: 90 },
   chatHeaderTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
   startOverLink: { marginTop: 16 },

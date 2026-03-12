@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   logo: {
     fontSize: 36,
     fontWeight: '800',
-    color: '#6366f1',
+    color: '#6B7FC4',
     marginBottom: 8,
   },
   tagline: {
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   btnPrimary: {
-    backgroundColor: '#6366f1',
+    backgroundColor: '#6B7FC4',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',

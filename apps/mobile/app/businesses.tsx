@@ -102,7 +102,7 @@ export default function BusinessListScreen() {
           {item.categories?.name ?? 'Services'}
         </Text>
       </View>
-      <Ionicons name="chatbubble-outline" size={20} color="#6366f1" />
+      <Ionicons name="chatbubble-outline" size={20} color="#6B7FC4" />
     </TouchableOpacity>
   );
 
@@ -161,7 +161,7 @@ export default function BusinessListScreen() {
       {/* List */}
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#6366f1" />
+          <ActivityIndicator size="large" color="#6B7FC4" />
         </View>
       ) : (
         <FlatList
@@ -173,7 +173,7 @@ export default function BusinessListScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#6366f1"
+              tintColor="#6B7FC4"
             />
           }
           ListEmptyComponent={
@@ -233,8 +233,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   pillActive: {
-    backgroundColor: '#6366f1',
-    borderColor: '#6366f1',
+    backgroundColor: '#6B7FC4',
+    borderColor: '#6B7FC4',
   },
   pillText: {
     fontSize: 13,
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#6B7FC4',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,

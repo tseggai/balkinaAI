@@ -89,7 +89,7 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#6366f1" />
+        <ActivityIndicator size="large" color="#6B7FC4" />
       </View>
     );
   }
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#6B7FC4',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 14,

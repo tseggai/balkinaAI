@@ -106,7 +106,7 @@ export default function HomeScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#6366f1" />
+        <ActivityIndicator size="large" color="#6B7FC4" />
       </View>
     );
   }
@@ -117,7 +117,7 @@ export default function HomeScreen() {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6B7FC4" />
         }
       >
         {/* Search */}
@@ -261,7 +261,7 @@ export default function HomeScreen() {
                 <Ionicons
                   name="chatbubble-outline"
                   size={20}
-                  color="#6366f1"
+                  color="#6B7FC4"
                 />
               </TouchableOpacity>
             ))
@@ -340,8 +340,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   categoryPillActive: {
-    backgroundColor: '#6366f1',
-    borderColor: '#6366f1',
+    backgroundColor: '#6B7FC4',
+    borderColor: '#6B7FC4',
   },
   categoryPillText: {
     fontSize: 13,
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#6B7FC4',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -474,12 +474,12 @@ const styles = StyleSheet.create({
     right: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#6366f1',
+    backgroundColor: '#6B7FC4',
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 28,
     elevation: 4,
-    shadowColor: '#6366f1',
+    shadowColor: '#6B7FC4',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
