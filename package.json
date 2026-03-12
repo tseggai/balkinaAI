@@ -24,6 +24,12 @@
     "turbo": "^2.0.14",
     "typescript": "^5.5.0"
   },
+  "overrides": {
+    "@balkina/mobile": {
+      "react": "19.1.0",
+      "react-dom": "19.1.0"
+    }
+  },
   "engines": {
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
