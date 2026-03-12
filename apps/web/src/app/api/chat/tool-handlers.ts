@@ -562,6 +562,7 @@ export async function handleGetServices(
   tenantId: string,
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
+  console.log('[get_services] called with tenantId:', tenantId);
   const serviceId = input.service_id as string | undefined;
 
   // Base query — always scope to tenant
