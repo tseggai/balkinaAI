@@ -1314,7 +1314,7 @@ export async function POST(request: Request) {
       try {
         while (toolRound < MAX_TOOL_ROUNDS) {
           const streamResponse = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: 'gpt-4o',
             max_tokens: 4096,
             tools: chatTools,
             messages: currentMessages,

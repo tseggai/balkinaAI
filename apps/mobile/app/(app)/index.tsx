@@ -147,6 +147,84 @@ function cleanAIMessage(text: string): string {
     .trim();
 }
 
+// ── Fallback: detect plain-text summary and convert to card ──────────────
+
+function tryParseSummaryText(text: string): SummaryCardData | null {
+  if (!text.includes('summary of your booking') && !text.includes('booking summary')) return null;
+
+  const extract = (label: string): string => {
+    const regex = new RegExp(`[-\\*]*\\s*\\*{0,2}${label}:?\\*{0,2}\\s*(.+)`, 'i');
+    const m = text.match(regex);
+    return m?.[1]?.trim() ?? '';
+  };
+
+  const service = extract('Service');
+  const business = extract('Business');
+  if (!service || !business) return null;
+
+  const totalMatch = text.match(/total\s+is\s+\*{0,2}\$?([\d.]+)\*{0,2}/i) ?? text.match(/\*{0,2}Total(?:\s*Price)?:?\*{0,2}\s*\$?([\d.]+)/i);
+  const total = totalMatch ? parseFloat(totalMatch[1]!) : 0;
+
+  const subtotalMatch = text.match(/Subtotal:?\*{0,2}\s*\$?([\d.]+)/i);
+  const subtotal = subtotalMatch ? parseFloat(subtotalMatch[1]!) : total;
+
+  const extrasStr = extract('Extras');
+  const extras = extrasStr && extrasStr.toLowerCase() !== 'none' ? extrasStr.split(',').map(e => e.trim()) : [];
+
+  return {
+    type: 'summary_card',
+    service,
+    extras,
+    business,
+    staff: extract('Staff'),
+    date: extract('Date'),
+    time: extract('Time'),
+    address: extract('Address'),
+    subtotal,
+    extras_total: 0,
+    package_discount: 0,
+    coupon_discount: 0,
+    loyalty_discount: 0,
+    total,
+    points_to_earn: 0,
+  };
+}
+
+// ── Fallback: detect plain-text confirmed booking and convert to card ────
+
+function tryParseConfirmedText(text: string): ConfirmedCardData | null {
+  if (!text.includes('booking is confirmed') && !text.includes('Appointment Confirmed')) return null;
+
+  const extract = (label: string): string => {
+    const regex = new RegExp(`[-\\*]*\\s*\\*{0,2}${label}:?\\*{0,2}\\s*(.+)`, 'i');
+    const m = text.match(regex);
+    return m?.[1]?.trim() ?? '';
+  };
+
+  const service = extract('Service');
+  const business = extract('Business');
+  if (!service || !business) return null;
+
+  const totalMatch = text.match(/\*{0,2}Total(?:\s*Price)?:?\*{0,2}\s*\$?([\d.]+)/i);
+  const total = totalMatch ? parseFloat(totalMatch[1]!) : 0;
+
+  const extrasStr = extract('Extras');
+  const extras = extrasStr && extrasStr.toLowerCase() !== 'none' ? extrasStr.split(',').map(e => e.trim()) : [];
+
+  return {
+    type: 'confirmed_card',
+    service,
+    extras,
+    business,
+    staff: extract('Staff'),
+    date: extract('Date'),
+    time: extract('Time'),
+    address: extract('Address'),
+    total,
+    points_earned: 0,
+  };
+}
+
 // ── Parse [[CARD:...]] blocks from message content ─────────────────────────
 
 function parseCardBlocks(content: string): ParsedSegment[] {
@@ -175,7 +253,21 @@ function parseCardBlocks(content: string): ParsedSegment[] {
     if (remaining) segments.push({ kind: 'text', text: remaining });
   }
 
-  return segments.length > 0 ? segments : [{ kind: 'text', text: content }];
+  if (segments.length > 0) return segments;
+
+  // Fallback: detect plain-text summary and convert to structured card
+  const summaryCard = tryParseSummaryText(content);
+  if (summaryCard) {
+    return [{ kind: 'card', card: summaryCard }];
+  }
+
+  // Fallback: detect plain-text confirmed booking and convert to structured card
+  const confirmedCard = tryParseConfirmedText(content);
+  if (confirmedCard) {
+    return [{ kind: 'card', card: confirmedCard }];
+  }
+
+  return [{ kind: 'text', text: content }];
 }
 
 // ── Parse [[button:...]] and [[link:Label|URL]] ─────────────────────────────
@@ -716,27 +808,27 @@ const richCardStyles = StyleSheet.create({
   businessImg: { width: 280, height: 100, resizeMode: 'cover' },
   businessEmoji: { fontSize: 24 },
   businessInfo: { padding: 8, flex: 1 },
-  businessName: { fontSize: 14, fontWeight: '700', color: '#111827', lineHeight: 18 },
-  businessDistance: { fontSize: 12, color: '#6b7280', marginTop: 2 },
-  businessDrive: { fontSize: 11, color: '#9ca3af' },
+  businessName: { fontSize: 17, fontWeight: '700', color: '#111827', lineHeight: 21 },
+  businessDistance: { fontSize: 15, color: '#6b7280', marginTop: 2 },
+  businessDrive: { fontSize: 14, color: '#9ca3af' },
   // Service cards
   serviceCard: { width: 280, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
   serviceImage: { width: 280, height: 100, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
   serviceImg: { width: 280, height: 100, resizeMode: 'cover' },
   serviceEmoji: { fontSize: 24 },
   serviceInfo: { padding: 8, flex: 1 },
-  serviceName: { fontSize: 14, fontWeight: '700', color: '#111827', lineHeight: 18 },
-  servicePrice: { fontSize: 14, fontWeight: '600', color: '#16a34a', marginTop: 2 },
-  serviceDuration: { fontSize: 12, color: '#9ca3af' },
+  serviceName: { fontSize: 17, fontWeight: '700', color: '#111827', lineHeight: 21 },
+  servicePrice: { fontSize: 17, fontWeight: '600', color: '#16a34a', marginTop: 2 },
+  serviceDuration: { fontSize: 15, color: '#9ca3af' },
   depositBadge: { backgroundColor: '#fef3c7', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, marginTop: 2, alignSelf: 'flex-start' },
-  depositText: { fontSize: 10, color: '#92400e', fontWeight: '600' },
-  // Staff cards
-  staffCard: { width: 250, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, alignItems: 'center', paddingTop: 12, paddingBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
+  depositText: { fontSize: 13, color: '#92400e', fontWeight: '600' },
+  // Staff cards (circle + name, no card background)
+  staffCard: { width: 90, marginRight: 16, alignItems: 'center' },
   staffAvatar: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   staffAvatarImg: { width: 64, height: 64, borderRadius: 32 },
   staffInitials: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  staffName: { fontSize: 14, fontWeight: '600', color: '#111827', marginTop: 8, textAlign: 'center', paddingHorizontal: 8 },
-  staffSlots: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  staffName: { fontSize: 14, fontWeight: '600', color: '#111827', marginTop: 6, textAlign: 'center' },
+  staffSlots: { fontSize: 13, color: '#9ca3af', marginTop: 2, textAlign: 'center' },
   // Package cards
   packageCard: { width: 130, height: 150, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
   packageImage: { width: 130, height: 65, backgroundColor: '#eef2ff', justifyContent: 'center', alignItems: 'center' },
@@ -1124,24 +1216,46 @@ export default function ChatScreen() {
           return;
         }
 
-        const respText = await res.text();
+        // Stream response in real-time using ReadableStream
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
         let fullText = '';
+        let buffer = '';
 
-        const lines = respText.split('\n');
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const jsonStr = line.slice(6).trim();
-          if (!jsonStr) continue;
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          try {
-            const event = JSON.parse(jsonStr) as { type: string; content?: string; name?: string };
-            if (event.type === 'text') {
-              fullText += event.content ?? '';
-            } else if (event.type === 'error' && event.content) {
-              fullText = `Sorry, something went wrong: ${event.content}`;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() ?? ''; // Keep incomplete line in buffer
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              const jsonStr = line.slice(6).trim();
+              if (!jsonStr) continue;
+
+              try {
+                const event = JSON.parse(jsonStr) as { type: string; content?: string; name?: string };
+                if (event.type === 'text') {
+                  fullText += event.content ?? '';
+                  // Update message in real-time as text streams in
+                  const streamedText = fullText;
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantId
+                        ? { ...m, content: streamedText, isStreaming: true }
+                        : m,
+                    ),
+                  );
+                } else if (event.type === 'error' && event.content) {
+                  fullText = `Sorry, something went wrong: ${event.content}`;
+                }
+              } catch {
+                // skip malformed JSON chunks
+              }
             }
-          } catch {
-            // skip malformed JSON chunks
           }
         }
 
