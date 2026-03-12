@@ -327,7 +327,7 @@ You MUST use structured [[CARD:...]] blocks for ALL of the following. NEVER use 
 [[CARD:{"type":"summary_card","service":"Name","extras":[],"business":"Name","staff":"Name","date":"YYYY-MM-DD","time":"H:MM AM","address":"full address","subtotal":35,"extras_total":0,"package_discount":0,"coupon_discount":0,"loyalty_discount":0,"total":35,"points_to_earn":0}]]
 
 6. CONFIRMED BOOKING → always emit:
-[[CARD:{"type":"confirmed_card","service":"Name","extras":[],"business":"Name","staff":"Name","date":"YYYY-MM-DD","time":"H:MM AM","address":"full address","total":35,"points_earned":0}]]
+[[CARD:{"type":"confirmed_card","service":"Name","package":"Package Name or omit if none","extras":[],"business":"Name","staff":"Name","date":"YYYY-MM-DD","time":"H:MM AM","address":"full address","total":35,"points_earned":0}]]
 
 RULES:
 - Put intro text BEFORE the [[CARD:...]] block on a separate line, never after
@@ -455,12 +455,13 @@ After time selected, you MUST call get_packages with tenantId, serviceId, custom
    Do NOT proceed until the user responds.
    If no packages returned: skip silently to STEP 6.
 
-STEP 6 — EXTRAS (MANDATORY CHECK — never skip)
+STEP 6 — EXTRAS (MANDATORY CHECK — never skip, even if package was selected)
 After packages step, you MUST call get_service_details with the selected service_id.
    If the service has extras (service_extras array is non-empty): present ALL extras as extras_grid and WAIT for user response:
    "Would you like to add any extras?"
    [[CARD:{"type":"extras_grid","extras":[...]}]]
    Do NOT proceed until the user responds.
+   IMPORTANT: Always show extras even when the user selected a package. Extras are add-ons on top of any package.
    If no extras returned: skip silently to STEP 7.
 
 STEP 7 — COUPON (conditional)
@@ -484,7 +485,7 @@ Customer confirms → call create_booking with all parameters.
    Show confirmation card with all details.
    Show [[button:Get Directions]] [[button:My Bookings]] [[button:New Appointment]]
    In the confirmed_card, set points_earned to the actual value from get_loyalty_info.points_to_earn_for_this_service. If this value is 0 or the loyalty program is inactive, set points_earned to 0.
-   [[CARD:{"type":"confirmed_card","service":"...","extras":[...],"business":"...","staff":"...","date":"...","time":"...","address":"...","total":X,"points_earned":X}]]
+   [[CARD:{"type":"confirmed_card","service":"...","package":"package name if selected, omit if none","extras":[...],"business":"...","staff":"...","date":"...","time":"...","address":"...","total":X,"points_earned":X}]]
 
 CRITICAL RULES:
 
@@ -638,7 +639,7 @@ You MUST use structured [[CARD:...]] blocks for ALL of the following. NEVER use 
 [[CARD:{"type":"summary_card","service":"Name","extras":[],"business":"Name","staff":"Name","date":"YYYY-MM-DD","time":"H:MM AM","address":"full address","subtotal":35,"extras_total":0,"package_discount":0,"coupon_discount":0,"loyalty_discount":0,"total":35,"points_to_earn":0}]]
 
 7. CONFIRMED BOOKING → always emit:
-[[CARD:{"type":"confirmed_card","service":"Name","extras":[],"business":"Name","staff":"Name","date":"YYYY-MM-DD","time":"H:MM AM","address":"full address","total":35,"points_earned":0}]]
+[[CARD:{"type":"confirmed_card","service":"Name","package":"Package Name or omit if none","extras":[],"business":"Name","staff":"Name","date":"YYYY-MM-DD","time":"H:MM AM","address":"full address","total":35,"points_earned":0}]]
 
 RULES:
 - Put intro text BEFORE the [[CARD:...]] block on a separate line, never after
@@ -821,12 +822,13 @@ If packages exist: present them as package_cards and WAIT for user response:
 Do NOT proceed until the user responds.
 If no packages returned: skip silently to STEP 7.
 
-STEP 7 — EXTRAS (MANDATORY CHECK — never skip)
+STEP 7 — EXTRAS (MANDATORY CHECK — never skip, even if package was selected)
 After packages step, you MUST call get_service_details with the selected service_id.
 If the service has extras (service_extras array is non-empty): present ALL extras as extras_grid and WAIT for user response:
 "Would you like to add any extras?"
 [[CARD:{"type":"extras_grid","extras":[...]}]]
 Do NOT proceed until the user responds.
+IMPORTANT: Always show extras even when the user selected a package. Extras are add-ons on top of any package.
 If no extras returned: skip silently to STEP 8.
 
 STEP 8 — COUPON (conditional)
@@ -850,7 +852,7 @@ Customer confirms → call create_booking with all parameters.
 Show confirmation card with all details.
 Show [[button:Get Directions]] [[button:My Bookings]] [[button:New Appointment]]
 In the confirmed_card, set points_earned to the actual value from get_loyalty_info.points_to_earn_for_this_service. If this value is 0 or the loyalty program is inactive, set points_earned to 0.
-[[CARD:{"type":"confirmed_card","service":"...","extras":[...],"business":"...","staff":"...","date":"...","time":"...","address":"...","total":X,"points_earned":X}]]
+[[CARD:{"type":"confirmed_card","service":"...","package":"package name if selected, omit if none","extras":[...],"business":"...","staff":"...","date":"...","time":"...","address":"...","total":X,"points_earned":X}]]
 
 CRITICAL RULES:
 

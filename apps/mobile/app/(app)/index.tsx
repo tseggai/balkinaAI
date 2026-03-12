@@ -102,6 +102,7 @@ interface SummaryCardData {
 interface ConfirmedCardData {
   type: 'confirmed_card';
   service: string;
+  package?: string;
   extras: string[];
   business: string;
   staff: string;
@@ -323,7 +324,7 @@ const typingStyles = StyleSheet.create({
 
 function BusinessCardRow({ items, onTap }: { items: BusinessCardData[]; onTap: (name: string) => void }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 6 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2 }}>
       {items.map((biz) => (
         <TouchableOpacity
           key={biz.id}
@@ -353,7 +354,7 @@ function BusinessCardRow({ items, onTap }: { items: BusinessCardData[]; onTap: (
 
 function ServiceCardRow({ items, onTap }: { items: ServiceCardData[]; onTap: (name: string) => void }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 6 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2 }}>
       {items.map((svc) => (
         <TouchableOpacity
           key={svc.id}
@@ -388,7 +389,7 @@ function ServiceCardRow({ items, onTap }: { items: ServiceCardData[]; onTap: (na
 
 function StaffCardRow({ items, onTap }: { items: StaffCardData[]; onTap: (name: string) => void }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 6 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2 }}>
       {items.map((staff) => (
         <TouchableOpacity
           key={staff.id}
@@ -426,7 +427,7 @@ function StaffCardRow({ items, onTap }: { items: StaffCardData[]; onTap: (name: 
 
 function PackageCardRow({ items, onTap }: { items: PackageCardData[]; onTap: (name: string) => void }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 6 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2 }}>
       {items.map((pkg) => (
         <TouchableOpacity
           key={pkg.id}
@@ -530,10 +531,10 @@ function ExtrasGridComponent({ data, onSubmit }: { data: ExtrasGridData; onSubmi
 // ── Summary Card (structured) ────────────────────────────────────────────────
 
 function RichSummaryCard({ data, onButtonPress }: { data: SummaryCardData; onButtonPress: (label: string) => void }) {
+  const displayService = data.package || data.service;
   return (
     <View style={richCardStyles.summaryCard}>
-      <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Service:</Text> {data.service}</Text>
-      {data.package ? <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Package:</Text> {data.package}</Text> : null}
+      <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Service:</Text> {displayService}</Text>
       <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Extras:</Text> {data.extras.length > 0 ? data.extras.join(', ') : 'None'}</Text>
       <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Business:</Text> {data.business}</Text>
       <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Staff:</Text> {data.staff}</Text>
@@ -621,17 +622,19 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
     }
   };
 
+  const displayService = data.package || data.service;
+
   return (
     <View style={richCardStyles.confirmedCard}>
       <View style={richCardStyles.confirmedCheckCircle}>
-        <Ionicons name="checkmark" size={28} color="#fff" />
+        <Ionicons name="checkmark" size={30} color="#16a34a" />
       </View>
       <Text style={richCardStyles.confirmedTitle}>Appointment Confirmed!</Text>
 
       <View style={{ width: '100%', marginTop: 8 }}>
         <View style={richCardStyles.confirmedRow}>
           <Text style={richCardStyles.confirmedLabel}>Service:</Text>
-          <Text style={richCardStyles.confirmedValue}>{data.service}</Text>
+          <Text style={richCardStyles.confirmedValue}>{displayService}</Text>
         </View>
         {data.extras.length > 0 ? (
           <View style={richCardStyles.confirmedRow}>
@@ -672,17 +675,17 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
             onPress={openDirections}
             activeOpacity={0.7}
           >
-            <Ionicons name="navigate-outline" size={16} color="#4f46e5" style={{ marginRight: 6 }} />
-            <Text style={richCardStyles.directionsBtnText}>📍 Get Directions</Text>
+            <Ionicons name="navigate-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+            <Text style={richCardStyles.directionsBtnText}>Get Directions</Text>
           </TouchableOpacity>
         </>
       ) : null}
 
       {data.points_earned > 0 ? (
-        <Text style={richCardStyles.confirmedPoints}>⭐ +{data.points_earned} pts</Text>
+        <Text style={richCardStyles.confirmedPoints}>+{data.points_earned} pts earned</Text>
       ) : null}
 
-      <View style={richCardStyles.divider} />
+      <View style={richCardStyles.confirmedDivider} />
 
       <View style={richCardStyles.confirmedActions}>
         <TouchableOpacity
@@ -708,32 +711,32 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
 
 const richCardStyles = StyleSheet.create({
   // Business cards
-  businessCard: { width: 160, height: 170, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
-  businessImage: { width: 160, height: 100, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
-  businessImg: { width: 160, height: 100, resizeMode: 'cover' },
+  businessCard: { width: 280, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
+  businessImage: { width: 280, height: 100, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
+  businessImg: { width: 280, height: 100, resizeMode: 'cover' },
   businessEmoji: { fontSize: 24 },
-  businessInfo: { padding: 6, flex: 1 },
-  businessName: { fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 16 },
-  businessDistance: { fontSize: 11, color: '#6b7280', marginTop: 2 },
+  businessInfo: { padding: 8, flex: 1 },
+  businessName: { fontSize: 14, fontWeight: '700', color: '#111827', lineHeight: 18 },
+  businessDistance: { fontSize: 12, color: '#6b7280', marginTop: 2 },
   businessDrive: { fontSize: 11, color: '#9ca3af' },
   // Service cards
-  serviceCard: { width: 170, height: 175, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
-  serviceImage: { width: 170, height: 100, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
-  serviceImg: { width: 170, height: 100, resizeMode: 'cover' },
+  serviceCard: { width: 280, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
+  serviceImage: { width: 280, height: 100, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
+  serviceImg: { width: 280, height: 100, resizeMode: 'cover' },
   serviceEmoji: { fontSize: 24 },
-  serviceInfo: { padding: 6, flex: 1 },
-  serviceName: { fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 16 },
-  servicePrice: { fontSize: 13, fontWeight: '600', color: '#16a34a', marginTop: 2 },
-  serviceDuration: { fontSize: 11, color: '#9ca3af' },
+  serviceInfo: { padding: 8, flex: 1 },
+  serviceName: { fontSize: 14, fontWeight: '700', color: '#111827', lineHeight: 18 },
+  servicePrice: { fontSize: 14, fontWeight: '600', color: '#16a34a', marginTop: 2 },
+  serviceDuration: { fontSize: 12, color: '#9ca3af' },
   depositBadge: { backgroundColor: '#fef3c7', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, marginTop: 2, alignSelf: 'flex-start' },
   depositText: { fontSize: 10, color: '#92400e', fontWeight: '600' },
   // Staff cards
-  staffCard: { width: 115, height: 130, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, alignItems: 'center', paddingTop: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
+  staffCard: { width: 250, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, alignItems: 'center', paddingTop: 12, paddingBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
   staffAvatar: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   staffAvatarImg: { width: 64, height: 64, borderRadius: 32 },
   staffInitials: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  staffName: { fontSize: 12, fontWeight: '600', color: '#111827', marginTop: 6, textAlign: 'center', paddingHorizontal: 4 },
-  staffSlots: { fontSize: 10, color: '#9ca3af', marginTop: 2 },
+  staffName: { fontSize: 14, fontWeight: '600', color: '#111827', marginTop: 8, textAlign: 'center', paddingHorizontal: 8 },
+  staffSlots: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
   // Package cards
   packageCard: { width: 130, height: 150, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
   packageImage: { width: 130, height: 65, backgroundColor: '#eef2ff', justifyContent: 'center', alignItems: 'center' },
@@ -773,21 +776,22 @@ const richCardStyles = StyleSheet.create({
   changeBtn: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6366f1', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 8 },
   changeBtnText: { color: '#6366f1', fontSize: 14, fontWeight: '600' },
   // Confirmed card
-  confirmedCard: { backgroundColor: '#dcfce7', borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: '#86efac', alignItems: 'center' },
+  confirmedCard: { backgroundColor: '#16a34a', borderRadius: 16, padding: 20, alignItems: 'center' },
   confirmedCheck: { fontSize: 40 },
-  confirmedCheckCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#16a34a', justifyContent: 'center', alignItems: 'center' },
-  confirmedTitle: { fontSize: 18, fontWeight: '700', color: '#065f46', marginTop: 6, marginBottom: 6 },
-  confirmedRow: { flexDirection: 'row', marginBottom: 4, width: '100%' },
-  confirmedLabel: { fontSize: 14, fontWeight: '700', color: '#374151', marginRight: 4 },
-  confirmedValue: { fontSize: 14, color: '#374151', flexShrink: 1 },
-  confirmedPoints: { fontSize: 13, fontWeight: '600', color: '#d97706', marginTop: 8 },
-  directionsBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 8, backgroundColor: '#eef2ff', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignSelf: 'flex-start' },
-  directionsBtnText: { fontSize: 14, fontWeight: '600', color: '#4f46e5' },
+  confirmedCheckCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  confirmedTitle: { fontSize: 20, fontWeight: '700', color: '#fff', marginTop: 4, marginBottom: 8 },
+  confirmedRow: { flexDirection: 'row', marginBottom: 5, width: '100%' },
+  confirmedLabel: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.85)', marginRight: 4 },
+  confirmedValue: { fontSize: 14, color: '#fff', flexShrink: 1 },
+  confirmedPoints: { fontSize: 13, fontWeight: '600', color: '#fef08a', marginTop: 8 },
+  directionsBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignSelf: 'flex-start' },
+  directionsBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  confirmedDivider: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.3)', marginVertical: 12, width: '100%' },
   confirmedActions: { flexDirection: 'row', gap: 10, marginTop: 4, width: '100%' },
-  confirmedActionBtn: { flex: 1, backgroundColor: '#6366f1', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
-  confirmedActionBtnSecondary: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#6366f1' },
-  confirmedActionText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  confirmedActionTextSecondary: { color: '#6366f1' },
+  confirmedActionBtn: { flex: 1, backgroundColor: '#fff', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  confirmedActionBtnSecondary: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#fff' },
+  confirmedActionText: { color: '#16a34a', fontSize: 13, fontWeight: '600' },
+  confirmedActionTextSecondary: { color: '#fff' },
 });
 
 // ── Action Button ───────────────────────────────────────────────────────────

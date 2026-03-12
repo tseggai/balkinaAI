@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 
 type Tab = 'profile' | 'billing' | 'notifications' | 'widget';
@@ -11,6 +12,7 @@ interface TenantInfo {
   owner_name: string;
   email: string;
   phone: string | null;
+  logo_url: string | null;
   stripe_customer_id: string | null;
   subscription_plan_id: string | null;
 }
@@ -22,6 +24,9 @@ export default function SettingsPage() {
   const [form, setForm] = useState({ name: '', phone: '' });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchTenant = useCallback(async () => {
     const supabase = createClient();
@@ -30,7 +35,7 @@ export default function SettingsPage() {
 
     const { data } = await supabase
       .from('tenants')
-      .select('id, name, owner_name, email, phone, stripe_customer_id, subscription_plan_id')
+      .select('id, name, owner_name, email, phone, logo_url, stripe_customer_id, subscription_plan_id')
       .eq('user_id', user.id)
       .single();
 
@@ -38,11 +43,79 @@ export default function SettingsPage() {
     if (tenantInfo) {
       setTenant(tenantInfo);
       setForm({ name: tenantInfo.name, phone: tenantInfo.phone ?? '' });
+      setLogoPreview(tenantInfo.logo_url);
     }
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchTenant(); }, [fetchTenant]);
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !tenant) return;
+
+    if (!file.type.startsWith('image/')) {
+      setMessage('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage('Image must be under 5MB');
+      return;
+    }
+
+    setUploadingLogo(true);
+    setMessage('');
+
+    const supabase = createClient();
+    const ext = file.name.split('.').pop() ?? 'png';
+    const filePath = `tenant-logos/${tenant.id}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('public-assets')
+      .upload(filePath, file, { upsert: true, contentType: file.type });
+
+    if (uploadError) {
+      setUploadingLogo(false);
+      setMessage('Failed to upload logo');
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from('public-assets').getPublicUrl(filePath);
+    const logoUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+    const { error: updateError } = await supabase
+      .from('tenants')
+      .update({ logo_url: logoUrl } as never)
+      .eq('id', tenant.id);
+
+    setUploadingLogo(false);
+    if (updateError) {
+      setMessage('Failed to save logo URL');
+      return;
+    }
+
+    setLogoPreview(logoUrl);
+    setMessage('Logo updated!');
+    fetchTenant();
+  }
+
+  async function handleRemoveLogo() {
+    if (!tenant) return;
+    setUploadingLogo(true);
+    setMessage('');
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('tenants')
+      .update({ logo_url: null } as never)
+      .eq('id', tenant.id);
+
+    setUploadingLogo(false);
+    if (error) { setMessage('Failed to remove logo'); return; }
+    setLogoPreview(null);
+    setMessage('Logo removed');
+    fetchTenant();
+  }
 
   async function handleProfileSave(e: React.FormEvent) {
     e.preventDefault();
@@ -110,6 +183,49 @@ export default function SettingsPage() {
         {/* Business Profile */}
         {tab === 'profile' && (
           <form onSubmit={handleProfileSave} className="space-y-5">
+            {/* Business Logo */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Business Logo</label>
+              <div className="flex items-center gap-4">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
+                  {logoPreview ? (
+                    <Image src={logoPreview} alt="Business logo" fill className="object-cover" unoptimized />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-2xl text-gray-400">
+                      {tenant?.name?.charAt(0)?.toUpperCase() ?? '?'}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingLogo}
+                    className="rounded-lg border border-gray-300 px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {uploadingLogo ? 'Uploading...' : logoPreview ? 'Change Logo' : 'Upload Logo'}
+                  </button>
+                  {logoPreview && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveLogo}
+                      disabled={uploadingLogo}
+                      className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  )}
+                  <p className="text-xs text-gray-400">PNG, JPG up to 5MB</p>
+                </div>
+              </div>
+            </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Business Name</label>
               <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
