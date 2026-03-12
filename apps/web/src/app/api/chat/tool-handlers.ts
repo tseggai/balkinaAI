@@ -1105,18 +1105,18 @@ export async function handleBookAppointment(
   const svc = service as { duration_minutes: number; price: number; deposit_enabled: boolean; deposit_type: string | null; deposit_amount: number | null; tenant_id: string };
 
   // Unpack customer
-  let customerId = customerResult.id;
+  const customerId = customerResult.id;
   if (!customerId) {
     return { success: false, error: `Failed to create customer: ${(customerResult as { error?: string }).error ?? 'Unknown error'}` };
   }
 
   // Unpack location & timezone
-  let finalLocationId = locationResult.id;
+  const finalLocationId = locationResult.id;
   const bookingTimezone = locationResult.timezone;
   const locationAddress = locationResult.address;
 
   // Unpack staff
-  let finalStaffId = staffResult.id;
+  const finalStaffId = staffResult.id;
   const staffName = staffResult.name;
 
   // 2. Calculate start/end times
