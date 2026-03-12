@@ -238,7 +238,7 @@ export default function BookingsScreen() {
 
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#6366f1" />
+          <ActivityIndicator size="large" color="#6B7FC4" />
         </View>
       ) : (
         <FlatList
@@ -250,7 +250,7 @@ export default function BookingsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#6366f1"
+              tintColor="#6B7FC4"
             />
           }
           ListEmptyComponent={
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: '#6366f1',
+    borderBottomColor: '#6B7FC4',
   },
   tabText: {
     fontSize: 14,
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
   },
   tabTextActive: {
-    color: '#6366f1',
+    color: '#6B7FC4',
   },
   list: {
     padding: 16,

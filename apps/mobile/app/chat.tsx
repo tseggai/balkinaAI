@@ -174,7 +174,7 @@ const bubbleStyles = StyleSheet.create({
     borderRadius: 18,
   },
   bubbleUser: {
-    backgroundColor: '#6366f1',
+    backgroundColor: '#6B7FC4',
     borderBottomRightRadius: 4,
   },
   bubbleAssistant: {
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#6B7FC4',
     justifyContent: 'center',
     alignItems: 'center',
   },

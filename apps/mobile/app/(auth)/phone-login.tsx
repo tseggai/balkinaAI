@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   btn: {
-    backgroundColor: '#6366f1',
+    backgroundColor: '#6B7FC4',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnSecondaryText: {
-    color: '#6366f1',
+    color: '#6B7FC4',
     fontSize: 16,
     fontWeight: '600',
   },
