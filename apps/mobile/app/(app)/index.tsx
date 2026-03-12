@@ -21,6 +21,48 @@ import * as Location from 'expo-location';
 
 const API_BASE = 'https://balkina-ai.vercel.app';
 
+// ── Booking State (Phase 2 — client-side flow) ──────────────────────────────
+
+interface BookingState {
+  tenantId: string | null;
+  tenantName: string | null;
+  serviceId: string | null;
+  serviceName: string | null;
+  servicePrice: number | null;
+  serviceDuration: number | null;
+  depositEnabled: boolean;
+  depositAmount: number | null;
+  date: string | null; // YYYY-MM-DD
+  staffId: string | null;
+  staffName: string | null;
+  timeSlot: string | null; // display time like "10:00 AM"
+  timeSlotIso: string | null; // ISO string
+  selectedPackage: string | null;
+  selectedExtras: string[];
+  extrasTotal: number;
+  address: string | null;
+}
+
+const INITIAL_BOOKING_STATE: BookingState = {
+  tenantId: null,
+  tenantName: null,
+  serviceId: null,
+  serviceName: null,
+  servicePrice: null,
+  serviceDuration: null,
+  depositEnabled: false,
+  depositAmount: null,
+  date: null,
+  staffId: null,
+  staffName: null,
+  timeSlot: null,
+  timeSlotIso: null,
+  selectedPackage: null,
+  selectedExtras: [],
+  extrasTotal: 0,
+  address: null,
+};
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface ChatMessage {
@@ -1403,12 +1445,17 @@ export default function ChatScreen() {
   const [customerEmail, setCustomerEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [bookingState, setBookingState] = useState<BookingState>(INITIAL_BOOKING_STATE);
+  // Track recently displayed service cards so we can match taps to IDs
+  const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; tenantId?: string; tenantName?: string }[]>([]);
 
   const resetConversation = useCallback(() => {
     setMessages([]);
     setInput('');
     setIsLoading(false);
     setSessionId(generateId());
+    setBookingState(INITIAL_BOOKING_STATE);
+    lastDisplayedServices.current = [];
   }, []);
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
@@ -1452,12 +1499,329 @@ export default function ChatScreen() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  // ── Client-side helpers for Phase 2 ──────────────────────────────────────
+
+  const addAssistantMessage = useCallback((content: string) => {
+    const id = `assistant_local_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const msg: ChatMessage = { id, role: 'assistant', content, type: 'text', isStreaming: false };
+    setMessages((prev) => [...prev, msg]);
+    return id;
+  }, []);
+
+  const addUserMessage = useCallback((content: string) => {
+    const id = `user_${Date.now()}`;
+    const msg: ChatMessage = { id, role: 'user', content, type: 'text' };
+    setMessages((prev) => [...prev, msg]);
+    return id;
+  }, []);
+
+  // Generate date buttons for the next 7 days
+  const getDateButtons = useCallback(() => {
+    const buttons: string[] = [];
+    const today = new Date();
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : `${dayNames[d.getDay()]} ${monthNames[d.getMonth()]} ${d.getDate()}`;
+      buttons.push(label);
+    }
+    return buttons;
+  }, []);
+
+  // Parse a date button label back to YYYY-MM-DD
+  const parseDateLabel = useCallback((label: string): string => {
+    const today = new Date();
+    if (label === 'Today') {
+      return today.toISOString().split('T')[0]!;
+    }
+    if (label === 'Tomorrow') {
+      const d = new Date(today);
+      d.setDate(today.getDate() + 1);
+      return d.toISOString().split('T')[0]!;
+    }
+    // Parse "Wed Mar 15" style
+    for (let i = 2; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const check = `${dayNames[d.getDay()]} ${monthNames[d.getMonth()]} ${d.getDate()}`;
+      if (check === label) return d.toISOString().split('T')[0]!;
+    }
+    return today.toISOString().split('T')[0]!;
+  }, []);
+
+  // Show date picker buttons locally
+  const showDatePicker = useCallback(() => {
+    const buttons = getDateButtons();
+    const buttonMarkup = buttons.map((b) => `[[button:${b}]]`).join('');
+    addAssistantMessage(`When would you like your appointment?\n\n${buttonMarkup}`);
+  }, [getDateButtons, addAssistantMessage]);
+
+  // Fetch staff + availability from direct API
+  const fetchStaffAvailability = useCallback(async (tenantId: string, serviceId: string, date: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/booking/staff-availability`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId, serviceId, date, customerId: null, userId }),
+      });
+      if (!res.ok) {
+        addAssistantMessage('Sorry, I could not check availability. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+      const data = (await res.json()) as {
+        staff: { id: string; name: string; image_url: string | null; available_slots_count: number; slots: { time: string; iso: string }[] }[];
+        anyone_slots: { time: string; iso: string; staff_name: string }[];
+        message?: string;
+      };
+
+      if (data.message || data.staff.length === 0) {
+        addAssistantMessage(data.message || 'No availability found for this date. Please try another date.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Build a staff_with_slots card
+      const card: StaffWithSlotsData = {
+        type: 'staff_with_slots',
+        items: data.staff.map((s) => ({
+          type: 'staff_card' as const,
+          id: s.id,
+          name: s.name,
+          image_url: s.image_url ?? undefined,
+          available_slots_count: s.available_slots_count,
+          slots: s.slots.map((sl) => ({ time: sl.time, iso: sl.iso })),
+        })),
+        anyone_slots: data.anyone_slots.map((sl) => ({ time: sl.time, iso: sl.iso, staff_name: sl.staff_name })),
+      };
+
+      addAssistantMessage(`Here are the available staff and time slots:\n\n[[CARD:${JSON.stringify(card)}]]`);
+    } catch {
+      addAssistantMessage('Connection error while checking availability. Please try again.');
+    }
+    setIsLoading(false);
+  }, [userId, addAssistantMessage]);
+
+  // Fetch packages + extras from direct API
+  const fetchBookingOptions = useCallback(async (tenantId: string, serviceId: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/booking/options`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId, serviceId, customerId: null }),
+      });
+      if (!res.ok) {
+        addAssistantMessage('Sorry, I could not load options. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+      const data = (await res.json()) as {
+        packages: { id: string; name: string; price?: number; image_url?: string; package_services: { quantity: number }[] }[];
+        customer_packages: { id: string; package: { name: string; price: number } | null; sessions: { sessions_remaining: number }[] }[];
+        extras: { id: string; name: string; price: number; duration_minutes: number }[];
+      };
+
+      const hasPackages = data.packages.length > 0 || data.customer_packages.length > 0;
+      const hasExtras = data.extras.length > 0;
+
+      if (!hasPackages && !hasExtras) {
+        // Skip options, go straight to summary
+        setIsLoading(false);
+        return 'skip';
+      }
+
+      const packageCards: PackageCardData[] = [
+        ...data.packages.map((p) => ({
+          type: 'package_card' as const,
+          id: p.id,
+          name: p.name,
+          image_url: p.image_url,
+          price: (p.price as number) ?? 0,
+          services_count: p.package_services?.reduce((sum, ps) => sum + ps.quantity, 0) ?? 1,
+          customer_owned: false,
+        })),
+        ...data.customer_packages.map((cp) => ({
+          type: 'package_card' as const,
+          id: cp.id,
+          name: cp.package?.name ?? 'Package',
+          price: cp.package?.price ?? 0,
+          services_count: 0,
+          customer_owned: true,
+          sessions_remaining: cp.sessions?.[0]?.sessions_remaining ?? 0,
+        })),
+      ];
+
+      const card: BookingOptionsData = {
+        type: 'booking_options',
+        packages: packageCards,
+        extras: data.extras,
+      };
+
+      addAssistantMessage(`Choose any packages or extras:\n\n[[CARD:${JSON.stringify(card)}]]`);
+    } catch {
+      addAssistantMessage('Connection error while loading options. Please try again.');
+    }
+    setIsLoading(false);
+    return 'shown';
+  }, [addAssistantMessage]);
+
+  // Build and show summary card locally
+  const showSummaryCard = useCallback((state: BookingState) => {
+    const subtotal = state.servicePrice ?? 0;
+    const total = subtotal + state.extrasTotal;
+    const card: SummaryCardData = {
+      type: 'summary_card',
+      service: state.serviceName ?? 'Unknown',
+      package: state.selectedPackage ?? undefined,
+      extras: state.selectedExtras,
+      business: state.tenantName ?? 'Unknown',
+      staff: state.staffName ?? 'Anyone',
+      date: state.date ?? '',
+      time: state.timeSlot ?? '',
+      address: state.address ?? '',
+      subtotal,
+      extras_total: state.extrasTotal,
+      package_discount: 0,
+      coupon_discount: 0,
+      loyalty_discount: 0,
+      total,
+      deposit_required: state.depositEnabled ? (state.depositAmount ?? 0) : undefined,
+      points_to_earn: 0,
+    };
+    addAssistantMessage(`Here's your booking summary:\n\n[[CARD:${JSON.stringify(card)}]]`);
+  }, [addAssistantMessage]);
+
+  // ── Client-side flow interceptor ──────────────────────────────────────────
+
+  const handleClientSideFlow = useCallback(
+    async (userText: string): Promise<boolean> => {
+      // Phase 2: intercept deterministic steps and handle locally
+
+      // Check if user selected a service (match against recently displayed cards)
+      const serviceAtBusinessMatch = userText.match(/^(.+) at (.+)$/);
+
+      // Match service selection from service_cards (just service name)
+      if (!bookingState.serviceId) {
+        const matchedService = lastDisplayedServices.current.find((s) => {
+          // Match "ServiceName" (from service_cards) or "ServiceName at BusinessName" (from business_with_services)
+          if (s.name === userText) return true;
+          if (serviceAtBusinessMatch && s.name === serviceAtBusinessMatch[1]?.trim() && s.tenantName === serviceAtBusinessMatch[2]?.trim()) return true;
+          return false;
+        });
+
+        if (matchedService) {
+          addUserMessage(userText);
+          const newState: BookingState = {
+            ...INITIAL_BOOKING_STATE,
+            tenantId: matchedService.tenantId ?? bookingState.tenantId,
+            tenantName: matchedService.tenantName ?? bookingState.tenantName,
+            serviceId: matchedService.id,
+            serviceName: matchedService.name,
+            servicePrice: matchedService.price,
+            serviceDuration: matchedService.duration_minutes,
+            depositEnabled: matchedService.deposit_enabled,
+            depositAmount: matchedService.deposit_amount ?? null,
+          };
+          setBookingState(newState);
+          // Show date picker locally — no GPT call needed
+          showDatePicker();
+          return true;
+        }
+      }
+
+      // If we have tenantId+serviceId set and no date yet → user may be picking a date
+      if (bookingState.serviceId && !bookingState.date) {
+        const dateButtons = getDateButtons();
+        if (dateButtons.includes(userText)) {
+          const dateStr = parseDateLabel(userText);
+          const newState = { ...bookingState, date: dateStr };
+          setBookingState(newState);
+          addUserMessage(userText);
+          fetchStaffAvailability(newState.tenantId!, newState.serviceId!, dateStr);
+          return true;
+        }
+      }
+
+      // If we have date set but no time slot → user is picking a time slot
+      // Pattern: "10:00 AM with StaffName" or just "10:00 AM"
+      if (bookingState.date && !bookingState.timeSlot) {
+        const timeMatch = userText.match(/^(\d{1,2}:\d{2}\s*[AP]M)\s*(?:with\s+(.+))?$/i);
+        if (timeMatch) {
+          const time = timeMatch[1]!;
+          const staffName = timeMatch[2] ?? null;
+          const newState = { ...bookingState, timeSlot: time, staffName: staffName || bookingState.staffName };
+          setBookingState(newState);
+          addUserMessage(userText);
+
+          // Fetch booking options (packages + extras)
+          const result = await fetchBookingOptions(newState.tenantId!, newState.serviceId!);
+          if (result === 'skip') {
+            // No packages or extras — show summary directly
+            showSummaryCard(newState);
+          }
+          return true;
+        }
+      }
+
+      // If we have time slot set but no package/extras selection yet → user is submitting options
+      if (bookingState.timeSlot && bookingState.selectedPackage === null && bookingState.selectedExtras.length === 0) {
+        // Check for options submission patterns
+        if (userText.startsWith('Package:') || userText.startsWith('Extras:') || userText === 'No packages or extras' || userText === 'Skip') {
+          addUserMessage(userText);
+
+          // Parse selections
+          let selectedPkg: string | null = null;
+          let selectedExtraNames: string[] = [];
+          let extrasTotal = 0;
+
+          const pkgMatch = userText.match(/Package:\s*(.+?)(?:\.\s*Extras:|$)/);
+          if (pkgMatch) selectedPkg = pkgMatch[1]!.trim();
+
+          const extrasMatch = userText.match(/Extras:\s*(.+)$/);
+          if (extrasMatch) {
+            selectedExtraNames = extrasMatch[1]!.split(',').map((e) => e.trim());
+          }
+
+          const newState = {
+            ...bookingState,
+            selectedPackage: selectedPkg,
+            selectedExtras: selectedExtraNames,
+            extrasTotal,
+          };
+          setBookingState(newState);
+          showSummaryCard(newState);
+          return true;
+        }
+      }
+
+      // Handle "Confirm Booking" from summary card — send to GPT for create_booking
+      if (userText === 'Confirm Booking' && bookingState.serviceId && bookingState.date && bookingState.timeSlot) {
+        // Let this go through to GPT — it needs to execute create_booking tool
+        return false;
+      }
+
+      return false;
+    },
+    [bookingState, getDateButtons, parseDateLabel, addUserMessage, fetchStaffAvailability, fetchBookingOptions, showSummaryCard],
+  );
+
   const sendMessage = useCallback(
     async (text?: string) => {
       const trimmed = (text ?? input).trim();
       if (!trimmed || isLoading) return;
 
       Keyboard.dismiss();
+      setInput('');
+
+      // Phase 2: try client-side handling first (deterministic steps)
+      const handled = await handleClientSideFlow(trimmed);
+      if (handled) return;
 
       const userMsg: ChatMessage = {
         id: `user_${Date.now()}`,
@@ -1476,7 +1840,6 @@ export default function ChatScreen() {
       };
 
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
-      setInput('');
       setIsLoading(true);
 
       try {
@@ -1590,6 +1953,49 @@ export default function ChatScreen() {
               : m,
           ),
         );
+
+        // Phase 2: Extract booking state from GPT response to capture service/business IDs
+        try {
+          const cardRegex = /\[\[CARD:([\s\S]*?)\]\]/g;
+          let cm: RegExpExecArray | null;
+          while ((cm = cardRegex.exec(fullText)) !== null) {
+            const cardData = JSON.parse(cm[1]!) as { type: string; [key: string]: unknown };
+
+            if (cardData.type === 'service_cards') {
+              const items = cardData.items as { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number }[];
+              if (items?.length) {
+                const tenantIdFromBody = (body as { tenantId?: string }).tenantId;
+                lastDisplayedServices.current = items.map((s) => ({
+                  ...s,
+                  tenantId: tenantIdFromBody,
+                }));
+                if (tenantIdFromBody) {
+                  setBookingState((prev) => ({ ...prev, tenantId: tenantIdFromBody }));
+                }
+              }
+            }
+
+            if (cardData.type === 'business_with_services') {
+              const items = cardData.items as { id: string; name: string; services: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number }[] }[];
+              if (items?.length) {
+                const allServices: typeof lastDisplayedServices.current = [];
+                for (const biz of items) {
+                  for (const svc of biz.services ?? []) {
+                    allServices.push({
+                      ...svc,
+                      deposit_enabled: svc.deposit_enabled ?? false,
+                      tenantId: biz.id,
+                      tenantName: biz.name,
+                    });
+                  }
+                }
+                lastDisplayedServices.current = allServices;
+              }
+            }
+          }
+        } catch {
+          // Non-critical — state extraction failed silently
+        }
       } catch {
         setMessages((prev) =>
           prev.map((m) =>
@@ -1602,7 +2008,7 @@ export default function ChatScreen() {
 
       setIsLoading(false);
     },
-    [input, isLoading, sessionId, customerName, customerPhone, customerEmail, userId, userCoords],
+    [input, isLoading, sessionId, customerName, customerPhone, customerEmail, userId, userCoords, handleClientSideFlow],
   );
 
   const handleButtonPress = useCallback(
