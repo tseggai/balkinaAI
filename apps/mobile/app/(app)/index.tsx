@@ -1454,6 +1454,7 @@ export default function ChatScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [bookingState, setBookingState] = useState<BookingState>(INITIAL_BOOKING_STATE);
+  const [categories, setCategories] = useState<{ id: string; name: string; slug: string }[]>([]);
   // Track recently displayed service cards so we can match taps to IDs
   const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; tenantId?: string; tenantName?: string }[]>([]);
 
@@ -1467,6 +1468,18 @@ export default function ChatScreen() {
   }, []);
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data } = await supabase
+        .from('categories')
+        .select('id, name, slug')
+        .is('parent_id', null)
+        .order('display_order');
+      if (data) setCategories(data as { id: string; name: string; slug: string }[]);
+    };
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -2108,10 +2121,19 @@ export default function ChatScreen() {
             <Text style={styles.greeting}>Hi there 👋</Text>
             <Text style={styles.subtitle}>What would you like to book today?</Text>
             <View style={styles.chipsContainer}>
-              <SuggestionChip label="Book a haircut" onPress={() => handleButtonPress('Book a haircut')} />
-              <SuggestionChip label="Find a dentist" onPress={() => handleButtonPress('Find a dentist')} />
-              <SuggestionChip label="My appointments" onPress={() => handleButtonPress('My appointments')} />
-              <SuggestionChip label="Cancel a booking" onPress={() => handleButtonPress('Cancel a booking')} />
+              {categories.map((cat) => (
+                <SuggestionChip
+                  key={cat.id}
+                  label={`Find a ${cat.name.toLowerCase()}`}
+                  onPress={() => handleButtonPress(`Find a ${cat.name.toLowerCase()}`)}
+                />
+              ))}
+              {categories.length === 0 && (
+                <>
+                  <SuggestionChip label="Book a haircut" onPress={() => handleButtonPress('Book a haircut')} />
+                  <SuggestionChip label="Find a dentist" onPress={() => handleButtonPress('Find a dentist')} />
+                </>
+              )}
             </View>
             <TouchableOpacity style={styles.startOverLink} onPress={resetConversation} activeOpacity={0.6}>
               <Text style={styles.startOverText}>Start over</Text>
