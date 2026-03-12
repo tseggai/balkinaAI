@@ -807,7 +807,7 @@ const richCardStyles = StyleSheet.create({
   businessImage: { width: 280, height: 100, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
   businessImg: { width: 280, height: 100, resizeMode: 'cover' },
   businessEmoji: { fontSize: 24 },
-  businessInfo: { padding: 8, flex: 1 },
+  businessInfo: { padding: 8 },
   businessName: { fontSize: 17, fontWeight: '700', color: '#111827', lineHeight: 21 },
   businessDistance: { fontSize: 15, color: '#6b7280', marginTop: 2 },
   businessDrive: { fontSize: 14, color: '#9ca3af' },
@@ -816,7 +816,7 @@ const richCardStyles = StyleSheet.create({
   serviceImage: { width: 280, height: 100, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
   serviceImg: { width: 280, height: 100, resizeMode: 'cover' },
   serviceEmoji: { fontSize: 24 },
-  serviceInfo: { padding: 8, flex: 1 },
+  serviceInfo: { padding: 8 },
   serviceName: { fontSize: 17, fontWeight: '700', color: '#111827', lineHeight: 21 },
   servicePrice: { fontSize: 17, fontWeight: '600', color: '#16a34a', marginTop: 2 },
   serviceDuration: { fontSize: 15, color: '#9ca3af' },
@@ -834,7 +834,7 @@ const richCardStyles = StyleSheet.create({
   packageImage: { width: 130, height: 65, backgroundColor: '#eef2ff', justifyContent: 'center', alignItems: 'center' },
   packageImg: { width: 130, height: 65, resizeMode: 'cover' },
   packageEmoji: { fontSize: 24 },
-  packageInfo: { padding: 6, flex: 1 },
+  packageInfo: { padding: 6 },
   packageName: { fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 16 },
   packagePrice: { fontSize: 13, fontWeight: '600', color: '#6366f1', marginTop: 2 },
   packageCount: { fontSize: 11, color: '#9ca3af' },
@@ -968,10 +968,15 @@ function MessageBubble({
 
   return (
     <Animated.View
-      style={[bubbleStyles.wrapper, bubbleStyles.wrapperAssistant, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
+      style={[
+        bubbleStyles.wrapper,
+        bubbleStyles.wrapperAssistant,
+        hasCards && { maxWidth: '100%' },
+        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+      ]}
     >
       {message.isStreaming ? (
-        <View style={[bubbleStyles.bubble, bubbleStyles.bubbleAssistant]}>
+        <View style={[bubbleStyles.bubble, bubbleStyles.bubbleAssistant, { maxWidth: '88%' }]}>
           {!message.content ? (
             <TypingIndicator />
           ) : (
@@ -987,7 +992,7 @@ function MessageBubble({
           // Text segment — parse for buttons/links
           const { text, buttons, links } = parseMessageContent(seg.text ?? '');
           return (
-            <View key={`seg-${i}`}>
+            <View key={`seg-${i}`} style={{ maxWidth: '88%' }}>
               {text ? (
                 <View style={[bubbleStyles.bubble, bubbleStyles.bubbleAssistant]}>
                   <Text style={[bubbleStyles.text, bubbleStyles.textAssistant]}>
