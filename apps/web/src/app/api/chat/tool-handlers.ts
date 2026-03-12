@@ -223,7 +223,7 @@ async function handleFindBusinessesInner(
     }
 
     if (serviceTenantMap.size > 0) {
-      let businesses: { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; matched_services?: string[]; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[] = Array.from(serviceTenantMap.values());
+      let businesses: { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; matched_services?: string[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[]; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[] = Array.from(serviceTenantMap.values());
 
       // Fetch locations
       const bizIds = businesses.map((b) => b.id);
@@ -232,6 +232,25 @@ async function handleFindBusinessesInner(
         : { data: [] };
 
       console.log('[find_businesses] bizLocations count:', bizLocations?.length);
+
+      // Fetch ALL services for each business so the AI can show them all (not just matched ones)
+      const { data: allBizServices } = bizIds.length > 0
+        ? await supabase
+            .from('services')
+            .select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, image_url, visibility')
+            .in('tenant_id', bizIds)
+            .eq('visibility', 'public')
+        : { data: [] };
+
+      const bizSvcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[]>();
+      for (const svc of (allBizServices ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[]) {
+        const existing = bizSvcMap.get(svc.tenant_id) ?? [];
+        existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, image_url: svc.image_url });
+        bizSvcMap.set(svc.tenant_id, existing);
+      }
+
+      // Attach all_services to each business
+      businesses = businesses.map((b) => ({ ...b, all_services: bizSvcMap.get(b.id) ?? [] }));
 
       const bizLocMap = new Map<string, { name: string; address: string; latitude: number | null; longitude: number | null }[]>();
       for (const loc of (bizLocations ?? []) as { tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
@@ -344,6 +363,23 @@ async function handleFindBusinessesInner(
     }
 
     console.log('[find_businesses] no-query locationsAll count:', locationsAll?.length);
+
+    // Fetch ALL services for each business so the AI can show them all
+    const { data: noQueryServices } = tenantIdsAll.length > 0
+      ? await supabase
+          .from('services')
+          .select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, image_url, visibility')
+          .in('tenant_id', tenantIdsAll)
+          .eq('visibility', 'public')
+      : { data: [] };
+
+    const noQuerySvcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[]>();
+    for (const svc of (noQueryServices ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[]) {
+      const existing = noQuerySvcMap.get(svc.tenant_id) ?? [];
+      existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, image_url: svc.image_url });
+      noQuerySvcMap.set(svc.tenant_id, existing);
+    }
+    businesses = businesses.map((b) => ({ ...b, all_services: noQuerySvcMap.get(b.id) ?? [] })) as typeof businesses;
 
     // If user location available, sort by proximity
     if (userLat && userLng && businesses.length > 0) {
@@ -503,6 +539,23 @@ async function handleFindBusinessesInner(
     existing.push({ name: loc.name, address: loc.address, latitude: loc.latitude, longitude: loc.longitude });
     bizLocMap.set(loc.tenant_id, existing);
   }
+
+  // Fetch ALL services for each business
+  const { data: queryBizServices } = bizIds.length > 0
+    ? await supabase
+        .from('services')
+        .select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, image_url, visibility')
+        .in('tenant_id', bizIds)
+        .eq('visibility', 'public')
+    : { data: [] };
+
+  const querySvcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[]>();
+  for (const svc of (queryBizServices ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[]) {
+    const existing = querySvcMap.get(svc.tenant_id) ?? [];
+    existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, image_url: svc.image_url });
+    querySvcMap.set(svc.tenant_id, existing);
+  }
+  businesses = businesses.map((b) => ({ ...b, all_services: querySvcMap.get(b.id) ?? [] }));
 
   // Sort by proximity if user location is available
   if (userLat && userLng && businesses.length > 0) {
