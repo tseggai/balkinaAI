@@ -1039,29 +1039,94 @@ export async function handleBookAppointment(
     return { success: false, error: 'service_id and start_time are required' };
   }
 
-  // 1. Get service details
-  const { data: service } = await supabase
-    .from('services')
-    .select('*')
-    .eq('id', serviceId)
-    .single();
+  // ── Phase 3: Parallel initial queries ──────────────────────────────────────
+  // Steps 1 (service), 4 (customer), 5 (location+timezone), 6 (staff) are independent.
+  // Run them all in parallel to cut latency.
 
-  if (!service) return { success: false, error: 'Service not found' };
+  const needsTimezone = !/Z$|[+-]\d{2}:\d{2}$/.test(startTime);
+
+  const [serviceResult, customerResult, locationResult, staffResult] = await Promise.all([
+    // 1. Service details
+    supabase.from('services').select('*').eq('id', serviceId).single(),
+
+    // 4. Find customer
+    (async () => {
+      if (sessionInfo.customerId) return { id: sessionInfo.customerId, created: false };
+      if (sessionInfo.userId) {
+        const { data } = await supabase.from('customers').select('id').eq('user_id', sessionInfo.userId).limit(1).maybeSingle();
+        if (data) return { id: (data as { id: string }).id, created: false };
+      }
+      if (sessionInfo.customerPhone) {
+        const { data } = await supabase.from('customers').select('id').eq('phone', sessionInfo.customerPhone).limit(1).maybeSingle();
+        if (data) return { id: (data as { id: string }).id, created: false };
+      }
+      // Create anonymous customer
+      const email = `chat_${Date.now()}@widget.balkina.ai`;
+      const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
+        email, email_confirm: true,
+        user_metadata: { display_name: sessionInfo.customerName ?? 'Guest', source: 'chat_widget' },
+      });
+      if (authErr || !authUser.user) return { id: null, error: authErr?.message ?? 'Unknown error', created: false };
+      await supabase.from('customers').insert({
+        id: authUser.user.id, display_name: sessionInfo.customerName,
+        phone: sessionInfo.customerPhone, email: null, user_id: sessionInfo.userId ?? null,
+      } as never);
+      return { id: authUser.user.id, created: true };
+    })(),
+
+    // 5. Location (+ timezone for time parsing and response formatting)
+    (async () => {
+      if (locationId) {
+        const { data } = await supabase.from('tenant_locations').select('id, address, timezone').eq('id', locationId).single();
+        const loc = data as { id: string; address: string; timezone: string } | null;
+        return { id: loc?.id ?? locationId, address: loc?.address ?? null, timezone: loc?.timezone ?? 'UTC' };
+      }
+      const { data } = await supabase.from('tenant_locations').select('id, address, timezone').eq('tenant_id', tenantId).limit(1);
+      const loc = (data as { id: string; address: string; timezone: string }[] | null)?.[0];
+      return { id: loc?.id ?? null, address: loc?.address ?? null, timezone: loc?.timezone ?? 'UTC' };
+    })(),
+
+    // 6. Staff
+    (async () => {
+      if (staffId) {
+        const { data } = await supabase.from('staff').select('id, name').eq('id', staffId).single();
+        const s = data as { id: string; name: string } | null;
+        return { id: s?.id ?? staffId, name: s?.name ?? null };
+      }
+      const { data } = await supabase.from('staff').select('id, name').eq('tenant_id', tenantId).limit(1);
+      const s = (data as { id: string; name: string }[] | null)?.[0];
+      return { id: s?.id ?? null, name: s?.name ?? null };
+    })(),
+  ]);
+
+  // Unpack service
+  if (!serviceResult.data) return { success: false, error: 'Service not found' };
+  const service = serviceResult.data;
   const svc = service as { duration_minutes: number; price: number; deposit_enabled: boolean; deposit_type: string | null; deposit_amount: number | null; tenant_id: string };
 
-  // 2. Calculate end time — handle timezone correctly
-  //    If the AI passes a time without Z or offset (local time), convert using tenant timezone.
-  //    If it already ends with Z or has an offset, trust it as UTC/absolute.
+  // Unpack customer
+  let customerId = customerResult.id;
+  if (!customerId) {
+    return { success: false, error: `Failed to create customer: ${(customerResult as { error?: string }).error ?? 'Unknown error'}` };
+  }
+
+  // Unpack location & timezone
+  let finalLocationId = locationResult.id;
+  const bookingTimezone = locationResult.timezone;
+  const locationAddress = locationResult.address;
+
+  // Unpack staff
+  let finalStaffId = staffResult.id;
+  const staffName = staffResult.name;
+
+  // 2. Calculate start/end times
   let start: Date;
-  const hasTimezoneInfo = /Z$|[+-]\d{2}:\d{2}$/.test(startTime);
-  if (hasTimezoneInfo) {
+  if (!needsTimezone) {
     start = new Date(startTime);
   } else {
-    // Interpret as local time in the tenant's timezone
-    const timezone = await getTenantTimezone(supabase, tenantId);
     const [datePart, timePart] = startTime.split('T');
     if (datePart && timePart) {
-      start = localTimeToUTC(datePart, timePart.slice(0, 5), timezone);
+      start = localTimeToUTC(datePart, timePart.slice(0, 5), bookingTimezone);
     } else {
       start = new Date(startTime);
     }
@@ -1074,86 +1139,6 @@ export async function handleBookAppointment(
     depositAmount = svc.deposit_type === 'percentage'
       ? (svc.price * svc.deposit_amount) / 100
       : svc.deposit_amount;
-  }
-
-  // 4. Create or find customer record
-  let customerId = sessionInfo.customerId;
-
-  // Try to find existing customer by user_id (authenticated mobile user)
-  if (!customerId && sessionInfo.userId) {
-    const { data: byUserId } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('user_id', sessionInfo.userId)
-      .limit(1)
-      .maybeSingle();
-    if (byUserId) {
-      customerId = (byUserId as { id: string }).id;
-    }
-  }
-
-  if (!customerId && sessionInfo.customerPhone) {
-    // Try to find existing customer by phone
-    const { data: existingCustomer } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('phone', sessionInfo.customerPhone)
-      .limit(1)
-      .single();
-
-    if (existingCustomer) {
-      customerId = (existingCustomer as { id: string }).id;
-    }
-  }
-
-  if (!customerId) {
-    // Create anonymous customer via auth (service role can create users)
-    const email = `chat_${Date.now()}@widget.balkina.ai`;
-    const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      user_metadata: {
-        display_name: sessionInfo.customerName ?? 'Guest',
-        source: 'chat_widget',
-      },
-    });
-
-    if (authErr || !authUser.user) {
-      return { success: false, error: `Failed to create customer: ${authErr?.message ?? 'Unknown error'}` };
-    }
-
-    customerId = authUser.user.id;
-
-    // Insert customer record
-    await supabase.from('customers').insert({
-      id: customerId,
-      display_name: sessionInfo.customerName,
-      phone: sessionInfo.customerPhone,
-      email: null,
-      user_id: sessionInfo.userId ?? null,
-    } as never);
-  }
-
-  // 5. Get a location if not specified
-  let finalLocationId = locationId;
-  if (!finalLocationId) {
-    const { data: locations } = await supabase
-      .from('tenant_locations')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .limit(1);
-    finalLocationId = (locations as { id: string }[] | null)?.[0]?.id ?? null;
-  }
-
-  // 6. Get a staff member if not specified
-  let finalStaffId = staffId;
-  if (!finalStaffId) {
-    const { data: staffMembers } = await supabase
-      .from('staff')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .limit(1);
-    finalStaffId = (staffMembers as { id: string }[] | null)?.[0]?.id ?? null;
   }
 
   // 7. Create the appointment
@@ -1182,234 +1167,147 @@ export async function handleBookAppointment(
 
   const appointmentId = (appointment as { id: string }).id;
 
-  // 8a. Insert appointment_extras for each selected extra
-  let extrasTotal = 0;
-  if (selectedExtras.length > 0) {
-    // Look up extra prices
-    const extraIds = selectedExtras.map((e) => e.extra_id);
-    const { data: extrasData } = await supabase
-      .from('service_extras')
-      .select('id, price')
-      .in('id', extraIds);
+  // ── Phase 3: Parallel post-insert operations ────────────────────────────────
+  // Run extras lookup, coupon validation, loyalty program fetch, package decrement,
+  // chat session update, and business name fetch all in parallel where possible.
 
+  const [extrasResult, couponResult, loyaltyProgram, packageResult, , tenantResult] = await Promise.all([
+    // 8a. Fetch extra prices (if any)
+    selectedExtras.length > 0
+      ? supabase.from('service_extras').select('id, price').in('id', selectedExtras.map((e) => e.extra_id))
+      : Promise.resolve({ data: [] }),
+
+    // 8b. Fetch coupon (if provided)
+    couponCode
+      ? supabase.from('coupons').select('id, discount_type, discount_value, expires_at, usage_count, usage_limit')
+          .eq('tenant_id', tenantId).eq('code', couponCode).limit(1).single()
+      : Promise.resolve({ data: null }),
+
+    // 8c+8d. Fetch loyalty program (single query for both redeem and earn)
+    customerId && (loyaltyPointsToRedeem > 0 || true)
+      ? supabase.from('loyalty_programs')
+          .select('points_to_currency_rate, points_per_booking, points_per_dollar, is_active')
+          .eq('tenant_id', tenantId).limit(1).single()
+      : Promise.resolve({ data: null }),
+
+    // 8e. Fetch package service entry (if using package)
+    useCustomerPackage && customerId
+      ? supabase.from('customer_package_services')
+          .select('id, sessions_remaining, customer_package_id')
+          .eq('service_id', serviceId).gt('sessions_remaining', 0).limit(1).single()
+      : Promise.resolve({ data: null }),
+
+    // 9. Link customer to chat session
+    customerId
+      ? supabase.from('chat_sessions').update({ customer_id: customerId } as never).eq('id', sessionInfo.chatSessionId)
+      : Promise.resolve(),
+
+    // Fetch business name for response
+    supabase.from('tenants').select('name').eq('id', tenantId).single(),
+  ]);
+
+  // 8a. Process extras
+  let extrasTotal = 0;
+  if (selectedExtras.length > 0 && extrasResult.data) {
     const extraPriceMap = new Map<string, number>();
-    for (const ex of (extrasData ?? []) as { id: string; price: number }[]) {
+    for (const ex of (extrasResult.data as { id: string; price: number }[])) {
       extraPriceMap.set(ex.id, ex.price);
     }
-
     const extrasInserts = selectedExtras.map((e) => {
       const price = extraPriceMap.get(e.extra_id) ?? 0;
       const qty = e.quantity ?? 1;
       extrasTotal += price * qty;
-      return {
-        appointment_id: appointmentId,
-        extra_id: e.extra_id,
-        quantity: qty,
-        price_at_booking: price,
-      };
+      return { appointment_id: appointmentId, extra_id: e.extra_id, quantity: qty, price_at_booking: price };
     });
-
     await supabase.from('appointment_extras').insert(extrasInserts as never[]);
   }
 
-  // 8b. Validate and link coupon if provided
+  // 8b. Process coupon
   let couponDiscount = 0;
-  if (couponCode) {
-    const { data: coupon } = await supabase
-      .from('coupons')
-      .select('id, discount_type, discount_value, expires_at, usage_count, usage_limit')
-      .eq('tenant_id', tenantId)
-      .eq('code', couponCode)
-      .limit(1)
-      .single();
-
-    if (coupon) {
-      const c = coupon as { id: string; discount_type: string; discount_value: number; expires_at: string | null; usage_count: number; usage_limit: number | null };
-      const isValid = (!c.expires_at || new Date(c.expires_at) >= new Date()) &&
-        (c.usage_limit === null || c.usage_count < c.usage_limit);
-
-      if (isValid) {
-        couponDiscount = c.discount_type === 'percentage'
-          ? (svc.price * c.discount_value) / 100
-          : c.discount_value;
-        couponDiscount = Math.min(couponDiscount, svc.price);
-
-        // Record coupon usage
-        await supabase.from('coupon_usage').insert({
-          coupon_id: c.id,
-          appointment_id: appointmentId,
-          customer_id: customerId,
-          discount_amount: couponDiscount,
-        } as never);
-
-        // Increment usage count
-        await supabase.from('coupons').update({ usage_count: c.usage_count + 1 } as never).eq('id', c.id);
-
-        // Store coupon_id on appointment
-        await supabase.from('appointments').update({ coupon_id: c.id } as never).eq('id', appointmentId);
-      }
+  if (couponCode && couponResult.data) {
+    const c = couponResult.data as { id: string; discount_type: string; discount_value: number; expires_at: string | null; usage_count: number; usage_limit: number | null };
+    const isValid = (!c.expires_at || new Date(c.expires_at) >= new Date()) &&
+      (c.usage_limit === null || c.usage_count < c.usage_limit);
+    if (isValid) {
+      couponDiscount = c.discount_type === 'percentage'
+        ? (svc.price * c.discount_value) / 100
+        : c.discount_value;
+      couponDiscount = Math.min(couponDiscount, svc.price);
+      // Record usage, increment count, store on appointment — all in parallel
+      await Promise.all([
+        supabase.from('coupon_usage').insert({
+          coupon_id: c.id, appointment_id: appointmentId, customer_id: customerId, discount_amount: couponDiscount,
+        } as never),
+        supabase.from('coupons').update({ usage_count: c.usage_count + 1 } as never).eq('id', c.id),
+        supabase.from('appointments').update({ coupon_id: c.id } as never).eq('id', appointmentId),
+      ]);
     }
   }
 
   // 8c. Handle loyalty points redemption
   let loyaltyDiscount = 0;
-  if (loyaltyPointsToRedeem > 0 && customerId) {
-    const { data: program } = await supabase
-      .from('loyalty_programs')
-      .select('points_to_currency_rate, is_active')
-      .eq('tenant_id', tenantId)
-      .limit(1)
-      .single();
-
-    if (program) {
-      const lp = program as { points_to_currency_rate: number; is_active: boolean };
-      if (lp.is_active) {
-        loyaltyDiscount = Math.min(
-          loyaltyPointsToRedeem * lp.points_to_currency_rate,
-          svc.price + extrasTotal - couponDiscount,
-        );
-
-        // Insert redeem transaction
-        await supabase.from('loyalty_transactions').insert({
-          customer_id: customerId,
-          tenant_id: tenantId,
-          appointment_id: appointmentId,
-          type: 'redeem',
-          points: -loyaltyPointsToRedeem,
-          description: 'Points redeemed for booking discount',
-        } as never);
-
-        // Update points balance — decrement directly
-        const { data: currentPts } = await supabase
-          .from('customer_loyalty_points')
-          .select('points_balance')
-          .eq('customer_id', customerId)
-          .eq('tenant_id', tenantId)
-          .limit(1)
-          .single();
-
-        if (currentPts) {
-          const newBalance = (currentPts as { points_balance: number }).points_balance - loyaltyPointsToRedeem;
-          await supabase
-            .from('customer_loyalty_points')
-            .update({ points_balance: Math.max(0, newBalance) } as never)
-            .eq('customer_id', customerId)
-            .eq('tenant_id', tenantId);
-        }
+  if (loyaltyPointsToRedeem > 0 && customerId && loyaltyProgram.data) {
+    const lp = loyaltyProgram.data as { points_to_currency_rate: number; is_active: boolean };
+    if (lp.is_active) {
+      loyaltyDiscount = Math.min(
+        loyaltyPointsToRedeem * lp.points_to_currency_rate,
+        svc.price + extrasTotal - couponDiscount,
+      );
+      // Insert redeem transaction + fetch current balance in parallel
+      const [, { data: currentPts }] = await Promise.all([
+        supabase.from('loyalty_transactions').insert({
+          customer_id: customerId, tenant_id: tenantId, appointment_id: appointmentId,
+          type: 'redeem', points: -loyaltyPointsToRedeem, description: 'Points redeemed for booking discount',
+        } as never),
+        supabase.from('customer_loyalty_points').select('points_balance')
+          .eq('customer_id', customerId).eq('tenant_id', tenantId).limit(1).single(),
+      ]);
+      if (currentPts) {
+        const newBalance = (currentPts as { points_balance: number }).points_balance - loyaltyPointsToRedeem;
+        await supabase.from('customer_loyalty_points')
+          .update({ points_balance: Math.max(0, newBalance) } as never)
+          .eq('customer_id', customerId).eq('tenant_id', tenantId);
       }
     }
   }
 
-  // 8d. After successful booking: earn loyalty points
+  // 8d. Earn loyalty points
   let pointsEarned = 0;
-  if (customerId) {
-    const { data: program } = await supabase
-      .from('loyalty_programs')
-      .select('points_per_booking, points_per_dollar, is_active')
-      .eq('tenant_id', tenantId)
-      .limit(1)
-      .single();
-
-    if (program) {
-      const lp = program as { points_per_booking: number; points_per_dollar: number | null; is_active: boolean };
-      if (lp.is_active) {
-        pointsEarned = (lp.points_per_booking ?? 0) + Math.floor((lp.points_per_dollar ?? 0) * svc.price);
-
-        if (pointsEarned > 0) {
-          await supabase.from('loyalty_transactions').insert({
-            customer_id: customerId,
-            tenant_id: tenantId,
-            appointment_id: appointmentId,
-            type: 'earn',
-            points: pointsEarned,
-            description: 'Points earned from booking',
-          } as never);
-        }
+  if (customerId && loyaltyProgram.data) {
+    const lp = loyaltyProgram.data as { points_per_booking: number; points_per_dollar: number | null; is_active: boolean };
+    if (lp.is_active) {
+      pointsEarned = (lp.points_per_booking ?? 0) + Math.floor((lp.points_per_dollar ?? 0) * svc.price);
+      if (pointsEarned > 0) {
+        await supabase.from('loyalty_transactions').insert({
+          customer_id: customerId, tenant_id: tenantId, appointment_id: appointmentId,
+          type: 'earn', points: pointsEarned, description: 'Points earned from booking',
+        } as never);
       }
     }
   }
 
-  // 8e. If useCustomerPackage: decrement sessions_remaining
-  if (useCustomerPackage && customerId) {
-    // Find the customer's active package service entry and decrement
-    const { data: cpSvc } = await supabase
-      .from('customer_package_services')
-      .select('id, sessions_remaining, customer_package_id')
-      .eq('service_id', serviceId)
-      .gt('sessions_remaining', 0)
-      .limit(1)
-      .single();
-
-    if (cpSvc) {
-      const entry = cpSvc as { id: string; sessions_remaining: number; customer_package_id: string };
-      // Verify the customer_package belongs to this customer/tenant
-      const { data: cpCheck } = await supabase
-        .from('customer_packages')
-        .select('id')
-        .eq('id', entry.customer_package_id)
-        .eq('customer_id', customerId)
-        .eq('tenant_id', tenantId)
-        .limit(1)
-        .single();
-
-      if (cpCheck) {
-        await supabase
-          .from('customer_package_services')
-          .update({ sessions_remaining: entry.sessions_remaining - 1 } as never)
-          .eq('id', entry.id);
-      }
+  // 8e. Decrement package sessions
+  if (useCustomerPackage && customerId && packageResult.data) {
+    const entry = packageResult.data as { id: string; sessions_remaining: number; customer_package_id: string };
+    const { data: cpCheck } = await supabase.from('customer_packages').select('id')
+      .eq('id', entry.customer_package_id).eq('customer_id', customerId).eq('tenant_id', tenantId).limit(1).single();
+    if (cpCheck) {
+      await supabase.from('customer_package_services')
+        .update({ sessions_remaining: entry.sessions_remaining - 1 } as never).eq('id', entry.id);
     }
   }
 
-  // Update appointment total with extras, coupon, loyalty adjustments
+  // Update appointment total if adjustments were made
   const finalTotal = svc.price + extrasTotal - couponDiscount - loyaltyDiscount;
   if (extrasTotal > 0 || couponDiscount > 0 || loyaltyDiscount > 0) {
     await supabase.from('appointments').update({
-      total_price: finalTotal,
-      balance_due: finalTotal - (depositAmount ?? 0),
+      total_price: finalTotal, balance_due: finalTotal - (depositAmount ?? 0),
     } as never).eq('id', appointmentId);
   }
 
-  // 9. Link customer to chat session
-  if (customerId) {
-    await supabase
-      .from('chat_sessions')
-      .update({ customer_id: customerId } as never)
-      .eq('id', sessionInfo.chatSessionId);
-  }
+  const businessName = (tenantResult.data as { name: string } | null)?.name ?? null;
 
-  // 10. Fetch staff name and business name for the response
-  let staffName: string | null = null;
-  if (finalStaffId) {
-    const { data: staffData } = await supabase
-      .from('staff')
-      .select('name')
-      .eq('id', finalStaffId)
-      .single();
-    staffName = (staffData as { name: string } | null)?.name ?? null;
-  }
-
-  let businessName: string | null = null;
-  const { data: tenantData } = await supabase
-    .from('tenants')
-    .select('name')
-    .eq('id', tenantId)
-    .single();
-  businessName = (tenantData as { name: string } | null)?.name ?? null;
-
-  // 10. Fetch location address for the response
-  let locationAddress: string | null = null;
-  if (finalLocationId) {
-    const { data: locData } = await supabase
-      .from('tenant_locations')
-      .select('address')
-      .eq('id', finalLocationId)
-      .single();
-    locationAddress = (locData as { address: string } | null)?.address ?? null;
-  }
-
-  // Compute human-readable local times for the response
-  const bookingTimezone = await getTenantTimezone(supabase, tenantId);
+  // 10. Compute human-readable local times (timezone already fetched in parallel step 5)
   const localStartStr = start.toLocaleString('en-US', { timeZone: bookingTimezone, hour: 'numeric', minute: '2-digit', hour12: true });
   const localEndStr = end.toLocaleString('en-US', { timeZone: bookingTimezone, hour: 'numeric', minute: '2-digit', hour12: true });
   const localDateStr = start.toLocaleDateString('en-US', { timeZone: bookingTimezone, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
