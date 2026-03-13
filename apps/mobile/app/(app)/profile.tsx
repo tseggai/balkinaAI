@@ -7,10 +7,13 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
+
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,18 +28,59 @@ interface MenuItem {
 export default function ProfileScreen() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notifySms, setNotifySms] = useState(true);
+  const [notifyPush, setNotifyPush] = useState(true);
+  const [toggling, setToggling] = useState(false);
 
   const fetchUser = useCallback(async () => {
     const {
       data: { user: authUser },
     } = await supabase.auth.getUser();
     setUser(authUser);
+
+    // Fetch notification preferences
+    if (authUser) {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('notify_sms, notify_push')
+        .eq('user_id', authUser.id)
+        .single();
+      if (customer) {
+        const c = customer as { notify_sms: boolean | null; notify_push: boolean | null };
+        setNotifySms(c.notify_sms ?? true);
+        setNotifyPush(c.notify_push ?? true);
+      }
+    }
+
     setLoading(false);
   }, []);
 
   useEffect(() => {
     fetchUser();
   }, [fetchUser]);
+
+  const updatePreference = useCallback(async (field: string, value: boolean) => {
+    setToggling(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setToggling(false); return; }
+
+    try {
+      await fetch(`${API_BASE}/api/customers/preferences`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ [field]: value }),
+      });
+    } catch {
+      // Revert on failure
+      if (field === 'notify_sms') setNotifySms(!value);
+      if (field === 'notify_push') setNotifyPush(!value);
+    } finally {
+      setToggling(false);
+    }
+  }, []);
 
   const handleSignOut = useCallback(() => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -68,21 +112,6 @@ export default function ProfileScreen() {
       onPress: () => {
         Alert.alert('Coming soon', 'Payment methods will be available soon.');
       },
-    },
-    {
-      icon: 'notifications-outline',
-      label: 'Notifications',
-      onPress: () => {
-        Alert.alert(
-          'Notifications',
-          'Notification settings will be available soon.',
-        );
-      },
-    },
-    {
-      icon: 'log-out-outline',
-      label: 'Sign Out',
-      onPress: handleSignOut,
     },
   ];
 
@@ -118,40 +147,67 @@ export default function ProfileScreen() {
 
       {/* Menu items */}
       <View style={styles.menuContainer}>
-        {menuItems.map((item) => {
-          const isSignOut = item.label === 'Sign Out';
-          return (
-            <TouchableOpacity
-              key={item.label}
-              style={styles.menuItem}
-              onPress={item.onPress}
-              activeOpacity={0.6}
-            >
-              <View style={styles.menuItemLeft}>
-                <Ionicons
-                  name={item.icon}
-                  size={22}
-                  color={isSignOut ? '#dc2626' : '#374151'}
-                />
-                <Text
-                  style={[
-                    styles.menuItemLabel,
-                    isSignOut && styles.menuItemLabelDanger,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </View>
-              {!isSignOut && (
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color="#d1d5db"
-                />
-              )}
-            </TouchableOpacity>
-          );
-        })}
+        {menuItems.map((item) => (
+          <TouchableOpacity
+            key={item.label}
+            style={styles.menuItem}
+            onPress={item.onPress}
+            activeOpacity={0.6}
+          >
+            <View style={styles.menuItemLeft}>
+              <Ionicons name={item.icon} size={22} color="#374151" />
+              <Text style={styles.menuItemLabel}>{item.label}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Notifications section */}
+      <Text style={styles.sectionTitle}>Notifications</Text>
+      <View style={styles.menuContainer}>
+        <View style={styles.menuItem}>
+          <View style={styles.menuItemLeft}>
+            <Ionicons name="chatbox-outline" size={22} color="#374151" />
+            <Text style={styles.menuItemLabel}>SMS reminders</Text>
+          </View>
+          <Switch
+            value={notifySms}
+            onValueChange={(val) => { setNotifySms(val); updatePreference('notify_sms', val); }}
+            disabled={toggling}
+            trackColor={{ false: '#e5e7eb', true: '#6B7FC4' }}
+            thumbColor="#fff"
+          />
+        </View>
+        <View style={styles.menuItem}>
+          <View style={styles.menuItemLeft}>
+            <Ionicons name="notifications-outline" size={22} color="#374151" />
+            <Text style={styles.menuItemLabel}>Push notifications</Text>
+          </View>
+          <Switch
+            value={notifyPush}
+            onValueChange={(val) => { setNotifyPush(val); updatePreference('notify_push', val); }}
+            disabled={toggling}
+            trackColor={{ false: '#e5e7eb', true: '#6B7FC4' }}
+            thumbColor="#fff"
+          />
+        </View>
+      </View>
+
+      {/* Sign out */}
+      <View style={[styles.menuContainer, { marginTop: 16 }]}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={handleSignOut}
+          activeOpacity={0.6}
+        >
+          <View style={styles.menuItemLeft}>
+            <Ionicons name="log-out-outline" size={22} color="#dc2626" />
+            <Text style={[styles.menuItemLabel, styles.menuItemLabelDanger]}>
+              Sign Out
+            </Text>
+          </View>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -200,6 +256,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     marginTop: 4,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginHorizontal: 20,
+    marginTop: 24,
+    marginBottom: 8,
   },
   menuContainer: {
     backgroundColor: '#fff',

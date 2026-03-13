@@ -56,6 +56,9 @@ const serverEnvSchema = z.object({
   // Auth
   NEXTAUTH_SECRET: z.string().min(32, 'NEXTAUTH_SECRET must be at least 32 characters'),
   NEXTAUTH_URL: z.string().url('NEXTAUTH_URL must be a valid URL'),
+
+  // Cron
+  CRON_SECRET: z.string().min(1).optional(),
 });
 
 // ─── Client-side environment schema (NEXT_PUBLIC_* only) ──────────────────────
