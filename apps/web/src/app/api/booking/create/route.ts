@@ -7,6 +7,7 @@
  */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
+import { notifyBookingConfirmed, notifyStaffNewBooking } from '@/lib/notifications/booking-events';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -217,6 +218,13 @@ export async function POST(request: Request) {
     if (apptErr) {
       return NextResponse.json({ error: apptErr.message }, { status: 500, headers: CORS_HEADERS });
     }
+
+    // Fire notifications (non-blocking)
+    const apptId = (appointment as { id: string }).id;
+    void Promise.allSettled([
+      notifyBookingConfirmed(apptId),
+      notifyStaffNewBooking(apptId),
+    ]);
 
     // 9. Format response with local times (timezone already available)
     const localDate = start.toLocaleDateString('en-US', {

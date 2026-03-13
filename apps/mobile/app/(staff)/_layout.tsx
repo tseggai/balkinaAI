@@ -1,7 +1,24 @@
+import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase, getAuthenticatedRole } from '@/lib/supabase';
+import { registerPushToken } from '@/lib/registerPushToken';
 
 export default function StaffTabsLayout() {
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { staffInfo } = await getAuthenticatedRole();
+      if (staffInfo) {
+        registerPushToken({
+          recipientType: 'staff',
+          recipientId: staffInfo.id,
+          accessToken: session.access_token,
+        });
+      }
+    })();
+  }, []);
   return (
     <Tabs
       screenOptions={{

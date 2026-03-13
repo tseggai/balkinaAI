@@ -22,6 +22,9 @@ export default function StaffProfile() {
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [loading, setLoading] = useState(true);
   const [togglingApproval, setTogglingApproval] = useState(false);
+  const [notifySms, setNotifySms] = useState(true);
+  const [notifyPush, setNotifyPush] = useState(true);
+  const [togglingNotif, setTogglingNotif] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     const { staffInfo: info } = await getAuthenticatedRole();
@@ -40,6 +43,18 @@ export default function StaffProfile() {
       if (tenant) setTenantName((tenant as { name: string }).name);
 
       setRequiresApproval(info.requires_approval);
+
+      // Fetch notification preferences from staff record
+      const { data: staffPrefs } = await supabase
+        .from('staff')
+        .select('notify_sms, notify_push')
+        .eq('id', info.id)
+        .single();
+      if (staffPrefs) {
+        const sp = staffPrefs as { notify_sms: boolean | null; notify_push: boolean | null };
+        setNotifySms(sp.notify_sms ?? true);
+        setNotifyPush(sp.notify_push ?? true);
+      }
     }
 
     setLoading(false);
@@ -67,6 +82,28 @@ export default function StaffProfile() {
       setRequiresApproval(!value); // Revert on failure
     } finally {
       setTogglingApproval(false);
+    }
+  }, []);
+
+  const updateNotifPref = useCallback(async (field: string, value: boolean) => {
+    setTogglingNotif(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setTogglingNotif(false); return; }
+
+    try {
+      await fetch(`${API_BASE}/api/staff/profile`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ [field]: value }),
+      });
+    } catch {
+      if (field === 'notify_sms') setNotifySms(!value);
+      if (field === 'notify_push') setNotifyPush(!value);
+    } finally {
+      setTogglingNotif(false);
     }
   }, []);
 
@@ -119,7 +156,41 @@ export default function StaffProfile() {
             thumbColor="#fff"
           />
         </View>
+      </View>
 
+      {/* Notifications */}
+      <Text style={styles.sectionTitle}>Notifications</Text>
+      <View style={styles.menuContainer}>
+        <View style={styles.menuItem}>
+          <View style={styles.menuItemLeft}>
+            <Ionicons name="chatbox-outline" size={22} color="#374151" />
+            <Text style={styles.menuItemLabel}>SMS reminders</Text>
+          </View>
+          <Switch
+            value={notifySms}
+            onValueChange={(val) => { setNotifySms(val); updateNotifPref('notify_sms', val); }}
+            disabled={togglingNotif}
+            trackColor={{ false: '#e5e7eb', true: '#6B7FC4' }}
+            thumbColor="#fff"
+          />
+        </View>
+        <View style={styles.menuItem}>
+          <View style={styles.menuItemLeft}>
+            <Ionicons name="notifications-outline" size={22} color="#374151" />
+            <Text style={styles.menuItemLabel}>Push notifications</Text>
+          </View>
+          <Switch
+            value={notifyPush}
+            onValueChange={(val) => { setNotifyPush(val); updateNotifPref('notify_push', val); }}
+            disabled={togglingNotif}
+            trackColor={{ false: '#e5e7eb', true: '#6B7FC4' }}
+            thumbColor="#fff"
+          />
+        </View>
+      </View>
+
+      {/* Sign out */}
+      <View style={[styles.menuContainer, { marginTop: 16 }]}>
         <TouchableOpacity style={styles.menuItem} onPress={handleSignOut} activeOpacity={0.6}>
           <View style={styles.menuItemLeft}>
             <Ionicons name="log-out-outline" size={22} color="#dc2626" />
@@ -141,6 +212,7 @@ const styles = StyleSheet.create({
   nameText: { fontSize: 20, fontWeight: '700', color: '#111827' },
   emailText: { fontSize: 14, color: '#6b7280', marginTop: 4 },
   tenantText: { fontSize: 14, color: '#6B7FC4', marginTop: 4, fontWeight: '500' },
+  sectionTitle: { fontSize: 13, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginHorizontal: 20, marginTop: 24, marginBottom: 8 },
   menuContainer: { backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 14, overflow: 'hidden' },
   menuItem: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

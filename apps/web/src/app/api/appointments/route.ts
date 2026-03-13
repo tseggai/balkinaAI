@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
+import {
+  notifyBookingConfirmed,
+  notifyStaffNewBooking,
+  notifyBookingCancelledByTenant,
+} from '@/lib/notifications/booking-events';
 
 async function getTenantId() {
   const supabase = createClient();
@@ -189,6 +194,14 @@ export async function POST(request: Request) {
     } as never);
   }
 
+  // Fire notifications (non-blocking)
+  if (appointmentData) {
+    void Promise.allSettled([
+      notifyBookingConfirmed(appointmentData.id),
+      notifyStaffNewBooking(appointmentData.id),
+    ]);
+  }
+
   return NextResponse.json({ data, error: null }, { status: 201 });
 }
 
@@ -326,6 +339,14 @@ export async function PATCH(request: Request) {
         }
       }
     }
+  }
+
+  // Fire cancellation notifications (non-blocking)
+  if (updateFields.status === 'cancelled' && data) {
+    const apptData = data as { id: string };
+    void Promise.allSettled([
+      notifyBookingCancelledByTenant(apptData.id),
+    ]);
   }
 
   return NextResponse.json({ data, error: null });

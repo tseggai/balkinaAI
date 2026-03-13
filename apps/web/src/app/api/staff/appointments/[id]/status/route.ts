@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
+import {
+  notifyBookingApproved,
+  notifyBookingDeclined,
+  notifyBookingCancelledByTenant,
+} from '@/lib/notifications/booking-events';
 
 function getBearerToken(request: Request): string | null {
   const auth = request.headers.get('authorization') ?? '';
@@ -78,6 +83,15 @@ export async function PATCH(
 
   if (updateErr) {
     return NextResponse.json({ data: null, error: { message: updateErr.message } }, { status: 500 });
+  }
+
+  // Fire notifications (non-blocking)
+  void Promise.allSettled([
+    newStatus === 'confirmed' ? notifyBookingApproved(params.id) : Promise.resolve(),
+    newStatus === 'cancelled' ? notifyBookingCancelledByTenant(params.id) : Promise.resolve(),
+  ]);
+  if (newStatus === 'declined') {
+    void notifyBookingDeclined(params.id);
   }
 
   return NextResponse.json({ data: updated, error: null });
