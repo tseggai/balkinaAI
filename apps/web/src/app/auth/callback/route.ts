@@ -12,9 +12,9 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      // If this is a recovery (password reset), redirect to password update page
+      // If this is a password reset recovery, redirect to the reset-password form
       if (type === 'recovery') {
-        return NextResponse.redirect(`${origin}/dashboard`);
+        return NextResponse.redirect(`${origin}/auth/reset-password`);
       }
       return NextResponse.redirect(`${origin}${next}`);
     }

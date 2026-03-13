@@ -99,7 +99,13 @@ export default function EmailLoginScreen() {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+    // Redirect to the web app's auth callback with type=recovery.
+    // The callback exchanges the code and redirects to /auth/reset-password
+    // where the user can set a new password in their browser.
+    const webUrl = process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${webUrl}/auth/callback?type=recovery`,
+    });
 
     setLoading(false);
 
