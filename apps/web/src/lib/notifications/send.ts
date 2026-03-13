@@ -1,5 +1,3 @@
-import { sendSms } from '@balkina/notifications';
-import { sendPushNotification } from '@balkina/notifications';
 import { createAdminClient } from '@/lib/supabase/server';
 
 export type NotificationType =
@@ -153,10 +151,11 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
       error_text: error ?? null,
     } as never);
 
-  // Send SMS
+  // Send SMS (dynamic import to avoid eager env validation at build time)
   const smsBody = template.sms(payload.data);
   if (notifySms && phone && smsBody.length > 0) {
     try {
+      const { sendSms } = await import('@balkina/notifications');
       await sendSms({ to: phone, body: smsBody });
       await logEntry('sms', 'sent');
     } catch (err) {
@@ -164,20 +163,25 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
     }
   }
 
-  // Send Push
+  // Send Push (dynamic import to avoid eager env validation at build time)
   if (notifyPush && pushTokens.length > 0) {
-    for (const token of pushTokens) {
-      try {
-        await sendPushNotification([{
-          pushToken: token,
-          title: template.push.title(payload.data),
-          body: template.push.body(payload.data),
-          data: { appointmentId: payload.appointmentId, type: payload.type },
-        }]);
-        await logEntry('push', 'sent');
-      } catch (err) {
-        await logEntry('push', 'failed', String(err));
+    try {
+      const { sendPushNotification } = await import('@balkina/notifications');
+      for (const token of pushTokens) {
+        try {
+          await sendPushNotification([{
+            pushToken: token,
+            title: template.push.title(payload.data),
+            body: template.push.body(payload.data),
+            data: { appointmentId: payload.appointmentId, type: payload.type },
+          }]);
+          await logEntry('push', 'sent');
+        } catch (err) {
+          await logEntry('push', 'failed', String(err));
+        }
       }
+    } catch (err) {
+      await logEntry('push', 'failed', String(err));
     }
   }
 }
