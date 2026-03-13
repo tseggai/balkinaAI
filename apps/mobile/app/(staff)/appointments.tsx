@@ -167,18 +167,13 @@ export default function StaffAppointments() {
                   )}
                   {item.status === 'confirmed' && (
                     <>
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#7c3aed' }]} onPress={() => updateStatus(item.id, 'in_progress')}>
-                        <Text style={styles.actionTextLight}>Start</Text>
+                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#059669' }]} onPress={() => updateStatus(item.id, 'completed')}>
+                        <Text style={styles.actionTextLight}>Complete</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#fee2e2' }]} onPress={() => updateStatus(item.id, 'no_show')}>
                         <Text style={styles.actionTextDanger}>No Show</Text>
                       </TouchableOpacity>
                     </>
-                  )}
-                  {item.status === 'in_progress' && (
-                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#059669' }]} onPress={() => updateStatus(item.id, 'completed')}>
-                      <Text style={styles.actionTextLight}>Complete</Text>
-                    </TouchableOpacity>
                   )}
                 </>
               )}
