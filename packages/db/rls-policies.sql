@@ -249,7 +249,10 @@ CREATE POLICY "Tenant users can read customers they have appointments with"
 
 CREATE POLICY "Customers can read their own appointments"
   ON appointments FOR SELECT
-  USING (customer_id = auth.uid());
+  USING (
+    customer_id = auth.uid()
+    OR customer_id IN (SELECT id FROM customers WHERE user_id = auth.uid())
+  );
 
 CREATE POLICY "Tenant users can read their own appointments"
   ON appointments FOR SELECT
@@ -266,7 +269,10 @@ CREATE POLICY "Tenant users can update their own appointments"
 
 CREATE POLICY "Customers can cancel their own appointments"
   ON appointments FOR UPDATE
-  USING (customer_id = auth.uid());
+  USING (
+    customer_id = auth.uid()
+    OR customer_id IN (SELECT id FROM customers WHERE user_id = auth.uid())
+  );
 
 
 -- =============================================================================
