@@ -99,12 +99,14 @@ export default function EmailLoginScreen() {
 
     setLoading(true);
 
-    // Redirect to the web app's auth callback with type=recovery.
-    // The callback exchanges the code and redirects to /auth/reset-password
-    // where the user can set a new password in their browser.
+    // Redirect directly to the web app's reset-password page.
+    // The mobile Supabase client doesn't use PKCE, so Supabase redirects with
+    // hash fragments (#access_token=...&type=recovery). A server-side callback
+    // can't read hash fragments, so we skip it and let the client-side page
+    // handle the tokens via @supabase/ssr's automatic hash detection.
     const webUrl = process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${webUrl}/auth/callback?type=recovery`,
+      redirectTo: `${webUrl}/auth/reset-password`,
     });
 
     setLoading(false);
