@@ -25,6 +25,13 @@ export default function WelcomeScreen() {
         >
           <Text style={styles.btnSecondaryText}>Continue with phone</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.btnStaff}
+          onPress={() => router.push('/(auth)/staff-invite')}
+        >
+          <Text style={styles.btnStaffText}>I'm a staff member</Text>
+        </TouchableOpacity>
       </View>
 
       <Text style={styles.terms}>
@@ -78,6 +85,18 @@ const styles = StyleSheet.create({
   },
   btnSecondaryText: {
     color: '#111827',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  btnStaff: {
+    borderWidth: 1,
+    borderColor: '#6B7FC4',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  btnStaffText: {
+    color: '#6B7FC4',
     fontSize: 16,
     fontWeight: '600',
   },

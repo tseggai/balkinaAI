@@ -170,6 +170,13 @@ export default function StaffPage() {
   const [bulkActing, setBulkActing] = useState(false);
   const [bulkStatusPickerOpen, setBulkStatusPickerOpen] = useState(false);
 
+  // Invite modal state
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteStaffName, setInviteStaffName] = useState('');
+  const [inviteEmailSent, setInviteEmailSent] = useState(false);
+  const [inviteLoading, setInviteLoading] = useState(false);
+
   // General state
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -210,6 +217,37 @@ export default function StaffPage() {
     fetchLocations();
     fetchServices();
   }, [fetchStaff, fetchLocations, fetchServices]);
+
+  // ── Invite handler ───────────────────────────────────────────────────────
+
+  async function handleInvite(staffId: string, staffName: string) {
+    setInviteLoading(true);
+    setInviteCode('');
+    setInviteStaffName(staffName);
+    setInviteEmailSent(false);
+    setInviteModalOpen(true);
+
+    try {
+      const res = await fetch('/api/staff/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staff_id: staffId }),
+      });
+      const json = await res.json() as { data?: { token: string; email_sent: boolean } | null; error?: { message: string } | null };
+      if (json.error) {
+        setError(json.error.message);
+        setInviteModalOpen(false);
+      } else if (json.data) {
+        setInviteCode(json.data.token);
+        setInviteEmailSent(json.data.email_sent);
+      }
+    } catch {
+      setError('Failed to generate invite');
+      setInviteModalOpen(false);
+    } finally {
+      setInviteLoading(false);
+    }
+  }
 
   // ── Panel open/close ───────────────────────────────────────────────────────
 
@@ -1385,6 +1423,7 @@ export default function StaffPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Profession</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Services</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -1441,6 +1480,17 @@ export default function StaffPage() {
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                         {s.services_count}
                       </td>
+                      <td data-checkbox-cell className="whitespace-nowrap px-4 py-3 text-sm">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleInvite(s.id, s.name);
+                          }}
+                          className="rounded-md bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
+                        >
+                          Invite
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1449,6 +1499,50 @@ export default function StaffPage() {
           </div>
         )}
       </div>
+
+      {/* Invite Modal */}
+      {inviteModalOpen && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setInviteModalOpen(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold text-gray-900">Invite {inviteStaffName}</h3>
+              {inviteLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+                </div>
+              ) : inviteCode ? (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600">Share this invite code with your staff member:</p>
+                  <div className="mt-3 flex items-center justify-center gap-3">
+                    <span className="rounded-lg bg-gray-100 px-6 py-3 font-mono text-2xl font-bold tracking-widest text-brand-700">
+                      {inviteCode}
+                    </span>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(inviteCode); }}
+                      className="rounded-md bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  {inviteEmailSent && (
+                    <p className="mt-3 text-center text-sm text-green-600">Invite email sent!</p>
+                  )}
+                  <p className="mt-3 text-center text-xs text-gray-500">Code expires in 7 days</p>
+                </div>
+              ) : null}
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setInviteModalOpen(false)}
+                  className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Slide-in Panel */}
       {showPanel && (
