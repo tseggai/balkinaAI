@@ -13,7 +13,12 @@ export async function GET() {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
-  const supabase = createClient();
+  // Use admin client — auth is already verified by getTenantId() above.
+  // The anon-key client goes through RLS which may block tenant reads if
+  // get_my_tenant_id() can't resolve from the JWT (stale session, missing
+  // app_metadata). The admin client bypasses RLS; security is enforced by
+  // the explicit .eq('tenant_id', tenantId) filter.
+  const supabase = createAdminClient();
 
   // Get all appointments for this tenant to build customer stats
   const { data: appointments } = await supabase

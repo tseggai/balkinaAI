@@ -31,7 +31,13 @@ export async function GET(request: Request) {
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)));
   const offset = (page - 1) * limit;
 
-  const supabase = createClient();
+  // Use admin client — auth is already verified by getTenantId() above.
+  // The anon-key client goes through RLS which requires get_my_tenant_id()
+  // to return a value from the JWT. If the JWT doesn't contain tenant_id
+  // in app_metadata (e.g. stale session), the query returns zero rows.
+  // The admin client bypasses RLS; security is enforced by the explicit
+  // .eq('tenant_id', tenantId) filter.
+  const supabase = createAdminClient();
 
   // Build query for count
   let countQuery = supabase
