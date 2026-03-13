@@ -192,20 +192,54 @@ async function handleFindBusinessesInner(
 
     console.log('[find_businesses] matching services for type:', serviceType, 'count:', matchingServices?.length, 'error:', svcError?.message);
 
+    // Also find tenants whose assigned category matches the search term
+    // This catches businesses like "Dan the Barber" in "Beauty & Personal Care"
+    // even when their service names don't contain the category keywords
+    const { data: categoryTenants } = await supabase
+      .from('tenants')
+      .select('id, name, logo_url, category_id, categories(name)')
+      .eq('status', 'active')
+      .not('category_id', 'is', null);
+
+    // Filter tenants whose category name matches the service type (case-insensitive)
+    const catMatchTenantIds = new Set<string>();
+    const typeLC = serviceType.toLowerCase();
+    const typeWords2 = typeLC.split(/\s+/).filter((w: string) => w.length >= 2);
+    for (const t of (categoryTenants ?? []) as unknown as { id: string; name: string; categories: { name: string } | { name: string }[] | null }[]) {
+      const catName = Array.isArray(t.categories) ? t.categories[0]?.name ?? '' : t.categories?.name ?? '';
+      const catLC = catName.toLowerCase();
+      // Match if category contains the search term, or search term contains the category,
+      // or if any significant word from the search term appears in the category name
+      if (catLC.includes(typeLC) || typeLC.includes(catLC) || typeWords2.some(w => catLC.includes(w))) {
+        catMatchTenantIds.add(t.id);
+      }
+    }
+    console.log('[find_businesses] category-matched tenant IDs:', catMatchTenantIds.size);
+
     let serviceTenantMap: Map<string, { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; matched_services: string[] }>;
 
-    if (!matchingServices || matchingServices.length === 0) {
-      // Fall back to all tenants — don't return empty
-      console.log('[find_businesses] no service match, falling back to all active tenants');
-      serviceTenantMap = new Map();
-    } else {
-      // Collect matching tenant IDs and service names per tenant
-      const svcByTenant = new Map<string, string[]>();
+    // Collect matching tenant IDs from service name search
+    const svcByTenant = new Map<string, string[]>();
+    if (matchingServices && matchingServices.length > 0) {
       for (const svc of matchingServices as { tenant_id: string; name: string }[]) {
         const existing = svcByTenant.get(svc.tenant_id) ?? [];
         existing.push(svc.name);
         svcByTenant.set(svc.tenant_id, existing);
       }
+    }
+
+    // Merge category-matched tenants into the service match map
+    for (const catTenantId of catMatchTenantIds) {
+      if (!svcByTenant.has(catTenantId)) {
+        svcByTenant.set(catTenantId, ['(category match)']);
+      }
+    }
+
+    if (svcByTenant.size === 0) {
+      // Fall back to all tenants — don't return empty
+      console.log('[find_businesses] no service or category match, falling back to all active tenants');
+      serviceTenantMap = new Map();
+    } else {
 
       // Filter out tenants whose services are semantically incompatible
       const incompatible = INCOMPATIBLE_KEYWORDS[serviceType.toLowerCase()] ?? [];

@@ -108,12 +108,32 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // Create an auth user so the customer has a valid auth.users entry.
   // Use email if provided, otherwise generate a placeholder email from phone or name.
   const email = body.email?.trim()
     || (body.phone?.trim() ? `${body.phone.trim().replace(/\D/g, '')}@placeholder.balkina.ai` : null)
     || `${crypto.randomUUID().slice(0, 8)}@placeholder.balkina.ai`;
 
+  // Try to find an existing customer with this email first
+  let userId: string | null = null;
+
+  const { data: existingCustomer } = await admin
+    .from('customers')
+    .select('id')
+    .eq('email', body.email?.trim() ?? '')
+    .limit(1)
+    .maybeSingle();
+
+  if (existingCustomer) {
+    // Customer already exists with this email — return them directly
+    const { data: fullCustomer } = await admin
+      .from('customers')
+      .select('*')
+      .eq('id', (existingCustomer as { id: string }).id)
+      .single();
+    return NextResponse.json({ data: fullCustomer, error: null }, { status: 200 });
+  }
+
+  // Create auth user — handle duplicate email gracefully
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({
     email,
     email_confirm: true,
@@ -121,17 +141,33 @@ export async function POST(request: Request) {
   });
 
   if (authError) {
-    return NextResponse.json(
-      { data: null, error: { message: authError.message } },
-      { status: 500 }
-    );
+    // If email already exists in auth, try to find and use that user
+    if (authError.message.includes('already been registered') || authError.message.includes('already exists')) {
+      const { data: { users } } = await admin.auth.admin.listUsers({ perPage: 1000 });
+      const existing = users?.find((u) => u.email === email);
+      if (existing) {
+        userId = existing.id;
+      } else {
+        return NextResponse.json(
+          { data: null, error: { message: authError.message } },
+          { status: 400 }
+        );
+      }
+    } else {
+      return NextResponse.json(
+        { data: null, error: { message: authError.message } },
+        { status: 500 }
+      );
+    }
+  } else {
+    userId = authUser.user.id;
   }
 
-  // Insert the customer record linked to the new auth user
+  // Insert the customer record linked to the auth user
   const { data: customer, error: custError } = await admin
     .from('customers')
     .insert({
-      id: authUser.user.id,
+      id: userId,
       display_name: body.display_name || null,
       first_name: body.first_name || null,
       last_name: body.last_name || null,
