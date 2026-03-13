@@ -3,6 +3,23 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
+/**
+ * Parse hash fragment parameters from the current URL.
+ * Supabase recovery redirects look like:
+ *   /auth/reset-password#access_token=xxx&refresh_token=xxx&type=recovery&...
+ */
+function getHashParams(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  const hash = window.location.hash.substring(1); // remove leading #
+  if (!hash) return {};
+  const params: Record<string, string> = {};
+  for (const part of hash.split('&')) {
+    const [key, ...rest] = part.split('=');
+    if (key) params[key] = decodeURIComponent(rest.join('='));
+  }
+  return params;
+}
+
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -12,42 +29,59 @@ export default function ResetPasswordPage() {
   const [sessionReady, setSessionReady] = useState(false);
   const [sessionError, setSessionError] = useState(false);
 
-  // On mount, the Supabase browser client automatically detects hash fragments
-  // (#access_token=...&type=recovery) from the URL and exchanges them for a
-  // session. We listen for the PASSWORD_RECOVERY event to know when it's ready.
   useEffect(() => {
-    try {
-      const supabase = createClient();
+    let cancelled = false;
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        (event) => {
-          if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
-            setSessionReady(true);
-          }
-        },
-      );
+    async function initSession() {
+      try {
+        const supabase = createClient();
 
-      // Also check if we already have a session (e.g. from a server-side callback)
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
+        // 1. Check if there's already a valid session (e.g. from server-side callback)
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        if (existingSession && !cancelled) {
           setSessionReady(true);
-        } else {
-          // Give the hash fragment processing a moment, then show error
-          setTimeout(() => {
-            setSessionReady((prev) => {
-              if (!prev) setSessionError(true);
-              return prev;
-            });
-          }, 3000);
+          return;
         }
-      });
 
-      return () => {
-        subscription.unsubscribe();
-      };
-    } catch {
-      setSessionError(true);
+        // 2. Parse hash fragment tokens from URL (Supabase recovery redirect)
+        const hashParams = getHashParams();
+        const accessToken = hashParams['access_token'];
+        const refreshToken = hashParams['refresh_token'];
+
+        if (accessToken && refreshToken) {
+          // Manually establish the session from the hash fragment tokens
+          const { error: sessionErr } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          // Clean the hash from the URL so tokens aren't exposed
+          if (typeof window !== 'undefined') {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+
+          if (!sessionErr && !cancelled) {
+            setSessionReady(true);
+            return;
+          }
+        }
+
+        // 3. No session and no hash tokens — link is invalid/expired
+        if (!cancelled) {
+          setSessionError(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setSessionError(true);
+        }
+      }
     }
+
+    initSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
