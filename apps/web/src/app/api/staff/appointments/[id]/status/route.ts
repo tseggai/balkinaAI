@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 
-async function getStaffRecord() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+function getBearerToken(request: Request): string | null {
+  const auth = request.headers.get('authorization') ?? '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7);
+  return null;
+}
+
+async function getStaffRecord(request: Request) {
+  const token = getBearerToken(request);
+  if (!token) return null;
 
   const admin = createAdminClient();
+  const { data: { user } } = await admin.auth.getUser(token);
+  if (!user) return null;
+
   const { data: staff } = await admin
     .from('staff')
     .select('id, tenant_id, name')
@@ -26,7 +34,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: { id: string } },
 ) {
-  const staff = await getStaffRecord();
+  const staff = await getStaffRecord(request);
   if (!staff) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
   const body = await request.json() as { status: string };
