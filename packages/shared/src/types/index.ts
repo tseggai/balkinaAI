@@ -11,7 +11,7 @@ export type Json = string | number | boolean | null | Json[] | { [key: string]: 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 export type TenantStatus = 'active' | 'inactive' | 'suspended' | 'pending_subscription' | 'past_due';
-export type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
+export type AppointmentStatus = 'pending' | 'confirmed' | 'in_progress' | 'cancelled' | 'completed' | 'no_show';
 export type DepositType = 'fixed' | 'percentage';
 export type DiscountType = 'percentage' | 'fixed';
 export type NudgeTriggerType = 'predicted_rebooking' | 'lapsed_customer' | 'post_appointment';
@@ -59,10 +59,16 @@ export interface TenantLocation {
 export interface Staff {
   id: UUID;
   tenant_id: UUID;
+  user_id: UUID | null;
   name: string;
   email: string;
   phone: string | null;
+  image_url: string | null;
   availability_schedule: Json;
+  requires_approval: boolean;
+  invite_token: string | null;
+  invite_expires_at: Timestamp | null;
+  invite_accepted_at: Timestamp | null;
   created_at: Timestamp;
 }
 
@@ -201,4 +207,45 @@ export interface PaginatedResponse<T> {
   page: number;
   pageSize: number;
   hasMore: boolean;
+}
+
+// ─── Staff app types ─────────────────────────────────────────────────────────
+
+export interface WeeklyDaySchedule {
+  enabled: boolean;
+  start: string;
+  end: string;
+  breaks: { start: string; end: string }[];
+}
+
+export type WeeklySchedule = Record<string, WeeklyDaySchedule>;
+
+export interface StaffProfile {
+  id: UUID;
+  tenant_id: UUID;
+  user_id: UUID | null;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  image_url: string | null;
+  requires_approval: boolean;
+  invite_accepted_at: Timestamp | null;
+  availability_schedule: Json;
+  tenant_name?: string;
+  location_name?: string;
+}
+
+export interface StaffAppointment {
+  id: UUID;
+  customer_name: string;
+  customer_phone: string | null;
+  service_name: string;
+  service_duration: number;
+  date: string;
+  start_time: Timestamp;
+  end_time: Timestamp;
+  status: AppointmentStatus;
+  total_price: number;
+  notes: string | null;
+  location_name: string | null;
 }

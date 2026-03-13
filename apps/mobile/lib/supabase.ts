@@ -24,3 +24,29 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
 });
+
+export interface StaffInfo {
+  id: string;
+  tenant_id: string;
+  name: string;
+  requires_approval: boolean;
+}
+
+export async function getAuthenticatedRole(): Promise<{ role: 'customer' | 'staff' | null; staffInfo?: StaffInfo }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { role: null };
+
+  // Check if this user is a staff member
+  const { data: staffRecord } = await supabase
+    .from('staff')
+    .select('id, tenant_id, name, requires_approval')
+    .eq('user_id', user.id)
+    .single();
+
+  if (staffRecord) {
+    const staff = staffRecord as StaffInfo;
+    return { role: 'staff', staffInfo: staff };
+  }
+
+  return { role: 'customer' };
+}

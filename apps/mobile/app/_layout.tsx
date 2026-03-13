@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase, getAuthenticatedRole } from '@/lib/supabase';
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
@@ -29,11 +29,19 @@ export default function RootLayout() {
 
     const inAuthGroup = segments[0] === '(auth)';
     const inAppGroup = segments[0] === '(app)';
+    const inStaffGroup = segments[0] === '(staff)';
 
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/welcome');
-    } else if (session && !inAppGroup) {
-      router.replace('/(app)');
+    } else if (session && !inAppGroup && !inStaffGroup) {
+      // Determine role and redirect accordingly
+      getAuthenticatedRole().then(({ role }) => {
+        if (role === 'staff') {
+          router.replace('/(staff)/dashboard');
+        } else {
+          router.replace('/(app)');
+        }
+      });
     }
   }, [session, initialized, segments, router]);
 
@@ -41,6 +49,7 @@ export default function RootLayout() {
     <Stack screenOptions={{ headerBackTitle: 'Back' }}>
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(app)" options={{ headerShown: false }} />
+      <Stack.Screen name="(staff)" options={{ headerShown: false }} />
     </Stack>
   );
 }
