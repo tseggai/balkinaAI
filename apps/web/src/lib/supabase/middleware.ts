@@ -88,8 +88,10 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Redirect authenticated users away from auth pages
-  if (user && pathname.startsWith('/auth/')) {
+  // Redirect authenticated users away from auth pages — except reset-password,
+  // which must remain accessible so password reset links work even when another
+  // user (e.g. the tenant owner) is logged in on the same browser.
+  if (user && pathname.startsWith('/auth/') && pathname !== '/auth/reset-password') {
     return redirectTo('/dashboard');
   }
 

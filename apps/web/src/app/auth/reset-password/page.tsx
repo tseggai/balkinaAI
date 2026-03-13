@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export default function ResetPasswordPage() {
@@ -9,6 +9,46 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [sessionError, setSessionError] = useState(false);
+
+  // On mount, the Supabase browser client automatically detects hash fragments
+  // (#access_token=...&type=recovery) from the URL and exchanges them for a
+  // session. We listen for the PASSWORD_RECOVERY event to know when it's ready.
+  useEffect(() => {
+    try {
+      const supabase = createClient();
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event) => {
+          if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+            setSessionReady(true);
+          }
+        },
+      );
+
+      // Also check if we already have a session (e.g. from a server-side callback)
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setSessionReady(true);
+        } else {
+          // Give the hash fragment processing a moment, then show error
+          setTimeout(() => {
+            setSessionReady((prev) => {
+              if (!prev) setSessionError(true);
+              return prev;
+            });
+          }, 3000);
+        }
+      });
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    } catch {
+      setSessionError(true);
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,6 +103,30 @@ export default function ResetPasswordPage() {
           <p className="mt-4 text-sm text-gray-500">
             You can close this page and return to the app.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (sessionError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg text-center">
+          <h1 className="text-2xl font-bold text-gray-900">Link expired</h1>
+          <p className="mt-3 text-sm text-gray-500">
+            This password reset link has expired or is invalid. Please request a new one from the app.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sessionReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-brand-600" />
+          <p className="mt-4 text-sm text-gray-500">Verifying your reset link...</p>
         </div>
       </div>
     );
