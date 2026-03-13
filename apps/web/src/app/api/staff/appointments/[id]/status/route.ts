@@ -91,7 +91,7 @@ export async function PATCH(
     newStatus === 'cancelled' ? notifyBookingCancelledByTenant(params.id) : Promise.resolve(),
   ]);
   if (newStatus === 'declined') {
-    void notifyBookingDeclined(params.id);
+    void Promise.allSettled([notifyBookingDeclined(params.id)]);
   }
 
   return NextResponse.json({ data: updated, error: null });
