@@ -221,7 +221,11 @@ CREATE POLICY "Tenant users can delete extras for their own services"
 
 CREATE POLICY "Customers can read their own profile"
   ON customers FOR SELECT
-  USING (id = auth.uid() OR is_platform_admin());
+  USING (
+    id = auth.uid()
+    OR user_id = auth.uid()
+    OR is_platform_admin()
+  );
 
 CREATE POLICY "Customers can insert their own profile"
   ON customers FOR INSERT
@@ -229,7 +233,10 @@ CREATE POLICY "Customers can insert their own profile"
 
 CREATE POLICY "Customers can update their own profile"
   ON customers FOR UPDATE
-  USING (id = auth.uid());
+  USING (
+    id = auth.uid()
+    OR user_id = auth.uid()
+  );
 
 -- Tenant users need to read customer data for their appointments
 CREATE POLICY "Tenant users can read customers they have appointments with"
