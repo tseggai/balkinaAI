@@ -26,8 +26,7 @@ async function getStaffRecord(request: Request) {
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending: ['confirmed', 'cancelled'],
-  confirmed: ['in_progress', 'no_show', 'cancelled'],
-  in_progress: ['completed'],
+  confirmed: ['completed', 'no_show', 'cancelled'],
 };
 
 export async function PATCH(
