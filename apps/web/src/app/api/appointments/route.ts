@@ -15,6 +15,7 @@ async function getTenantId() {
 }
 
 export async function GET(request: Request) {
+  try {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ data: null, total: 0, error: { message: 'Unauthorized' } }, { status: 401 });
 
@@ -98,9 +99,14 @@ export async function GET(request: Request) {
     limit,
     error: null,
   });
+  } catch (err) {
+    console.error('GET /api/appointments error:', err);
+    return NextResponse.json({ data: null, total: 0, error: { message: String(err) } }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
+  try {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
@@ -203,9 +209,14 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ data, error: null }, { status: 201 });
+  } catch (err) {
+    console.error('POST /api/appointments error:', err);
+    return NextResponse.json({ data: null, error: { message: String(err) } }, { status: 500 });
+  }
 }
 
 export async function PATCH(request: Request) {
+  try {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
@@ -350,6 +361,10 @@ export async function PATCH(request: Request) {
   }
 
   return NextResponse.json({ data, error: null });
+  } catch (err) {
+    console.error('PATCH /api/appointments error:', err);
+    return NextResponse.json({ data: null, error: { message: String(err) } }, { status: 500 });
+  }
 }
 
 export async function DELETE(request: Request) {
