@@ -189,10 +189,10 @@ export default function StaffDashboard() {
                   {item.status === 'confirmed' && (
                     <>
                       <TouchableOpacity
-                        style={[styles.actionBtn, styles.actionStart]}
-                        onPress={() => updateStatus(item.id, 'in_progress')}
+                        style={[styles.actionBtn, styles.actionComplete]}
+                        onPress={() => updateStatus(item.id, 'completed')}
                       >
-                        <Text style={styles.actionBtnTextLight}>Start</Text>
+                        <Text style={styles.actionBtnTextLight}>Complete</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.actionBtn, styles.actionNoShow]}
@@ -201,14 +201,6 @@ export default function StaffDashboard() {
                         <Text style={styles.actionBtnTextDanger}>No Show</Text>
                       </TouchableOpacity>
                     </>
-                  )}
-                  {item.status === 'in_progress' && (
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.actionComplete]}
-                      onPress={() => updateStatus(item.id, 'completed')}
-                    >
-                      <Text style={styles.actionBtnTextLight}>Complete</Text>
-                    </TouchableOpacity>
                   )}
                 </>
               )}
@@ -306,7 +298,6 @@ const styles = StyleSheet.create({
   actionBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' },
   actionAccept: { backgroundColor: '#6B7FC4' },
   actionDecline: { backgroundColor: '#fee2e2' },
-  actionStart: { backgroundColor: '#7c3aed' },
   actionNoShow: { backgroundColor: '#fee2e2' },
   actionComplete: { backgroundColor: '#059669' },
   actionBtnTextLight: { color: '#fff', fontSize: 14, fontWeight: '600' },
