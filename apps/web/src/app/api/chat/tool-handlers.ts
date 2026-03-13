@@ -235,6 +235,19 @@ async function handleFindBusinessesInner(
       }
     }
 
+    // When category matches exist, remove service-only matches that don't belong
+    // to the matching category. This prevents e.g. "Peak Performance Coaching"
+    // from appearing in "Beauty & Personal Care" just because a service name
+    // contains "personal" or "care".
+    if (catMatchTenantIds.size > 0) {
+      for (const tid of [...svcByTenant.keys()]) {
+        if (!catMatchTenantIds.has(tid)) {
+          svcByTenant.delete(tid);
+        }
+      }
+      console.log('[find_businesses] after category-priority filter:', svcByTenant.size, 'tenants');
+    }
+
     if (svcByTenant.size === 0) {
       // Fall back to all tenants — don't return empty
       console.log('[find_businesses] no service or category match, falling back to all active tenants');
