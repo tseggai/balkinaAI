@@ -190,6 +190,7 @@ export default function AppointmentsPage() {
   const [limit] = useState(20);
   const [sortBy, setSortBy] = useState('start_time');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [viewMode, setViewMode] = useState<'upcoming' | 'all'>('upcoming');
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -264,13 +265,14 @@ export default function AppointmentsPage() {
     params.set('limit', String(limit));
     params.set('sort_by', sortBy);
     params.set('sort_order', sortOrder);
+    if (viewMode === 'upcoming') params.set('upcoming', '1');
 
     const res = await fetch(`/api/appointments?${params}`);
     const json = await res.json() as { data: Appointment[] | null; total: number };
     setAppointments(json.data ?? []);
     setTotal(json.total ?? 0);
     setLoading(false);
-  }, [statusFilter, staffFilter, serviceFilter, dateFrom, dateTo, search, page, limit, sortBy, sortOrder]);
+  }, [statusFilter, staffFilter, serviceFilter, dateFrom, dateTo, search, page, limit, sortBy, sortOrder, viewMode]);
 
   const fetchDropdownData = useCallback(async () => {
     const [staffRes, servicesRes, locationsRes, customersRes, couponsRes, productsRes] = await Promise.all([
@@ -734,6 +736,20 @@ export default function AppointmentsPage() {
             <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
               {total}
             </span>
+            <div className="ml-2 inline-flex rounded-lg border border-gray-300 bg-white p-0.5">
+              <button
+                onClick={() => { setViewMode('upcoming'); setPage(1); }}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${viewMode === 'upcoming' ? 'bg-brand-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+              >
+                Upcoming
+              </button>
+              <button
+                onClick={() => { setViewMode('all'); setPage(1); }}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${viewMode === 'all' ? 'bg-brand-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+              >
+                All
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
