@@ -586,7 +586,7 @@ function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesDa
   }, [data.items.length, SNAP_INTERVAL]);
 
   return (
-    <View style={{ marginTop: 4, marginBottom: 2, flexShrink: 0 }}>
+    <View style={{ marginTop: 4, marginBottom: 6, flexShrink: 0 }}>
       <View style={{ height: 210 }}>
         <FlatList
           data={data.items}
@@ -1181,7 +1181,7 @@ const richCardStyles = StyleSheet.create({
   // Extras grid
   extrasContainer: { marginVertical: 6 },
   extrasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  extrasChip: { width: '47%', backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: '#e5e7eb', padding: 14, minHeight: 70, justifyContent: 'center' as const, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2, elevation: 1 },
+  extrasChip: { width: '47%', backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e5e7eb', padding: 14, minHeight: 70, justifyContent: 'center' as const },
   extrasChipSelected: { borderColor: '#6B7FC4', backgroundColor: '#eef2ff' },
   extrasChipName: { fontSize: 14, fontWeight: '700', color: '#374151' },
   extrasChipNameSelected: { color: '#4338ca' },
@@ -1225,10 +1225,10 @@ const richCardStyles = StyleSheet.create({
 });
 
 const combinedStyles = StyleSheet.create({
-  // Large service cards (horizontal scroll) below business cards
-  serviceCardLg: { width: 140, height: 110, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: '#e5e7eb', paddingHorizontal: 14, paddingVertical: 12, marginRight: 10, justifyContent: 'center' as const, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 },
-  serviceCardLgName: { fontSize: 14, fontWeight: '700', color: '#374151', marginBottom: 6 },
-  serviceCardLgPrice: { fontSize: 16, fontWeight: '700', color: '#6B7FC4' },
+  // Service cards (horizontal scroll) below business cards
+  serviceCardLg: { width: 160, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e5e7eb', paddingHorizontal: 14, paddingVertical: 12, marginRight: 10, justifyContent: 'center' as const },
+  serviceCardLgName: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 6 },
+  serviceCardLgPrice: { fontSize: 15, fontWeight: '700', color: '#6B7FC4' },
   serviceCardLgDuration: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
   serviceCardLgDeposit: { marginTop: 4, backgroundColor: '#fef3c7', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start' as const },
   serviceCardLgDepositText: { fontSize: 10, fontWeight: '600', color: '#92400e' },
@@ -1247,7 +1247,7 @@ const combinedStyles = StyleSheet.create({
   // Booking options (packages + extras combined)
   bookingOptionsContainer: { marginVertical: 6 },
   sectionLabel: { fontSize: 13, fontWeight: '600', color: '#6b7280', marginBottom: 6, marginTop: 4 },
-  packageChip: { width: 160, height: 100, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: '#e5e7eb', paddingHorizontal: 14, paddingVertical: 12, marginRight: 10, justifyContent: 'center' as const, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 },
+  packageChip: { width: 160, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e5e7eb', paddingHorizontal: 14, paddingVertical: 12, marginRight: 10, justifyContent: 'center' as const },
   packageChipSelected: { borderColor: '#6B7FC4', backgroundColor: '#eef2ff' },
   packageChipName: { fontSize: 14, fontWeight: '700', color: '#374151', marginBottom: 4 },
   packageChipNameSelected: { color: '#4338ca' },
@@ -1258,60 +1258,25 @@ const combinedStyles = StyleSheet.create({
 // ── Landing Screen Styles ───────────────────────────────────────────────────
 
 const landingStyles = StyleSheet.create({
-  categoryLabel: {
-    backgroundColor: '#6B7FC4',
-    borderRadius: 24,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginBottom: 20,
-    alignSelf: 'center',
-  },
-  categoryLabelText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#fff',
-    textAlign: 'center',
-  },
-  categoryLabelTextActive: {
-    color: '#fff',
-  },
-  serviceTypesGrid: {
+  categoriesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
     justifyContent: 'center',
+    paddingHorizontal: 16,
   },
-  serviceTypeChip: {
+  categoryChip: {
     backgroundColor: '#fff',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#e5e7eb',
     borderRadius: 24,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
   },
-  serviceTypeChipText: {
+  categoryChipText: {
     fontSize: 15,
     fontWeight: '600',
     color: '#374151',
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-    gap: 6,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#d1d5db',
-  },
-  dotActive: {
-    backgroundColor: '#6B7FC4',
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
   },
 });
 
@@ -1406,7 +1371,7 @@ function MessageBubble({
       style={[
         bubbleStyles.wrapper,
         bubbleStyles.wrapperAssistant,
-        hasCards && { maxWidth: '100%' },
+        hasCards && { maxWidth: '100%', gap: 10 },
         { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
       ]}
     >
@@ -1504,7 +1469,7 @@ function MessageBubble({
 }
 
 const bubbleStyles = StyleSheet.create({
-  wrapper: { paddingHorizontal: 12, marginVertical: 1, maxWidth: '88%', flexGrow: 0, flexShrink: 0 },
+  wrapper: { paddingHorizontal: 12, marginVertical: 3, maxWidth: '88%', flexGrow: 0, flexShrink: 0 },
   wrapperUser: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   wrapperAssistant: { alignSelf: 'flex-start', alignItems: 'flex-start' },
   bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
@@ -2365,42 +2330,7 @@ export default function ChatScreen() {
   const hasMessages = messages.length > 0;
 
   // Service-type buttons per category slug (Option 2 — horizontal tabs)
-  const CATEGORY_SERVICE_TYPES: Record<string, string[]> = {
-    'health-wellness': ['Dentist', 'Spa', 'Therapy', 'Chiropractor'],
-    'beauty-personal-care': ['Barber', 'Skin Care', 'Lashes & Brows', 'Nails'],
-    'fitness-sports': ['Personal Trainer', 'Yoga'],
-    'home-services': ['Cleaning', 'Plumbing', 'Electrical'],
-    'professional-services': ['Coaching', 'Consulting'],
-    'education-tutoring': ['Music Lessons', 'Tutoring'],
-    'pet-services': ['Pet Grooming', 'Vet'],
-    'automotive': ['Auto Detailing', 'Mechanic'],
-    'events-entertainment': ['Photography', 'DJ'],
-    'food-nutrition': ['Nutrition Coach', 'Meal Prep'],
-  };
-
-  const [selectedCategoryIdx, setSelectedCategoryIdx] = useState(0);
-  const activeCategories = categories.filter((c) => (CATEGORY_SERVICE_TYPES[c.slug] ?? []).length > 0);
-
-  // Refs for pager
-  const servicesPagerRef = useRef<FlatList<{ slug: string; name: string; services: string[] }>>(null);
-
-  const categoryPages = useMemo(() =>
-    activeCategories.map((cat) => ({
-      slug: cat.slug,
-      name: cat.name,
-      services: CATEGORY_SERVICE_TYPES[cat.slug] ?? [],
-    })),
-    [activeCategories],
-  );
-
-  // When swiping the pager, update the selected index (for dots)
-  const onServicesPagerScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetX = e.nativeEvent.contentOffset.x;
-    const idx = Math.round(offsetX / SCREEN_WIDTH);
-    if (idx >= 0 && idx < activeCategories.length && idx !== selectedCategoryIdx) {
-      setSelectedCategoryIdx(idx);
-    }
-  }, [activeCategories.length, selectedCategoryIdx]);
+  const activeCategories = categories;
 
   if (!hasMessages) {
     return (
@@ -2418,55 +2348,17 @@ export default function ChatScreen() {
             {categoriesLoading ? (
               <ActivityIndicator size="small" color="#6B7FC4" style={{ marginTop: 20 }} />
             ) : (
-              <View style={{ width: '100%', flex: 0 }}>
-                {/* Single pager: each page = category name (centered) + service chips (centered) */}
-                <FlatList
-                  ref={servicesPagerRef}
-                  data={categoryPages}
-                  keyExtractor={(item) => item.slug}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  onMomentumScrollEnd={onServicesPagerScroll}
-                  initialScrollIndex={selectedCategoryIdx}
-                  getItemLayout={(_data, index) => ({
-                    length: SCREEN_WIDTH,
-                    offset: SCREEN_WIDTH * index,
-                    index,
-                  })}
-                  renderItem={({ item, index: idx }) => (
-                    <View style={{ width: SCREEN_WIDTH, paddingHorizontal: 24, alignItems: 'center' }}>
-                      {/* Category name centered */}
-                      <View style={landingStyles.categoryLabel}>
-                        <Text style={[landingStyles.categoryLabelText, idx === selectedCategoryIdx && landingStyles.categoryLabelTextActive]}>
-                          {item.name}
-                        </Text>
-                      </View>
-                      {/* Service chips centered */}
-                      <View style={landingStyles.serviceTypesGrid}>
-                        {item.services.map((svc) => (
-                          <TouchableOpacity
-                            key={svc}
-                            style={landingStyles.serviceTypeChip}
-                            onPress={() => handleButtonPress(`Find a ${svc.toLowerCase()}`)}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={landingStyles.serviceTypeChipText}>{svc}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-                />
-                {/* Page dots */}
-                <View style={landingStyles.dotsRow}>
-                  {categoryPages.map((_, idx) => (
-                    <View
-                      key={idx}
-                      style={[landingStyles.dot, idx === selectedCategoryIdx && landingStyles.dotActive]}
-                    />
-                  ))}
-                </View>
+              <View style={landingStyles.categoriesGrid}>
+                {activeCategories.map((cat) => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={landingStyles.categoryChip}
+                    onPress={() => handleButtonPress(`Show me ${cat.name.toLowerCase()} services`)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={landingStyles.categoryChipText}>{cat.name}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             )}
           </View>

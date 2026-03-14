@@ -35,7 +35,7 @@ interface Appointment {
 }
 
 type Tab = 'upcoming' | 'past';
-type SortOrder = 'date_asc' | 'date_desc' | 'price_asc' | 'price_desc';
+type SortOrder = 'date_asc' | 'date_desc';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -175,7 +175,6 @@ export default function BookingsScreen() {
   const [search, setSearch] = useState('');
   const [sortOrder, setSortOrder] = useState<SortOrder>('date_asc');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [showFilters, setShowFilters] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   const fetchAppointments = useCallback(async () => {
@@ -257,18 +256,10 @@ export default function BookingsScreen() {
       return true;
     })
     .sort((a, b) => {
-      switch (sortOrder) {
-        case 'date_asc':
-          return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
-        case 'date_desc':
-          return new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
-        case 'price_asc':
-          return (a.total_price ?? 0) - (b.total_price ?? 0);
-        case 'price_desc':
-          return (b.total_price ?? 0) - (a.total_price ?? 0);
-        default:
-          return 0;
+      if (sortOrder === 'date_desc') {
+        return new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
       }
+      return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
     });
 
   const handleCancel = useCallback(async (appointmentId: string) => {
@@ -329,7 +320,7 @@ export default function BookingsScreen() {
     />
   );
 
-  const STATUS_FILTERS = ['all', 'confirmed', 'pending', 'completed', 'cancelled'];
+  const STATUS_OPTIONS = ['all', 'confirmed', 'pending', 'completed', 'cancelled'];
 
   return (
     <View style={styles.container}>
@@ -353,7 +344,7 @@ export default function BookingsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Search bar */}
+      {/* Search + Sort + Status (inline row) */}
       <View style={styles.searchRow}>
         <View style={styles.searchInputContainer}>
           <Ionicons name="search" size={16} color="#9ca3af" style={styles.searchIcon} />
@@ -361,7 +352,7 @@ export default function BookingsScreen() {
             style={styles.searchInput}
             value={search}
             onChangeText={setSearch}
-            placeholder="Search bookings..."
+            placeholder="Search..."
             placeholderTextColor="#9ca3af"
           />
           {search ? (
@@ -370,56 +361,33 @@ export default function BookingsScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
+        {/* Date sort toggle */}
         <TouchableOpacity
-          style={[styles.filterBtn, showFilters && styles.filterBtnActive]}
-          onPress={() => setShowFilters(!showFilters)}
+          style={styles.sortToggle}
+          onPress={() => setSortOrder(sortOrder === 'date_asc' ? 'date_desc' : 'date_asc')}
         >
-          <Ionicons name="options-outline" size={18} color={showFilters ? '#fff' : '#6B7FC4'} />
+          <Ionicons
+            name={sortOrder === 'date_asc' ? 'arrow-up' : 'arrow-down'}
+            size={14}
+            color="#6B7FC4"
+          />
+          <Text style={styles.sortToggleText}>Date</Text>
+        </TouchableOpacity>
+        {/* Status dropdown */}
+        <TouchableOpacity
+          style={styles.statusDropdown}
+          onPress={() => {
+            const currentIdx = STATUS_OPTIONS.indexOf(statusFilter);
+            const nextIdx = (currentIdx + 1) % STATUS_OPTIONS.length;
+            setStatusFilter(STATUS_OPTIONS[nextIdx]);
+          }}
+        >
+          <Text style={styles.statusDropdownText}>
+            {statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color="#6B7FC4" />
         </TouchableOpacity>
       </View>
-
-      {/* Filter/sort controls */}
-      {showFilters ? (
-        <View style={styles.filtersContainer}>
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterLabel}>Status</Text>
-            <View style={styles.filterChips}>
-              {STATUS_FILTERS.map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.filterChip, statusFilter === s && styles.filterChipActive]}
-                  onPress={() => setStatusFilter(s)}
-                >
-                  <Text style={[styles.filterChipText, statusFilter === s && styles.filterChipTextActive]}>
-                    {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterLabel}>Sort by</Text>
-            <View style={styles.filterChips}>
-              {[
-                { key: 'date_asc' as SortOrder, label: 'Date (earliest)' },
-                { key: 'date_desc' as SortOrder, label: 'Date (latest)' },
-                { key: 'price_asc' as SortOrder, label: 'Price (low)' },
-                { key: 'price_desc' as SortOrder, label: 'Price (high)' },
-              ].map((s) => (
-                <TouchableOpacity
-                  key={s.key}
-                  style={[styles.filterChip, sortOrder === s.key && styles.filterChipActive]}
-                  onPress={() => setSortOrder(s.key)}
-                >
-                  <Text style={[styles.filterChipText, sortOrder === s.key && styles.filterChipTextActive]}>
-                    {s.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      ) : null}
 
       {loading ? (
         <View style={styles.centered}>
@@ -509,13 +477,14 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 14, fontWeight: '600', color: '#9ca3af' },
   tabTextActive: { color: '#6B7FC4' },
 
-  // Search
+  // Search + controls row
   searchRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: '#fff',
     gap: 8,
+    alignItems: 'center',
   },
   searchInputContainer: {
     flex: 1,
@@ -524,40 +493,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
     borderRadius: 10,
     paddingHorizontal: 10,
-    height: 40,
+    height: 38,
   },
   searchIcon: { marginRight: 6 },
   searchInput: { flex: 1, fontSize: 14, color: '#111827', padding: 0 },
-  filterBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#eef2ff',
-    justifyContent: 'center',
+  sortToggle: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  filterBtnActive: { backgroundColor: '#6B7FC4' },
-
-  // Filters
-  filtersContainer: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  filterGroup: { marginBottom: 8 },
-  filterLabel: { fontSize: 12, fontWeight: '600', color: '#6b7280', marginBottom: 6 },
-  filterChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    height: 38,
+    paddingHorizontal: 10,
+    borderRadius: 10,
     backgroundColor: '#f3f4f6',
+    gap: 4,
   },
-  filterChipActive: { backgroundColor: '#6B7FC4' },
-  filterChipText: { fontSize: 12, fontWeight: '500', color: '#6b7280' },
-  filterChipTextActive: { color: '#fff' },
+  sortToggleText: { fontSize: 12, fontWeight: '600', color: '#6B7FC4' },
+  statusDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 38,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: '#f3f4f6',
+    gap: 4,
+  },
+  statusDropdownText: { fontSize: 12, fontWeight: '600', color: '#6B7FC4' },
 
   list: { padding: 16, paddingBottom: 24 },
 
@@ -597,7 +556,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  businessName: { fontSize: 16, fontWeight: '700', color: '#111827', flex: 1, marginRight: 8 },
+  businessName: { fontSize: 15, fontWeight: '600', color: '#111827', flex: 1, marginRight: 8 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
   statusText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
   serviceName: { fontSize: 14, color: '#374151', marginBottom: 2 },
@@ -607,10 +566,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    marginTop: 10,
   },
   dateTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   dateTimeText: { fontSize: 13, color: '#6b7280' },
