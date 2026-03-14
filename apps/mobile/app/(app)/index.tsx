@@ -1149,7 +1149,7 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
 
 const richCardStyles = StyleSheet.create({
   // Business cards
-  businessCard: { width: 280, height: 200, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
+  businessCard: { width: 280, height: 200, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, borderWidth: 1, borderColor: '#e5e7eb', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
   businessImage: { width: 280, height: 100, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
   businessImg: { width: 280, height: 100, resizeMode: 'cover' },
   businessEmoji: { fontSize: 24 },
@@ -2069,10 +2069,13 @@ export default function ChatScreen() {
       const handled = await handleClientSideFlow(trimmed);
       if (handled) return;
 
+      // Strip metadata tags like [category_id:...] from display text
+      const displayText = trimmed.replace(/\s*\[category_id:[^\]]*\]/g, '');
+
       const userMsg: ChatMessage = {
         id: `user_${Date.now()}`,
         role: 'user',
-        content: trimmed,
+        content: displayText,
         type: 'text',
       };
 
