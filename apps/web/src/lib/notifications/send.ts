@@ -98,6 +98,7 @@ const TEMPLATES: Record<NotificationType, {
 
 export async function sendNotification(payload: NotificationPayload): Promise<void> {
   const supabase = createAdminClient();
+  const tag = `[notifications:${payload.type}]`;
 
   let phone: string | null = null;
   let pushTokens: string[] = [];
@@ -105,12 +106,15 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
   let notifyPush = true;
 
   if (payload.recipientType === 'customer') {
-    const { data: customer } = await supabase
+    const { data: customer, error: custErr } = await supabase
       .from('customers')
       .select('phone, notify_sms, notify_push')
       .eq('id', payload.recipientId)
       .single();
-    if (!customer) return;
+    if (custErr || !customer) {
+      console.error(`${tag} customer lookup failed for ${payload.recipientId}:`, custErr?.message ?? 'not found');
+      return;
+    }
     const c = customer as { phone: string | null; notify_sms: boolean | null; notify_push: boolean | null };
     phone = c.phone;
     notifySms = c.notify_sms ?? true;
@@ -121,12 +125,15 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
       .eq('customer_id', payload.recipientId);
     pushTokens = (tokens as { token: string }[] | null)?.map(t => t.token) ?? [];
   } else {
-    const { data: staffMember } = await supabase
+    const { data: staffMember, error: staffErr } = await supabase
       .from('staff')
       .select('phone, notify_sms, notify_push')
       .eq('id', payload.recipientId)
       .single();
-    if (!staffMember) return;
+    if (staffErr || !staffMember) {
+      console.error(`${tag} staff lookup failed for ${payload.recipientId}:`, staffErr?.message ?? 'not found');
+      return;
+    }
     const s = staffMember as { phone: string | null; notify_sms: boolean | null; notify_push: boolean | null };
     phone = s.phone;
     notifySms = s.notify_sms ?? true;
@@ -137,6 +144,8 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
       .eq('staff_id', payload.recipientId);
     pushTokens = (tokens as { token: string }[] | null)?.map(t => t.token) ?? [];
   }
+
+  console.log(`${tag} recipient=${payload.recipientType}:${payload.recipientId} phone=${phone ? 'yes' : 'no'} pushTokens=${pushTokens.length} smsEnabled=${notifySms} pushEnabled=${notifyPush}`);
 
   const template = TEMPLATES[payload.type];
 
@@ -151,19 +160,24 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
       error_text: error ?? null,
     } as never);
 
-  // Send SMS (dynamic import to avoid eager env validation at build time)
+  // Send SMS
   const smsBody = template.sms(payload.data);
   if (notifySms && phone && smsBody.length > 0) {
     try {
       const { sendSms } = await import('@balkina/notifications');
       await sendSms({ to: phone, body: smsBody });
+      console.log(`${tag} SMS sent to ${phone}`);
       await logEntry('sms', 'sent');
     } catch (err) {
+      console.error(`${tag} SMS failed:`, err);
       await logEntry('sms', 'failed', String(err));
     }
+  } else {
+    const reason = !notifySms ? 'sms disabled' : !phone ? 'no phone number' : 'empty sms body';
+    console.log(`${tag} SMS skipped: ${reason}`);
   }
 
-  // Send Push (dynamic import to avoid eager env validation at build time)
+  // Send Push
   if (notifyPush && pushTokens.length > 0) {
     try {
       const { sendPushNotification } = await import('@balkina/notifications');
@@ -175,13 +189,19 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
             body: template.push.body(payload.data),
             data: { appointmentId: payload.appointmentId, type: payload.type },
           }]);
+          console.log(`${tag} push sent to token ${token.slice(0, 20)}...`);
           await logEntry('push', 'sent');
         } catch (err) {
+          console.error(`${tag} push failed for token ${token.slice(0, 20)}...:`, err);
           await logEntry('push', 'failed', String(err));
         }
       }
     } catch (err) {
+      console.error(`${tag} push import/init failed:`, err);
       await logEntry('push', 'failed', String(err));
     }
+  } else {
+    const reason = !notifyPush ? 'push disabled' : 'no push tokens registered';
+    console.log(`${tag} push skipped: ${reason}`);
   }
 }
