@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,11 +15,16 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const API_BASE = 'https://balkina-ai.vercel.app';
 
@@ -180,11 +185,12 @@ interface TimeSlotData {
   time: string;
   iso: string;
   staff_name?: string;
+  available?: boolean;
 }
 
 interface StaffWithSlotsData {
   type: 'staff_with_slots';
-  items: Array<StaffCardData & { slots: TimeSlotData[] }>;
+  items: Array<StaffCardData & { slots: TimeSlotData[]; all_slots?: TimeSlotData[] }>;
   anyone_slots?: Array<TimeSlotData & { staff_name: string }>;
 }
 
@@ -565,15 +571,38 @@ function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesDa
   const [selectedIdx, setSelectedIdx] = useState(0);
   const selectedBiz = data.items[selectedIdx];
   const services = selectedBiz?.services ?? [];
+  const CARD_WIDTH = 280;
+  const CARD_MARGIN = 10;
+  const SNAP_INTERVAL = CARD_WIDTH + CARD_MARGIN;
+  const SIDE_PADDING = (SCREEN_WIDTH - CARD_WIDTH) / 2;
+
+  // Auto-select business on snap
+  const onBusinessScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const idx = Math.round(offsetX / SNAP_INTERVAL);
+    if (idx >= 0 && idx < data.items.length) {
+      setSelectedIdx(idx);
+    }
+  }, [data.items.length, SNAP_INTERVAL]);
 
   return (
     <View style={{ marginTop: 4, marginBottom: 2 }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
-        {data.items.map((biz, idx) => (
+      <FlatList
+        data={data.items}
+        keyExtractor={(biz) => biz.id}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={SNAP_INTERVAL}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        contentContainerStyle={{ paddingLeft: SIDE_PADDING, paddingRight: SIDE_PADDING }}
+        onMomentumScrollEnd={onBusinessScroll}
+        renderItem={({ item: biz, index: idx }) => (
           <TouchableOpacity
             key={biz.id}
             style={[
               richCardStyles.businessCard,
+              { marginRight: CARD_MARGIN },
               idx === selectedIdx && { borderWidth: 2, borderColor: '#6B7FC4' },
             ]}
             onPress={() => setSelectedIdx(idx)}
@@ -592,8 +621,8 @@ function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesDa
               <Text style={richCardStyles.businessDrive}>{biz.drive_minutes} min drive</Text>
             </View>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+        )}
+      />
       {services.length > 0 && selectedBiz ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 10 }}>
           {services.map((svc) => (
@@ -664,9 +693,10 @@ function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (
   // -1 means "Anyone" is selected
   const isAnyone = selectedIdx === -1;
   const selectedStaff = isAnyone ? null : data.items[selectedIdx];
-  const slots = isAnyone
+  // Use all_slots (with available flag) if present, otherwise fall back to slots (all available)
+  const slots: TimeSlotData[] = isAnyone
     ? (data.anyone_slots ?? [])
-    : (selectedStaff?.slots ?? []);
+    : (selectedStaff?.all_slots ?? selectedStaff?.slots?.map((s) => ({ ...s, available: true })) ?? []);
 
   return (
     <View style={{ marginTop: 4, marginBottom: 2 }}>
@@ -714,15 +744,23 @@ function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (
       {slots.length > 0 ? (
         <View style={combinedStyles.slotsContainer}>
           {slots.map((slot, i) => {
+            const isAvailable = slot.available !== false;
             const staffLabel = isAnyone && slot.staff_name ? ` with ${slot.staff_name}` : selectedStaff ? ` with ${selectedStaff.name}` : '';
             return (
               <TouchableOpacity
                 key={`${slot.time}-${i}`}
-                style={combinedStyles.slotChip}
-                onPress={() => onTap(`${slot.time}${staffLabel}`)}
-                activeOpacity={0.7}
+                style={[
+                  combinedStyles.slotChip,
+                  !isAvailable && combinedStyles.slotChipUnavailable,
+                ]}
+                onPress={() => isAvailable ? onTap(`${slot.time}${staffLabel}`) : undefined}
+                activeOpacity={isAvailable ? 0.7 : 1}
+                disabled={!isAvailable}
               >
-                <Text style={combinedStyles.slotChipText}>{slot.time}</Text>
+                <Text style={[
+                  combinedStyles.slotChipText,
+                  !isAvailable && combinedStyles.slotChipTextUnavailable,
+                ]}>{slot.time}</Text>
                 {isAnyone && slot.staff_name ? (
                   <Text style={combinedStyles.slotStaffLabel}>{slot.staff_name}</Text>
                 ) : null}
@@ -1072,44 +1110,26 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
       </View>
 
       {data.address ? (
-        <>
-          <View style={richCardStyles.confirmedRow}>
-            <Text style={richCardStyles.confirmedLabel}>Address:</Text>
-            <Text style={richCardStyles.confirmedValue}>{data.address}</Text>
-          </View>
-          <TouchableOpacity
-            style={richCardStyles.directionsBtn}
-            onPress={openDirections}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="navigate-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
-            <Text style={richCardStyles.directionsBtnText}>Get Directions</Text>
-          </TouchableOpacity>
-        </>
+        <View style={richCardStyles.confirmedRow}>
+          <Text style={richCardStyles.confirmedLabel}>Address:</Text>
+          <Text style={richCardStyles.confirmedValue}>{data.address}</Text>
+        </View>
       ) : null}
 
       {data.points_earned > 0 ? (
         <Text style={richCardStyles.confirmedPoints}>+{data.points_earned} pts earned</Text>
       ) : null}
 
-      <View style={richCardStyles.confirmedDivider} />
-
-      <View style={richCardStyles.confirmedActions}>
+      {(data.address || data.latitude) ? (
         <TouchableOpacity
-          style={richCardStyles.confirmedActionBtn}
-          onPress={() => onButtonPress('View My Bookings')}
+          style={richCardStyles.directionsBtnCenter}
+          onPress={openDirections}
           activeOpacity={0.7}
         >
-          <Text style={richCardStyles.confirmedActionText}>My Bookings</Text>
+          <Ionicons name="navigate-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={richCardStyles.directionsBtnText}>Get Directions</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[richCardStyles.confirmedActionBtn, richCardStyles.confirmedActionBtnSecondary]}
-          onPress={() => onButtonPress('Book Another Service')}
-          activeOpacity={0.7}
-        >
-          <Text style={[richCardStyles.confirmedActionText, richCardStyles.confirmedActionTextSecondary]}>New Appointment</Text>
-        </TouchableOpacity>
-      </View>
+      ) : null}
     </View>
   );
 }
@@ -1192,6 +1212,7 @@ const richCardStyles = StyleSheet.create({
   confirmedValue: { fontSize: 14, color: '#111827', flexShrink: 1 },
   confirmedPoints: { fontSize: 13, fontWeight: '600', color: '#6B7FC4', marginTop: 8 },
   directionsBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 10, backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignSelf: 'flex-start' },
+  directionsBtnCenter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, alignSelf: 'center', width: '80%' },
   directionsBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
   confirmedDivider: { borderTopWidth: 1, borderTopColor: '#d1d5db', marginVertical: 12, width: '100%' },
   confirmedActions: { flexDirection: 'row', gap: 10, marginTop: 4, width: '100%' },
@@ -1218,6 +1239,8 @@ const combinedStyles = StyleSheet.create({
   slotsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, paddingHorizontal: 2 },
   slotChip: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6B7FC4', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, alignItems: 'center' as const },
   slotChipText: { fontSize: 14, fontWeight: '600', color: '#6B7FC4' },
+  slotChipUnavailable: { borderColor: '#e5e7eb', backgroundColor: '#f9fafb', opacity: 0.6 },
+  slotChipTextUnavailable: { color: '#d1d5db', textDecorationLine: 'line-through' as const },
   slotStaffLabel: { fontSize: 11, color: '#9ca3af', marginTop: 1 },
   // Booking options (packages + extras combined)
   bookingOptionsContainer: { marginVertical: 6 },
@@ -1255,25 +1278,17 @@ const landingStyles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginTop: 20,
     justifyContent: 'center',
   },
-  serviceTypeCard: {
+  serviceTypeChip: {
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
-    borderRadius: 14,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    minWidth: 100,
-    alignItems: 'center' as const,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
+    borderRadius: 24,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
   },
-  serviceTypeText: {
+  serviceTypeChipText: {
     fontSize: 15,
     fontWeight: '600',
     color: '#374151',
@@ -1677,7 +1692,7 @@ export default function ChatScreen() {
         return;
       }
       const data = (await res.json()) as {
-        staff: { id: string; name: string; image_url: string | null; available_slots_count: number; slots: { time: string; iso: string }[] }[];
+        staff: { id: string; name: string; image_url: string | null; available_slots_count: number; slots: { time: string; iso: string }[]; all_slots?: { time: string; iso: string; available: boolean }[] }[];
         anyone_slots: { time: string; iso: string; staff_name: string }[];
         address?: string | null;
         message?: string;
@@ -1704,6 +1719,7 @@ export default function ChatScreen() {
           image_url: s.image_url ?? undefined,
           available_slots_count: s.available_slots_count,
           slots: s.slots.map((sl) => ({ time: sl.time, iso: sl.iso })),
+          all_slots: s.all_slots?.map((sl) => ({ time: sl.time, iso: sl.iso, available: sl.available })),
         })),
         anyone_slots: data.anyone_slots.map((sl) => ({ time: sl.time, iso: sl.iso, staff_name: sl.staff_name })),
       };
@@ -2337,8 +2353,47 @@ export default function ChatScreen() {
 
   const [selectedCategoryIdx, setSelectedCategoryIdx] = useState(0);
   const activeCategories = categories.filter((c) => (CATEGORY_SERVICE_TYPES[c.slug] ?? []).length > 0);
-  const activeCategory = activeCategories[selectedCategoryIdx];
-  const activeSvcTypes = activeCategory ? (CATEGORY_SERVICE_TYPES[activeCategory.slug] ?? []) : [];
+
+  // Refs for syncing category tabs with swipe
+  const servicesPagerRef = useRef<FlatList<{ slug: string; services: string[] }>>(null);
+  const categoryScrollRef = useRef<ScrollView>(null);
+  const categoryTabLayouts = useRef<{ x: number; width: number }[]>([]);
+  const isTabPress = useRef(false);
+
+  const categoryPages = useMemo(() =>
+    activeCategories.map((cat) => ({
+      slug: cat.slug,
+      services: CATEGORY_SERVICE_TYPES[cat.slug] ?? [],
+    })),
+    [activeCategories],
+  );
+
+  // When swiping the services pager, auto-select the corresponding category tab
+  const onServicesPagerScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (isTabPress.current) return;
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const idx = Math.round(offsetX / SCREEN_WIDTH);
+    if (idx >= 0 && idx < activeCategories.length && idx !== selectedCategoryIdx) {
+      setSelectedCategoryIdx(idx);
+      // Scroll tab into view
+      const layout = categoryTabLayouts.current[idx];
+      if (layout && categoryScrollRef.current) {
+        categoryScrollRef.current.scrollTo({ x: Math.max(0, layout.x - 16), animated: true });
+      }
+    }
+  }, [activeCategories.length, selectedCategoryIdx]);
+
+  // When tapping a category tab, scroll the pager
+  const onCategoryTabPress = useCallback((idx: number) => {
+    setSelectedCategoryIdx(idx);
+    isTabPress.current = true;
+    servicesPagerRef.current?.scrollToIndex({ index: idx, animated: true });
+    const layout = categoryTabLayouts.current[idx];
+    if (layout && categoryScrollRef.current) {
+      categoryScrollRef.current.scrollTo({ x: Math.max(0, layout.x - 16), animated: true });
+    }
+    setTimeout(() => { isTabPress.current = false; }, 400);
+  }, []);
 
   if (!hasMessages) {
     return (
@@ -2356,9 +2411,10 @@ export default function ChatScreen() {
             {categoriesLoading ? (
               <ActivityIndicator size="small" color="#6B7FC4" style={{ marginTop: 20 }} />
             ) : (
-              <View style={{ width: '100%' }}>
+              <View style={{ width: '100%', flex: 0 }}>
                 {/* Horizontal scrollable category tabs */}
                 <ScrollView
+                  ref={categoryScrollRef}
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 4 }}
@@ -2369,7 +2425,10 @@ export default function ChatScreen() {
                       <TouchableOpacity
                         key={cat.id}
                         style={[landingStyles.categoryTab, isActive && landingStyles.categoryTabActive]}
-                        onPress={() => setSelectedCategoryIdx(idx)}
+                        onPress={() => onCategoryTabPress(idx)}
+                        onLayout={(e) => {
+                          categoryTabLayouts.current[idx] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
+                        }}
                         activeOpacity={0.7}
                       >
                         <Text style={[landingStyles.categoryTabText, isActive && landingStyles.categoryTabTextActive]}>
@@ -2379,18 +2438,39 @@ export default function ChatScreen() {
                     );
                   })}
                 </ScrollView>
-                {/* Service-type chips for active category */}
-                <View style={landingStyles.serviceTypesGrid}>
-                  {activeSvcTypes.map((svc) => (
-                    <TouchableOpacity
-                      key={svc}
-                      style={landingStyles.serviceTypeCard}
-                      onPress={() => handleButtonPress(`Find a ${svc.toLowerCase()}`)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={landingStyles.serviceTypeText}>{svc}</Text>
-                    </TouchableOpacity>
-                  ))}
+                {/* Swipeable service pages — fixed height so category tabs don't shift */}
+                <View style={{ height: 200, marginTop: 16 }}>
+                  <FlatList
+                    ref={servicesPagerRef}
+                    data={categoryPages}
+                    keyExtractor={(item) => item.slug}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onMomentumScrollEnd={onServicesPagerScroll}
+                    initialScrollIndex={selectedCategoryIdx}
+                    getItemLayout={(_data, index) => ({
+                      length: SCREEN_WIDTH,
+                      offset: SCREEN_WIDTH * index,
+                      index,
+                    })}
+                    renderItem={({ item }) => (
+                      <View style={{ width: SCREEN_WIDTH, paddingHorizontal: 24 }}>
+                        <View style={landingStyles.serviceTypesGrid}>
+                          {item.services.map((svc) => (
+                            <TouchableOpacity
+                              key={svc}
+                              style={landingStyles.serviceTypeChip}
+                              onPress={() => handleButtonPress(`Find a ${svc.toLowerCase()}`)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={landingStyles.serviceTypeChipText}>{svc}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                  />
                 </View>
               </View>
             )}

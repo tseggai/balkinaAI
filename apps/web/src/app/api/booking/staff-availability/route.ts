@@ -214,6 +214,7 @@ export async function POST(request: Request) {
       image_url: string | null;
       available_slots_count: number;
       slots: { time: string; iso: string; staff_name?: string }[];
+      all_slots: { time: string; iso: string; available: boolean }[];
     }[] = [];
 
     const anyoneSlots: { time: string; iso: string; staff_name: string }[] = [];
@@ -249,6 +250,7 @@ export async function POST(request: Request) {
       const scheduleEndMinutes = (endParts[0] ?? 0) * 60 + (endParts[1] ?? 0);
 
       const staffSlots: { time: string; iso: string }[] = [];
+      const allSlots: { time: string; iso: string; available: boolean }[] = [];
 
       for (let minutes = scheduleStartMinutes; minutes + totalSlotMinutes <= scheduleEndMinutes; minutes += 30) {
         const slotHour = Math.floor(minutes / 60);
@@ -267,14 +269,16 @@ export async function POST(request: Request) {
           return bufferStartUtc.getTime() < apptEnd && bufferEndUtc.getTime() > apptStart;
         });
 
-        if (!hasConflict) {
-          const serviceStartMinutes = minutes + bufferBefore;
-          const displayHour = Math.floor(serviceStartMinutes / 60);
-          const displayMin = serviceStartMinutes % 60;
-          const ampm = displayHour >= 12 ? 'PM' : 'AM';
-          const displayHour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour;
-          const localDisplay = `${displayHour12}:${String(displayMin).padStart(2, '0')} ${ampm}`;
+        const serviceStartMinutes = minutes + bufferBefore;
+        const displayHour = Math.floor(serviceStartMinutes / 60);
+        const displayMin = serviceStartMinutes % 60;
+        const ampm = displayHour >= 12 ? 'PM' : 'AM';
+        const displayHour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour;
+        const localDisplay = `${displayHour12}:${String(displayMin).padStart(2, '0')} ${ampm}`;
 
+        allSlots.push({ time: localDisplay, iso: slotStartUtc.toISOString(), available: !hasConflict });
+
+        if (!hasConflict) {
           staffSlots.push({ time: localDisplay, iso: slotStartUtc.toISOString() });
           anyoneSlots.push({ time: localDisplay, iso: slotStartUtc.toISOString(), staff_name: staff.name });
         }
@@ -286,6 +290,7 @@ export async function POST(request: Request) {
         image_url: staff.image_url,
         available_slots_count: staffSlots.length,
         slots: staffSlots,
+        all_slots: allSlots,
       });
     }
 

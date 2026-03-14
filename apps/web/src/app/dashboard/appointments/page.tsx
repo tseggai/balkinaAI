@@ -965,9 +965,20 @@ export default function AppointmentsPage() {
                           )}
                         </td>
 
-                        {/* Service */}
+                        {/* Service / Package */}
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
-                          {appt.services?.name ?? '—'}
+                          {(() => {
+                            const pkgMatch = appt.notes?.match(/^Package:\s*(.+)$/);
+                            if (pkgMatch) {
+                              return (
+                                <div>
+                                  <div className="font-medium">{pkgMatch[1]}</div>
+                                  <div className="text-xs text-gray-400">via {appt.services?.name}</div>
+                                </div>
+                              );
+                            }
+                            return appt.services?.name ?? '—';
+                          })()}
                         </td>
 
                         {/* Payment */}
@@ -1715,10 +1726,26 @@ export default function AppointmentsPage() {
                       const hasProducts = formSelectedProducts.size > 0;
                       return (
                         <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Service: {selectedService?.name ?? editing.services?.name ?? ''}</span>
-                            <span className="text-gray-900">${(selectedService?.price ?? editing.services?.price ?? editing.total_price ?? 0).toFixed(2)}</span>
-                          </div>
+                          {(() => {
+                            const pkgMatch = editing.notes?.match(/^Package:\s*(.+)$/);
+                            return pkgMatch ? (
+                              <>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Package: {pkgMatch[1]}</span>
+                                  <span className="text-gray-900">${(editing.total_price ?? 0).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-400">
+                                  <span>via {selectedService?.name ?? editing.services?.name ?? ''}</span>
+                                  <span />
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Service: {selectedService?.name ?? editing.services?.name ?? ''}</span>
+                                <span className="text-gray-900">${(selectedService?.price ?? editing.services?.price ?? editing.total_price ?? 0).toFixed(2)}</span>
+                              </div>
+                            );
+                          })()}
                           {hasExtras && serviceExtras
                             .filter((e) => formSelectedExtras.has(e.id))
                             .map((e) => (
