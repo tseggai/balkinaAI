@@ -12,13 +12,11 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   const now = new Date();
 
+  // Get all active staff with their tenant's timezone
   const { data: allStaff } = await supabase
     .from('staff')
     .select(`
-      id, name, notify_push,
-      staff_location_assignments(
-        tenant_locations(timezone)
-      )
+      id, name, tenant_id, notify_push
     `)
     .eq('is_active', true);
 
@@ -28,11 +26,18 @@ export async function GET(request: Request) {
     const staffMember = raw as unknown as {
       id: string;
       name: string;
+      tenant_id: string;
       notify_push: boolean | null;
-      staff_location_assignments: Array<{ tenant_locations: { timezone: string } | null }>;
     };
-    const timezone = staffMember.staff_location_assignments?.[0]
-      ?.tenant_locations?.timezone ?? 'UTC';
+
+    // Get timezone from tenant's location
+    const { data: locData } = await supabase
+      .from('tenant_locations')
+      .select('timezone')
+      .eq('tenant_id', staffMember.tenant_id)
+      .limit(1)
+      .maybeSingle();
+    const timezone = (locData as { timezone: string } | null)?.timezone ?? 'UTC';
 
     // Check if it is currently 7am in this staff member's timezone
     const localHour = parseInt(
@@ -47,6 +52,8 @@ export async function GET(request: Request) {
 
     // Get today's date string in their timezone
     const today = now.toLocaleDateString('en-CA', { timeZone: timezone });
+    const dayStartUtc = new Date(`${today}T00:00:00Z`);
+    const dayEndUtc = new Date(`${today}T23:59:59Z`);
 
     // Check notification_log — no daily summary sent today for this staff
     const { data: alreadySent } = await supabase
@@ -60,12 +67,13 @@ export async function GET(request: Request) {
 
     if (alreadySent) continue;
 
-    // Count today's appointments
+    // Count today's appointments using start_time range
     const { count } = await supabase
       .from('appointments')
       .select('id', { count: 'exact', head: true })
       .eq('staff_id', staffMember.id)
-      .eq('appointment_date', today)
+      .gte('start_time', dayStartUtc.toISOString())
+      .lte('start_time', dayEndUtc.toISOString())
       .in('status', ['confirmed', 'pending']);
 
     if (!count || count === 0) continue;
@@ -75,14 +83,15 @@ export async function GET(request: Request) {
       .from('appointments')
       .select('start_time')
       .eq('staff_id', staffMember.id)
-      .eq('appointment_date', today)
+      .gte('start_time', dayStartUtc.toISOString())
+      .lte('start_time', dayEndUtc.toISOString())
       .in('status', ['confirmed', 'pending'])
       .order('start_time', { ascending: true })
       .limit(1)
       .single();
 
     const firstTime = firstAppt
-      ? new Date(`1970-01-01T${(firstAppt as { start_time: string }).start_time}`)
+      ? new Date((firstAppt as { start_time: string }).start_time)
           .toLocaleTimeString('en-US', {
             timeZone: timezone,
             hour: 'numeric',

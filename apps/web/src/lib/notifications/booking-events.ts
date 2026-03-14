@@ -13,9 +13,6 @@ interface AppointmentContext {
     name: string;
     phone: string | null;
     requires_approval: boolean;
-    staff_location_assignments: Array<{
-      tenant_locations: { timezone: string } | null;
-    }>;
   } | null;
   tenants: { id: string; name: string };
   tenant_locations: { address: string; timezone: string } | null;
@@ -23,22 +20,22 @@ interface AppointmentContext {
 
 async function getAppointmentContext(appointmentId: string): Promise<AppointmentContext | null> {
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('appointments')
     .select(`
       id, start_time, end_time, total_price,
       customers(id, display_name, phone),
       services(id, name, duration_minutes),
-      staff(id, name, phone, requires_approval,
-        staff_location_assignments(
-          tenant_locations(timezone)
-        )
-      ),
+      staff(id, name, phone, requires_approval),
       tenants(id, name),
       tenant_locations(address, timezone)
     `)
     .eq('id', appointmentId)
     .single();
+  if (error) {
+    console.error('[notifications] getAppointmentContext error:', error.message);
+    return null;
+  }
   return data as unknown as AppointmentContext | null;
 }
 
@@ -78,8 +75,7 @@ export async function notifyBookingConfirmed(appointmentId: string) {
 export async function notifyStaffNewBooking(appointmentId: string) {
   const ctx = await getAppointmentContext(appointmentId);
   if (!ctx || !ctx.staff) return;
-  const tz = ctx.staff.staff_location_assignments?.[0]
-    ?.tenant_locations?.timezone ?? 'UTC';
+  const tz = ctx.tenant_locations?.timezone ?? 'UTC';
   await sendNotification({
     type: 'new_booking_assigned',
     appointmentId,
@@ -136,8 +132,7 @@ export async function notifyBookingDeclined(appointmentId: string) {
 export async function notifyBookingCancelledByCustomer(appointmentId: string) {
   const ctx = await getAppointmentContext(appointmentId);
   if (!ctx) return;
-  const tz = ctx.staff?.staff_location_assignments?.[0]
-    ?.tenant_locations?.timezone ?? ctx.tenant_locations?.timezone ?? 'UTC';
+  const tz = ctx.tenant_locations?.timezone ?? 'UTC';
   // Notify customer (confirmation)
   await sendNotification({
     type: 'booking_cancelled_by_customer',

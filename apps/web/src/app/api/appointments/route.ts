@@ -54,6 +54,14 @@ export async function GET(request: Request) {
     .order(safeSortBy, { ascending })
     .range(offset, offset + limit - 1);
 
+  // Apply upcoming filter (start_time >= now)
+  const upcoming = searchParams.get('upcoming');
+  if (upcoming === '1') {
+    const now = new Date().toISOString();
+    countQuery = countQuery.gte('start_time', now);
+    dataQuery = dataQuery.gte('start_time', now);
+  }
+
   // Apply filters to both queries
   if (status) {
     countQuery = countQuery.eq('status', status);

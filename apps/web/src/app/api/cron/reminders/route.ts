@@ -21,12 +21,6 @@ export async function GET(request: Request) {
       id, start_time,
       customers(id, display_name, phone),
       services(name),
-      staff(
-        id,
-        staff_location_assignments(
-          tenant_locations(timezone)
-        )
-      ),
       tenants(name),
       tenant_locations(address, timezone)
     `)
@@ -43,14 +37,10 @@ export async function GET(request: Request) {
       start_time: string;
       customers: { id: string; display_name: string | null; phone: string | null };
       services: { name: string };
-      staff: { id: string; staff_location_assignments: Array<{ tenant_locations: { timezone: string } | null }> } | null;
       tenants: { name: string };
       tenant_locations: { address: string; timezone: string } | null;
     };
-    const tz = appt.staff?.staff_location_assignments?.[0]
-      ?.tenant_locations?.timezone
-      ?? appt.tenant_locations?.timezone
-      ?? 'UTC';
+    const tz = appt.tenant_locations?.timezone ?? 'UTC';
 
     const apptTime = new Date(appt.start_time);
     const diffMs = apptTime.getTime() - now.getTime();
