@@ -598,7 +598,7 @@ async function handleFindBusinessesInner(
 
   const { data: serviceMatches } = await supabase
     .from('services')
-    .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name, categories(name))')
+    .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name, logo_url, categories(name))')
     .or(uniquePatterns.join(','))
     .eq('tenants.status', 'active')
     .limit(20);
@@ -619,10 +619,10 @@ async function handleFindBusinessesInner(
     const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
     tenantMap.set(t.id, { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: cat, business_category: cat });
   }
-  for (const s of (serviceMatches ?? []) as unknown as { tenant_id: string; name: string; price: number; tenants: { id: string; name: string; categories: { name: string } | { name: string }[] | null } }[]) {
+  for (const s of (serviceMatches ?? []) as unknown as { tenant_id: string; name: string; price: number; tenants: { id: string; name: string; logo_url: string | null; categories: { name: string } | { name: string }[] | null } }[]) {
     if (s.tenants) {
       const sCat = Array.isArray(s.tenants.categories) ? s.tenants.categories[0]?.name ?? null : s.tenants.categories?.name ?? null;
-      tenantMap.set(s.tenants.id, { id: s.tenants.id, name: s.tenants.name, category: sCat, business_category: sCat });
+      tenantMap.set(s.tenants.id, { id: s.tenants.id, name: s.tenants.name, image_url: s.tenants.logo_url ?? undefined, category: sCat, business_category: sCat });
       const existing = tenantMatchedServices.get(s.tenants.id) ?? [];
       existing.push(s.name);
       tenantMatchedServices.set(s.tenants.id, existing);
