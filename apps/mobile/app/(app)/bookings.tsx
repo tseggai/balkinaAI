@@ -76,17 +76,16 @@ function SwipeableRow({
   item,
   onCancel,
   onGetDirections,
-  onReschedule,
 }: {
   item: Appointment;
   onCancel: (id: string) => void;
   onGetDirections: (item: Appointment) => void;
-  onReschedule: (id: string) => void;
 }) {
   const translateX = useRef(new Animated.Value(0)).current;
   const lastDx = useRef(0);
-  const ACTION_WIDTH = 180;
+  const ACTION_WIDTH = 80;
   const isCancellable = item.status === 'confirmed' || item.status === 'pending';
+  const hasLocation = !!(item.tenant_locations?.address || item.tenant_locations?.latitude);
 
   const onTouchStart = useRef(0);
   const onTouchStartY = useRef(0);
@@ -99,9 +98,14 @@ function SwipeableRow({
   const packageMatch = item.notes?.match(/^Package:\s*(.+)$/);
   const displayName = packageMatch ? packageMatch[1] : (item.services?.name ?? 'Service');
 
-  const openActions = () => {
+  const openLeft = () => {
     Animated.spring(translateX, { toValue: -ACTION_WIDTH, useNativeDriver: true, friction: 8 }).start();
     lastDx.current = -ACTION_WIDTH;
+  };
+
+  const openRight = () => {
+    Animated.spring(translateX, { toValue: ACTION_WIDTH, useNativeDriver: true, friction: 8 }).start();
+    lastDx.current = ACTION_WIDTH;
   };
 
   const closeActions = () => {
@@ -111,36 +115,33 @@ function SwipeableRow({
 
   return (
     <View style={styles.swipeContainer}>
-      {/* Action buttons behind the card */}
-      <View style={styles.actionsContainer}>
-        {item.tenant_locations?.address || item.tenant_locations?.latitude ? (
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionBtnDirections]}
-            onPress={() => { closeActions(); onGetDirections(item); }}
-          >
-            <Ionicons name="navigate-outline" size={20} color="#fff" />
-            <Text style={styles.actionBtnText}>Directions</Text>
-          </TouchableOpacity>
-        ) : null}
-        {isCancellable ? (
+      {/* Cancel action on the left (revealed by swiping right) */}
+      {isCancellable ? (
+        <View style={styles.actionsContainerLeft}>
           <TouchableOpacity
             style={[styles.actionBtn, styles.actionBtnCancel]}
             onPress={() => { closeActions(); onCancel(item.id); }}
           >
-            <Ionicons name="close-circle-outline" size={20} color="#fff" />
+            <Ionicons name="close-circle-outline" size={22} color="#fff" />
             <Text style={styles.actionBtnText}>Cancel</Text>
           </TouchableOpacity>
-        ) : null}
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnReschedule]}
-          onPress={() => { closeActions(); onReschedule(item.id); }}
-        >
-          <Ionicons name="calendar-outline" size={20} color="#fff" />
-          <Text style={styles.actionBtnText}>Reschedule</Text>
-        </TouchableOpacity>
-      </View>
+        </View>
+      ) : null}
 
-      {/* Card that slides left */}
+      {/* Directions action on the right (revealed by swiping left) */}
+      {hasLocation ? (
+        <View style={styles.actionsContainerRight}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnDirections]}
+            onPress={() => { closeActions(); onGetDirections(item); }}
+          >
+            <Ionicons name="navigate-outline" size={22} color="#fff" />
+            <Text style={styles.actionBtnText}>Directions</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {/* Card that slides */}
       <Animated.View
         style={[styles.card, { transform: [{ translateX }] }]}
         onStartShouldSetResponder={() => true}
@@ -157,14 +158,19 @@ function SwipeableRow({
         onResponderMove={(e) => {
           if (!isTracking.current) return;
           const dx = e.nativeEvent.pageX - onTouchStart.current + lastDx.current;
-          const clamped = Math.max(-ACTION_WIDTH, Math.min(0, dx));
+          // Swipe right: clamp to ACTION_WIDTH (cancel), swipe left: clamp to -ACTION_WIDTH (directions)
+          const maxRight = isCancellable ? ACTION_WIDTH : 0;
+          const maxLeft = hasLocation ? -ACTION_WIDTH : 0;
+          const clamped = Math.max(maxLeft, Math.min(maxRight, dx));
           translateX.setValue(clamped);
         }}
         onResponderRelease={(e) => {
           isTracking.current = false;
           const dx = e.nativeEvent.pageX - onTouchStart.current + lastDx.current;
-          if (dx < -ACTION_WIDTH / 3) {
-            openActions();
+          if (dx > ACTION_WIDTH / 3 && isCancellable) {
+            openRight();
+          } else if (dx < -ACTION_WIDTH / 3 && hasLocation) {
+            openLeft();
           } else {
             closeActions();
           }
@@ -205,10 +211,6 @@ function SwipeableRow({
           </Text>
         </View>
 
-        {/* Swipe hint */}
-        <View style={styles.swipeHint}>
-          <Ionicons name="chevron-back" size={12} color="#d1d5db" />
-        </View>
       </Animated.View>
     </View>
   );
@@ -372,16 +374,11 @@ export default function BookingsScreen() {
     }
   }, []);
 
-  const handleReschedule = useCallback((_appointmentId: string) => {
-    router.navigate('/(app)');
-  }, [router]);
-
   const renderItem = ({ item }: { item: Appointment }) => (
     <SwipeableRow
       item={item}
       onCancel={handleCancel}
       onGetDirections={handleGetDirections}
-      onReschedule={handleReschedule}
     />
   );
 
@@ -619,7 +616,15 @@ const styles = StyleSheet.create({
 
   // Swipeable
   swipeContainer: { marginBottom: 12, overflow: 'hidden', borderRadius: 14 },
-  actionsContainer: {
+  actionsContainerLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  actionsContainerRight: {
     position: 'absolute',
     right: 0,
     top: 0,
@@ -628,14 +633,13 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   actionBtn: {
-    width: 70,
+    width: 80,
     justifyContent: 'center',
     alignItems: 'center',
     gap: 4,
   },
   actionBtnDirections: { backgroundColor: '#6B7FC4' },
   actionBtnCancel: { backgroundColor: '#ef4444' },
-  actionBtnReschedule: { backgroundColor: '#f59e0b' },
   actionBtnText: { fontSize: 10, fontWeight: '600', color: '#fff' },
 
   card: {
@@ -672,12 +676,6 @@ const styles = StyleSheet.create({
   dateTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   dateTimeText: { fontSize: 13, color: '#6b7280' },
   price: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  swipeHint: {
-    position: 'absolute',
-    right: 4,
-    top: '50%',
-    opacity: 0.4,
-  },
   empty: { alignItems: 'center', paddingTop: 80, gap: 8 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#374151', marginTop: 8 },
   emptySubtitle: {
