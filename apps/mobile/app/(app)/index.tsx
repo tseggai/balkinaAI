@@ -14,6 +14,7 @@ import {
   Linking,
   ScrollView,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
@@ -1456,6 +1457,7 @@ export default function ChatScreen() {
   const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [bookingState, setBookingState] = useState<BookingState>(INITIAL_BOOKING_STATE);
   const [categories, setCategories] = useState<{ id: string; name: string; slug: string }[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   // Track recently displayed service cards so we can match taps to IDs
   const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; tenantId?: string; tenantName?: string }[]>([]);
 
@@ -1472,12 +1474,14 @@ export default function ChatScreen() {
 
   useEffect(() => {
     const fetchCategories = async () => {
+      setCategoriesLoading(true);
       const { data } = await supabase
         .from('categories')
         .select('id, name, slug')
         .is('parent_id', null)
         .order('display_order');
       if (data) setCategories(data as { id: string; name: string; slug: string }[]);
+      setCategoriesLoading(false);
     };
     fetchCategories();
   }, []);
@@ -2110,6 +2114,20 @@ export default function ChatScreen() {
 
   const hasMessages = messages.length > 0;
 
+  // Service-type buttons per category slug (Option 2)
+  const CATEGORY_SERVICE_TYPES: Record<string, string[]> = {
+    'health-wellness': ['Dentist', 'Spa', 'Therapy', 'Chiropractor'],
+    'beauty-personal-care': ['Barber', 'Skin Care', 'Lashes & Brows', 'Nails'],
+    'fitness-sports': ['Personal Trainer', 'Yoga'],
+    'home-services': ['Cleaning', 'Plumbing', 'Electrical'],
+    'professional-services': ['Coaching', 'Consulting'],
+    'education-tutoring': ['Music Lessons', 'Tutoring'],
+    'pet-services': ['Pet Grooming', 'Vet'],
+    'automotive': ['Auto Detailing', 'Mechanic'],
+    'events-entertainment': ['Photography', 'DJ'],
+    'food-nutrition': ['Nutrition Coach', 'Meal Prep'],
+  };
+
   if (!hasMessages) {
     return (
       <SafeAreaView style={styles.container}>
@@ -2118,27 +2136,37 @@ export default function ChatScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          <View style={styles.welcomeContainer}>
+          <ScrollView
+            contentContainerStyle={styles.welcomeScroll}
+            showsVerticalScrollIndicator={false}
+          >
             <BalkinaLogo size="large" />
             <Text style={styles.subtitle}>What would you like to book today?</Text>
-            <View style={styles.chipsContainer}>
-              {categories.map((cat) => (
-                <SuggestionChip
-                  key={cat.id}
-                  label={cat.name}
-                  onPress={() => handleButtonPress(`Find a ${cat.name.toLowerCase()}`)}
-                />
-              ))}
-              {categories.length === 0 && (
-                <>
-                  <SuggestionChip label="Barber" onPress={() => handleButtonPress('Find a barber')} />
-                  <SuggestionChip label="Dentist" onPress={() => handleButtonPress('Find a dentist')} />
-                  <SuggestionChip label="Massage" onPress={() => handleButtonPress('Find a massage therapist')} />
-                  <SuggestionChip label="Nail salon" onPress={() => handleButtonPress('Find a nail salon')} />
-                </>
-              )}
-            </View>
-          </View>
+            {categoriesLoading ? (
+              <ActivityIndicator size="small" color="#6B7FC4" style={{ marginTop: 20 }} />
+            ) : (
+              <View style={styles.categorySections}>
+                {categories.map((cat) => {
+                  const serviceTypes = CATEGORY_SERVICE_TYPES[cat.slug] ?? [];
+                  if (serviceTypes.length === 0) return null;
+                  return (
+                    <View key={cat.id} style={styles.categorySection}>
+                      <Text style={styles.categorySectionTitle}>{cat.name}</Text>
+                      <View style={styles.chipsContainer}>
+                        {serviceTypes.map((svc) => (
+                          <SuggestionChip
+                            key={svc}
+                            label={svc}
+                            onPress={() => handleButtonPress(`Find a ${svc.toLowerCase()}`)}
+                          />
+                        ))}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </ScrollView>
           <View style={styles.inputBar}>
             <TextInput
               style={styles.textInput}
@@ -2235,6 +2263,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   flex: { flex: 1 },
   welcomeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
+  welcomeScroll: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 40 },
+  categorySections: { width: '100%', marginTop: 8 },
+  categorySection: { marginBottom: 18 },
+  categorySectionTitle: { fontSize: 14, fontWeight: '700', color: '#6B7FC4', marginBottom: 8, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 },
   greeting: { fontSize: 34, fontWeight: '700', color: '#111827', marginBottom: 8 },
   subtitle: { fontSize: 18, color: '#6b7280', marginTop: 20, marginBottom: 28 },
   chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
