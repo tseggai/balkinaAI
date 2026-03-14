@@ -115,6 +115,12 @@ export default function StaffAppointments() {
     return () => { supabase.removeChannel(channel); };
   }, [staffId, fetchAppointments]);
 
+  // Polling fallback — realtime requires table publication in Supabase
+  useEffect(() => {
+    const interval = setInterval(() => { fetchAppointments(); }, 10_000);
+    return () => clearInterval(interval);
+  }, [fetchAppointments]);
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     fetchAppointments();

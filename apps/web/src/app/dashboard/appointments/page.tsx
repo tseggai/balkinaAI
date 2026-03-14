@@ -252,8 +252,8 @@ export default function AppointmentsPage() {
   // Data fetching
   // ----------------------------------------------------------
 
-  const fetchAppointments = useCallback(async () => {
-    setLoading(true);
+  const fetchAppointments = useCallback(async (background = false) => {
+    if (!background) setLoading(true);
     const params = new URLSearchParams();
     if (statusFilter) params.set('status', statusFilter);
     if (staffFilter) params.set('staff_id', staffFilter);
@@ -301,9 +301,9 @@ export default function AppointmentsPage() {
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
   useEffect(() => { fetchDropdownData(); }, [fetchDropdownData]);
 
-  // Auto-refresh every 10 seconds to surface new/updated bookings
+  // Background auto-refresh every 10 seconds — no loading flash
   useEffect(() => {
-    const interval = setInterval(() => { fetchAppointments(); }, 10_000);
+    const interval = setInterval(() => { fetchAppointments(true); }, 10_000);
     return () => clearInterval(interval);
   }, [fetchAppointments]);
 
