@@ -107,6 +107,12 @@ export default function StaffDashboard() {
     return () => { supabase.removeChannel(channel); };
   }, [staffInfo?.id, fetchData]);
 
+  // Polling fallback — realtime requires table publication in Supabase
+  useEffect(() => {
+    const interval = setInterval(() => { fetchData(); }, 10_000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
   // Auto-scroll to the first upcoming appointment when data loads
   useEffect(() => {
     if (appointments.length === 0) return;

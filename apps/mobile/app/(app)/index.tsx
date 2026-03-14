@@ -153,6 +153,7 @@ interface SummaryCardData {
 
 interface ConfirmedCardData {
   type: 'confirmed_card';
+  status: 'confirmed' | 'pending';
   service: string;
   package?: string;
   extras: string[];
@@ -1077,13 +1078,21 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
   };
 
   const displayService = data.package || data.service;
+  const isPending = data.status === 'pending';
 
   return (
-    <View style={richCardStyles.confirmedCard}>
-      <View style={richCardStyles.confirmedCheckCircle}>
-        <Ionicons name="checkmark" size={30} color="#fff" />
+    <View style={[richCardStyles.confirmedCard, isPending && { backgroundColor: '#FEF9EE' }]}>
+      <View style={[richCardStyles.confirmedCheckCircle, isPending && { backgroundColor: '#F59E0B' }]}>
+        <Ionicons name={isPending ? 'time-outline' : 'checkmark'} size={30} color="#fff" />
       </View>
-      <Text style={richCardStyles.confirmedTitle}>Appointment Confirmed!</Text>
+      <Text style={richCardStyles.confirmedTitle}>
+        {isPending ? 'Appointment Request Sent' : 'Appointment Confirmed!'}
+      </Text>
+      {isPending && (
+        <Text style={{ fontSize: 13, color: '#92400e', textAlign: 'center', marginBottom: 8, paddingHorizontal: 8 }}>
+          Waiting for confirmation from {data.staff}. You'll be notified once approved.
+        </Text>
+      )}
 
       <View style={{ width: '100%', marginTop: 8 }}>
         <View style={richCardStyles.confirmedRow}>
@@ -2014,6 +2023,7 @@ export default function ChatScreen() {
           }
           const result = (await createRes.json()) as {
             success: boolean;
+            status: 'confirmed' | 'pending';
             service_name: string;
             staff_name: string | null;
             business_name: string;
@@ -2036,6 +2046,7 @@ export default function ChatScreen() {
 
           const confirmedCard: ConfirmedCardData = {
             type: 'confirmed_card',
+            status: result.status ?? 'confirmed',
             service: result.service_name,
             package: confirmedPkgLabel,
             extras: confirmedExtras,
@@ -2050,7 +2061,10 @@ export default function ChatScreen() {
             longitude: result.longitude,
           };
 
-          addAssistantMessage(`Your booking is confirmed!\n\n[[CARD:${JSON.stringify(confirmedCard)}]]`);
+          const messageText = result.status === 'pending'
+            ? `Your appointment request has been sent!\n\n[[CARD:${JSON.stringify(confirmedCard)}]]`
+            : `Your booking is confirmed!\n\n[[CARD:${JSON.stringify(confirmedCard)}]]`;
+          addAssistantMessage(messageText);
           setBookingState(INITIAL_BOOKING_STATE);
         } catch {
           addAssistantMessage('Connection error while creating booking. Please try again.');
