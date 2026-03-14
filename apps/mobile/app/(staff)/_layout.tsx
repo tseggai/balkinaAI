@@ -15,7 +15,7 @@ export default function StaffTabsLayout() {
           recipientType: 'staff',
           recipientId: staffInfo.id,
           accessToken: session.access_token,
-        });
+        }).catch(() => { /* push registration is non-critical */ });
       }
     })();
   }, []);

@@ -19,7 +19,8 @@ export async function registerPushToken(params: {
   if (finalStatus !== 'granted') return;
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-  const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: projectId ?? undefined });
+  if (!projectId) return; // projectId required for push token registration
+  const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
 
   try {
     await fetch(`${API_BASE}/api/push-tokens`, {

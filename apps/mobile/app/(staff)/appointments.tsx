@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
@@ -150,6 +151,25 @@ export default function StaffAppointments() {
             {item.notes && <Text style={styles.detailText}>Notes: {item.notes}</Text>}
             <Text style={styles.detailText}>Price: ${(item.total_price ?? 0).toFixed(2)}</Text>
 
+            {item.customer_phone && (
+              <View style={styles.contactRow}>
+                <TouchableOpacity
+                  style={styles.contactBtn}
+                  onPress={() => Linking.openURL(`tel:${item.customer_phone}`)}
+                >
+                  <Ionicons name="call-outline" size={16} color="#6B7FC4" />
+                  <Text style={styles.contactBtnText}>Call</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.contactBtn}
+                  onPress={() => Linking.openURL(`sms:${item.customer_phone}`)}
+                >
+                  <Ionicons name="chatbubble-outline" size={16} color="#6B7FC4" />
+                  <Text style={styles.contactBtnText}>Message</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <View style={styles.actionRow}>
               {isActioning ? (
                 <ActivityIndicator size="small" color="#6B7FC4" />
@@ -246,9 +266,12 @@ const styles = StyleSheet.create({
   expandedSection: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
   detailText: { fontSize: 13, color: '#6b7280', marginBottom: 4 },
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  actionBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' },
+  actionBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
   actionTextLight: { color: '#fff', fontSize: 14, fontWeight: '600' },
   actionTextDanger: { color: '#991b1b', fontSize: 14, fontWeight: '600' },
+  contactRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  contactBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#6B7FC4' },
+  contactBtnText: { fontSize: 13, fontWeight: '600', color: '#6B7FC4' },
   emptyContainer: { alignItems: 'center', paddingTop: 60 },
   emptyText: { fontSize: 16, color: '#9ca3af', marginTop: 12 },
 });
