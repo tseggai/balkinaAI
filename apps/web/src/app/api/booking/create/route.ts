@@ -152,33 +152,33 @@ export async function POST(request: Request) {
         .eq('tenant_id', tenantId).limit(1),
 
       // 6. Staff — prefer service_staff assignment over random tenant staff
-      (async () => {
+      (async (): Promise<{ id: string | null; name: string | null; requiresApproval: boolean }> => {
         if (staffId) {
-          const { data } = await supabase.from('staff').select('id, name').eq('id', staffId).single();
-          const s = data as { id: string; name: string } | null;
-          return { id: s?.id ?? staffId, name: body.staffName || s?.name || null };
+          const { data } = await supabase.from('staff').select('id, name, requires_approval').eq('id', staffId).single();
+          const s = data as { id: string; name: string; requires_approval: boolean } | null;
+          return { id: s?.id ?? staffId, name: body.staffName || s?.name || null, requiresApproval: s?.requires_approval ?? false };
         }
         // Get all staff assigned to this service via service_staff junction
         const { data: serviceStaff } = await supabase
           .from('service_staff')
-          .select('staff:staff_id(id, name)')
+          .select('staff:staff_id(id, name, requires_approval)')
           .eq('service_id', serviceId);
-        const allAssigned = (serviceStaff as unknown as { staff: { id: string; name: string } | null }[] | null)
+        const allAssigned = (serviceStaff as unknown as { staff: { id: string; name: string; requires_approval: boolean } | null }[] | null)
           ?.map((s) => s.staff)
-          .filter(Boolean) as { id: string; name: string }[] | undefined;
+          .filter(Boolean) as { id: string; name: string; requires_approval: boolean }[] | undefined;
         // If staffName is provided, match by name among assigned staff
         if (body.staffName && allAssigned && allAssigned.length > 0) {
           const matched = allAssigned.find((s) => s.name.toLowerCase() === body.staffName!.toLowerCase());
-          if (matched) return { id: matched.id, name: matched.name };
+          if (matched) return { id: matched.id, name: matched.name, requiresApproval: matched.requires_approval };
         }
         // Otherwise pick first assigned staff
         if (allAssigned && allAssigned.length > 0) {
-          return { id: allAssigned[0]!.id, name: body.staffName || allAssigned[0]!.name };
+          return { id: allAssigned[0]!.id, name: body.staffName || allAssigned[0]!.name, requiresApproval: allAssigned[0]!.requires_approval };
         }
         // Fallback: any staff from the tenant
-        const { data } = await supabase.from('staff').select('id, name').eq('tenant_id', tenantId).limit(1);
-        const s = (data as { id: string; name: string }[] | null)?.[0];
-        return { id: s?.id ?? null, name: body.staffName || s?.name || null };
+        const { data } = await supabase.from('staff').select('id, name, requires_approval').eq('tenant_id', tenantId).limit(1);
+        const s = (data as { id: string; name: string; requires_approval: boolean }[] | null)?.[0];
+        return { id: s?.id ?? null, name: body.staffName || s?.name || null, requiresApproval: s?.requires_approval ?? false };
       })(),
 
       // 8. Tenant name
@@ -211,6 +211,7 @@ export async function POST(request: Request) {
     // Unpack staff
     const finalStaffId = staffResult.id;
     const staffName = staffResult.name;
+    const requiresApproval = staffResult.requiresApproval;
 
     // Unpack tenant
     const businessName = (tenantResult.data as { name: string } | null)?.name ?? 'Business';
@@ -273,7 +274,7 @@ export async function POST(request: Request) {
         location_id: locationId,
         start_time: start.toISOString(),
         end_time: end.toISOString(),
-        status: 'confirmed',
+        status: requiresApproval ? 'pending' : 'confirmed',
         total_price: finalTotal,
         deposit_paid: false,
         deposit_amount_paid: depositAmount,
@@ -304,8 +305,9 @@ export async function POST(request: Request) {
     }
 
     // Fire notifications (non-blocking)
+    // When staff requires approval, don't send "confirmed" to customer yet — staff must approve first
     void Promise.allSettled([
-      notifyBookingConfirmed(apptId),
+      ...(!requiresApproval ? [notifyBookingConfirmed(apptId)] : []),
       notifyStaffNewBooking(apptId),
     ]);
 
@@ -321,6 +323,7 @@ export async function POST(request: Request) {
       {
         success: true,
         appointment_id: (appointment as { id: string }).id,
+        status: requiresApproval ? 'pending' : 'confirmed',
         service_name: svc.name,
         staff_name: staffName,
         business_name: businessName,

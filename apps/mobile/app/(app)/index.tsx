@@ -2414,22 +2414,23 @@ export default function ChatScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        <View style={styles.chatHeader}>
-          <TouchableOpacity style={styles.resetBtn} onPress={resetConversation} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={18} color="#6B7FC4" />
-            <Text style={styles.resetBtnText}>Start over</Text>
-          </TouchableOpacity>
-          <BalkinaLogoInline />
-          <View style={styles.resetBtnPlaceholder} />
-        </View>
+    <View style={styles.chatScreenWrapper}>
+      <SafeAreaView style={styles.chatScreenSafe}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
+          <View style={styles.chatHeader}>
+            <TouchableOpacity style={styles.resetBtn} onPress={resetConversation} activeOpacity={0.7}>
+              <Ionicons name="arrow-back" size={18} color="#6B7FC4" />
+              <Text style={styles.resetBtnText}>Start over</Text>
+            </TouchableOpacity>
+            <BalkinaLogoInline />
+            <View style={styles.resetBtnPlaceholder} />
+          </View>
 
-        <FlatList
+          <FlatList
           ref={flatListRef}
           data={[...messages].reverse()}
           keyExtractor={(item) => item.id}
@@ -2471,8 +2472,9 @@ export default function ChatScreen() {
             )}
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -2480,8 +2482,10 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
+  chatScreenWrapper: { flex: 1, backgroundColor: '#fff' },
+  chatScreenSafe: { flex: 1, backgroundColor: '#f9fafb' },
   flex: { flex: 1 },
-  welcomeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
+  welcomeContainer: { flex: 1, justifyContent: 'flex-start', alignItems: 'center', paddingHorizontal: 24, paddingTop: 60 },
   greeting: { fontSize: 34, fontWeight: '700', color: '#111827', marginBottom: 8 },
   subtitle: { fontSize: 18, color: '#6b7280', marginTop: 20, marginBottom: 28 },
   chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
