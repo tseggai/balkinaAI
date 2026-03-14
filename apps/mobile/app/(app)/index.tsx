@@ -569,6 +569,7 @@ function ServiceCardRow({ items, onTap }: { items: ServiceCardData[]; onTap: (na
 
 function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesData; onTap: (msg: string) => void }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [selectedSvcId, setSelectedSvcId] = useState<string | null>(null);
   const selectedBiz = data.items[selectedIdx];
   const services = selectedBiz?.services ?? [];
   const CARD_WIDTH = 280;
@@ -627,23 +628,31 @@ function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesDa
       </View>
       {services.length > 0 && selectedBiz ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 10 }}>
-          {services.map((svc) => (
-            <TouchableOpacity
-              key={svc.id}
-              style={combinedStyles.serviceCardLg}
-              onPress={() => onTap(`${svc.name} at ${selectedBiz.name}`)}
-              activeOpacity={0.7}
-            >
-              <Text style={combinedStyles.serviceCardLgName} numberOfLines={2}>{svc.name}</Text>
-              <Text style={combinedStyles.serviceCardLgPrice}>${svc.price}</Text>
-              <Text style={combinedStyles.serviceCardLgDuration}>{svc.duration_minutes} min</Text>
-              {svc.deposit_enabled && svc.deposit_amount ? (
-                <View style={combinedStyles.serviceCardLgDeposit}>
-                  <Text style={combinedStyles.serviceCardLgDepositText}>${svc.deposit_amount} deposit</Text>
+          {services.map((svc) => {
+            const isSelected = selectedSvcId === svc.id;
+            return (
+              <TouchableOpacity
+                key={svc.id}
+                style={[combinedStyles.serviceCardLg, isSelected && combinedStyles.serviceCardLgSelected]}
+                onPress={() => {
+                  setSelectedSvcId(svc.id);
+                  onTap(`${svc.name} at ${selectedBiz.name}`);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[combinedStyles.serviceCardLgName, isSelected && combinedStyles.serviceCardLgNameSelected]} numberOfLines={1}>{svc.name}</Text>
+                <View style={combinedStyles.serviceCardLgRow}>
+                  <View style={combinedStyles.serviceCardLgLeft}>
+                    <Text style={[combinedStyles.serviceCardLgPrice, isSelected && combinedStyles.serviceCardLgPriceSelected]}>${svc.price}</Text>
+                    {svc.deposit_enabled && svc.deposit_amount ? (
+                      <Text style={combinedStyles.serviceCardLgDepositText}>({Math.round((svc.deposit_amount / svc.price) * 100)}% deposit)</Text>
+                    ) : null}
+                  </View>
+                  <Text style={[combinedStyles.serviceCardLgDuration, isSelected && combinedStyles.serviceCardLgDurationSelected]}>{svc.duration_minutes} min</Text>
                 </View>
-              ) : null}
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       ) : null}
     </View>
@@ -1226,12 +1235,17 @@ const richCardStyles = StyleSheet.create({
 
 const combinedStyles = StyleSheet.create({
   // Service cards (horizontal scroll) below business cards
-  serviceCardLg: { width: 160, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e5e7eb', paddingHorizontal: 14, paddingVertical: 12, marginRight: 10, justifyContent: 'center' as const },
-  serviceCardLgName: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 6 },
+  serviceCardLg: { width: 210, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e5e7eb', paddingHorizontal: 14, paddingVertical: 12, marginRight: 10 },
+  serviceCardLgSelected: { borderColor: '#6B7FC4', backgroundColor: '#eef2ff' },
+  serviceCardLgName: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  serviceCardLgNameSelected: { color: '#4338ca' },
+  serviceCardLgRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  serviceCardLgLeft: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   serviceCardLgPrice: { fontSize: 15, fontWeight: '700', color: '#6B7FC4' },
-  serviceCardLgDuration: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  serviceCardLgDeposit: { marginTop: 4, backgroundColor: '#fef3c7', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start' as const },
-  serviceCardLgDepositText: { fontSize: 10, fontWeight: '600', color: '#92400e' },
+  serviceCardLgPriceSelected: { color: '#4338ca' },
+  serviceCardLgDuration: { fontSize: 12, color: '#9ca3af' },
+  serviceCardLgDurationSelected: { color: '#6B7FC4' },
+  serviceCardLgDepositText: { fontSize: 11, color: '#9ca3af' },
   // Legacy service chips (kept for compat)
   serviceChipsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, paddingHorizontal: 2 },
   serviceChip: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#e5e7eb', paddingHorizontal: 12, paddingVertical: 8 },
