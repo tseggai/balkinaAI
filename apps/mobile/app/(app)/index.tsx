@@ -1138,7 +1138,7 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
 
 const richCardStyles = StyleSheet.create({
   // Business cards
-  businessCard: { width: 280, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
+  businessCard: { width: 280, height: 200, borderRadius: 12, backgroundColor: '#fff', marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
   businessImage: { width: 280, height: 100, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
   businessImg: { width: 280, height: 100, resizeMode: 'cover' },
   businessEmoji: { fontSize: 24 },
@@ -1813,6 +1813,13 @@ export default function ChatScreen() {
       return extra ? `${name} (+$${extra.price.toFixed(2)})` : name;
     });
 
+    // Format date as human-readable (e.g. "Thursday, March 19, 2026")
+    const formatHumanDate = (dateStr: string): string => {
+      if (!dateStr) return '';
+      const d = new Date(dateStr + 'T12:00:00');
+      return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    };
+
     const card: SummaryCardData = {
       type: 'summary_card',
       service: state.serviceName ?? 'Unknown',
@@ -1820,7 +1827,7 @@ export default function ChatScreen() {
       extras: extrasDisplay,
       business: state.tenantName ?? 'Unknown',
       staff: state.staffName ?? 'Anyone',
-      date: state.date ?? '',
+      date: formatHumanDate(state.date ?? ''),
       time: state.timeSlot ?? '',
       address: state.address ?? '',
       subtotal,
@@ -2417,7 +2424,7 @@ export default function ChatScreen() {
                   ref={categoryScrollRef}
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 4 }}
+                  contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 4, flexGrow: 1, justifyContent: 'center' }}
                 >
                   {activeCategories.map((cat, idx) => {
                     const isActive = idx === selectedCategoryIdx;
@@ -2455,7 +2462,7 @@ export default function ChatScreen() {
                       index,
                     })}
                     renderItem={({ item }) => (
-                      <View style={{ width: SCREEN_WIDTH, paddingHorizontal: 24 }}>
+                      <View style={{ width: SCREEN_WIDTH, paddingHorizontal: 24, alignItems: 'center' }}>
                         <View style={landingStyles.serviceTypesGrid}>
                           {item.services.map((svc) => (
                             <TouchableOpacity
