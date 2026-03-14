@@ -42,6 +42,7 @@ interface BookingState {
   selectedPackage: string | null;
   selectedExtras: string[];
   extrasTotal: number;
+  packagePrice: number;
   address: string | null;
 }
 
@@ -62,6 +63,7 @@ const INITIAL_BOOKING_STATE: BookingState = {
   selectedPackage: null,
   selectedExtras: [],
   extrasTotal: 0,
+  packagePrice: 0,
   address: null,
 };
 
@@ -593,22 +595,25 @@ function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesDa
         ))}
       </ScrollView>
       {services.length > 0 && selectedBiz ? (
-        <View style={combinedStyles.serviceChipsContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 10 }}>
           {services.map((svc) => (
             <TouchableOpacity
               key={svc.id}
-              style={combinedStyles.serviceChip}
+              style={combinedStyles.serviceCardLg}
               onPress={() => onTap(`${svc.name} at ${selectedBiz.name}`)}
               activeOpacity={0.7}
             >
-              <Text style={combinedStyles.serviceChipName}>{svc.name}</Text>
-              <Text style={combinedStyles.serviceChipDetail}>
-                ${svc.price} · {svc.duration_minutes}min
-                {svc.deposit_enabled && svc.deposit_amount ? ` · $${svc.deposit_amount} dep` : ''}
-              </Text>
+              <Text style={combinedStyles.serviceCardLgName} numberOfLines={2}>{svc.name}</Text>
+              <Text style={combinedStyles.serviceCardLgPrice}>${svc.price}</Text>
+              <Text style={combinedStyles.serviceCardLgDuration}>{svc.duration_minutes} min</Text>
+              {svc.deposit_enabled && svc.deposit_amount ? (
+                <View style={combinedStyles.serviceCardLgDeposit}>
+                  <Text style={combinedStyles.serviceCardLgDepositText}>${svc.deposit_amount} deposit</Text>
+                </View>
+              ) : null}
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       ) : null}
     </View>
   );
@@ -1002,13 +1007,6 @@ function RichSummaryCard({ data, onButtonPress }: { data: SummaryCardData; onBut
       >
         <Text style={richCardStyles.confirmBtnText}>Confirm Booking</Text>
       </TouchableOpacity>
-      <TouchableOpacity
-        style={richCardStyles.changeBtn}
-        onPress={() => onButtonPress('Change something')}
-        activeOpacity={0.7}
-      >
-        <Text style={richCardStyles.changeBtnText}>Change something</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -1161,11 +1159,11 @@ const richCardStyles = StyleSheet.create({
   // Extras grid
   extrasContainer: { marginVertical: 6 },
   extrasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  extrasChip: { width: '47%', backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#e5e7eb', padding: 10 },
+  extrasChip: { width: '47%', backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: '#e5e7eb', padding: 14, minHeight: 70, justifyContent: 'center' as const, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2, elevation: 1 },
   extrasChipSelected: { borderColor: '#6B7FC4', backgroundColor: '#eef2ff' },
-  extrasChipName: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  extrasChipName: { fontSize: 14, fontWeight: '700', color: '#374151' },
   extrasChipNameSelected: { color: '#4338ca' },
-  extrasChipDetail: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  extrasChipDetail: { fontSize: 12, color: '#9ca3af', marginTop: 4 },
   extrasChipDetailSelected: { color: '#6B7FC4' },
   extrasDoneBtn: { backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 10 },
   extrasDoneBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
@@ -1204,7 +1202,14 @@ const richCardStyles = StyleSheet.create({
 });
 
 const combinedStyles = StyleSheet.create({
-  // Service chips below business cards
+  // Large service cards (horizontal scroll) below business cards
+  serviceCardLg: { width: 140, height: 110, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: '#e5e7eb', paddingHorizontal: 14, paddingVertical: 12, marginRight: 10, justifyContent: 'center' as const, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 },
+  serviceCardLgName: { fontSize: 14, fontWeight: '700', color: '#374151', marginBottom: 6 },
+  serviceCardLgPrice: { fontSize: 16, fontWeight: '700', color: '#6B7FC4' },
+  serviceCardLgDuration: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  serviceCardLgDeposit: { marginTop: 4, backgroundColor: '#fef3c7', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start' as const },
+  serviceCardLgDepositText: { fontSize: 10, fontWeight: '600', color: '#92400e' },
+  // Legacy service chips (kept for compat)
   serviceChipsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, paddingHorizontal: 2 },
   serviceChip: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#e5e7eb', paddingHorizontal: 12, paddingVertical: 8 },
   serviceChipName: { fontSize: 14, fontWeight: '600', color: '#374151' },
@@ -1217,12 +1222,62 @@ const combinedStyles = StyleSheet.create({
   // Booking options (packages + extras combined)
   bookingOptionsContainer: { marginVertical: 6 },
   sectionLabel: { fontSize: 13, fontWeight: '600', color: '#6b7280', marginBottom: 6, marginTop: 4 },
-  packageChip: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#e5e7eb', paddingHorizontal: 14, paddingVertical: 10, marginRight: 8 },
+  packageChip: { width: 160, height: 100, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: '#e5e7eb', paddingHorizontal: 14, paddingVertical: 12, marginRight: 10, justifyContent: 'center' as const, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 },
   packageChipSelected: { borderColor: '#6B7FC4', backgroundColor: '#eef2ff' },
-  packageChipName: { fontSize: 14, fontWeight: '600', color: '#374151' },
+  packageChipName: { fontSize: 14, fontWeight: '700', color: '#374151', marginBottom: 4 },
   packageChipNameSelected: { color: '#4338ca' },
-  packageChipDetail: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  packageChipDetail: { fontSize: 13, color: '#9ca3af', marginTop: 2 },
   packageChipDetailSelected: { color: '#6B7FC4' },
+});
+
+// ── Landing Screen Styles ───────────────────────────────────────────────────
+
+const landingStyles = StyleSheet.create({
+  categoryTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: '#f3f4f6',
+    marginRight: 8,
+  },
+  categoryTabActive: {
+    backgroundColor: '#6B7FC4',
+  },
+  categoryTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  categoryTabTextActive: {
+    color: '#fff',
+  },
+  serviceTypesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 20,
+    justifyContent: 'center',
+  },
+  serviceTypeCard: {
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    minWidth: 100,
+    alignItems: 'center' as const,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  serviceTypeText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+  },
 });
 
 // ── Action Button ───────────────────────────────────────────────────────────
@@ -1460,6 +1515,10 @@ export default function ChatScreen() {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   // Track recently displayed service cards so we can match taps to IDs
   const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; tenantId?: string; tenantName?: string }[]>([]);
+  // Stores structured tool data from SSE for deterministic rendering
+  const pendingToolData = useRef<{ tool: string; data: Record<string, unknown> } | null>(null);
+  // Stores last booking options so we can look up package/extras prices
+  const lastBookingOptions = useRef<BookingOptionsData | null>(null);
 
   const resetConversation = useCallback(() => {
     setMessages([]);
@@ -1542,18 +1601,37 @@ export default function ChatScreen() {
   }, []);
 
   // Generate date buttons for the next 7 days
+  const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // Get all date button labels (Today, Tomorrow, and 14 more days)
   const getDateButtons = useCallback(() => {
-    const buttons: string[] = [];
+    return ['Today', 'Tomorrow', 'Next Week', 'Pick a date'];
+  }, []);
+
+  // Get next week's days (starting from the next Monday, or 2 days from now if that's sooner)
+  const getNextWeekDays = useCallback(() => {
     const today = new Date();
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    for (let i = 0; i < 7; i++) {
+    const days: string[] = [];
+    // Start from 2 days out, show 7 days
+    for (let i = 2; i <= 8; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
-      const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : `${dayNames[d.getDay()]} ${monthNames[d.getMonth()]} ${d.getDate()}`;
-      buttons.push(label);
+      days.push(`${DAY_NAMES[d.getDay()]} ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`);
     }
-    return buttons;
+    return days;
+  }, []);
+
+  // Get extended date range (2 weeks out)
+  const getPickDateDays = useCallback(() => {
+    const today = new Date();
+    const days: string[] = [];
+    for (let i = 2; i <= 14; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      days.push(`${DAY_NAMES[d.getDay()]} ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`);
+    }
+    return days;
   }, []);
 
   // Parse a date button label back to YYYY-MM-DD
@@ -1567,13 +1645,11 @@ export default function ChatScreen() {
       d.setDate(today.getDate() + 1);
       return d.toISOString().split('T')[0]!;
     }
-    // Parse "Wed Mar 15" style
-    for (let i = 2; i < 7; i++) {
+    // Parse "Wed Mar 15" style — search up to 30 days out
+    for (let i = 2; i <= 30; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
-      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const check = `${dayNames[d.getDay()]} ${monthNames[d.getMonth()]} ${d.getDate()}`;
+      const check = `${DAY_NAMES[d.getDay()]} ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
       if (check === label) return d.toISOString().split('T')[0]!;
     }
     return today.toISOString().split('T')[0]!;
@@ -1696,6 +1772,7 @@ export default function ChatScreen() {
         packages: packageCards,
         extras: data.extras,
       };
+      lastBookingOptions.current = card;
 
       addAssistantMessage(`Choose any packages or extras:\n\n[[CARD:${JSON.stringify(card)}]]`);
     } catch {
@@ -1707,20 +1784,31 @@ export default function ChatScreen() {
 
   // Build and show summary card locally
   const showSummaryCard = useCallback((state: BookingState) => {
-    const subtotal = state.servicePrice ?? 0;
-    const total = subtotal + state.extrasTotal;
+    const serviceSubtotal = state.servicePrice ?? 0;
+    const extrasTotal = state.extrasTotal;
+    const packagePrice = state.packagePrice;
+    // If a package is selected, the package replaces the service price
+    const subtotal = packagePrice > 0 ? packagePrice : serviceSubtotal;
+    const total = subtotal + extrasTotal;
+
+    // Build extras display with prices
+    const extrasDisplay = state.selectedExtras.map((name) => {
+      const extra = lastBookingOptions.current?.extras.find((e) => e.name === name);
+      return extra ? `${name} (+$${extra.price.toFixed(2)})` : name;
+    });
+
     const card: SummaryCardData = {
       type: 'summary_card',
       service: state.serviceName ?? 'Unknown',
-      package: state.selectedPackage ?? undefined,
-      extras: state.selectedExtras,
+      package: state.selectedPackage ? `${state.selectedPackage} ($${packagePrice.toFixed(2)})` : undefined,
+      extras: extrasDisplay,
       business: state.tenantName ?? 'Unknown',
       staff: state.staffName ?? 'Anyone',
       date: state.date ?? '',
       time: state.timeSlot ?? '',
       address: state.address ?? '',
       subtotal,
-      extras_total: state.extrasTotal,
+      extras_total: extrasTotal,
       package_discount: 0,
       coupon_discount: 0,
       loyalty_discount: 0,
@@ -1771,7 +1859,24 @@ export default function ChatScreen() {
 
       // If we have tenantId+serviceId set and no date yet → user may be picking a date
       if (bookingState.serviceId && !bookingState.date) {
-        const dateButtons = getDateButtons();
+        // Handle "Next Week" — expand to individual day buttons
+        if (userText === 'Next Week') {
+          addUserMessage(userText);
+          const days = getNextWeekDays();
+          const buttonMarkup = days.map((d) => `[[button:${d}]]`).join('');
+          addAssistantMessage(`Pick a day next week:\n\n${buttonMarkup}`);
+          return true;
+        }
+        // Handle "Pick a date" — expand to 2-week range
+        if (userText === 'Pick a date') {
+          addUserMessage(userText);
+          const days = getPickDateDays();
+          const buttonMarkup = days.map((d) => `[[button:${d}]]`).join('');
+          addAssistantMessage(`Choose a date:\n\n${buttonMarkup}`);
+          return true;
+        }
+        // Handle Today, Tomorrow, or expanded day selection
+        const dateButtons = [...getDateButtons(), ...getNextWeekDays(), ...getPickDateDays()];
         if (dateButtons.includes(userText)) {
           const dateStr = parseDateLabel(userText);
           const newState = { ...bookingState, date: dateStr };
@@ -1809,17 +1914,30 @@ export default function ChatScreen() {
         if (userText.startsWith('Package:') || userText.startsWith('Extras:') || userText === 'No packages or extras' || userText === 'Skip') {
           addUserMessage(userText);
 
-          // Parse selections
+          // Parse selections and look up prices from stored booking options
           let selectedPkg: string | null = null;
           let selectedExtraNames: string[] = [];
           let extrasTotal = 0;
+          let packagePrice = 0;
 
           const pkgMatch = userText.match(/Package:\s*(.+?)(?:\.\s*Extras:|$)/);
-          if (pkgMatch) selectedPkg = pkgMatch[1]!.trim();
+          if (pkgMatch) {
+            selectedPkg = pkgMatch[1]!.trim();
+            // Look up package price
+            const pkg = lastBookingOptions.current?.packages.find((p) => p.name === selectedPkg);
+            if (pkg && !pkg.customer_owned) {
+              packagePrice = pkg.price ?? 0;
+            }
+          }
 
           const extrasMatch = userText.match(/Extras:\s*(.+)$/);
           if (extrasMatch) {
             selectedExtraNames = extrasMatch[1]!.split(',').map((e) => e.trim());
+            // Look up extras prices
+            for (const eName of selectedExtraNames) {
+              const extra = lastBookingOptions.current?.extras.find((e) => e.name === eName);
+              if (extra) extrasTotal += extra.price;
+            }
           }
 
           const newState = {
@@ -1827,6 +1945,7 @@ export default function ChatScreen() {
             selectedPackage: selectedPkg,
             selectedExtras: selectedExtraNames,
             extrasTotal,
+            packagePrice,
           };
           setBookingState(newState);
           showSummaryCard(newState);
@@ -1877,11 +1996,20 @@ export default function ChatScreen() {
             longitude?: number;
           };
 
+          // Build extras display with prices for confirmation
+          const confirmedExtras = bookingState.selectedExtras.map((name) => {
+            const extra = lastBookingOptions.current?.extras.find((e) => e.name === name);
+            return extra ? `${name} (+$${extra.price.toFixed(2)})` : name;
+          });
+          const confirmedPkgLabel = bookingState.selectedPackage && bookingState.packagePrice > 0
+            ? `${bookingState.selectedPackage} ($${bookingState.packagePrice.toFixed(2)})`
+            : bookingState.selectedPackage ?? undefined;
+
           const confirmedCard: ConfirmedCardData = {
             type: 'confirmed_card',
             service: result.service_name,
-            package: bookingState.selectedPackage ?? undefined,
-            extras: bookingState.selectedExtras,
+            package: confirmedPkgLabel,
+            extras: confirmedExtras,
             business: result.business_name,
             staff: result.staff_name ?? bookingState.staffName ?? 'Anyone',
             date: result.date,
@@ -1983,9 +2111,11 @@ export default function ChatScreen() {
             const jsonStr = line.slice(6).trim();
             if (!jsonStr) continue;
             try {
-              const event = JSON.parse(jsonStr) as { type: string; content?: string; name?: string };
+              const event = JSON.parse(jsonStr) as { type: string; content?: string; name?: string; tool?: string; data?: Record<string, unknown> };
               if (event.type === 'text') {
                 fullText += event.content ?? '';
+              } else if (event.type === 'tool_data') {
+                pendingToolData.current = { tool: event.tool ?? '', data: event.data ?? {} };
               } else if (event.type === 'error' && event.content) {
                 fullText = `Sorry, something went wrong: ${event.content}`;
               }
@@ -2014,10 +2144,12 @@ export default function ChatScreen() {
               const jsonStr = line.slice(6).trim();
               if (!jsonStr) continue;
               try {
-                const event = JSON.parse(jsonStr) as { type: string; content?: string; name?: string };
+                const event = JSON.parse(jsonStr) as { type: string; content?: string; name?: string; tool?: string; data?: Record<string, unknown> };
                 if (event.type === 'text') {
                   fullText += event.content ?? '';
                   chunkText = fullText;
+                } else if (event.type === 'tool_data') {
+                  pendingToolData.current = { tool: event.tool ?? '', data: event.data ?? {} };
                 } else if (event.type === 'error' && event.content) {
                   fullText = `Sorry, something went wrong: ${event.content}`;
                 }
@@ -2050,6 +2182,79 @@ export default function ChatScreen() {
           ),
         );
 
+        // If we received structured tool data from find_businesses, rebuild the
+        // business_with_services card from the deterministic server data instead
+        // of relying on the AI's non-deterministic formatting. This ensures ALL
+        // services are always shown.
+        if (pendingToolData.current?.tool === 'find_businesses') {
+          const toolData = pendingToolData.current.data as {
+            businesses?: {
+              id: string;
+              name: string;
+              image_url?: string;
+              logo_url?: string;
+              distance_mi?: number;
+              estimated_drive_minutes?: number;
+              category?: string;
+              all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number; image_url?: string }[];
+            }[];
+          };
+          const businesses = toolData.businesses ?? [];
+          if (businesses.length > 0) {
+            const cardObj: BusinessWithServicesData = {
+              type: 'business_with_services',
+              items: businesses.map((b) => ({
+                type: 'business_card' as const,
+                id: b.id,
+                name: b.name,
+                image_url: b.image_url || b.logo_url,
+                distance_mi: b.distance_mi ?? 0,
+                drive_minutes: b.estimated_drive_minutes ?? 0,
+                category: b.category ?? '',
+                services: (b.all_services ?? []).map((s) => ({
+                  id: s.id,
+                  name: s.name,
+                  price: s.price,
+                  duration_minutes: s.duration_minutes,
+                  deposit_enabled: s.deposit_enabled,
+                  deposit_amount: s.deposit_amount,
+                })),
+              })),
+            };
+            // Replace any AI-generated business_with_services card in fullText
+            const existingCardRegex = /\[\[CARD:\{[^]*?"type"\s*:\s*"business_with_services"[^]*?\}\]\]/;
+            const newCardTag = `[[CARD:${JSON.stringify(cardObj)}]]`;
+            if (existingCardRegex.test(fullText)) {
+              fullText = fullText.replace(existingCardRegex, newCardTag);
+            } else {
+              // AI didn't generate a card — append one
+              fullText += `\n\n${newCardTag}`;
+            }
+            // Update the message with the rebuilt card
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId
+                  ? { ...m, content: fullText, isStreaming: false }
+                  : m,
+              ),
+            );
+            // Capture all services for client-side flow
+            const allServices: typeof lastDisplayedServices.current = [];
+            for (const biz of cardObj.items) {
+              for (const svc of biz.services ?? []) {
+                allServices.push({
+                  ...svc,
+                  deposit_enabled: svc.deposit_enabled ?? false,
+                  tenantId: biz.id,
+                  tenantName: biz.name,
+                });
+              }
+            }
+            lastDisplayedServices.current = allServices;
+          }
+          pendingToolData.current = null;
+        }
+
         // Phase 2: Extract booking state from GPT response to capture service/business IDs
         try {
           const cardRegex = /\[\[CARD:([\s\S]*?)\]\]/g;
@@ -2074,10 +2279,10 @@ export default function ChatScreen() {
             if (cardData.type === 'business_with_services') {
               const items = cardData.items as { id: string; name: string; services: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number }[] }[];
               if (items?.length) {
-                const allServices: typeof lastDisplayedServices.current = [];
+                const allSvcs: typeof lastDisplayedServices.current = [];
                 for (const biz of items) {
                   for (const svc of biz.services ?? []) {
-                    allServices.push({
+                    allSvcs.push({
                       ...svc,
                       deposit_enabled: svc.deposit_enabled ?? false,
                       tenantId: biz.id,
@@ -2085,7 +2290,9 @@ export default function ChatScreen() {
                     });
                   }
                 }
-                lastDisplayedServices.current = allServices;
+                if (allSvcs.length > lastDisplayedServices.current.length) {
+                  lastDisplayedServices.current = allSvcs;
+                }
               }
             }
           }
@@ -2114,7 +2321,7 @@ export default function ChatScreen() {
 
   const hasMessages = messages.length > 0;
 
-  // Service-type buttons per category slug (Option 2)
+  // Service-type buttons per category slug (Option 2 — horizontal tabs)
   const CATEGORY_SERVICE_TYPES: Record<string, string[]> = {
     'health-wellness': ['Dentist', 'Spa', 'Therapy', 'Chiropractor'],
     'beauty-personal-care': ['Barber', 'Skin Care', 'Lashes & Brows', 'Nails'],
@@ -2128,6 +2335,11 @@ export default function ChatScreen() {
     'food-nutrition': ['Nutrition Coach', 'Meal Prep'],
   };
 
+  const [selectedCategoryIdx, setSelectedCategoryIdx] = useState(0);
+  const activeCategories = categories.filter((c) => (CATEGORY_SERVICE_TYPES[c.slug] ?? []).length > 0);
+  const activeCategory = activeCategories[selectedCategoryIdx];
+  const activeSvcTypes = activeCategory ? (CATEGORY_SERVICE_TYPES[activeCategory.slug] ?? []) : [];
+
   if (!hasMessages) {
     return (
       <SafeAreaView style={styles.container}>
@@ -2136,37 +2348,53 @@ export default function ChatScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          <ScrollView
-            contentContainerStyle={styles.welcomeScroll}
-            showsVerticalScrollIndicator={false}
-          >
-            <BalkinaLogo size="large" />
-            <Text style={styles.subtitle}>What would you like to book today?</Text>
+          <View style={styles.welcomeContainer}>
+            <View style={{ alignItems: 'center', marginBottom: 24 }}>
+              <BalkinaLogo size="large" />
+              <Text style={styles.subtitle}>What would you like to book today?</Text>
+            </View>
             {categoriesLoading ? (
               <ActivityIndicator size="small" color="#6B7FC4" style={{ marginTop: 20 }} />
             ) : (
-              <View style={styles.categorySections}>
-                {categories.map((cat) => {
-                  const serviceTypes = CATEGORY_SERVICE_TYPES[cat.slug] ?? [];
-                  if (serviceTypes.length === 0) return null;
-                  return (
-                    <View key={cat.id} style={styles.categorySection}>
-                      <Text style={styles.categorySectionTitle}>{cat.name}</Text>
-                      <View style={styles.chipsContainer}>
-                        {serviceTypes.map((svc) => (
-                          <SuggestionChip
-                            key={svc}
-                            label={svc}
-                            onPress={() => handleButtonPress(`Find a ${svc.toLowerCase()}`)}
-                          />
-                        ))}
-                      </View>
-                    </View>
-                  );
-                })}
+              <View style={{ width: '100%' }}>
+                {/* Horizontal scrollable category tabs */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 4 }}
+                >
+                  {activeCategories.map((cat, idx) => {
+                    const isActive = idx === selectedCategoryIdx;
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[landingStyles.categoryTab, isActive && landingStyles.categoryTabActive]}
+                        onPress={() => setSelectedCategoryIdx(idx)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[landingStyles.categoryTabText, isActive && landingStyles.categoryTabTextActive]}>
+                          {cat.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+                {/* Service-type chips for active category */}
+                <View style={landingStyles.serviceTypesGrid}>
+                  {activeSvcTypes.map((svc) => (
+                    <TouchableOpacity
+                      key={svc}
+                      style={landingStyles.serviceTypeCard}
+                      onPress={() => handleButtonPress(`Find a ${svc.toLowerCase()}`)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={landingStyles.serviceTypeText}>{svc}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             )}
-          </ScrollView>
+          </View>
           <View style={styles.inputBar}>
             <TextInput
               style={styles.textInput}
@@ -2263,10 +2491,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   flex: { flex: 1 },
   welcomeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
-  welcomeScroll: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 40 },
-  categorySections: { width: '100%', marginTop: 8 },
-  categorySection: { marginBottom: 18 },
-  categorySectionTitle: { fontSize: 14, fontWeight: '700', color: '#6B7FC4', marginBottom: 8, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 },
   greeting: { fontSize: 34, fontWeight: '700', color: '#111827', marginBottom: 8 },
   subtitle: { fontSize: 18, color: '#6b7280', marginTop: 20, marginBottom: 28 },
   chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },

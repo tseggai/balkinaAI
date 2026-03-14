@@ -881,6 +881,19 @@ export async function POST(request: Request) {
               tool_use_id: toolCall.id,
               content: JSON.stringify(result),
             });
+
+            // Stream structured tool data to the client so it can render
+            // cards deterministically without relying on the AI's formatting.
+            if (toolCall.name === 'find_businesses' && result && typeof result === 'object' && 'success' in result && (result as { success: boolean }).success) {
+              const fbResult = result as { data?: { businesses?: unknown[] } };
+              if (fbResult.data?.businesses) {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ type: 'tool_data', tool: 'find_businesses', data: fbResult.data })}\n\n`,
+                  ),
+                );
+              }
+            }
           }
 
           // Save the assistant message with tool calls and results
