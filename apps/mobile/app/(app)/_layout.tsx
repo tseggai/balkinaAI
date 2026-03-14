@@ -19,7 +19,7 @@ export default function AppTabsLayout() {
           recipientType: 'customer',
           recipientId: (customer as { id: string }).id,
           accessToken: session.access_token,
-        });
+        }).catch(() => { /* push registration is non-critical */ });
       }
     })();
   }, []);
