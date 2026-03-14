@@ -12,6 +12,9 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 
+const API_BASE =
+  process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Appointment {
@@ -83,112 +86,35 @@ export default function BookingsScreen() {
       return;
     }
 
-    // Step 1: Find the customer_id by looking up the customers table
-    // Match by user_id first (set when booking via chat), then by id, email, phone
-    let customerId: string | null = null;
+    try {
+      // Use server-side API endpoint (admin client) to avoid mobile RLS issues
+      const params = new URLSearchParams({ tab });
+      if (user.id) params.set('userId', user.id);
+      if (user.email) params.set('email', user.email);
+      if (user.phone) params.set('phone', user.phone);
 
-    // Try matching by user_id (linked authenticated user)
-    const { data: byUserId } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (byUserId) {
-      customerId = byUserId.id;
-    }
-
-    // Try matching by id (auth user id = customers.id)
-    if (!customerId) {
-      const { data: byId } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (byId) {
-        customerId = byId.id;
-      }
-    }
-
-    // If not found by id, try email
-    if (!customerId && user.email) {
-      const { data: byEmail } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('email', user.email)
-        .limit(1)
-        .maybeSingle();
-
-      if (byEmail) {
-        customerId = byEmail.id;
-      }
-    }
-
-    // If not found by email, try phone
-    if (!customerId && user.phone) {
-      const { data: byPhone } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('phone', user.phone)
-        .limit(1)
-        .maybeSingle();
-
-      if (byPhone) {
-        customerId = byPhone.id;
-      }
-    }
-
-    // Link user_id to customer if found by email/phone but not user_id
-    if (customerId && !byUserId) {
-      await supabase
-        .from('customers')
-        .update({ user_id: user.id })
-        .eq('id', customerId)
-        .is('user_id', null);
-    }
-
-    if (!customerId) {
-      // No customer record found — show empty state
-      setAppointments([]);
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayISO = todayStart.toISOString();
-    const isUpcoming = tab === 'upcoming';
-
-    let query = supabase
-      .from('appointments')
-      .select(
-        'id, start_time, end_time, status, total_price, services(name), staff(name), tenant_locations(name), tenants(name)',
-      )
-      .eq('customer_id', customerId)
-      .order('start_time', { ascending: isUpcoming });
-
-    if (isUpcoming) {
-      query = query
-        .gte('start_time', todayISO)
-        .in('status', ['pending', 'confirmed']);
-    } else {
-      query = query.or(
-        `start_time.lt.${now},status.eq.completed,status.eq.cancelled`,
+      const res = await fetch(
+        `${API_BASE}/api/customer/bookings?${params.toString()}`,
       );
-    }
 
-    const { data, error } = await query.limit(50);
-
-    if (error) {
-      setErrorMsg(`Failed to load bookings: ${error.message}`);
+      if (!res.ok) {
+        setErrorMsg('Failed to load bookings. Please try again.');
+        setAppointments([]);
+      } else {
+        const result = (await res.json()) as {
+          data: Appointment[];
+          error: string | null;
+        };
+        if (result.error) {
+          setErrorMsg(result.error);
+          setAppointments([]);
+        } else {
+          setAppointments(result.data ?? []);
+        }
+      }
+    } catch {
+      setErrorMsg('Connection error. Please check your network.');
       setAppointments([]);
-    } else {
-      setAppointments((data as unknown as Appointment[]) ?? []);
     }
 
     setLoading(false);
