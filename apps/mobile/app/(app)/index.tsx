@@ -2367,7 +2367,7 @@ export default function ChatScreen() {
                   <TouchableOpacity
                     key={cat.id}
                     style={landingStyles.categoryChip}
-                    onPress={() => handleButtonPress(`Show me ${cat.name.toLowerCase()} services`)}
+                    onPress={() => handleButtonPress(`Find ${cat.name} businesses near me [category_id:${cat.id}]`)}
                     activeOpacity={0.7}
                   >
                     <Text style={landingStyles.categoryChipText}>{cat.name}</Text>

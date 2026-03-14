@@ -230,6 +230,7 @@ const findBusinessesTool: OpenAI.ChatCompletionTool = {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Search query - service type, category, or business name. Use empty string to list ALL nearby businesses.' },
+        category_id: { type: 'string', description: 'UUID of a category to filter businesses by. When provided, returns ONLY businesses in this exact category. Use this instead of query when the user browses by category.' },
         service_type: { type: 'string', description: 'Optional service type to filter businesses by (e.g. "haircut", "massage"). Only returns businesses with at least 1 active staff with schedule availability.' },
         latitude: { type: 'number', description: 'User latitude for proximity search (optional)' },
         longitude: { type: 'number', description: 'User longitude for proximity search (optional)' },
@@ -427,6 +428,7 @@ ${userLocation ? `User location: ${userLocation.latitude}, ${userLocation.longit
 ## Booking Flow (strict order, one step per message, skip steps already answered)
 Extract all info from user's message first (service type, business, date, time, staff). Never re-ask answered questions.
 Synonyms for "show businesses": "near me", "around me", "what's nearby", "show me everything", etc. → call find_businesses.
+CATEGORY BROWSING: When user message contains [category_id:UUID], extract the UUID and pass it as category_id to find_businesses. This filters businesses by their assigned category directly from the database — fast and accurate. Do NOT pass query or service_type when using category_id.
 
 1. Call find_businesses — it returns each business with an all_services array containing ALL their services (id, name, price, duration_minutes, deposit_enabled, deposit_amount). Do NOT call get_services separately. Render as ONE business_with_services card.
    CRITICAL field mapping from find_businesses result: id → id, name → name, image_url → image_url (use logo_url value), distance_mi → distance_mi, estimated_drive_minutes → drive_minutes, category → category, all_services → services.
