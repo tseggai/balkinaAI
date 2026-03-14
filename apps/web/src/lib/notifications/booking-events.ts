@@ -3,11 +3,10 @@ import { sendNotification } from './send';
 
 interface AppointmentContext {
   id: string;
-  appointment_date: string;
   start_time: string;
   end_time: string;
   total_price: number;
-  customers: { id: string; name: string; phone: string | null };
+  customers: { id: string; display_name: string | null; phone: string | null };
   services: { id: string; name: string; duration_minutes: number };
   staff: {
     id: string;
@@ -27,8 +26,8 @@ async function getAppointmentContext(appointmentId: string): Promise<Appointment
   const { data } = await supabase
     .from('appointments')
     .select(`
-      id, appointment_date, start_time, end_time, total_price,
-      customers(id, name, phone),
+      id, start_time, end_time, total_price,
+      customers(id, display_name, phone),
       services(id, name, duration_minutes),
       staff(id, name, phone, requires_approval,
         staff_location_assignments(
@@ -43,18 +42,15 @@ async function getAppointmentContext(appointmentId: string): Promise<Appointment
   return data as unknown as AppointmentContext | null;
 }
 
-function formatDate(date: string, timezone: string): string {
-  return new Date(date).toLocaleDateString('en-US', {
+function formatDate(iso: string, timezone: string): string {
+  return new Date(iso).toLocaleDateString('en-US', {
     timeZone: timezone,
     weekday: 'short', month: 'short', day: 'numeric',
   });
 }
 
-function formatTime(time: string, timezone: string): string {
-  const [h, m] = time.split(':');
-  const d = new Date();
-  d.setHours(parseInt(h!, 10), parseInt(m!, 10));
-  return d.toLocaleTimeString('en-US', {
+function formatTime(iso: string, timezone: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', {
     timeZone: timezone,
     hour: 'numeric', minute: '2-digit', hour12: true,
   });
@@ -70,10 +66,10 @@ export async function notifyBookingConfirmed(appointmentId: string) {
     recipientType: 'customer',
     recipientId: ctx.customers.id,
     data: {
-      customerName: ctx.customers.name ?? '',
+      customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
-      date: formatDate(ctx.appointment_date, tz),
+      date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
     },
   });
@@ -90,9 +86,9 @@ export async function notifyStaffNewBooking(appointmentId: string) {
     recipientType: 'staff',
     recipientId: ctx.staff.id,
     data: {
-      customerName: ctx.customers.name ?? '',
+      customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
-      date: formatDate(ctx.appointment_date, tz),
+      date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
       requiresApproval: ctx.staff.requires_approval ? 1 : 0,
     },
@@ -109,10 +105,10 @@ export async function notifyBookingApproved(appointmentId: string) {
     recipientType: 'customer',
     recipientId: ctx.customers.id,
     data: {
-      customerName: ctx.customers.name ?? '',
+      customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
-      date: formatDate(ctx.appointment_date, tz),
+      date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
     },
   });
@@ -128,10 +124,10 @@ export async function notifyBookingDeclined(appointmentId: string) {
     recipientType: 'customer',
     recipientId: ctx.customers.id,
     data: {
-      customerName: ctx.customers.name ?? '',
+      customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
-      date: formatDate(ctx.appointment_date, tz),
+      date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
     },
   });
@@ -149,9 +145,9 @@ export async function notifyBookingCancelledByCustomer(appointmentId: string) {
     recipientType: 'customer',
     recipientId: ctx.customers.id,
     data: {
-      customerName: ctx.customers.name ?? '',
+      customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
-      date: formatDate(ctx.appointment_date, tz),
+      date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
     },
   });
@@ -163,9 +159,9 @@ export async function notifyBookingCancelledByCustomer(appointmentId: string) {
       recipientType: 'staff',
       recipientId: ctx.staff.id,
       data: {
-        customerName: ctx.customers.name ?? '',
+        customerName: ctx.customers.display_name ?? '',
         serviceName: ctx.services.name,
-        date: formatDate(ctx.appointment_date, tz),
+        date: formatDate(ctx.start_time, tz),
         time: formatTime(ctx.start_time, tz),
       },
     });
@@ -182,10 +178,10 @@ export async function notifyBookingCancelledByTenant(appointmentId: string) {
     recipientType: 'customer',
     recipientId: ctx.customers.id,
     data: {
-      customerName: ctx.customers.name ?? '',
+      customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
-      date: formatDate(ctx.appointment_date, tz),
+      date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
     },
   });

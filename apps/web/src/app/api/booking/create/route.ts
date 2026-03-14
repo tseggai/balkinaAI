@@ -151,13 +151,22 @@ export async function POST(request: Request) {
       supabase.from('tenant_locations').select('id, address, latitude, longitude, timezone')
         .eq('tenant_id', tenantId).limit(1),
 
-      // 6. Staff
+      // 6. Staff — prefer service_staff assignment over random tenant staff
       (async () => {
         if (staffId) {
           const { data } = await supabase.from('staff').select('id, name').eq('id', staffId).single();
           const s = data as { id: string; name: string } | null;
           return { id: s?.id ?? staffId, name: body.staffName || s?.name || null };
         }
+        // Pick first staff assigned to this service via service_staff junction
+        const { data: serviceStaff } = await supabase
+          .from('service_staff')
+          .select('staff:staff_id(id, name)')
+          .eq('service_id', serviceId)
+          .limit(1);
+        const assigned = (serviceStaff as unknown as { staff: { id: string; name: string } | null }[] | null)?.[0]?.staff;
+        if (assigned) return { id: assigned.id, name: body.staffName || assigned.name };
+        // Fallback: any staff from the tenant
         const { data } = await supabase.from('staff').select('id, name').eq('tenant_id', tenantId).limit(1);
         const s = (data as { id: string; name: string }[] | null)?.[0];
         return { id: s?.id ?? null, name: body.staffName || s?.name || null };

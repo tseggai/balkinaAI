@@ -30,13 +30,14 @@ export async function GET(request: Request) {
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)));
   const offset = (page - 1) * limit;
+  const sortBy = searchParams.get('sort_by') ?? 'start_time';
+  const sortOrder = searchParams.get('sort_order') ?? 'asc';
+  const ascending = sortOrder !== 'desc';
 
-  // Use admin client — auth is already verified by getTenantId() above.
-  // The anon-key client goes through RLS which requires get_my_tenant_id()
-  // to return a value from the JWT. If the JWT doesn't contain tenant_id
-  // in app_metadata (e.g. stale session), the query returns zero rows.
-  // The admin client bypasses RLS; security is enforced by the explicit
-  // .eq('tenant_id', tenantId) filter.
+  // Validate sort column to prevent injection
+  const allowedSortColumns = ['start_time', 'created_at', 'status', 'total_price'];
+  const safeSortBy = allowedSortColumns.includes(sortBy) ? sortBy : 'start_time';
+
   const supabase = createAdminClient();
 
   // Build query for count
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
     .from('appointments')
     .select('*, services(name, duration_minutes, price), customers(id, display_name, email, phone), staff(id, name), tenant_locations(id, name)')
     .eq('tenant_id', tenantId)
-    .order('start_time', { ascending: false })
+    .order(safeSortBy, { ascending })
     .range(offset, offset + limit - 1);
 
   // Apply filters to both queries

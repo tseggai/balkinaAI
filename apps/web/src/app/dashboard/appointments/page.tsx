@@ -188,6 +188,8 @@ export default function AppointmentsPage() {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
+  const [sortBy, setSortBy] = useState('start_time');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -260,13 +262,15 @@ export default function AppointmentsPage() {
     if (search.trim()) params.set('search', search.trim());
     params.set('page', String(page));
     params.set('limit', String(limit));
+    params.set('sort_by', sortBy);
+    params.set('sort_order', sortOrder);
 
     const res = await fetch(`/api/appointments?${params}`);
     const json = await res.json() as { data: Appointment[] | null; total: number };
     setAppointments(json.data ?? []);
     setTotal(json.total ?? 0);
     setLoading(false);
-  }, [statusFilter, staffFilter, serviceFilter, dateFrom, dateTo, search, page, limit]);
+  }, [statusFilter, staffFilter, serviceFilter, dateFrom, dateTo, search, page, limit, sortBy, sortOrder]);
 
   const fetchDropdownData = useCallback(async () => {
     const [staffRes, servicesRes, locationsRes, customersRes, couponsRes, productsRes] = await Promise.all([
@@ -890,14 +894,47 @@ export default function AppointmentsPage() {
                         className="h-4 w-4 rounded border-gray-300 text-brand-600"
                       />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Start Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Customer</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Staff</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Service</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Payment</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Duration</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Created At</th>
+                    {[
+                      { key: 'start_time', label: 'Start Date' },
+                      { key: 'customer', label: 'Customer' },
+                      { key: 'status', label: 'Status' },
+                      { key: 'staff', label: 'Staff' },
+                      { key: 'service', label: 'Service' },
+                      { key: 'total_price', label: 'Payment' },
+                      { key: 'duration', label: 'Duration' },
+                      { key: 'created_at', label: 'Created At' },
+                    ].map((col) => {
+                      const isSortable = ['start_time', 'status', 'total_price', 'created_at'].includes(col.key);
+                      const isActive = sortBy === col.key;
+                      return (
+                        <th
+                          key={col.key}
+                          className={`px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 ${isSortable ? 'cursor-pointer select-none hover:text-gray-700' : ''}`}
+                          onClick={isSortable ? () => {
+                            if (isActive) {
+                              setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setSortBy(col.key);
+                              setSortOrder('asc');
+                            }
+                            setPage(1);
+                          } : undefined}
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            {col.label}
+                            {isSortable && isActive && (
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                {sortOrder === 'asc' ? (
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                                ) : (
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                )}
+                              </svg>
+                            )}
+                          </span>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -997,8 +1034,9 @@ export default function AppointmentsPage() {
                         </td>
 
                         {/* Created At */}
-                        <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
-                          {formatDate(appt.created_at)}
+                        <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                          <div>{formatDate(appt.created_at)}</div>
+                          <div className="text-xs text-gray-500">{formatTime(appt.created_at)}</div>
                         </td>
                       </tr>
                     );
