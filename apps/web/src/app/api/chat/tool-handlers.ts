@@ -134,8 +134,80 @@ async function handleFindBusinessesInner(
   const limit = (input.limit as number) || 8;
 
   const serviceType = ((input.service_type as string) || '').trim();
+  const categoryId = ((input.category_id as string) || '').trim();
 
-  console.log('[find_businesses] START params:', JSON.stringify({ query, serviceType, userLat, userLng, radiusKm, offset, limit }));
+  console.log('[find_businesses] START params:', JSON.stringify({ query, serviceType, categoryId, userLat, userLng, radiusKm, offset, limit }));
+
+  // ── Fast path: filter by category_id directly from DB ─────────────────────
+  if (categoryId) {
+    const { data: catTenants, error: catError } = await supabase
+      .from('tenants')
+      .select('id, name, logo_url, categories(name)')
+      .eq('status', 'active')
+      .eq('category_id', categoryId);
+
+    if (catError) return { success: false, error: catError.message };
+
+    let businesses = (catTenants ?? []).map((t: unknown) => {
+      const row = t as { id: string; name: string; logo_url: string | null; categories: { name: string } | { name: string }[] | null };
+      const cat = Array.isArray(row.categories) ? row.categories[0]?.name ?? null : row.categories?.name ?? null;
+      return { id: row.id, name: row.name, image_url: row.logo_url ?? undefined, category: cat, business_category: cat };
+    }) as { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[] }[];
+
+    // Fetch locations
+    const catBizIds = businesses.map((b) => b.id);
+    const { data: catLocs } = catBizIds.length > 0
+      ? await supabase.from('tenant_locations').select('tenant_id, name, address, latitude, longitude').in('tenant_id', catBizIds)
+      : { data: [] };
+
+    const catLocMap = new Map<string, { name: string; address: string; latitude: number | null; longitude: number | null }[]>();
+    for (const loc of (catLocs ?? []) as { tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
+      const existing = catLocMap.get(loc.tenant_id) ?? [];
+      existing.push({ name: loc.name, address: loc.address, latitude: loc.latitude, longitude: loc.longitude });
+      catLocMap.set(loc.tenant_id, existing);
+    }
+
+    // Fetch all services
+    const { data: catSvcs } = catBizIds.length > 0
+      ? await supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, image_url, visibility').in('tenant_id', catBizIds).eq('visibility', 'public')
+      : { data: [] };
+
+    const catSvcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[]>();
+    for (const svc of (catSvcs ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[]) {
+      const existing = catSvcMap.get(svc.tenant_id) ?? [];
+      existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, image_url: svc.image_url });
+      catSvcMap.set(svc.tenant_id, existing);
+    }
+    businesses = businesses.map((b) => ({ ...b, all_services: catSvcMap.get(b.id) ?? [], locations: catLocMap.get(b.id) ?? [] }));
+
+    // Sort by proximity if location available
+    if (userLat && userLng) {
+      const locMap = new Map<string, { latitude: number; longitude: number }>();
+      for (const loc of (catLocs ?? []) as { tenant_id: string; latitude: number | null; longitude: number | null }[]) {
+        if (loc.latitude && loc.longitude && !locMap.has(loc.tenant_id)) {
+          locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude });
+        }
+      }
+      businesses = businesses
+        .map((b) => {
+          const loc = locMap.get(b.id);
+          if (!loc) return b;
+          const distance = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
+          const distKm = Math.round(distance * 10) / 10;
+          const distMi = Math.round(distKm * 0.621371 * 10) / 10;
+          return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm) };
+        })
+        .filter((b) => b.distance_km === undefined || b.distance_km <= radiusKm)
+        .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
+    }
+
+    const totalCount = businesses.length;
+    const paged = businesses.slice(offset, offset + limit);
+    const hasMore = offset + limit < totalCount;
+
+    console.log('[find_businesses] category_id path returning:', paged.length, 'businesses (total:', totalCount, ')');
+    return { success: true, data: { businesses: paged, total_count: totalCount, offset, limit, has_more: hasMore, matching_services: [], location_note: userLat && userLng ? undefined : 'Showing all locations — enable location access for nearby results' } };
+  }
 
   // If a service_type is specified, filter tenants that actually offer matching services
   if (serviceType) {
