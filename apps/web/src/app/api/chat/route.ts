@@ -866,6 +866,7 @@ export async function POST(request: Request) {
                     chatSession!.customer_name ?? customerName ?? null,
                   customerPhone:
                     chatSession!.customer_phone ?? customerPhone ?? null,
+                  customerEmail: resolvedEmail,
                   chatSessionId: chatSession!.id,
                   userId: userId ?? null,
                 },

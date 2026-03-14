@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 
@@ -199,6 +199,13 @@ export default function BookingsScreen() {
     setLoading(true);
     fetchAppointments();
   }, [fetchAppointments]);
+
+  // Re-fetch when screen gains focus (e.g., after booking in Chat tab)
+  useFocusEffect(
+    useCallback(() => {
+      fetchAppointments();
+    }, [fetchAppointments]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

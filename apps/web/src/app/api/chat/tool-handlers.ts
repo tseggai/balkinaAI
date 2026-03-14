@@ -216,6 +216,29 @@ async function handleFindBusinessesInner(
     }
     console.log('[find_businesses] category-matched tenant IDs:', catMatchTenantIds.size);
 
+    // Also match tenants by business name (e.g., "barber" → "Dan the Barber",
+    // "barbershop" → "Milpitas Fades Barbershop")
+    const nameMatchTenantIds = new Set<string>();
+    for (const t of (categoryTenants ?? []) as unknown as { id: string; name: string }[]) {
+      const tNameLC = t.name.toLowerCase();
+      if (tNameLC.includes(typeLC) || typeWords2.some(w => w.length >= 3 && tNameLC.includes(w))) {
+        nameMatchTenantIds.add(t.id);
+      }
+    }
+    // Also search inactive-category tenants by name (categoryTenants only has those with category_id)
+    if (nameMatchTenantIds.size === 0) {
+      const namePatterns = [typeLC, ...typeWords2.filter(w => w.length >= 3)].map(w => `%${w}%`);
+      const { data: nameTenants } = await supabase
+        .from('tenants')
+        .select('id, name')
+        .eq('status', 'active')
+        .or(namePatterns.map(p => `name.ilike.${p}`).join(','));
+      for (const nt of (nameTenants ?? []) as { id: string; name: string }[]) {
+        nameMatchTenantIds.add(nt.id);
+      }
+    }
+    console.log('[find_businesses] name-matched tenant IDs:', nameMatchTenantIds.size);
+
     let serviceTenantMap: Map<string, { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; matched_services: string[] }>;
 
     // Collect matching tenant IDs from service name search
@@ -235,13 +258,20 @@ async function handleFindBusinessesInner(
       }
     }
 
+    // Merge name-matched tenants into the service match map
+    for (const nameTenantId of nameMatchTenantIds) {
+      if (!svcByTenant.has(nameTenantId)) {
+        svcByTenant.set(nameTenantId, ['(name match)']);
+      }
+    }
+
     // When category matches exist, remove service-only matches that don't belong
-    // to the matching category. This prevents e.g. "Peak Performance Coaching"
+    // to the matching category or name matches. This prevents e.g. "Peak Performance Coaching"
     // from appearing in "Beauty & Personal Care" just because a service name
     // contains "personal" or "care".
     if (catMatchTenantIds.size > 0) {
       for (const tid of [...svcByTenant.keys()]) {
-        if (!catMatchTenantIds.has(tid)) {
+        if (!catMatchTenantIds.has(tid) && !nameMatchTenantIds.has(tid)) {
           svcByTenant.delete(tid);
         }
       }
@@ -1107,7 +1137,7 @@ export async function handleBookAppointment(
   supabase: AdminClient,
   tenantId: string,
   input: Record<string, unknown>,
-  sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string; userId: string | null },
+  sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; customerEmail?: string | null; chatSessionId: string; userId: string | null },
 ): Promise<ToolResult> {
   const serviceId = input.service_id as string;
   const startTime = input.start_time as string;
@@ -1139,10 +1169,27 @@ export async function handleBookAppointment(
       if (sessionInfo.userId) {
         const { data } = await supabase.from('customers').select('id').eq('user_id', sessionInfo.userId).limit(1).maybeSingle();
         if (data) return { id: (data as { id: string }).id, created: false };
+        // Also try matching by id (customers.id = auth user id)
+        const { data: byId } = await supabase.from('customers').select('id').eq('id', sessionInfo.userId).limit(1).maybeSingle();
+        if (byId) return { id: (byId as { id: string }).id, created: false };
+      }
+      if (sessionInfo.customerEmail) {
+        const { data } = await supabase.from('customers').select('id').eq('email', sessionInfo.customerEmail).limit(1).maybeSingle();
+        if (data) {
+          if (sessionInfo.userId) {
+            await supabase.from('customers').update({ user_id: sessionInfo.userId } as never).eq('id', (data as { id: string }).id).is('user_id', null);
+          }
+          return { id: (data as { id: string }).id, created: false };
+        }
       }
       if (sessionInfo.customerPhone) {
         const { data } = await supabase.from('customers').select('id').eq('phone', sessionInfo.customerPhone).limit(1).maybeSingle();
-        if (data) return { id: (data as { id: string }).id, created: false };
+        if (data) {
+          if (sessionInfo.userId) {
+            await supabase.from('customers').update({ user_id: sessionInfo.userId } as never).eq('id', (data as { id: string }).id).is('user_id', null);
+          }
+          return { id: (data as { id: string }).id, created: false };
+        }
       }
       // Create anonymous customer
       const email = `chat_${Date.now()}@widget.balkina.ai`;
@@ -2119,7 +2166,7 @@ export async function executeTool(
   toolInput: Record<string, unknown>,
   supabase: AdminClient,
   tenantId: string,
-  sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string; userId: string | null },
+  sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; customerEmail?: string | null; chatSessionId: string; userId: string | null },
   userLocation?: { latitude: number; longitude: number } | null,
 ): Promise<ToolResult> {
   try {

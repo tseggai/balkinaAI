@@ -108,12 +108,31 @@ export async function POST(request: Request) {
       // 4. Find or create customer
       (async () => {
         if (userId) {
+          // Try user_id first, then try id = userId (for customers where id matches auth user id)
           const { data } = await supabase.from('customers').select('id').eq('user_id', userId).limit(1).maybeSingle();
           if (data) return { id: (data as { id: string }).id, error: null };
+          const { data: byId } = await supabase.from('customers').select('id').eq('id', userId).limit(1).maybeSingle();
+          if (byId) return { id: (byId as { id: string }).id, error: null };
+        }
+        if (customerEmail) {
+          const { data } = await supabase.from('customers').select('id').eq('email', customerEmail).limit(1).maybeSingle();
+          if (data) {
+            // Link user_id if not already set
+            if (userId) {
+              await supabase.from('customers').update({ user_id: userId } as never).eq('id', (data as { id: string }).id).is('user_id', null);
+            }
+            return { id: (data as { id: string }).id, error: null };
+          }
         }
         if (customerPhone) {
           const { data } = await supabase.from('customers').select('id').eq('phone', customerPhone).limit(1).maybeSingle();
-          if (data) return { id: (data as { id: string }).id, error: null };
+          if (data) {
+            // Link user_id if not already set
+            if (userId) {
+              await supabase.from('customers').update({ user_id: userId } as never).eq('id', (data as { id: string }).id).is('user_id', null);
+            }
+            return { id: (data as { id: string }).id, error: null };
+          }
         }
         const email = `chat_${Date.now()}@widget.balkina.ai`;
         const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
