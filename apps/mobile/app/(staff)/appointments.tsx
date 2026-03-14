@@ -11,7 +11,7 @@ import {
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '@/lib/supabase';
+import { supabase, getAuthenticatedRole } from '@/lib/supabase';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
 
@@ -58,6 +58,15 @@ export default function StaffAppointments() {
   const [refreshing, setRefreshing] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [staffId, setStaffId] = useState<string | null>(null);
+
+  // Get staff ID for realtime subscription
+  useEffect(() => {
+    (async () => {
+      const { staffInfo } = await getAuthenticatedRole();
+      if (staffInfo) setStaffId(staffInfo.id);
+    })();
+  }, []);
 
   const fetchAppointments = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -86,6 +95,25 @@ export default function StaffAppointments() {
     setLoading(true);
     fetchAppointments();
   }, [fetchAppointments]);
+
+  // Realtime subscription — auto-refresh when appointments change
+  useEffect(() => {
+    if (!staffId) return;
+    const channel = supabase
+      .channel('staff-appointments-list')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+          filter: `staff_id=eq.${staffId}`,
+        },
+        () => { fetchAppointments(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [staffId, fetchAppointments]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);

@@ -107,30 +107,42 @@ export async function POST(request: Request) {
 
       // 4. Find or create customer
       (async () => {
+        // Helper: update existing customer with latest info when found
+        const patchExisting = async (id: string) => {
+          const updates: Record<string, string> = {};
+          if (customerName) updates.display_name = customerName;
+          if (customerPhone) updates.phone = customerPhone;
+          if (customerEmail) updates.email = customerEmail;
+          if (userId) updates.user_id = userId;
+          if (Object.keys(updates).length > 0) {
+            await supabase.from('customers').update(updates as never).eq('id', id);
+          }
+        };
+
         if (userId) {
           // Try user_id first, then try id = userId (for customers where id matches auth user id)
           const { data } = await supabase.from('customers').select('id').eq('user_id', userId).limit(1).maybeSingle();
-          if (data) return { id: (data as { id: string }).id, error: null };
+          if (data) {
+            await patchExisting((data as { id: string }).id);
+            return { id: (data as { id: string }).id, error: null };
+          }
           const { data: byId } = await supabase.from('customers').select('id').eq('id', userId).limit(1).maybeSingle();
-          if (byId) return { id: (byId as { id: string }).id, error: null };
+          if (byId) {
+            await patchExisting((byId as { id: string }).id);
+            return { id: (byId as { id: string }).id, error: null };
+          }
         }
         if (customerEmail) {
           const { data } = await supabase.from('customers').select('id').eq('email', customerEmail).limit(1).maybeSingle();
           if (data) {
-            // Link user_id if not already set
-            if (userId) {
-              await supabase.from('customers').update({ user_id: userId } as never).eq('id', (data as { id: string }).id).is('user_id', null);
-            }
+            await patchExisting((data as { id: string }).id);
             return { id: (data as { id: string }).id, error: null };
           }
         }
         if (customerPhone) {
           const { data } = await supabase.from('customers').select('id').eq('phone', customerPhone).limit(1).maybeSingle();
           if (data) {
-            // Link user_id if not already set
-            if (userId) {
-              await supabase.from('customers').update({ user_id: userId } as never).eq('id', (data as { id: string }).id).is('user_id', null);
-            }
+            await patchExisting((data as { id: string }).id);
             return { id: (data as { id: string }).id, error: null };
           }
         }
