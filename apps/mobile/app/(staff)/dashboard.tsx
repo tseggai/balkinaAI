@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -63,6 +63,7 @@ export default function StaffDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const listRef = useRef<FlatList<StaffAppointment>>(null);
 
   const fetchData = useCallback(async () => {
     const { staffInfo: info } = await getAuthenticatedRole();
@@ -86,6 +87,20 @@ export default function StaffDashboard() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Auto-scroll to the first upcoming appointment when data loads
+  useEffect(() => {
+    if (appointments.length === 0) return;
+    const now = new Date();
+    const firstUpcomingIdx = appointments.findIndex(
+      (a) => new Date(a.start_time) > now && (a.status === 'confirmed' || a.status === 'pending'),
+    );
+    if (firstUpcomingIdx > 0) {
+      setTimeout(() => {
+        listRef.current?.scrollToIndex({ index: firstUpcomingIdx, animated: true, viewOffset: 8 });
+      }, 300);
+    }
+  }, [appointments]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -131,18 +146,19 @@ export default function StaffDashboard() {
     const colors = STATUS_COLORS[item.status] ?? STATUS_COLORS.cancelled;
     const isExpanded = expandedId === item.id;
     const isActioning = actionLoading === item.id;
+    const isPast = new Date(item.end_time) < new Date();
 
     return (
       <TouchableOpacity
-        style={styles.apptCard}
+        style={[styles.apptCard, isPast && styles.apptCardPast]}
         onPress={() => setExpandedId(isExpanded ? null : item.id)}
         activeOpacity={0.7}
       >
         <View style={styles.apptRow}>
-          <Text style={styles.apptTime}>{formatTime(item.start_time)}</Text>
+          <Text style={[styles.apptTime, isPast && styles.apptTimePast]}>{formatTime(item.start_time)}</Text>
           <View style={styles.apptInfo}>
-            <Text style={styles.apptCustomer}>{item.customer_name}</Text>
-            <Text style={styles.apptService}>
+            <Text style={[styles.apptCustomer, isPast && styles.textPast]}>{item.customer_name}</Text>
+            <Text style={[styles.apptService, isPast && styles.textPast]}>
               {item.service_name} — {item.service_duration} min
             </Text>
           </View>
@@ -249,6 +265,7 @@ export default function StaffDashboard() {
 
       {/* Appointment list */}
       <FlatList
+        ref={listRef}
         data={appointments}
         keyExtractor={(item) => item.id}
         renderItem={renderAppointment}
@@ -256,6 +273,11 @@ export default function StaffDashboard() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6B7FC4" />
         }
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            listRef.current?.scrollToIndex({ index: info.index, animated: true, viewOffset: 8 });
+          }, 500);
+        }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="calendar-outline" size={48} color="#d1d5db" />
@@ -302,6 +324,9 @@ const styles = StyleSheet.create({
   actionComplete: { backgroundColor: '#059669' },
   actionBtnTextLight: { color: '#fff', fontSize: 14, fontWeight: '600' },
   actionBtnTextDanger: { color: '#991b1b', fontSize: 14, fontWeight: '600' },
+  apptCardPast: { opacity: 0.5, backgroundColor: '#f9fafb' },
+  apptTimePast: { color: '#9ca3af' },
+  textPast: { color: '#9ca3af' },
   emptyContainer: { alignItems: 'center', paddingTop: 60 },
   emptyText: { fontSize: 16, color: '#9ca3af', marginTop: 12 },
 });
