@@ -757,6 +757,7 @@ function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (
           {slots.map((slot, i) => {
             const isAvailable = slot.available !== false;
             const staffLabel = isAnyone ? '' : selectedStaff ? ` with ${selectedStaff.name}` : '';
+            const staffIdTag = isAnyone || !selectedStaff ? '' : ` [staff:${selectedStaff.id}]`;
             return (
               <TouchableOpacity
                 key={`${slot.time}-${i}`}
@@ -764,7 +765,7 @@ function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (
                   combinedStyles.slotChip,
                   !isAvailable && combinedStyles.slotChipUnavailable,
                 ]}
-                onPress={() => isAvailable ? onTap(`${slot.time}${staffLabel}`) : undefined}
+                onPress={() => isAvailable ? onTap(`${slot.time}${staffLabel}${staffIdTag}`) : undefined}
                 activeOpacity={isAvailable ? 0.7 : 1}
                 disabled={!isAvailable}
               >
@@ -1907,15 +1908,24 @@ export default function ChatScreen() {
       }
 
       // If we have date set but no time slot → user is picking a time slot
-      // Pattern: "10:00 AM with StaffName" or just "10:00 AM"
+      // Pattern: "10:00 AM with StaffName [staff:uuid]" or just "10:00 AM"
       if (bookingState.date && !bookingState.timeSlot) {
-        const timeMatch = userText.match(/^(\d{1,2}:\d{2}\s*[AP]M)\s*(?:with\s+(.+))?$/i);
+        // Extract staff ID tag if present, then strip it for the rest of parsing
+        const staffIdMatch = userText.match(/\s*\[staff:([a-f0-9-]+)\]\s*$/i);
+        const parsedStaffId = staffIdMatch ? staffIdMatch[1]! : null;
+        const cleanText = staffIdMatch ? userText.replace(staffIdMatch[0], '') : userText;
+        const timeMatch = cleanText.match(/^(\d{1,2}:\d{2}\s*[AP]M)\s*(?:with\s+(.+))?$/i);
         if (timeMatch) {
           const time = timeMatch[1]!;
           const staffName = timeMatch[2] ?? null;
-          const newState = { ...bookingState, timeSlot: time, staffName: staffName || bookingState.staffName };
+          const newState = {
+            ...bookingState,
+            timeSlot: time,
+            staffName: staffName || bookingState.staffName,
+            staffId: parsedStaffId || bookingState.staffId,
+          };
           setBookingState(newState);
-          addUserMessage(userText);
+          addUserMessage(cleanText);
 
           // Fetch booking options (packages + extras)
           const result = await fetchBookingOptions(newState.tenantId!, newState.serviceId!);
