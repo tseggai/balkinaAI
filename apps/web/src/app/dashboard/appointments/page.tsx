@@ -301,6 +301,12 @@ export default function AppointmentsPage() {
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
   useEffect(() => { fetchDropdownData(); }, [fetchDropdownData]);
 
+  // Auto-refresh every 10 seconds to surface new/updated bookings
+  useEffect(() => {
+    const interval = setInterval(() => { fetchAppointments(); }, 10_000);
+    return () => clearInterval(interval);
+  }, [fetchAppointments]);
+
   // ----------------------------------------------------------
   // Selection
   // ----------------------------------------------------------

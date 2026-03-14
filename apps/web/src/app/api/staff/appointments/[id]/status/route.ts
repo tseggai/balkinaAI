@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import {
   notifyBookingApproved,
-  notifyBookingDeclined,
   notifyBookingCancelledByTenant,
 } from '@/lib/notifications/booking-events';
 
@@ -85,14 +84,18 @@ export async function PATCH(
     return NextResponse.json({ data: null, error: { message: updateErr.message } }, { status: 500 });
   }
 
-  // Fire notifications (non-blocking)
+  // Fire notifications (non-blocking but with logging)
+  console.log(`[staff/status] appointment ${params.id}: ${appointment.status} → ${newStatus}`);
   void Promise.allSettled([
-    newStatus === 'confirmed' ? notifyBookingApproved(params.id) : Promise.resolve(),
-    newStatus === 'cancelled' ? notifyBookingCancelledByTenant(params.id) : Promise.resolve(),
-  ]);
-  if (newStatus === 'declined') {
-    void Promise.allSettled([notifyBookingDeclined(params.id)]);
-  }
+    newStatus === 'confirmed'
+      ? notifyBookingApproved(params.id).catch((e) => console.error('[staff/status] notifyBookingApproved error:', e))
+      : Promise.resolve(),
+    newStatus === 'cancelled'
+      ? notifyBookingCancelledByTenant(params.id).catch((e) => console.error('[staff/status] notifyBookingCancelledByTenant error:', e))
+      : Promise.resolve(),
+  ]).then((results) => {
+    console.log('[staff/status] notification results:', results.map((r) => r.status));
+  });
 
   return NextResponse.json({ data: updated, error: null });
 }
