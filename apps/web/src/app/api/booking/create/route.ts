@@ -158,14 +158,23 @@ export async function POST(request: Request) {
           const s = data as { id: string; name: string } | null;
           return { id: s?.id ?? staffId, name: body.staffName || s?.name || null };
         }
-        // Pick first staff assigned to this service via service_staff junction
+        // Get all staff assigned to this service via service_staff junction
         const { data: serviceStaff } = await supabase
           .from('service_staff')
           .select('staff:staff_id(id, name)')
-          .eq('service_id', serviceId)
-          .limit(1);
-        const assigned = (serviceStaff as unknown as { staff: { id: string; name: string } | null }[] | null)?.[0]?.staff;
-        if (assigned) return { id: assigned.id, name: body.staffName || assigned.name };
+          .eq('service_id', serviceId);
+        const allAssigned = (serviceStaff as unknown as { staff: { id: string; name: string } | null }[] | null)
+          ?.map((s) => s.staff)
+          .filter(Boolean) as { id: string; name: string }[] | undefined;
+        // If staffName is provided, match by name among assigned staff
+        if (body.staffName && allAssigned && allAssigned.length > 0) {
+          const matched = allAssigned.find((s) => s.name.toLowerCase() === body.staffName!.toLowerCase());
+          if (matched) return { id: matched.id, name: matched.name };
+        }
+        // Otherwise pick first assigned staff
+        if (allAssigned && allAssigned.length > 0) {
+          return { id: allAssigned[0]!.id, name: body.staffName || allAssigned[0]!.name };
+        }
         // Fallback: any staff from the tenant
         const { data } = await supabase.from('staff').select('id, name').eq('tenant_id', tenantId).limit(1);
         const s = (data as { id: string; name: string }[] | null)?.[0];
