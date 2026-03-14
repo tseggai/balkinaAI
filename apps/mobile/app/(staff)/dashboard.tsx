@@ -88,6 +88,25 @@ export default function StaffDashboard() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Realtime subscription: auto-refresh when appointments change for this staff
+  useEffect(() => {
+    if (!staffInfo?.id) return;
+    const channel = supabase
+      .channel('staff-appointments')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+          filter: `staff_id=eq.${staffInfo.id}`,
+        },
+        () => { fetchData(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [staffInfo?.id, fetchData]);
+
   // Auto-scroll to the first upcoming appointment when data loads
   useEffect(() => {
     if (appointments.length === 0) return;
