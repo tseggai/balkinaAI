@@ -88,7 +88,7 @@ function localTimeToUTC(date: string, time12h: string, timezone: string): Date {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CreateBookingBody;
-    const { tenantId, serviceId, staffId, date, timeSlot, timeSlotIso, userId, customerName, customerPhone, customerEmail } = body;
+    const { tenantId, serviceId, staffId, date, timeSlot, timeSlotIso, extras, packageName, userId, customerName, customerPhone, customerEmail } = body;
 
     if (!tenantId || !serviceId || !date || !timeSlot) {
       return NextResponse.json(
@@ -213,8 +213,38 @@ export async function POST(request: Request) {
         svc.deposit_type === 'percentage' ? (svc.price * svc.deposit_amount) / 100 : svc.deposit_amount;
     }
 
+    // 7a. Look up extras prices and package price
+    let extrasTotal = 0;
+    let packagePrice = 0;
+    const extrasNames = extras ?? [];
+
+    const [extrasResult, packageResult] = await Promise.all([
+      extrasNames.length > 0
+        ? supabase.from('service_extras').select('id, name, price').eq('service_id', serviceId)
+        : Promise.resolve({ data: [] }),
+      packageName
+        ? supabase.from('packages').select('id, name, price').eq('tenant_id', tenantId).eq('name', packageName).limit(1).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    if (extrasNames.length > 0 && extrasResult.data) {
+      const extrasList = extrasResult.data as { id: string; name: string; price: number }[];
+      for (const eName of extrasNames) {
+        const found = extrasList.find((e) => e.name === eName);
+        if (found) extrasTotal += found.price;
+      }
+    }
+
+    if (packageResult.data) {
+      packagePrice = (packageResult.data as { price: number }).price ?? 0;
+    }
+
+    // Calculate final total: use package price if selected, otherwise service price, plus extras
+    const basePrice = packagePrice > 0 ? packagePrice : svc.price;
+    const finalTotal = basePrice + extrasTotal;
+
     // 7. Create appointment
-    const balanceDue = depositAmount ? svc.price - depositAmount : svc.price;
+    const balanceDue = depositAmount ? finalTotal - depositAmount : finalTotal;
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
       .insert({
@@ -226,10 +256,11 @@ export async function POST(request: Request) {
         start_time: start.toISOString(),
         end_time: end.toISOString(),
         status: 'confirmed',
-        total_price: svc.price,
+        total_price: finalTotal,
         deposit_paid: false,
         deposit_amount_paid: depositAmount,
         balance_due: balanceDue,
+        notes: packageName ? `Package: ${packageName}` : null,
       } as never)
       .select()
       .single();
@@ -238,8 +269,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: apptErr.message }, { status: 500, headers: CORS_HEADERS });
     }
 
-    // Fire notifications (non-blocking)
     const apptId = (appointment as { id: string }).id;
+
+    // 7b. Insert appointment extras records
+    if (extrasNames.length > 0 && extrasResult.data) {
+      const extrasList = extrasResult.data as { id: string; name: string; price: number }[];
+      const extrasInserts = extrasNames
+        .map((eName) => {
+          const found = extrasList.find((e) => e.name === eName);
+          return found ? { appointment_id: apptId, extra_id: found.id, quantity: 1, price_at_booking: found.price } : null;
+        })
+        .filter(Boolean);
+      if (extrasInserts.length > 0) {
+        await supabase.from('appointment_extras').insert(extrasInserts as never[]);
+      }
+    }
+
+    // Fire notifications (non-blocking)
     void Promise.allSettled([
       notifyBookingConfirmed(apptId),
       notifyStaffNewBooking(apptId),
@@ -263,7 +309,7 @@ export async function POST(request: Request) {
         date: localDate,
         time: localTime,
         address: loc?.address ?? '',
-        total: svc.price,
+        total: finalTotal,
         deposit_amount: depositAmount,
         latitude: loc?.latitude ?? undefined,
         longitude: loc?.longitude ?? undefined,

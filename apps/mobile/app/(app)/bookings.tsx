@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
+  Animated,
+  Alert,
+  Linking,
+  Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,13 +28,15 @@ interface Appointment {
   end_time: string;
   status: string;
   total_price: number;
+  notes: string | null;
   services: { name: string } | null;
   staff: { name: string } | null;
-  tenant_locations: { name: string } | null;
+  tenant_locations: { name: string; address?: string; latitude?: number; longitude?: number } | null;
   tenants: { name: string } | null;
 }
 
 type Tab = 'upcoming' | 'past';
+type SortOrder = 'date_asc' | 'date_desc' | 'price_asc' | 'price_desc';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -63,6 +70,150 @@ function formatDateTime(dateStr: string): { date: string; time: string } {
   };
 }
 
+// ── Swipeable Row ────────────────────────────────────────────────────────────
+
+function SwipeableRow({
+  item,
+  onCancel,
+  onGetDirections,
+  onReschedule,
+}: {
+  item: Appointment;
+  onCancel: (id: string) => void;
+  onGetDirections: (item: Appointment) => void;
+  onReschedule: (id: string) => void;
+}) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const lastDx = useRef(0);
+  const ACTION_WIDTH = 180;
+  const isCancellable = item.status === 'confirmed' || item.status === 'pending';
+
+  const onTouchStart = useRef(0);
+  const onTouchStartY = useRef(0);
+  const isTracking = useRef(false);
+
+  const { date, time } = formatDateTime(item.start_time);
+  const statusColor = getStatusStyle(item.status);
+
+  // Extract package name from notes if present
+  const packageMatch = item.notes?.match(/^Package:\s*(.+)$/);
+  const displayName = packageMatch ? packageMatch[1] : (item.services?.name ?? 'Service');
+
+  const openActions = () => {
+    Animated.spring(translateX, { toValue: -ACTION_WIDTH, useNativeDriver: true, friction: 8 }).start();
+    lastDx.current = -ACTION_WIDTH;
+  };
+
+  const closeActions = () => {
+    Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 8 }).start();
+    lastDx.current = 0;
+  };
+
+  return (
+    <View style={styles.swipeContainer}>
+      {/* Action buttons behind the card */}
+      <View style={styles.actionsContainer}>
+        {item.tenant_locations?.address || item.tenant_locations?.latitude ? (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnDirections]}
+            onPress={() => { closeActions(); onGetDirections(item); }}
+          >
+            <Ionicons name="navigate-outline" size={20} color="#fff" />
+            <Text style={styles.actionBtnText}>Directions</Text>
+          </TouchableOpacity>
+        ) : null}
+        {isCancellable ? (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnCancel]}
+            onPress={() => { closeActions(); onCancel(item.id); }}
+          >
+            <Ionicons name="close-circle-outline" size={20} color="#fff" />
+            <Text style={styles.actionBtnText}>Cancel</Text>
+          </TouchableOpacity>
+        ) : null}
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnReschedule]}
+          onPress={() => { closeActions(); onReschedule(item.id); }}
+        >
+          <Ionicons name="calendar-outline" size={20} color="#fff" />
+          <Text style={styles.actionBtnText}>Reschedule</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Card that slides left */}
+      <Animated.View
+        style={[styles.card, { transform: [{ translateX }] }]}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={(e) => {
+          const dx = e.nativeEvent.pageX - onTouchStart.current;
+          const dy = Math.abs(e.nativeEvent.pageY - onTouchStartY.current);
+          return Math.abs(dx) > 10 && Math.abs(dx) > dy;
+        }}
+        onResponderGrant={(e) => {
+          onTouchStart.current = e.nativeEvent.pageX;
+          onTouchStartY.current = e.nativeEvent.pageY;
+          isTracking.current = true;
+        }}
+        onResponderMove={(e) => {
+          if (!isTracking.current) return;
+          const dx = e.nativeEvent.pageX - onTouchStart.current + lastDx.current;
+          const clamped = Math.max(-ACTION_WIDTH, Math.min(0, dx));
+          translateX.setValue(clamped);
+        }}
+        onResponderRelease={(e) => {
+          isTracking.current = false;
+          const dx = e.nativeEvent.pageX - onTouchStart.current + lastDx.current;
+          if (dx < -ACTION_WIDTH / 3) {
+            openActions();
+          } else {
+            closeActions();
+          }
+        }}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={styles.businessName}>
+            {item.tenants?.name ?? 'Business'}
+          </Text>
+          <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
+            <Text style={[styles.statusText, { color: statusColor.text }]}>
+              {item.status}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.serviceName}>{displayName}</Text>
+
+        {item.staff?.name ? (
+          <Text style={styles.staffName}>with {item.staff.name}</Text>
+        ) : null}
+
+        {item.tenant_locations?.name ? (
+          <Text style={styles.locationName}>
+            at {item.tenant_locations.name}
+          </Text>
+        ) : null}
+
+        <View style={styles.cardFooter}>
+          <View style={styles.dateTimeRow}>
+            <Ionicons name="calendar-outline" size={14} color="#6b7280" />
+            <Text style={styles.dateTimeText}>
+              {date} at {time}
+            </Text>
+          </View>
+          <Text style={styles.price}>
+            ${(item.total_price ?? 0).toFixed(2)}
+          </Text>
+        </View>
+
+        {/* Swipe hint */}
+        <View style={styles.swipeHint}>
+          <Ionicons name="chevron-back" size={12} color="#d1d5db" />
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
 // ── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function BookingsScreen() {
@@ -72,6 +223,11 @@ export default function BookingsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<Tab>('upcoming');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('date_asc');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const fetchAppointments = useCallback(async () => {
     setErrorMsg(null);
@@ -85,9 +241,9 @@ export default function BookingsScreen() {
       setErrorMsg('Please sign in to view your bookings.');
       return;
     }
+    setUserId(user.id);
 
     try {
-      // Use server-side API endpoint (admin client) to avoid mobile RLS issues
       const params = new URLSearchParams({ tab });
       if (user.id) params.set('userId', user.id);
       if (user.email) params.set('email', user.email);
@@ -126,7 +282,6 @@ export default function BookingsScreen() {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  // Re-fetch when screen gains focus (e.g., after booking in Chat tab)
   useFocusEffect(
     useCallback(() => {
       fetchAppointments();
@@ -138,59 +293,99 @@ export default function BookingsScreen() {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  const renderItem = ({ item }: { item: Appointment }) => {
-    const { date, time } = formatDateTime(item.start_time);
-    const statusColor = getStatusStyle(item.status);
+  // Filter and sort
+  const filteredAppointments = appointments
+    .filter((a) => {
+      if (statusFilter !== 'all' && a.status !== statusFilter) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const serviceName = a.services?.name?.toLowerCase() ?? '';
+        const businessName = a.tenants?.name?.toLowerCase() ?? '';
+        const staffName = a.staff?.name?.toLowerCase() ?? '';
+        const packageName = a.notes?.match(/^Package:\s*(.+)$/)?.[1]?.toLowerCase() ?? '';
+        return serviceName.includes(q) || businessName.includes(q) || staffName.includes(q) || packageName.includes(q);
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortOrder) {
+        case 'date_asc':
+          return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+        case 'date_desc':
+          return new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
+        case 'price_asc':
+          return (a.total_price ?? 0) - (b.total_price ?? 0);
+        case 'price_desc':
+          return (b.total_price ?? 0) - (a.total_price ?? 0);
+        default:
+          return 0;
+      }
+    });
 
-    return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.businessName}>
-            {item.tenants?.name ?? 'Business'}
-          </Text>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: statusColor.bg },
-            ]}
-          >
-            <Text style={[styles.statusText, { color: statusColor.text }]}>
-              {item.status}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={styles.serviceName}>
-          {item.services?.name ?? 'Service'}
-        </Text>
-
-        {item.staff?.name ? (
-          <Text style={styles.staffName}>with {item.staff.name}</Text>
-        ) : null}
-
-        {item.tenant_locations?.name ? (
-          <Text style={styles.locationName}>
-            at {item.tenant_locations.name}
-          </Text>
-        ) : null}
-
-        <View style={styles.cardFooter}>
-          <View style={styles.dateTimeRow}>
-            <Ionicons name="calendar-outline" size={14} color="#6b7280" />
-            <Text style={styles.dateTimeText}>
-              {date} at {time}
-            </Text>
-          </View>
-
-          <Text style={styles.price}>
-            ${(item.total_price ?? 0).toFixed(2)}
-          </Text>
-        </View>
-      </View>
+  const handleCancel = useCallback(async (appointmentId: string) => {
+    Alert.alert(
+      'Cancel Appointment',
+      'Are you sure you want to cancel this appointment?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await fetch(`${API_BASE}/api/customer/bookings/cancel`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ appointmentId, userId }),
+              });
+              if (res.ok) {
+                setAppointments((prev) =>
+                  prev.map((a) => a.id === appointmentId ? { ...a, status: 'cancelled' } : a),
+                );
+              } else {
+                const err = (await res.json().catch(() => ({}))) as { error?: string };
+                Alert.alert('Error', err.error ?? 'Failed to cancel appointment');
+              }
+            } catch {
+              Alert.alert('Error', 'Connection error. Please try again.');
+            }
+          },
+        },
+      ],
     );
-  };
+  }, [userId]);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const handleGetDirections = useCallback((item: Appointment) => {
+    const loc = item.tenant_locations;
+    if (!loc) return;
+    if (loc.latitude && loc.longitude) {
+      const url = Platform.OS === 'ios'
+        ? `maps://maps.apple.com/?daddr=${loc.latitude},${loc.longitude}`
+        : `https://www.google.com/maps/dir/?api=1&destination=${loc.latitude},${loc.longitude}`;
+      Linking.openURL(url);
+    } else if (loc.address) {
+      const encoded = encodeURIComponent(loc.address);
+      const url = Platform.OS === 'ios'
+        ? `maps://maps.apple.com/?daddr=${encoded}`
+        : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
+      Linking.openURL(url);
+    }
+  }, []);
+
+  const handleReschedule = useCallback((_appointmentId: string) => {
+    router.navigate('/(app)');
+  }, [router]);
+
+  const renderItem = ({ item }: { item: Appointment }) => (
+    <SwipeableRow
+      item={item}
+      onCancel={handleCancel}
+      onGetDirections={handleGetDirections}
+      onReschedule={handleReschedule}
+    />
+  );
+
+  const STATUS_FILTERS = ['all', 'confirmed', 'pending', 'completed', 'cancelled'];
 
   return (
     <View style={styles.container}>
@@ -200,12 +395,7 @@ export default function BookingsScreen() {
           style={[styles.tab, tab === 'upcoming' && styles.tabActive]}
           onPress={() => setTab('upcoming')}
         >
-          <Text
-            style={[
-              styles.tabText,
-              tab === 'upcoming' && styles.tabTextActive,
-            ]}
-          >
+          <Text style={[styles.tabText, tab === 'upcoming' && styles.tabTextActive]}>
             Upcoming
           </Text>
         </TouchableOpacity>
@@ -213,16 +403,79 @@ export default function BookingsScreen() {
           style={[styles.tab, tab === 'past' && styles.tabActive]}
           onPress={() => setTab('past')}
         >
-          <Text
-            style={[
-              styles.tabText,
-              tab === 'past' && styles.tabTextActive,
-            ]}
-          >
+          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>
             Past
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Search bar */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchInputContainer}>
+          <Ionicons name="search" size={16} color="#9ca3af" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search bookings..."
+            placeholderTextColor="#9ca3af"
+          />
+          {search ? (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={18} color="#9ca3af" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <TouchableOpacity
+          style={[styles.filterBtn, showFilters && styles.filterBtnActive]}
+          onPress={() => setShowFilters(!showFilters)}
+        >
+          <Ionicons name="options-outline" size={18} color={showFilters ? '#fff' : '#6B7FC4'} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Filter/sort controls */}
+      {showFilters ? (
+        <View style={styles.filtersContainer}>
+          <View style={styles.filterGroup}>
+            <Text style={styles.filterLabel}>Status</Text>
+            <View style={styles.filterChips}>
+              {STATUS_FILTERS.map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.filterChip, statusFilter === s && styles.filterChipActive]}
+                  onPress={() => setStatusFilter(s)}
+                >
+                  <Text style={[styles.filterChipText, statusFilter === s && styles.filterChipTextActive]}>
+                    {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          <View style={styles.filterGroup}>
+            <Text style={styles.filterLabel}>Sort by</Text>
+            <View style={styles.filterChips}>
+              {[
+                { key: 'date_asc' as SortOrder, label: 'Date (earliest)' },
+                { key: 'date_desc' as SortOrder, label: 'Date (latest)' },
+                { key: 'price_asc' as SortOrder, label: 'Price (low)' },
+                { key: 'price_desc' as SortOrder, label: 'Price (high)' },
+              ].map((s) => (
+                <TouchableOpacity
+                  key={s.key}
+                  style={[styles.filterChip, sortOrder === s.key && styles.filterChipActive]}
+                  onPress={() => setSortOrder(s.key)}
+                >
+                  <Text style={[styles.filterChipText, sortOrder === s.key && styles.filterChipTextActive]}>
+                    {s.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={styles.centered}>
@@ -247,7 +500,7 @@ export default function BookingsScreen() {
         </View>
       ) : (
         <FlatList
-          data={appointments}
+          data={filteredAppointments}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
@@ -261,24 +514,22 @@ export default function BookingsScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="calendar-outline" size={56} color="#d1d5db" />
-              <Text style={styles.emptyTitle}>No bookings yet</Text>
-              <Text style={styles.emptySubtitle}>
-                {tab === 'upcoming'
-                  ? 'Your upcoming appointments will appear here.'
-                  : 'Your past appointments will appear here.'}
+              <Text style={styles.emptyTitle}>
+                {search || statusFilter !== 'all' ? 'No matching bookings' : 'No bookings yet'}
               </Text>
-              {tab === 'upcoming' && (
+              <Text style={styles.emptySubtitle}>
+                {search || statusFilter !== 'all'
+                  ? 'Try adjusting your search or filters.'
+                  : tab === 'upcoming'
+                    ? 'Your upcoming appointments will appear here.'
+                    : 'Your past appointments will appear here.'}
+              </Text>
+              {tab === 'upcoming' && !search && statusFilter === 'all' && (
                 <TouchableOpacity
                   style={styles.startChatBtn}
-                  onPress={() => {
-                    router.navigate('/(app)');
-                  }}
+                  onPress={() => router.navigate('/(app)')}
                 >
-                  <Ionicons
-                    name="chatbubbles-outline"
-                    size={18}
-                    color="#fff"
-                  />
+                  <Ionicons name="chatbubbles-outline" size={18} color="#fff" />
                   <Text style={styles.startChatBtnText}>Start chatting</Text>
                 </TouchableOpacity>
               )}
@@ -293,15 +544,8 @@ export default function BookingsScreen() {
 // ── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f9fafb',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  container: { flex: 1, backgroundColor: '#f9fafb' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   tabs: {
     flexDirection: 'row',
     backgroundColor: '#fff',
@@ -317,26 +561,87 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
-  tabActive: {
-    borderBottomColor: '#6B7FC4',
+  tabActive: { borderBottomColor: '#6B7FC4' },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#9ca3af' },
+  tabTextActive: { color: '#6B7FC4' },
+
+  // Search
+  searchRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    gap: 8,
   },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#9ca3af',
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 40,
   },
-  tabTextActive: {
-    color: '#6B7FC4',
+  searchIcon: { marginRight: 6 },
+  searchInput: { flex: 1, fontSize: 14, color: '#111827', padding: 0 },
+  filterBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#eef2ff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  list: {
-    padding: 16,
-    paddingBottom: 24,
+  filterBtnActive: { backgroundColor: '#6B7FC4' },
+
+  // Filters
+  filtersContainer: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
   },
+  filterGroup: { marginBottom: 8 },
+  filterLabel: { fontSize: 12, fontWeight: '600', color: '#6b7280', marginBottom: 6 },
+  filterChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+  },
+  filterChipActive: { backgroundColor: '#6B7FC4' },
+  filterChipText: { fontSize: 12, fontWeight: '500', color: '#6b7280' },
+  filterChipTextActive: { color: '#fff' },
+
+  list: { padding: 16, paddingBottom: 24 },
+
+  // Swipeable
+  swipeContainer: { marginBottom: 12, overflow: 'hidden', borderRadius: 14 },
+  actionsContainer: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  actionBtn: {
+    width: 70,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionBtnDirections: { backgroundColor: '#6B7FC4' },
+  actionBtnCancel: { backgroundColor: '#ef4444' },
+  actionBtnReschedule: { backgroundColor: '#f59e0b' },
+  actionBtnText: { fontSize: 10, fontWeight: '600', color: '#fff' },
+
   card: {
     backgroundColor: '#fff',
     borderRadius: 14,
     padding: 16,
-    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -349,38 +654,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  businessName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    flex: 1,
-    marginRight: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'capitalize',
-  },
-  serviceName: {
-    fontSize: 14,
-    color: '#374151',
-    marginBottom: 2,
-  },
-  staffName: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginBottom: 2,
-  },
-  locationName: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginBottom: 10,
-  },
+  businessName: { fontSize: 16, fontWeight: '700', color: '#111827', flex: 1, marginRight: 8 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
+  statusText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+  serviceName: { fontSize: 14, color: '#374151', marginBottom: 2 },
+  staffName: { fontSize: 13, color: '#6b7280', marginBottom: 2 },
+  locationName: { fontSize: 13, color: '#6b7280', marginBottom: 10 },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -390,31 +669,17 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
   },
-  dateTimeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
+  dateTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  dateTimeText: { fontSize: 13, color: '#6b7280' },
+  price: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  swipeHint: {
+    position: 'absolute',
+    right: 4,
+    top: '50%',
+    opacity: 0.4,
   },
-  dateTimeText: {
-    fontSize: 13,
-    color: '#6b7280',
-  },
-  price: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  empty: {
-    alignItems: 'center',
-    paddingTop: 80,
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#374151',
-    marginTop: 8,
-  },
+  empty: { alignItems: 'center', paddingTop: 80, gap: 8 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#374151', marginTop: 8 },
   emptySubtitle: {
     fontSize: 14,
     color: '#9ca3af',
@@ -432,9 +697,5 @@ const styles = StyleSheet.create({
     marginTop: 16,
     gap: 8,
   },
-  startChatBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  startChatBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 });
