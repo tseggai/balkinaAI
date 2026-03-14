@@ -299,7 +299,19 @@ export default function CustomersPage() {
                   </div>
                 </div>
 
-                {/* Row 3: Date of Birth (50%) + Gender (50%) */}
+                {/* Row 3: Email (50%) + Phone (50%) */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-400">Email</label>
+                    <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Email" className={editInputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400">Phone</label>
+                    <input type="tel" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="Phone" className={editInputClass} />
+                  </div>
+                </div>
+
+                {/* Row 4: Date of Birth (50%) + Gender (50%) */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs text-gray-400">Date of Birth</label>
