@@ -73,14 +73,17 @@ function formatDateTime(dateStr: string): { date: string; time: string } {
 
 function BookingCardRow({
   item,
+  expanded,
+  onToggle,
   onCancel,
   onGetDirections,
 }: {
   item: Appointment;
+  expanded: boolean;
+  onToggle: () => void;
   onCancel: (id: string) => void;
   onGetDirections: (item: Appointment) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const isCancellable = item.status === 'confirmed' || item.status === 'pending';
   const hasLocation = !!(item.tenant_locations?.address || item.tenant_locations?.latitude);
 
@@ -95,7 +98,7 @@ function BookingCardRow({
     <View style={styles.cardWrapper}>
       <TouchableOpacity
         style={styles.card}
-        onPress={() => setExpanded(!expanded)}
+        onPress={onToggle}
         activeOpacity={0.7}
       >
         <View style={styles.cardHeader}>
@@ -140,7 +143,7 @@ function BookingCardRow({
           {hasLocation ? (
             <TouchableOpacity
               style={[styles.actionBtn, styles.actionBtnDirections]}
-              onPress={() => { setExpanded(false); onGetDirections(item); }}
+              onPress={() => onGetDirections(item)}
               activeOpacity={0.7}
             >
               <Ionicons name="navigate-outline" size={18} color="#fff" />
@@ -150,7 +153,7 @@ function BookingCardRow({
           {isCancellable ? (
             <TouchableOpacity
               style={[styles.actionBtn, styles.actionBtnCancel]}
-              onPress={() => { setExpanded(false); onCancel(item.id); }}
+              onPress={() => onCancel(item.id)}
               activeOpacity={0.7}
             >
               <Ionicons name="close-circle-outline" size={18} color="#fff" />
@@ -176,6 +179,7 @@ export default function BookingsScreen() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('date_asc');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [userId, setUserId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchAppointments = useCallback(async () => {
     setErrorMsg(null);
@@ -315,6 +319,8 @@ export default function BookingsScreen() {
   const renderItem = ({ item }: { item: Appointment }) => (
     <BookingCardRow
       item={item}
+      expanded={expandedId === item.id}
+      onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)}
       onCancel={handleCancel}
       onGetDirections={handleGetDirections}
     />
