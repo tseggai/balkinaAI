@@ -304,12 +304,14 @@ export async function POST(request: Request) {
       }
     }
 
-    // Fire notifications (non-blocking)
+    // Fire notifications (non-blocking but with logging)
     // When staff requires approval, don't send "confirmed" to customer yet — staff must approve first
     void Promise.allSettled([
-      ...(!requiresApproval ? [notifyBookingConfirmed(apptId)] : []),
-      notifyStaffNewBooking(apptId),
-    ]);
+      ...(!requiresApproval ? [notifyBookingConfirmed(apptId).catch((e) => console.error('[booking/create] notifyBookingConfirmed error:', e))] : []),
+      notifyStaffNewBooking(apptId).catch((e) => console.error('[booking/create] notifyStaffNewBooking error:', e)),
+    ]).then((results) => {
+      console.log('[booking/create] notification results:', results.map((r) => r.status));
+    });
 
     // 9. Format response with local times (timezone already available)
     const localDate = start.toLocaleDateString('en-US', {

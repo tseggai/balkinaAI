@@ -3,12 +3,22 @@
  * Used for booking confirmations, reminders, and OTP.
  */
 import twilio from 'twilio';
-import { serverEnv } from '@balkina/config';
 
-export const twilioClient = twilio(
-  serverEnv.TWILIO_ACCOUNT_SID,
-  serverEnv.TWILIO_AUTH_TOKEN
-);
+let _client: ReturnType<typeof twilio> | null = null;
+
+function getTwilioClient() {
+  if (_client) return _client;
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) {
+    throw new Error('Twilio credentials not configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)');
+  }
+  _client = twilio(sid, token);
+  return _client;
+}
+
+/** @deprecated Use getTwilioClient() for lazy initialization */
+export const twilioClient = null as unknown as ReturnType<typeof twilio>;
 
 export interface SendSmsParams {
   to: string;
@@ -24,12 +34,12 @@ export interface SmsResult {
  * Send an SMS message via Twilio.
  */
 export async function sendSms({ to, body }: SendSmsParams): Promise<SmsResult> {
-  const message = await twilioClient.messages.create({
-    from: serverEnv.TWILIO_PHONE_NUMBER,
-    to,
-    body,
-  });
-
+  const from = process.env.TWILIO_PHONE_NUMBER;
+  if (!from) {
+    throw new Error('TWILIO_PHONE_NUMBER not configured');
+  }
+  const client = getTwilioClient();
+  const message = await client.messages.create({ from, to, body });
   return { sid: message.sid, status: message.status };
 }
 
@@ -45,7 +55,7 @@ export async function sendBookingConfirmationSms(params: {
   const { customerPhone, serviceName, tenantName, startTime } = params;
   return sendSms({
     to: customerPhone,
-    body: `✅ Confirmed: ${serviceName} at ${tenantName} on ${startTime}. Manage via Balkina AI app.`,
+    body: `Confirmed: ${serviceName} at ${tenantName} on ${startTime}. Manage via Balkina AI app.`,
   });
 }
 
@@ -62,7 +72,7 @@ export async function sendAppointmentReminderSms(params: {
   const { customerPhone, serviceName, tenantName, startTime, appointmentId } = params;
   return sendSms({
     to: customerPhone,
-    body: `⏰ Reminder: ${serviceName} at ${tenantName} tomorrow at ${startTime}. ID: ${appointmentId}`,
+    body: `Reminder: ${serviceName} at ${tenantName} tomorrow at ${startTime}. ID: ${appointmentId}`,
   });
 }
 

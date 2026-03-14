@@ -3,9 +3,19 @@
  * Templates live in /packages/email-templates (future package).
  */
 import { Resend } from 'resend';
-import { serverEnv } from '@balkina/config';
 
-export const resend = new Resend(serverEnv.RESEND_API_KEY);
+let _resend: Resend | null = null;
+
+function getResend(): Resend {
+  if (_resend) return _resend;
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error('RESEND_API_KEY not configured');
+  _resend = new Resend(key);
+  return _resend;
+}
+
+/** @deprecated Use getResend() for lazy initialization */
+export const resend = null as unknown as Resend;
 
 export interface SendEmailParams {
   to: string | string[];
@@ -29,8 +39,11 @@ export async function sendEmail({
   text,
   replyTo,
 }: SendEmailParams): Promise<EmailResult> {
-  const { data, error } = await resend.emails.send({
-    from: serverEnv.RESEND_FROM_EMAIL,
+  const fromEmail = process.env.RESEND_FROM_EMAIL;
+  if (!fromEmail) throw new Error('RESEND_FROM_EMAIL not configured');
+  const client = getResend();
+  const { data, error } = await client.emails.send({
+    from: fromEmail,
     to: Array.isArray(to) ? to : [to],
     subject,
     html,
