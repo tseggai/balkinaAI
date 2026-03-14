@@ -191,7 +191,7 @@ interface TimeSlotData {
 interface StaffWithSlotsData {
   type: 'staff_with_slots';
   items: Array<StaffCardData & { slots: TimeSlotData[]; all_slots?: TimeSlotData[] }>;
-  anyone_slots?: Array<TimeSlotData & { staff_name: string }>;
+  anyone_slots?: Array<TimeSlotData>;
 }
 
 interface BookingOptionsData {
@@ -735,7 +735,7 @@ function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (
             <Text style={richCardStyles.staffSlots}>{staff.available_slots_count} slots</Text>
           </TouchableOpacity>
         ))}
-        {data.anyone_slots && data.anyone_slots.length > 0 ? (
+        {data.anyone_slots && data.anyone_slots.length > 0 && data.items.length > 1 ? (
           <TouchableOpacity
             style={[
               richCardStyles.staffCard,
@@ -756,7 +756,7 @@ function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (
         <View style={combinedStyles.slotsContainer}>
           {slots.map((slot, i) => {
             const isAvailable = slot.available !== false;
-            const staffLabel = isAnyone && slot.staff_name ? ` with ${slot.staff_name}` : selectedStaff ? ` with ${selectedStaff.name}` : '';
+            const staffLabel = isAnyone ? '' : selectedStaff ? ` with ${selectedStaff.name}` : '';
             return (
               <TouchableOpacity
                 key={`${slot.time}-${i}`}
@@ -772,9 +772,6 @@ function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (
                   combinedStyles.slotChipText,
                   !isAvailable && combinedStyles.slotChipTextUnavailable,
                 ]}>{slot.time}</Text>
-                {isAnyone && slot.staff_name ? (
-                  <Text style={combinedStyles.slotStaffLabel}>{slot.staff_name}</Text>
-                ) : null}
               </TouchableOpacity>
             );
           })}
@@ -1692,7 +1689,7 @@ export default function ChatScreen() {
       }
       const data = (await res.json()) as {
         staff: { id: string; name: string; image_url: string | null; available_slots_count: number; slots: { time: string; iso: string }[]; all_slots?: { time: string; iso: string; available: boolean }[] }[];
-        anyone_slots: { time: string; iso: string; staff_name: string }[];
+        anyone_slots: { time: string; iso: string; available: boolean }[];
         address?: string | null;
         message?: string;
       };
@@ -1720,7 +1717,7 @@ export default function ChatScreen() {
           slots: s.slots.map((sl) => ({ time: sl.time, iso: sl.iso })),
           all_slots: s.all_slots?.map((sl) => ({ time: sl.time, iso: sl.iso, available: sl.available })),
         })),
-        anyone_slots: data.anyone_slots.map((sl) => ({ time: sl.time, iso: sl.iso, staff_name: sl.staff_name })),
+        anyone_slots: data.anyone_slots.map((sl) => ({ time: sl.time, iso: sl.iso, available: sl.available })),
       };
 
       addAssistantMessage(`Here are the available staff and time slots:\n\n[[CARD:${JSON.stringify(card)}]]`);

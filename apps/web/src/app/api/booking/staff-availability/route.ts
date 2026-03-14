@@ -207,23 +207,29 @@ export async function POST(request: Request) {
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const dayOfWeek = dayNames[new Date(date).getDay()] as string;
 
-    // Build per-staff slots
-    const staffWithSlots: {
-      id: string;
-      name: string;
-      image_url: string | null;
-      available_slots_count: number;
-      slots: { time: string; iso: string; staff_name?: string }[];
-      all_slots: { time: string; iso: string; available: boolean }[];
-    }[] = [];
+    // Pre-compute each staff's effective schedule for the day
+    interface StaffDayInfo {
+      staff: typeof eligibleStaff[number];
+      worksToday: boolean;
+      startMinutes: number;
+      endMinutes: number;
+    }
 
-    const anyoneSlots: { time: string; iso: string; staff_name: string }[] = [];
+    const staffDayInfos: StaffDayInfo[] = [];
+    let masterStartMinutes = Infinity;
+    let masterEndMinutes = -Infinity;
 
     for (const staff of eligibleStaff) {
-      if (holidayStaffIds.has(staff.id)) continue;
+      if (holidayStaffIds.has(staff.id)) {
+        staffDayInfos.push({ staff, worksToday: false, startMinutes: 0, endMinutes: 0 });
+        continue;
+      }
 
       const staffSpecial = staffSpecialMap.get(staff.id);
-      if (staffSpecial?.is_day_off) continue;
+      if (staffSpecial?.is_day_off) {
+        staffDayInfos.push({ staff, worksToday: false, startMinutes: 0, endMinutes: 0 });
+        continue;
+      }
 
       const schedule = staff.availability_schedule as Record<string, { start: string; end: string } | undefined>;
       let dayScheduleStart: string;
@@ -234,7 +240,10 @@ export async function POST(request: Request) {
         dayScheduleEnd = staffSpecial.end_time;
       } else {
         const daySchedule = schedule[dayOfWeek];
-        if (!daySchedule?.start || !daySchedule?.end) continue;
+        if (!daySchedule?.start || !daySchedule?.end) {
+          staffDayInfos.push({ staff, worksToday: false, startMinutes: 0, endMinutes: 0 });
+          continue;
+        }
         dayScheduleStart = daySchedule.start;
         dayScheduleEnd = daySchedule.end;
       }
@@ -246,13 +255,52 @@ export async function POST(request: Request) {
 
       const startParts = dayScheduleStart.split(':').map(Number);
       const endParts = dayScheduleEnd.split(':').map(Number);
-      const scheduleStartMinutes = (startParts[0] ?? 0) * 60 + (startParts[1] ?? 0);
-      const scheduleEndMinutes = (endParts[0] ?? 0) * 60 + (endParts[1] ?? 0);
+      const startMin = (startParts[0] ?? 0) * 60 + (startParts[1] ?? 0);
+      const endMin = (endParts[0] ?? 0) * 60 + (endParts[1] ?? 0);
 
+      staffDayInfos.push({ staff, worksToday: true, startMinutes: startMin, endMinutes: endMin });
+
+      if (startMin < masterStartMinutes) masterStartMinutes = startMin;
+      if (endMin > masterEndMinutes) masterEndMinutes = endMin;
+    }
+
+    // If no staff works today, return all staff with 0 slots
+    if (masterStartMinutes === Infinity) {
+      return NextResponse.json({
+        date,
+        service_duration_minutes: svc.duration_minutes,
+        staff: eligibleStaff.map((s) => ({
+          id: s.id,
+          name: s.name,
+          image_url: s.image_url,
+          available_slots_count: 0,
+          slots: [],
+          all_slots: [],
+        })),
+        anyone_slots: [],
+        address,
+        customer_appointments: customerApptResult.length > 0 ? customerApptResult : undefined,
+      }, { headers: CORS_HEADERS });
+    }
+
+    // Build per-staff slots across the master time range
+    const staffWithSlots: {
+      id: string;
+      name: string;
+      image_url: string | null;
+      available_slots_count: number;
+      slots: { time: string; iso: string }[];
+      all_slots: { time: string; iso: string; available: boolean }[];
+    }[] = [];
+
+    // anyone_slots: each time slot is available if ANY staff can take it
+    const anyoneSlotsMap = new Map<string, { time: string; iso: string; available: boolean }>();
+
+    for (const { staff, worksToday, startMinutes: staffStart, endMinutes: staffEnd } of staffDayInfos) {
       const staffSlots: { time: string; iso: string }[] = [];
       const allSlots: { time: string; iso: string; available: boolean }[] = [];
 
-      for (let minutes = scheduleStartMinutes; minutes + totalSlotMinutes <= scheduleEndMinutes; minutes += 30) {
+      for (let minutes = masterStartMinutes; minutes + totalSlotMinutes <= masterEndMinutes; minutes += 30) {
         const slotHour = Math.floor(minutes / 60);
         const slotMin = minutes % 60;
         const localTimeStr = `${String(slotHour).padStart(2, '0')}:${String(slotMin).padStart(2, '0')}`;
@@ -262,12 +310,17 @@ export async function POST(request: Request) {
         const slotEndUtc = new Date(slotStartUtc.getTime() + svc.duration_minutes * 60000);
         const bufferEndUtc = new Date(slotEndUtc.getTime() + bufferAfter * 60000);
 
-        const hasConflict = appointments.some((appt) => {
+        // Staff is available only if they work today AND slot is within their schedule AND no booking conflict
+        const inSchedule = worksToday && minutes >= staffStart && minutes + totalSlotMinutes <= staffEnd;
+
+        const hasConflict = inSchedule && appointments.some((appt) => {
           if (appt.staff_id !== staff.id) return false;
           const apptStart = new Date(appt.start_time).getTime();
           const apptEnd = new Date(appt.end_time).getTime();
           return bufferStartUtc.getTime() < apptEnd && bufferEndUtc.getTime() > apptStart;
         });
+
+        const available = inSchedule && !hasConflict;
 
         const serviceStartMinutes = minutes + bufferBefore;
         const displayHour = Math.floor(serviceStartMinutes / 60);
@@ -276,11 +329,18 @@ export async function POST(request: Request) {
         const displayHour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour;
         const localDisplay = `${displayHour12}:${String(displayMin).padStart(2, '0')} ${ampm}`;
 
-        allSlots.push({ time: localDisplay, iso: slotStartUtc.toISOString(), available: !hasConflict });
+        allSlots.push({ time: localDisplay, iso: slotStartUtc.toISOString(), available });
 
-        if (!hasConflict) {
+        if (available) {
           staffSlots.push({ time: localDisplay, iso: slotStartUtc.toISOString() });
-          anyoneSlots.push({ time: localDisplay, iso: slotStartUtc.toISOString(), staff_name: staff.name });
+        }
+
+        // Update anyone map — available if ANY staff can take this slot
+        const existing = anyoneSlotsMap.get(localDisplay);
+        if (!existing) {
+          anyoneSlotsMap.set(localDisplay, { time: localDisplay, iso: slotStartUtc.toISOString(), available });
+        } else if (available && !existing.available) {
+          anyoneSlotsMap.set(localDisplay, { time: localDisplay, iso: slotStartUtc.toISOString(), available: true });
         }
       }
 
@@ -293,6 +353,8 @@ export async function POST(request: Request) {
         all_slots: allSlots,
       });
     }
+
+    const anyoneSlots = Array.from(anyoneSlotsMap.values());
 
     return NextResponse.json({
       date,
