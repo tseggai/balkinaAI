@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   TextInput,
-  Animated,
   Alert,
   Linking,
   Platform,
@@ -70,9 +69,9 @@ function formatDateTime(dateStr: string): { date: string; time: string } {
   };
 }
 
-// ── Swipeable Row ────────────────────────────────────────────────────────────
+// ── Booking Card Row ─────────────────────────────────────────────────────────
 
-function SwipeableRow({
+function BookingCardRow({
   item,
   onCancel,
   onGetDirections,
@@ -81,15 +80,9 @@ function SwipeableRow({
   onCancel: (id: string) => void;
   onGetDirections: (item: Appointment) => void;
 }) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const lastDx = useRef(0);
-  const ACTION_WIDTH = 80;
+  const [expanded, setExpanded] = useState(false);
   const isCancellable = item.status === 'confirmed' || item.status === 'pending';
   const hasLocation = !!(item.tenant_locations?.address || item.tenant_locations?.latitude);
-
-  const onTouchStart = useRef(0);
-  const onTouchStartY = useRef(0);
-  const isTracking = useRef(false);
 
   const { date, time } = formatDateTime(item.start_time);
   const statusColor = getStatusStyle(item.status);
@@ -98,83 +91,12 @@ function SwipeableRow({
   const packageMatch = item.notes?.match(/^Package:\s*(.+)$/);
   const displayName = packageMatch ? packageMatch[1] : (item.services?.name ?? 'Service');
 
-  const openLeft = () => {
-    Animated.spring(translateX, { toValue: -ACTION_WIDTH, useNativeDriver: true, friction: 8 }).start();
-    lastDx.current = -ACTION_WIDTH;
-  };
-
-  const openRight = () => {
-    Animated.spring(translateX, { toValue: ACTION_WIDTH, useNativeDriver: true, friction: 8 }).start();
-    lastDx.current = ACTION_WIDTH;
-  };
-
-  const closeActions = () => {
-    Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 8 }).start();
-    lastDx.current = 0;
-  };
-
   return (
-    <View style={styles.swipeContainer}>
-      {/* Cancel action on the left (revealed by swiping right) */}
-      {isCancellable ? (
-        <View style={styles.actionsContainerLeft}>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionBtnCancel]}
-            onPress={() => { closeActions(); onCancel(item.id); }}
-          >
-            <Ionicons name="close-circle-outline" size={22} color="#fff" />
-            <Text style={styles.actionBtnText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
-      {/* Directions action on the right (revealed by swiping left) */}
-      {hasLocation ? (
-        <View style={styles.actionsContainerRight}>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionBtnDirections]}
-            onPress={() => { closeActions(); onGetDirections(item); }}
-          >
-            <Ionicons name="navigate-outline" size={22} color="#fff" />
-            <Text style={styles.actionBtnText}>Directions</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
-      {/* Card that slides */}
-      <Animated.View
-        style={[styles.card, { transform: [{ translateX }] }]}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={(e) => {
-          const dx = e.nativeEvent.pageX - onTouchStart.current;
-          const dy = Math.abs(e.nativeEvent.pageY - onTouchStartY.current);
-          return Math.abs(dx) > 10 && Math.abs(dx) > dy;
-        }}
-        onResponderGrant={(e) => {
-          onTouchStart.current = e.nativeEvent.pageX;
-          onTouchStartY.current = e.nativeEvent.pageY;
-          isTracking.current = true;
-        }}
-        onResponderMove={(e) => {
-          if (!isTracking.current) return;
-          const dx = e.nativeEvent.pageX - onTouchStart.current + lastDx.current;
-          // Swipe right: clamp to ACTION_WIDTH (cancel), swipe left: clamp to -ACTION_WIDTH (directions)
-          const maxRight = isCancellable ? ACTION_WIDTH : 0;
-          const maxLeft = hasLocation ? -ACTION_WIDTH : 0;
-          const clamped = Math.max(maxLeft, Math.min(maxRight, dx));
-          translateX.setValue(clamped);
-        }}
-        onResponderRelease={(e) => {
-          isTracking.current = false;
-          const dx = e.nativeEvent.pageX - onTouchStart.current + lastDx.current;
-          if (dx > ACTION_WIDTH / 3 && isCancellable) {
-            openRight();
-          } else if (dx < -ACTION_WIDTH / 3 && hasLocation) {
-            openLeft();
-          } else {
-            closeActions();
-          }
-        }}
+    <View style={styles.cardWrapper}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => setExpanded(!expanded)}
+        activeOpacity={0.7}
       >
         <View style={styles.cardHeader}>
           <Text style={styles.businessName}>
@@ -210,8 +132,33 @@ function SwipeableRow({
             ${(item.total_price ?? 0).toFixed(2)}
           </Text>
         </View>
+      </TouchableOpacity>
 
-      </Animated.View>
+      {/* Action buttons revealed on tap */}
+      {expanded ? (
+        <View style={styles.actionsRow}>
+          {hasLocation ? (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnDirections]}
+              onPress={() => { setExpanded(false); onGetDirections(item); }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="navigate-outline" size={18} color="#fff" />
+              <Text style={styles.actionBtnText}>Directions</Text>
+            </TouchableOpacity>
+          ) : null}
+          {isCancellable ? (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnCancel]}
+              onPress={() => { setExpanded(false); onCancel(item.id); }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close-circle-outline" size={18} color="#fff" />
+              <Text style={styles.actionBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -375,7 +322,7 @@ export default function BookingsScreen() {
   }, []);
 
   const renderItem = ({ item }: { item: Appointment }) => (
-    <SwipeableRow
+    <BookingCardRow
       item={item}
       onCancel={handleCancel}
       onGetDirections={handleGetDirections}
@@ -614,33 +561,25 @@ const styles = StyleSheet.create({
 
   list: { padding: 16, paddingBottom: 24 },
 
-  // Swipeable
-  swipeContainer: { marginBottom: 12, overflow: 'hidden', borderRadius: 14 },
-  actionsContainerLeft: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
+  // Booking card
+  cardWrapper: { marginBottom: 12 },
+  actionsRow: {
     flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  actionsContainerRight: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    flexDirection: 'row',
-    alignItems: 'stretch',
+    gap: 8,
+    marginTop: 8,
   },
   actionBtn: {
-    width: 80,
+    flex: 1,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 4,
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
   },
   actionBtnDirections: { backgroundColor: '#6B7FC4' },
   actionBtnCancel: { backgroundColor: '#ef4444' },
-  actionBtnText: { fontSize: 10, fontWeight: '600', color: '#fff' },
+  actionBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
 
   card: {
     backgroundColor: '#fff',

@@ -586,43 +586,45 @@ function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesDa
   }, [data.items.length, SNAP_INTERVAL]);
 
   return (
-    <View style={{ marginTop: 4, marginBottom: 2 }}>
-      <FlatList
-        data={data.items}
-        keyExtractor={(biz) => biz.id}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={SNAP_INTERVAL}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        contentContainerStyle={{ paddingLeft: SIDE_PADDING, paddingRight: SIDE_PADDING }}
-        onMomentumScrollEnd={onBusinessScroll}
-        renderItem={({ item: biz, index: idx }) => (
-          <TouchableOpacity
-            key={biz.id}
-            style={[
-              richCardStyles.businessCard,
-              { marginRight: CARD_MARGIN },
-              idx === selectedIdx && { borderWidth: 2, borderColor: '#6B7FC4' },
-            ]}
-            onPress={() => setSelectedIdx(idx)}
-            activeOpacity={0.7}
-          >
-            <View style={richCardStyles.businessImage}>
-              {biz.image_url ? (
-                <Image source={{ uri: biz.image_url }} style={richCardStyles.businessImg} />
-              ) : (
-                <Text style={richCardStyles.businessEmoji}>🏢</Text>
-              )}
-            </View>
-            <View style={richCardStyles.businessInfo}>
-              <Text style={richCardStyles.businessName} numberOfLines={2}>{biz.name}</Text>
-              <Text style={richCardStyles.businessDistance}>{biz.distance_mi} mi</Text>
-              <Text style={richCardStyles.businessDrive}>{biz.drive_minutes} min drive</Text>
-            </View>
-          </TouchableOpacity>
-        )}
-      />
+    <View style={{ marginTop: 4, marginBottom: 2, flexShrink: 0 }}>
+      <View style={{ height: 210 }}>
+        <FlatList
+          data={data.items}
+          keyExtractor={(biz) => biz.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={SNAP_INTERVAL}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          contentContainerStyle={{ paddingLeft: SIDE_PADDING, paddingRight: SIDE_PADDING }}
+          onMomentumScrollEnd={onBusinessScroll}
+          renderItem={({ item: biz, index: idx }) => (
+            <TouchableOpacity
+              key={biz.id}
+              style={[
+                richCardStyles.businessCard,
+                { marginRight: CARD_MARGIN },
+                idx === selectedIdx && { borderWidth: 2, borderColor: '#6B7FC4' },
+              ]}
+              onPress={() => setSelectedIdx(idx)}
+              activeOpacity={0.7}
+            >
+              <View style={richCardStyles.businessImage}>
+                {biz.image_url ? (
+                  <Image source={{ uri: biz.image_url }} style={richCardStyles.businessImg} />
+                ) : (
+                  <Text style={richCardStyles.businessEmoji}>🏢</Text>
+                )}
+              </View>
+              <View style={richCardStyles.businessInfo}>
+                <Text style={richCardStyles.businessName} numberOfLines={2}>{biz.name}</Text>
+                <Text style={richCardStyles.businessDistance}>{biz.distance_mi} mi</Text>
+                <Text style={richCardStyles.businessDrive}>{biz.drive_minutes} min drive</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
       {services.length > 0 && selectedBiz ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 10 }}>
           {services.map((svc) => (
@@ -1256,22 +1258,21 @@ const combinedStyles = StyleSheet.create({
 // ── Landing Screen Styles ───────────────────────────────────────────────────
 
 const landingStyles = StyleSheet.create({
-  categoryTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: '#f3f4f6',
-    marginRight: 8,
-  },
-  categoryTabActive: {
+  categoryLabel: {
     backgroundColor: '#6B7FC4',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginBottom: 20,
+    alignSelf: 'center',
   },
-  categoryTabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
+  categoryLabelText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
   },
-  categoryTabTextActive: {
+  categoryLabelTextActive: {
     color: '#fff',
   },
   serviceTypesGrid: {
@@ -1292,6 +1293,25 @@ const landingStyles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#374151',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    gap: 6,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#d1d5db',
+  },
+  dotActive: {
+    backgroundColor: '#6B7FC4',
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
 });
 
@@ -2361,46 +2381,26 @@ export default function ChatScreen() {
   const [selectedCategoryIdx, setSelectedCategoryIdx] = useState(0);
   const activeCategories = categories.filter((c) => (CATEGORY_SERVICE_TYPES[c.slug] ?? []).length > 0);
 
-  // Refs for syncing category tabs with swipe
-  const servicesPagerRef = useRef<FlatList<{ slug: string; services: string[] }>>(null);
-  const categoryScrollRef = useRef<ScrollView>(null);
-  const categoryTabLayouts = useRef<{ x: number; width: number }[]>([]);
-  const isTabPress = useRef(false);
+  // Refs for pager
+  const servicesPagerRef = useRef<FlatList<{ slug: string; name: string; services: string[] }>>(null);
 
   const categoryPages = useMemo(() =>
     activeCategories.map((cat) => ({
       slug: cat.slug,
+      name: cat.name,
       services: CATEGORY_SERVICE_TYPES[cat.slug] ?? [],
     })),
     [activeCategories],
   );
 
-  // When swiping the services pager, auto-select the corresponding category tab
+  // When swiping the pager, update the selected index (for dots)
   const onServicesPagerScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (isTabPress.current) return;
     const offsetX = e.nativeEvent.contentOffset.x;
     const idx = Math.round(offsetX / SCREEN_WIDTH);
     if (idx >= 0 && idx < activeCategories.length && idx !== selectedCategoryIdx) {
       setSelectedCategoryIdx(idx);
-      // Scroll tab into view
-      const layout = categoryTabLayouts.current[idx];
-      if (layout && categoryScrollRef.current) {
-        categoryScrollRef.current.scrollTo({ x: Math.max(0, layout.x - 16), animated: true });
-      }
     }
   }, [activeCategories.length, selectedCategoryIdx]);
-
-  // When tapping a category tab, scroll the pager
-  const onCategoryTabPress = useCallback((idx: number) => {
-    setSelectedCategoryIdx(idx);
-    isTabPress.current = true;
-    servicesPagerRef.current?.scrollToIndex({ index: idx, animated: true });
-    const layout = categoryTabLayouts.current[idx];
-    if (layout && categoryScrollRef.current) {
-      categoryScrollRef.current.scrollTo({ x: Math.max(0, layout.x - 16), animated: true });
-    }
-    setTimeout(() => { isTabPress.current = false; }, 400);
-  }, []);
 
   if (!hasMessages) {
     return (
@@ -2419,65 +2419,53 @@ export default function ChatScreen() {
               <ActivityIndicator size="small" color="#6B7FC4" style={{ marginTop: 20 }} />
             ) : (
               <View style={{ width: '100%', flex: 0 }}>
-                {/* Horizontal scrollable category tabs */}
-                <ScrollView
-                  ref={categoryScrollRef}
+                {/* Single pager: each page = category name (centered) + service chips (centered) */}
+                <FlatList
+                  ref={servicesPagerRef}
+                  data={categoryPages}
+                  keyExtractor={(item) => item.slug}
                   horizontal
+                  pagingEnabled
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 4, flexGrow: 1, justifyContent: 'center' }}
-                >
-                  {activeCategories.map((cat, idx) => {
-                    const isActive = idx === selectedCategoryIdx;
-                    return (
-                      <TouchableOpacity
-                        key={cat.id}
-                        style={[landingStyles.categoryTab, isActive && landingStyles.categoryTabActive]}
-                        onPress={() => onCategoryTabPress(idx)}
-                        onLayout={(e) => {
-                          categoryTabLayouts.current[idx] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[landingStyles.categoryTabText, isActive && landingStyles.categoryTabTextActive]}>
-                          {cat.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
+                  onMomentumScrollEnd={onServicesPagerScroll}
+                  initialScrollIndex={selectedCategoryIdx}
+                  getItemLayout={(_data, index) => ({
+                    length: SCREEN_WIDTH,
+                    offset: SCREEN_WIDTH * index,
+                    index,
                   })}
-                </ScrollView>
-                {/* Swipeable service pages — fixed height so category tabs don't shift */}
-                <View style={{ height: 200, marginTop: 16 }}>
-                  <FlatList
-                    ref={servicesPagerRef}
-                    data={categoryPages}
-                    keyExtractor={(item) => item.slug}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    onMomentumScrollEnd={onServicesPagerScroll}
-                    initialScrollIndex={selectedCategoryIdx}
-                    getItemLayout={(_data, index) => ({
-                      length: SCREEN_WIDTH,
-                      offset: SCREEN_WIDTH * index,
-                      index,
-                    })}
-                    renderItem={({ item }) => (
-                      <View style={{ width: SCREEN_WIDTH, paddingHorizontal: 24, alignItems: 'center' }}>
-                        <View style={landingStyles.serviceTypesGrid}>
-                          {item.services.map((svc) => (
-                            <TouchableOpacity
-                              key={svc}
-                              style={landingStyles.serviceTypeChip}
-                              onPress={() => handleButtonPress(`Find a ${svc.toLowerCase()}`)}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={landingStyles.serviceTypeChipText}>{svc}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
+                  renderItem={({ item, index: idx }) => (
+                    <View style={{ width: SCREEN_WIDTH, paddingHorizontal: 24, alignItems: 'center' }}>
+                      {/* Category name centered */}
+                      <View style={landingStyles.categoryLabel}>
+                        <Text style={[landingStyles.categoryLabelText, idx === selectedCategoryIdx && landingStyles.categoryLabelTextActive]}>
+                          {item.name}
+                        </Text>
                       </View>
-                    )}
-                  />
+                      {/* Service chips centered */}
+                      <View style={landingStyles.serviceTypesGrid}>
+                        {item.services.map((svc) => (
+                          <TouchableOpacity
+                            key={svc}
+                            style={landingStyles.serviceTypeChip}
+                            onPress={() => handleButtonPress(`Find a ${svc.toLowerCase()}`)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={landingStyles.serviceTypeChipText}>{svc}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                />
+                {/* Page dots */}
+                <View style={landingStyles.dotsRow}>
+                  {categoryPages.map((_, idx) => (
+                    <View
+                      key={idx}
+                      style={[landingStyles.dot, idx === selectedCategoryIdx && landingStyles.dotActive]}
+                    />
+                  ))}
                 </View>
               </View>
             )}
