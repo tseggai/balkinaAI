@@ -606,7 +606,7 @@ async function handleFindBusinessesInner(
   // 3. Search tenants by category (e.g. "beauty" matches "Beauty & Personal Care")
   const { data: tenantsByCategory } = await supabase
     .from('tenants')
-    .select('id, name, categories!inner(name)')
+    .select('id, name, logo_url, categories!inner(name)')
     .eq('status', 'active')
     .ilike('categories.name', `%${sanitized}%`)
     .limit(50);
@@ -615,9 +615,14 @@ async function handleFindBusinessesInner(
   const tenantMap = new Map<string, { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null }>();
   const tenantMatchedServices = new Map<string, string[]>();
 
+  // Track which tenants came from category match vs service-name match
+  const categoryMatchedIds = new Set<string>();
+  const nameMatchedIds = new Set<string>();
+
   for (const t of (tenantsByName ?? []) as unknown as { id: string; name: string; logo_url: string | null; categories: { name: string } | { name: string }[] | null }[]) {
     const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
     tenantMap.set(t.id, { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: cat, business_category: cat });
+    nameMatchedIds.add(t.id);
   }
   for (const s of (serviceMatches ?? []) as unknown as { tenant_id: string; name: string; price: number; tenants: { id: string; name: string; logo_url: string | null; categories: { name: string } | { name: string }[] | null } }[]) {
     if (s.tenants) {
@@ -628,8 +633,23 @@ async function handleFindBusinessesInner(
       tenantMatchedServices.set(s.tenants.id, existing);
     }
   }
-  for (const t of (tenantsByCategory ?? []) as unknown as { id: string; name: string }[]) {
-    if (!tenantMap.has(t.id)) tenantMap.set(t.id, { id: t.id, name: t.name, business_category: null });
+  for (const t of (tenantsByCategory ?? []) as unknown as { id: string; name: string; logo_url: string | null; categories: { name: string } | { name: string }[] | null }[]) {
+    const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
+    if (!tenantMap.has(t.id)) tenantMap.set(t.id, { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: cat, business_category: cat });
+    categoryMatchedIds.add(t.id);
+  }
+
+  // Category-priority filtering: when category matches exist, remove tenants
+  // that only matched via service name (e.g. "Personal Training" matching
+  // "personal" when searching for "Beauty & Personal Care")
+  if (categoryMatchedIds.size > 0) {
+    for (const tid of [...tenantMap.keys()]) {
+      if (!categoryMatchedIds.has(tid) && !nameMatchedIds.has(tid)) {
+        tenantMap.delete(tid);
+        tenantMatchedServices.delete(tid);
+      }
+    }
+    console.log('[find_businesses] query path: after category-priority filter:', tenantMap.size, 'tenants');
   }
 
   let businesses: { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; matched_services?: string[]; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[] }[] = Array.from(tenantMap.values()).map((t) => ({
