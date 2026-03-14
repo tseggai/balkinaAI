@@ -605,7 +605,7 @@ function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesDa
               style={[
                 richCardStyles.businessCard,
                 { marginRight: CARD_MARGIN },
-                idx === selectedIdx && { borderWidth: 2, borderColor: '#6B7FC4' },
+                idx === selectedIdx && { borderColor: '#6B7FC4' },
               ]}
               onPress={() => setSelectedIdx(idx)}
               activeOpacity={0.7}
