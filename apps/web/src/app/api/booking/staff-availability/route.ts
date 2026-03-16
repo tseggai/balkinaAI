@@ -320,7 +320,11 @@ export async function POST(request: Request) {
           return bufferStartUtc.getTime() < apptEnd && bufferEndUtc.getTime() > apptStart;
         });
 
-        const available = inSchedule && !hasConflict;
+        // Skip slots that are less than 15 minutes from now
+        const nowPlus15 = Date.now() + 15 * 60000;
+        const isPast = slotStartUtc.getTime() < nowPlus15;
+
+        const available = inSchedule && !hasConflict && !isPast;
 
         const serviceStartMinutes = minutes + bufferBefore;
         const displayHour = Math.floor(serviceStartMinutes / 60);

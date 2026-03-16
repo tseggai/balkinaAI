@@ -160,6 +160,10 @@ export async function GET(request: Request) {
         return bufferedStartMs < apptEnd && bufferedEndMs > apptStart;
       });
 
+      // Skip slots that are less than 15 minutes from now
+      const nowPlus15 = Date.now() + 15 * 60000;
+      if (!hasConflict && slotStartMs < nowPlus15) continue;
+
       if (!hasConflict) {
         const existing = slotSet.get(timeStr);
         if (existing) {

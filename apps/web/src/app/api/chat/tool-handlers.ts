@@ -1185,6 +1185,10 @@ export async function handleCheckAvailability(
       });
 
       if (!hasConflict) {
+        // Skip slots that are less than 15 minutes from now
+        const nowPlus15 = Date.now() + 15 * 60000;
+        if (slotStartUtc.getTime() < nowPlus15) continue;
+
         // Compute human-readable local start time (accounting for buffer before)
         const serviceStartMinutes = minutes + bufferBefore;
         const displayHour = Math.floor(serviceStartMinutes / 60);
@@ -1309,16 +1313,16 @@ export async function handleBookAppointment(
       return { id: loc?.id ?? null, address: loc?.address ?? null, timezone: loc?.timezone ?? 'UTC' };
     })(),
 
-    // 6. Staff
+    // 6. Staff (including requires_approval flag)
     (async () => {
       if (staffId) {
-        const { data } = await supabase.from('staff').select('id, name').eq('id', staffId).single();
-        const s = data as { id: string; name: string } | null;
-        return { id: s?.id ?? staffId, name: s?.name ?? null };
+        const { data } = await supabase.from('staff').select('id, name, requires_approval').eq('id', staffId).single();
+        const s = data as { id: string; name: string; requires_approval: boolean } | null;
+        return { id: s?.id ?? staffId, name: s?.name ?? null, requiresApproval: s?.requires_approval ?? false };
       }
-      const { data } = await supabase.from('staff').select('id, name').eq('tenant_id', tenantId).limit(1);
-      const s = (data as { id: string; name: string }[] | null)?.[0];
-      return { id: s?.id ?? null, name: s?.name ?? null };
+      const { data } = await supabase.from('staff').select('id, name, requires_approval').eq('tenant_id', tenantId).limit(1);
+      const s = (data as { id: string; name: string; requires_approval: boolean }[] | null)?.[0];
+      return { id: s?.id ?? null, name: s?.name ?? null, requiresApproval: s?.requires_approval ?? false };
     })(),
   ]);
 
@@ -1341,6 +1345,7 @@ export async function handleBookAppointment(
   // Unpack staff
   const finalStaffId = staffResult.id;
   const staffName = staffResult.name;
+  const requiresApproval = staffResult.requiresApproval;
 
   // 2. Calculate start/end times
   let start: Date;
@@ -1354,6 +1359,13 @@ export async function handleBookAppointment(
       start = new Date(startTime);
     }
   }
+
+  // Reject bookings less than 15 minutes from now
+  const nowPlus15 = Date.now() + 15 * 60000;
+  if (start.getTime() < nowPlus15) {
+    return { success: false, error: 'Cannot book a time slot less than 15 minutes from now. Please choose a later time.' };
+  }
+
   const end = new Date(start.getTime() + svc.duration_minutes * 60000);
 
   // 3. Calculate deposit
@@ -1377,7 +1389,7 @@ export async function handleBookAppointment(
       location_id: finalLocationId,
       start_time: start.toISOString(),
       end_time: end.toISOString(),
-      status: 'confirmed',
+      status: requiresApproval ? 'pending' : 'confirmed',
       total_price: svc.price,
       deposit_paid: false,
       deposit_amount_paid: depositAmount,
@@ -1389,6 +1401,15 @@ export async function handleBookAppointment(
   if (apptErr) return { success: false, error: apptErr.message };
 
   const appointmentId = (appointment as { id: string }).id;
+
+  // Fire notifications (non-blocking)
+  const { notifyBookingConfirmed, notifyStaffNewBooking } = await import('@/lib/notifications/booking-events');
+  void Promise.allSettled([
+    ...(!requiresApproval ? [notifyBookingConfirmed(appointmentId).catch((e: unknown) => console.error('[chat/book] notifyBookingConfirmed error:', e))] : []),
+    notifyStaffNewBooking(appointmentId).catch((e: unknown) => console.error('[chat/book] notifyStaffNewBooking error:', e)),
+  ]).then((results) => {
+    console.log('[chat/book] notification results:', results.map((r) => r.status));
+  });
 
   // ── Phase 3: Parallel post-insert operations ────────────────────────────────
   // Run extras lookup, coupon validation, loyalty program fetch, package decrement,
@@ -1559,7 +1580,8 @@ export async function handleBookAppointment(
       deposit_amount: depositAmount,
       balance_due: finalTotal - (depositAmount ?? 0),
       used_package: useCustomerPackage,
-      status: 'confirmed',
+      status: requiresApproval ? 'pending' : 'confirmed',
+      requires_approval: requiresApproval,
     },
   };
 }
