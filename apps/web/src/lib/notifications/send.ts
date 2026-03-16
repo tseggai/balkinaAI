@@ -1,5 +1,10 @@
 import { createAdminClient } from '@/lib/supabase/server';
 
+/** Normalize phone to E.164 format: strip spaces, dashes, parens. */
+function normalizePhone(raw: string): string {
+  return raw.replace(/[\s\-().]/g, '');
+}
+
 export type NotificationType =
   | 'booking_confirmed'
   | 'booking_cancelled_by_customer'
@@ -165,7 +170,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
   if (notifySms && phone && smsBody.length > 0) {
     try {
       const { sendSms } = await import('@balkina/notifications');
-      await sendSms({ to: phone, body: smsBody });
+      await sendSms({ to: normalizePhone(phone), body: smsBody });
       console.log(`${tag} SMS sent to ${phone}`);
       await logEntry('sms', 'sent');
     } catch (err) {
