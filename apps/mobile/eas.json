@@ -9,10 +9,12 @@
       "distribution": "internal",
       "ios": {
         "simulator": true
-      }
+      },
+      "node": "20.18.0"
     },
     "preview": {
       "distribution": "internal",
+      "node": "20.18.0",
       "ios": {
         "resourceClass": "m-medium"
       },
@@ -21,7 +23,8 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "node": "20.18.0"
     }
   },
   "submit": {
