@@ -235,6 +235,16 @@ export async function POST(request: Request) {
     } else {
       start = localTimeToUTC(date, timeSlot, tz);
     }
+
+    // Reject bookings less than 15 minutes from now
+    const nowPlus15 = Date.now() + 15 * 60000;
+    if (start.getTime() < nowPlus15) {
+      return NextResponse.json(
+        { error: 'Cannot book a time slot less than 15 minutes from now. Please choose a later time.' },
+        { status: 400, headers: CORS_HEADERS },
+      );
+    }
+
     const end = new Date(start.getTime() + svc.duration_minutes * 60000);
 
     // 3. Calculate deposit
