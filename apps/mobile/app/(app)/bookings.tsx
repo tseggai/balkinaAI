@@ -240,6 +240,24 @@ export default function BookingsScreen() {
     }, [fetchAppointments]),
   );
 
+  // Realtime subscription for appointment status changes
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel('customer-bookings-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+        },
+        () => { fetchAppointments(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, fetchAppointments]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchAppointments();

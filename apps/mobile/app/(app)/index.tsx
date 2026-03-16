@@ -153,7 +153,8 @@ interface SummaryCardData {
 
 interface ConfirmedCardData {
   type: 'confirmed_card';
-  status: 'confirmed' | 'pending';
+  status: 'confirmed' | 'pending' | 'cancelled';
+  appointmentId?: string;
   service: string;
   package?: string;
   extras: string[];
@@ -302,6 +303,7 @@ function tryParseConfirmedText(text: string): ConfirmedCardData | null {
 
   return {
     type: 'confirmed_card',
+    status: 'confirmed',
     service,
     extras,
     business,
@@ -1079,18 +1081,24 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
 
   const displayService = data.package || data.service;
   const isPending = data.status === 'pending';
+  const isCancelled = data.status === 'cancelled';
 
   return (
-    <View style={[richCardStyles.confirmedCard, isPending && { backgroundColor: '#FEF9EE' }]}>
-      <View style={[richCardStyles.confirmedCheckCircle, isPending && { backgroundColor: '#F59E0B' }]}>
-        <Ionicons name={isPending ? 'time-outline' : 'checkmark'} size={30} color="#fff" />
+    <View style={[richCardStyles.confirmedCard, isPending && { backgroundColor: '#FEF9EE' }, isCancelled && { backgroundColor: '#FEF2F2' }]}>
+      <View style={[richCardStyles.confirmedCheckCircle, isPending && { backgroundColor: '#F59E0B' }, isCancelled && { backgroundColor: '#EF4444' }]}>
+        <Ionicons name={isCancelled ? 'close' : isPending ? 'time-outline' : 'checkmark'} size={30} color="#fff" />
       </View>
       <Text style={richCardStyles.confirmedTitle}>
-        {isPending ? 'Appointment Request Sent' : 'Appointment Confirmed!'}
+        {isCancelled ? 'Appointment Declined' : isPending ? 'Appointment Request Sent' : 'Appointment Confirmed!'}
       </Text>
       {isPending && (
         <Text style={{ fontSize: 13, color: '#92400e', textAlign: 'center', marginBottom: 8, paddingHorizontal: 8 }}>
-          Waiting for confirmation from {data.staff}. You'll be notified once approved.
+          Waiting for confirmation from {data.staff}. You{"'"}ll be notified once approved.
+        </Text>
+      )}
+      {isCancelled && (
+        <Text style={{ fontSize: 13, color: '#991b1b', textAlign: 'center', marginBottom: 8, paddingHorizontal: 8 }}>
+          This appointment request was not approved. Please try another time.
         </Text>
       )}
 
@@ -1593,6 +1601,49 @@ export default function ChatScreen() {
     fetchLocation();
   }, []);
 
+  // Realtime subscription: update confirmed cards when appointment status changes
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel('chat-appointment-status')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'appointments',
+        },
+        (payload) => {
+          const updated = payload.new as { id: string; status: string; customer_id?: string };
+          // Only process updates for this customer's appointments
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (!msg.content.includes('confirmed_card')) return msg;
+              const cardMatch = msg.content.match(/\[\[CARD:(.*?)\]\]/);
+              if (!cardMatch) return msg;
+              try {
+                const card = JSON.parse(cardMatch[1]) as ConfirmedCardData;
+                if (card.appointmentId !== updated.id) return msg;
+                if (updated.status !== 'confirmed' && updated.status !== 'cancelled') return msg;
+                if (updated.status === card.status) return msg;
+                const updatedCard = { ...card, status: updated.status as 'confirmed' | 'pending' | 'cancelled' };
+                const newText = updated.status === 'confirmed'
+                  ? `Your booking is confirmed!\n\n[[CARD:${JSON.stringify(updatedCard)}]]`
+                  : updated.status === 'cancelled'
+                    ? `Your appointment was declined.\n\n[[CARD:${JSON.stringify(updatedCard)}]]`
+                    : msg.content.replace(cardMatch[0], `[[CARD:${JSON.stringify(updatedCard)}]]`);
+                return { ...msg, content: newText };
+              } catch {
+                return msg;
+              }
+            }),
+          );
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
+
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
       if (flatListRef.current && messages.length > 0) {
@@ -2023,6 +2074,7 @@ export default function ChatScreen() {
           }
           const result = (await createRes.json()) as {
             success: boolean;
+            appointment_id: string;
             status: 'confirmed' | 'pending';
             service_name: string;
             staff_name: string | null;
@@ -2047,6 +2099,7 @@ export default function ChatScreen() {
           const confirmedCard: ConfirmedCardData = {
             type: 'confirmed_card',
             status: result.status ?? 'confirmed',
+            appointmentId: result.appointment_id,
             service: result.service_name,
             package: confirmedPkgLabel,
             extras: confirmedExtras,
