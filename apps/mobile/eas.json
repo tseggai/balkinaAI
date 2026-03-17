@@ -11,7 +11,6 @@
         "simulator": true
       },
       "node": "20.18.0",
-      "installCommand": "cd ../.. && npm ci --legacy-peer-deps",
       "env": {
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
         "EAS_BUILD": "true"
@@ -26,7 +25,6 @@
       "android": {
         "buildType": "apk"
       },
-      "installCommand": "cd ../.. && npm ci --legacy-peer-deps",
       "env": {
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
         "EAS_BUILD": "true"
@@ -35,7 +33,6 @@
     "production": {
       "autoIncrement": true,
       "node": "20.18.0",
-      "installCommand": "cd ../.. && npm ci --legacy-peer-deps",
       "env": {
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
         "EAS_BUILD": "true"
