@@ -20,6 +20,10 @@ export default function AuthLayout() {
         name="profile-setup"
         options={{ headerShown: true, title: 'Profile Setup' }}
       />
+      <Stack.Screen
+        name="staff-invite"
+        options={{ headerShown: true, title: 'Staff Login', headerBackTitle: 'Back' }}
+      />
     </Stack>
   );
 }

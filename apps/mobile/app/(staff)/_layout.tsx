@@ -2,56 +2,70 @@ import { useEffect } from 'react';
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
-import { supabase, getAuthenticatedRole } from '@/lib/supabase';
+import { supabase, supabaseConfigured, getAuthenticatedRole } from '@/lib/supabase';
 import { registerPushToken } from '@/lib/registerPushToken';
 
 // Configure notification handler for foreground notifications
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+} catch {
+  // Notification handler setup may fail if native module isn't available
+}
 
 export default function StaffTabsLayout() {
   const router = useRouter();
 
   useEffect(() => {
+    if (!supabaseConfigured) return;
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { staffInfo } = await getAuthenticatedRole();
-      if (staffInfo) {
-        registerPushToken({
-          recipientType: 'staff',
-          recipientId: staffInfo.id,
-          accessToken: session.access_token,
-        }).catch(() => { /* push registration is non-critical */ });
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const { staffInfo } = await getAuthenticatedRole();
+        if (staffInfo) {
+          registerPushToken({
+            recipientType: 'staff',
+            recipientId: staffInfo.id,
+            accessToken: session.access_token,
+          }).catch(() => { /* push registration is non-critical */ });
+        }
+      } catch {
+        // Auth check is non-critical here
       }
     })();
   }, []);
 
   // Listen for incoming notifications while app is in foreground
   useEffect(() => {
-    const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
-      const data = notification.request.content.data as { type?: string } | undefined;
-      console.log('[staff] notification received:', notification.request.content.title, data?.type);
-    });
+    let receivedSub: Notifications.Subscription | undefined;
+    let responseSub: Notifications.Subscription | undefined;
+    try {
+      receivedSub = Notifications.addNotificationReceivedListener((notification) => {
+        const data = notification.request.content.data as { type?: string } | undefined;
+        console.log('[staff] notification received:', notification.request.content.title, data?.type);
+      });
 
-    // Handle notification tap (navigate to appointments)
-    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as { type?: string } | undefined;
-      if (data?.type === 'new_booking_assigned') {
-        router.navigate('/(staff)/appointments');
-      }
-    });
+      responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+        const data = response.notification.request.content.data as { type?: string } | undefined;
+        if (data?.type === 'new_booking_assigned') {
+          router.navigate('/(staff)/appointments');
+        }
+      });
+    } catch {
+      // Notifications may not be available
+    }
 
     return () => {
-      receivedSub.remove();
-      responseSub.remove();
+      receivedSub?.remove();
+      responseSub?.remove();
     };
   }, [router]);
   return (
