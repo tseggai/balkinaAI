@@ -1,13 +1,27 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       <View style={styles.hero}>
-        <Text style={styles.logo}>Balkina AI</Text>
+        <Image
+          source={require('../../assets/logo.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
         <Text style={styles.tagline}>Book appointments with AI</Text>
       </View>
 
@@ -37,7 +51,7 @@ export default function WelcomeScreen() {
       <Text style={styles.terms}>
         By continuing, you agree to our Terms of Service and Privacy Policy.
       </Text>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -53,11 +67,10 @@ const styles = StyleSheet.create({
   hero: {
     alignItems: 'center',
   },
-  logo: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#6B7FC4',
-    marginBottom: 8,
+  logoImage: {
+    width: 180,
+    height: 180,
+    marginBottom: 12,
   },
   tagline: {
     fontSize: 18,
