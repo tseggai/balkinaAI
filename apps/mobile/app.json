@@ -6,6 +6,12 @@
     "orientation": "portrait",
     "scheme": "balkina",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/app_Icon.png",
+    "splash": {
+      "image": "./assets/splash_Logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6B7FC4"
+    },
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": false,
@@ -13,7 +19,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/app_Icon.png",
+        "backgroundColor": "#6B7FC4"
       },
       "package": "com.tseggaid.balkinaai"
     },
