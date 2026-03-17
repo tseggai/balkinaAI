@@ -9,7 +9,8 @@
     "ios": "expo run:ios",
     "lint": "eslint . --ext .ts,.tsx",
     "type-check": "tsc --noEmit",
-    "build": "echo 'Expo apps are built via EAS Build — skipping'"
+    "build": "echo 'Expo apps are built via EAS Build — skipping'",
+    "eas-build-pre-install": "cd ../.. && npm ci --legacy-peer-deps"
   },
   "dependencies": {
     "@balkina/shared": "*",
