@@ -20,7 +20,13 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Balkina AI uses your location to find nearby businesses."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
