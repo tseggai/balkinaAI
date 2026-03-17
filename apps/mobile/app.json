@@ -15,14 +15,21 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.tseggaid.balkinaai"
+      "bundleIdentifier": "com.tseggaid.balkinaai",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/app_Icon.png",
         "backgroundColor": "#6B7FC4"
       },
-      "package": "com.tseggaid.balkinaai"
+      "package": "com.tseggaid.balkinaai",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "plugins": [
       "expo-router",
