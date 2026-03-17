@@ -9,13 +9,13 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "ai.balkina.app"
+      "bundleIdentifier": "com.tseggaid.balkinaai"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       },
-      "package": "ai.balkina.app"
+      "package": "com.tseggaid.balkinaai"
     },
     "plugins": [
       "expo-router",
