@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "turbo run build --filter='./packages/*'",
+    "postinstall": "if [ \"$EAS_BUILD\" = \"true\" ]; then turbo run build --filter=@balkina/shared; else turbo run build --filter='./packages/*'; fi",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
