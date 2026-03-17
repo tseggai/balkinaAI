@@ -27,6 +27,7 @@ coverage
 
 # Expo
 .expo
+/app.json
 android
 ios
 *.jks
