@@ -1,8 +1,17 @@
 import { createAdminClient } from '@/lib/supabase/server';
 
-/** Normalize phone to E.164 format: strip spaces, dashes, parens. */
+/** Normalize phone to E.164 format for Twilio. */
 function normalizePhone(raw: string): string {
-  return raw.replace(/[\s\-().]/g, '');
+  // Strip all non-digit characters except leading +
+  const cleaned = raw.replace(/[^\d+]/g, '');
+  // If it starts with +, keep it as-is (already E.164)
+  if (cleaned.startsWith('+')) return cleaned;
+  // If it's 10 digits (US), prepend +1
+  if (cleaned.length === 10) return `+1${cleaned}`;
+  // If it's 11 digits starting with 1 (US with country code), prepend +
+  if (cleaned.length === 11 && cleaned.startsWith('1')) return `+${cleaned}`;
+  // Otherwise prepend + and hope for the best
+  return `+${cleaned}`;
 }
 
 export type NotificationType =
@@ -189,9 +198,11 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
   const smsBody = template.sms(payload.data);
   if (notifySms && phone && smsBody.length > 0) {
     try {
+      const normalized = normalizePhone(phone);
+      console.log(`${tag} SMS sending to raw="${phone}" normalized="${normalized}" body="${smsBody.slice(0, 80)}..."`);
       const { sendSms } = await import('@balkina/notifications');
-      await sendSms({ to: normalizePhone(phone), body: smsBody });
-      console.log(`${tag} SMS sent to ${phone}`);
+      await sendSms({ to: normalized, body: smsBody });
+      console.log(`${tag} SMS sent successfully to ${normalized}`);
       await logEntry('sms', 'sent');
     } catch (err) {
       console.error(`${tag} SMS failed:`, err);
