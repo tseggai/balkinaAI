@@ -203,6 +203,84 @@ async function handlePaymentFailed(supabase: ReturnType<typeof createServerAdmin
   }
 }
 
+// ── Customer appointment payment handlers ────────────────────────────────────
+
+/**
+ * Handle payment_intent.succeeded — mark deposit/balance as paid, confirm appointment.
+ */
+async function handlePaymentIntentSucceeded(supabase: ReturnType<typeof createServerAdminClient>, paymentIntent: Stripe.PaymentIntent) {
+  const appointmentId = paymentIntent.metadata?.appointment_id;
+  const paymentType = paymentIntent.metadata?.payment_type; // 'deposit' | 'balance'
+
+  if (!appointmentId) return; // Not an appointment payment
+
+  if (paymentType === 'deposit') {
+    await supabase
+      .from('appointments')
+      .update({
+        deposit_paid: true,
+        deposit_amount_paid: paymentIntent.amount / 100,
+        stripe_payment_intent_id: paymentIntent.id,
+        status: 'confirmed' as const,
+      } as never)
+      .eq('id', appointmentId);
+  } else if (paymentType === 'balance') {
+    await supabase
+      .from('appointments')
+      .update({
+        balance_due: 0,
+        status: 'confirmed' as const,
+      } as never)
+      .eq('id', appointmentId);
+  }
+}
+
+/**
+ * Handle payment_intent.payment_failed — keep appointment pending, log failure.
+ */
+async function handlePaymentIntentFailed(supabase: ReturnType<typeof createServerAdminClient>, paymentIntent: Stripe.PaymentIntent) {
+  const appointmentId = paymentIntent.metadata?.appointment_id;
+
+  if (!appointmentId) return; // Not an appointment payment
+
+  await supabase
+    .from('appointments')
+    .update({
+      status: 'pending' as const,
+    } as never)
+    .eq('id', appointmentId);
+}
+
+/**
+ * Handle charge.refunded — update appointment status and restore balance.
+ */
+async function handleChargeRefunded(supabase: ReturnType<typeof createServerAdminClient>, charge: Stripe.Charge) {
+  const paymentIntentId = typeof charge.payment_intent === 'string'
+    ? charge.payment_intent
+    : charge.payment_intent?.id;
+
+  if (!paymentIntentId) return;
+
+  // Look up the appointment by stripe_payment_intent_id
+  const { data: appointment } = await supabase
+    .from('appointments')
+    .select('id, total_price, deposit_amount_paid')
+    .eq('stripe_payment_intent_id', paymentIntentId)
+    .single();
+
+  if (!appointment) return;
+
+  const refundedAmountDollars = (charge.amount_refunded ?? 0) / 100;
+
+  await supabase
+    .from('appointments')
+    .update({
+      status: 'cancelled' as const,
+      balance_due: (appointment.total_price ?? 0) - ((appointment.deposit_amount_paid ?? 0) - refundedAmountDollars),
+    } as never)
+    .eq('id', appointment.id);
+}
+
 /**
  * Handle invoice.paid — ensure tenant is active.
  */
@@ -276,6 +354,15 @@ stripeWebhookRouter.post('/', async (req: Request, res: Response) => {
         break;
       case 'invoice.paid':
         await handleInvoicePaid(supabase, event.data.object as Stripe.Invoice);
+        break;
+      case 'payment_intent.succeeded':
+        await handlePaymentIntentSucceeded(supabase, event.data.object as Stripe.PaymentIntent);
+        break;
+      case 'payment_intent.payment_failed':
+        await handlePaymentIntentFailed(supabase, event.data.object as Stripe.PaymentIntent);
+        break;
+      case 'charge.refunded':
+        await handleChargeRefunded(supabase, event.data.object as Stripe.Charge);
         break;
       default:
         // Unhandled event type — log and acknowledge
