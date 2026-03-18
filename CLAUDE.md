@@ -21,7 +21,7 @@ Balkina AI is an AI-powered appointment booking marketplace hosted at balkina.ai
 - Admin: Next.js 14 on Vercel
 - API: Node.js Express, deployed as Vercel serverless functions in /apps/api
 - DB: Supabase (PostgreSQL). ALL queries use Supabase client. NEVER raw SQL in app code.
-- AI: Claude API (claude-sonnet-4-6) with tool use. See /packages/ai for integration.
+- AI: OpenAI GPT-4o-mini with function calling for the customer chatbot (cost-optimized). Claude integration exists in /packages/ai as a premium option for future use.
 - Payments: Stripe. Two flows: (1) Tenant subscriptions via Stripe Billing, (2) Customer appointment payments via Stripe Connect.
 - Email: Resend. Templates in /packages/email-templates.
 - SMS: Twilio. Used for booking confirmations, reminders, and OTP.
@@ -35,7 +35,7 @@ Balkina AI is an AI-powered appointment booking marketplace hosted at balkina.ai
 /apps/mobile       — React Native + Expo customer chatbot app
 /packages/api      — Express API routes (Vercel serverless functions)
 /packages/db       — Supabase client, migrations, type generation
-/packages/ai       — Claude API integration, tool definitions, memory engine
+/packages/ai       — AI integration (Claude premium option), tool definitions, memory engine
 /packages/shared   — Types, utils, constants shared across all apps
 /packages/billing  — Stripe subscription and Connect payment logic
 /packages/notifications — Resend email + Twilio SMS + Expo push
@@ -82,11 +82,12 @@ All tables require RLS enabled. Tenant data always filtered by tenant_id.
 - ai_nudge_log — id, customer_id, tenant_id, trigger_type, sent_at, opened_at, converted_at
 - stripe_webhook_events — id, stripe_event_id, processed_at (for idempotency)
 
-## AI Chatbot Rules (/packages/ai)
-- All Claude API calls in /packages/ai/chat.ts using streaming.
-- Model: claude-sonnet-4-6 only.
-- System prompt built in /packages/ai/system-prompt.ts — injects customer profile, location, past bookings, behavior patterns.
-- Tool definitions in /packages/ai/tools/ — one file per tool, 11 tools total.
+## AI Chatbot Rules
+- **Production model: OpenAI GPT-4o-mini** via `/apps/web/src/app/api/chat/route.ts` with function calling.
+- Cost analysis (100 tenants, 30 bookings/day): GPT-4o-mini ~$440/mo vs Claude Haiku ~$2,430/mo vs Claude Sonnet ~$9,120/mo. GPT-4o-mini is the only viable option at $10/tenant pricing.
+- `/packages/ai/` contains a Claude API integration (claude-sonnet-4-6) preserved as a premium tier option for future use. It is NOT the active chat backend.
+- Tool definitions live inline in the chat route (OpenAI function calling format). The `/packages/ai/tools/` definitions are Claude-format equivalents.
+- System prompt built in the chat route — injects customer profile, location, past bookings, behavior patterns.
 - NEVER execute create_booking or process_payment tools without an explicit user confirmation message in the conversation immediately prior.
 - Always show price and deposit amount before any payment tool call.
 - Stream all responses. Never wait for full completion before rendering.
@@ -100,10 +101,11 @@ All tables require RLS enabled. Tenant data always filtered by tenant_id.
 - Deposit flow: create PaymentIntent for deposit_amount only, transfer_data to tenant stripe_account_id minus commission.
 
 ## Testing Requirements
-- Unit tests for all utility functions in /packages/shared/utils.
-- Integration tests for all API routes using supertest.
-- E2E tests for critical flows using Playwright: tenant registration, service creation with deposit, customer booking via chatbot, payment flow.
-- Run npm test from repo root before any PR. All tests must pass.
+- Testing deferred to post-launch. Will implement in phases:
+  - Phase 1: Unit tests for utility functions in /packages/shared/utils
+  - Phase 2: Integration tests for API routes using supertest
+  - Phase 3: E2E tests for critical flows using Playwright
+- Manual testing is acceptable during development and test mode.
 
 ## Git Workflow
 - Branch naming: feature/feature-name, fix/bug-description, chore/task-name

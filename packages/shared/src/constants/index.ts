@@ -6,8 +6,11 @@ export const APP_NAME = 'Balkina AI';
 export const APP_URL = 'https://balkina.ai';
 export const SUPPORT_EMAIL = 'support@balkina.ai';
 
-/** Claude model used for all AI interactions. */
-export const AI_MODEL = 'claude-sonnet-4-6';
+/** OpenAI model used for production chatbot (cost-optimized). */
+export const AI_MODEL = 'gpt-4o-mini';
+
+/** Claude model preserved for premium tier (future use). */
+export const AI_MODEL_PREMIUM = 'claude-sonnet-4-6';
 
 /** Balkina platform commission rate taken from Stripe Connect payments (10%). */
 export const PLATFORM_COMMISSION_RATE = 0.1;
