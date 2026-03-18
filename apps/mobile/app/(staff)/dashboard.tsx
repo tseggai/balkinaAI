@@ -171,7 +171,9 @@ export default function StaffDashboard() {
     const colors = STATUS_COLORS[item.status] ?? STATUS_COLORS.cancelled;
     const isExpanded = expandedId === item.id;
     const isActioning = actionLoading === item.id;
-    const isPast = new Date(item.end_time) < new Date();
+    // Robust date parsing: Supabase may return "2026-03-17 09:35:00+00" (space, no T)
+    const endMs = new Date(typeof item.end_time === 'string' ? item.end_time.replace(' ', 'T') : item.end_time).getTime();
+    const isPast = !isNaN(endMs) && endMs < Date.now();
 
     return (
       <TouchableOpacity
