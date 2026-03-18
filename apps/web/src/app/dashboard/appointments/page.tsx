@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -238,6 +238,9 @@ export default function AppointmentsPage() {
   // Edit panel: status picker popover
   const [showStatusPicker, setShowStatusPicker] = useState(false);
 
+  // Dirty-state tracking for the edit panel
+  const initialFormValues = useRef<Record<string, unknown>>({});
+
   // Bulk action state
   const [bulkStatusPickerOpen, setBulkStatusPickerOpen] = useState(false);
   const [bulkActing, setBulkActing] = useState(false);
@@ -369,6 +372,16 @@ export default function AppointmentsPage() {
     setFormCustomerId(appt.customer_id ?? '');
     setFormStatus(appt.status);
     setFormNotes(appt.notes ?? '');
+    initialFormValues.current = {
+      locationId: appt.location_id ?? '',
+      serviceId: appt.service_id ?? '',
+      staffId: appt.staff_id ?? '',
+      date: formatDateInput(appt.start_time),
+      time: formatTimeInput(appt.start_time),
+      customerId: appt.customer_id ?? '',
+      status: appt.status,
+      notes: appt.notes ?? '',
+    };
     setFormSelectedExtras(new Set());
     setFormSelectedProducts(new Map());
     setFormCustomFieldValues({});
@@ -610,6 +623,17 @@ export default function AppointmentsPage() {
 
     setSaving(false);
     if (editing) {
+      // Update initial form values so dirty state resets after successful save
+      initialFormValues.current = {
+        locationId: formLocationId,
+        serviceId: formServiceId,
+        staffId: formStaffId,
+        date: formDate,
+        time: formTime,
+        customerId: formCustomerId,
+        status: formStatus,
+        notes: formNotes,
+      };
       // Don't close modal on update — just refresh the list so the table reflects the change
       fetchAppointments();
     } else {
@@ -726,6 +750,21 @@ export default function AppointmentsPage() {
 
     return pages;
   }
+
+  // ----------------------------------------------------------
+  // Dirty-state check for edit panel
+  // ----------------------------------------------------------
+
+  const isDirty = editing
+    ? formLocationId !== initialFormValues.current.locationId ||
+      formServiceId !== initialFormValues.current.serviceId ||
+      formStaffId !== initialFormValues.current.staffId ||
+      formDate !== initialFormValues.current.date ||
+      formTime !== initialFormValues.current.time ||
+      formCustomerId !== initialFormValues.current.customerId ||
+      formStatus !== initialFormValues.current.status ||
+      formNotes !== initialFormValues.current.notes
+    : true;
 
   // ----------------------------------------------------------
   // Render
@@ -1875,8 +1914,8 @@ export default function AppointmentsPage() {
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={saving}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                  disabled={editing ? !isDirty || saving : saving}
+                  className={`rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50${editing && !isDirty ? ' cursor-not-allowed' : ''}`}
                 >
                   {saving ? 'Saving...' : editing ? 'Update Appointment' : 'Create Appointment'}
                 </button>

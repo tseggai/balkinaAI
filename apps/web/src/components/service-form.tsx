@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ImageUpload } from '@/components/image-upload';
 
 const EDIT_INPUT_CLASS =
@@ -288,6 +288,56 @@ export function ServiceForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // --- Dirty-state tracking for edit mode ---
+  const initialFormValues = useRef<Record<string, unknown>>({});
+
+  const getFormSnapshot = useCallback((): Record<string, unknown> => ({
+    name,
+    categoryName,
+    description,
+    imageUrl,
+    price,
+    depositEnabled,
+    depositType,
+    depositAmount,
+    duration,
+    bufferTime,
+    customDuration,
+    capacity,
+    hidePrice,
+    hideDuration,
+    isRecurring,
+    selectedStaff,
+    timesheetEnabled,
+    timesheet,
+    extras,
+    visibility,
+    minBookingLeadTime,
+    maxDaysEnabled,
+    maxBookingDaysAhead,
+    minExtrasEnabled,
+    minExtras,
+    maxExtrasEnabled,
+    maxExtras,
+    limitPerCustomerEnabled,
+    limitPerCustomer,
+    limitPerCustomerInterval,
+    limitPerSlotEnabled,
+    limitPerSlot,
+    limitPerSlotInterval,
+    selectedLocations,
+    customDurations,
+  }), [
+    name, categoryName, description, imageUrl, price, depositEnabled, depositType,
+    depositAmount, duration, bufferTime, customDuration, capacity, hidePrice,
+    hideDuration, isRecurring, selectedStaff, timesheetEnabled, timesheet, extras,
+    visibility, minBookingLeadTime, maxDaysEnabled, maxBookingDaysAhead,
+    minExtrasEnabled, minExtras, maxExtrasEnabled, maxExtras,
+    limitPerCustomerEnabled, limitPerCustomer, limitPerCustomerInterval,
+    limitPerSlotEnabled, limitPerSlot, limitPerSlotInterval, selectedLocations,
+    customDurations,
+  ]);
+
   // Fetch staff and categories on mount
   const fetchInitialData = useCallback(() => {
     fetch('/api/staff')
@@ -318,6 +368,15 @@ export function ServiceForm({
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
+
+  // Capture initial form values for dirty-state tracking (edit mode)
+  useEffect(() => {
+    if (isEditMode) {
+      initialFormValues.current = getFormSnapshot();
+    }
+    // Only capture on mount — intentionally run once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // --- Helpers ---
   function toggleStaff(staffId: string, staffName: string) {
@@ -410,6 +469,9 @@ export function ServiceForm({
       return;
     }
 
+    // Update initial values so form is no longer dirty after save
+    initialFormValues.current = getFormSnapshot();
+
     onClose();
   }
 
@@ -423,6 +485,11 @@ export function ServiceForm({
   const inputClass = isEditMode ? EDIT_INPUT_CLASS : addInputClass;
   const selectClass = isEditMode ? EDIT_SELECT_CLASS : addSelectClass;
 
+
+  // --- Dirty-state check for edit mode ---
+  const isDirty = isEditMode
+    ? JSON.stringify(getFormSnapshot()) !== JSON.stringify(initialFormValues.current)
+    : true;
 
   // =========================================================================
   // RENDER
@@ -1579,8 +1646,9 @@ export function ServiceForm({
         </button>
         <button
           type="submit"
-          disabled={saving}
+          disabled={isEditMode ? !isDirty || saving : saving}
           className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          style={isEditMode ? { opacity: (!isDirty || saving) ? 0.5 : 1 } : undefined}
         >
           {saving ? 'Saving...' : service?.id ? 'Update Service' : 'Create Service'}
         </button>

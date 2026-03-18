@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 const PRESET_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444'];
 
@@ -37,6 +37,7 @@ export default function CategoriesPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [bulkActing, setBulkActing] = useState(false);
+  const initialFormValues = useRef<Record<string, unknown>>({});
 
   const fetchCategories = useCallback(async () => {
     const res = await fetch('/api/tenant-categories');
@@ -58,12 +59,14 @@ export default function CategoriesPage() {
 
   function openEdit(cat: Category) {
     setEditing(cat);
-    setForm({
+    const formValues = {
       name: cat.name,
       color: cat.color || '#6366f1',
       parent_id: cat.parent_id ?? '',
       description: cat.description ?? '',
-    });
+    };
+    setForm(formValues);
+    initialFormValues.current = { ...formValues };
     setError('');
     setShowPanel(true);
   }
@@ -116,6 +119,7 @@ export default function CategoriesPage() {
 
     const json = await res.json();
     if (!res.ok) { setError(json.error?.message ?? 'Failed to save'); setSaving(false); return; }
+    initialFormValues.current = { ...form };
     closePanel();
     setSaving(false);
     fetchCategories();
@@ -138,6 +142,9 @@ export default function CategoriesPage() {
   const filteredCategories = search.trim()
     ? categories.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
     : categories;
+
+  // Dirty-state tracking
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialFormValues.current);
 
   const parentOptions = categories.filter((c) => c.id !== editing?.id && !c.parent_id);
 
@@ -434,7 +441,8 @@ export default function CategoriesPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={editing ? (!isDirty || saving) : saving}
+                  style={editing ? { opacity: (!isDirty || saving) ? 0.5 : 1 } : undefined}
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : editing ? 'Update Category' : 'Create Category'}

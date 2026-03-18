@@ -9,6 +9,7 @@ import {
   RefreshControl,
   SafeAreaView,
   Alert,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase, getAuthenticatedRole } from '@/lib/supabase';
@@ -207,6 +208,26 @@ export default function StaffDashboard() {
             )}
             <Text style={styles.detailText}>Price: ${(item.total_price ?? 0).toFixed(2)}</Text>
 
+            {/* Contact buttons */}
+            {item.customer_phone && (
+              <View style={styles.contactRow}>
+                <TouchableOpacity
+                  style={styles.contactBtn}
+                  onPress={() => Linking.openURL(`tel:${item.customer_phone}`)}
+                >
+                  <Ionicons name="call-outline" size={16} color="#6B7FC4" />
+                  <Text style={styles.contactBtnText}>Call</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.contactBtn}
+                  onPress={() => Linking.openURL(`sms:${item.customer_phone}`)}
+                >
+                  <Ionicons name="chatbubble-outline" size={16} color="#6B7FC4" />
+                  <Text style={styles.contactBtnText}>Message</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Action buttons */}
             <View style={styles.actionRow}>
               {isActioning ? (
@@ -343,8 +364,11 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
   expandedSection: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
   detailText: { fontSize: 13, color: '#6b7280', marginBottom: 4 },
+  contactRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  contactBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#6B7FC4' },
+  contactBtnText: { fontSize: 13, fontWeight: '600', color: '#6B7FC4' },
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  actionBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' },
+  actionBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
   actionAccept: { backgroundColor: '#6B7FC4' },
   actionDecline: { backgroundColor: '#fee2e2' },
   actionNoShow: { backgroundColor: '#fee2e2' },

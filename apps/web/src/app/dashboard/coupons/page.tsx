@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { BulkActionBar } from '@/components/bulk-action-bar';
 import { ImageUpload } from '@/components/image-upload';
 
@@ -78,6 +78,8 @@ export default function CouponsPage() {
   const [error, setError] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const initialFormValues = useRef<Record<string, unknown>>({});
 
   // Dropdown toggles for tag-based multi-selects
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
@@ -161,7 +163,7 @@ export default function CouponsPage() {
 
   function openEdit(c: Coupon) {
     setEditing(c);
-    setForm({
+    const formValues = {
       code: c.code,
       discount_type: c.discount_type,
       discount_value: String(c.discount_value),
@@ -172,7 +174,9 @@ export default function CouponsPage() {
       applicable_service_ids: c.applicable_service_ids ?? [],
       applicable_staff_ids: c.applicable_staff_ids ?? [],
       image_url: c.image_url ?? '',
-    });
+    };
+    setForm(formValues);
+    initialFormValues.current = { ...formValues };
     setShowForm(true);
   }
 
@@ -260,7 +264,12 @@ export default function CouponsPage() {
         setEditing(updatedCoupon);
       }
     }
+    initialFormValues.current = { ...form };
   }
+
+  // Dirty-state tracking
+  const currentFormValues = { ...form };
+  const isDirty = JSON.stringify(currentFormValues) !== JSON.stringify(initialFormValues.current);
 
   /* ── Shared form field classes ─────────────────────────────────────── */
 
@@ -912,7 +921,8 @@ export default function CouponsPage() {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={saving}
+                  disabled={editing ? (!isDirty || saving) : saving}
+                  style={editing ? { opacity: (!isDirty || saving) ? 0.5 : 1 } : undefined}
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : editing ? 'Update Coupon' : 'Create Coupon'}

@@ -107,13 +107,15 @@ export async function POST(request: Request) {
 
       // 4. Find or create customer
       (async () => {
-        // Helper: update existing customer with latest info when found
+        // Helper: fill in missing fields on existing customer — never overwrite phone/email set by tenant
         const patchExisting = async (id: string) => {
+          const { data: existing } = await supabase.from('customers').select('phone, email, user_id').eq('id', id).single();
+          const cur = existing as { phone: string | null; email: string | null; user_id: string | null } | null;
           const updates: Record<string, string> = {};
           if (customerName) updates.display_name = customerName;
-          if (customerPhone) updates.phone = customerPhone;
-          if (customerEmail) updates.email = customerEmail;
-          if (userId) updates.user_id = userId;
+          if (customerPhone && !cur?.phone) updates.phone = customerPhone;
+          if (customerEmail && !cur?.email) updates.email = customerEmail;
+          if (userId && !cur?.user_id) updates.user_id = userId;
           if (Object.keys(updates).length > 0) {
             await supabase.from('customers').update(updates as never).eq('id', id);
           }

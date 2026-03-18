@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { ImageUpload } from '@/components/image-upload';
 import { BulkActionBar } from '@/components/bulk-action-bar';
 
@@ -57,6 +57,7 @@ export default function InventoryPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const initialFormValues = useRef<Record<string, unknown>>({});
 
   async function handleBulkDelete() {
     if (!confirm(`Delete ${selectedIds.length} product(s)?`)) return;
@@ -99,7 +100,7 @@ export default function InventoryPage() {
 
   function openEdit(product: Product) {
     setEditing(product);
-    setForm({
+    const formValues = {
       name: product.name,
       image_url: product.image_url ?? '',
       description: product.description ?? '',
@@ -110,13 +111,14 @@ export default function InventoryPage() {
       sell_price: String(product.sell_price),
       display_in_booking: product.display_in_booking,
       is_active: product.is_active,
-    });
-    setFormServices(
-      (product.product_services ?? []).map((ps) => ({
-        service_id: ps.service_id,
-        quantity_per_service: ps.quantity_per_service,
-      }))
-    );
+    };
+    setForm(formValues);
+    const svcList = (product.product_services ?? []).map((ps) => ({
+      service_id: ps.service_id,
+      quantity_per_service: ps.quantity_per_service,
+    }));
+    setFormServices(svcList);
+    initialFormValues.current = { ...formValues, formServices: svcList };
     setAddServiceId('');
     setAddServiceQty('1');
     setShowForm(true);
@@ -199,12 +201,12 @@ export default function InventoryPage() {
       const updatedProduct = refreshedProducts.find((p) => p.id === editing.id);
       if (updatedProduct) {
         setEditing(updatedProduct);
-        setFormServices(
-          (updatedProduct.product_services ?? []).map((ps) => ({
-            service_id: ps.service_id,
-            quantity_per_service: ps.quantity_per_service,
-          }))
-        );
+        const updatedSvcList = (updatedProduct.product_services ?? []).map((ps) => ({
+          service_id: ps.service_id,
+          quantity_per_service: ps.quantity_per_service,
+        }));
+        setFormServices(updatedSvcList);
+        initialFormValues.current = { ...form, formServices: updatedSvcList };
       }
     }
   }
@@ -222,6 +224,10 @@ export default function InventoryPage() {
       setSelectedIds(products.map((p) => p.id));
     }
   }
+
+  // Dirty-state tracking
+  const currentInventoryValues = { ...form, formServices };
+  const isDirty = JSON.stringify(currentInventoryValues) !== JSON.stringify(initialFormValues.current);
 
   const addInputClass = 'w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
   const editInputClass = 'w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3';
@@ -695,7 +701,8 @@ export default function InventoryPage() {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={saving}
+                  disabled={editing ? (!isDirty || saving) : saving}
+                  style={editing ? { opacity: (!isDirty || saving) ? 0.5 : 1 } : undefined}
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : editing ? 'Update' : 'Create Product'}
