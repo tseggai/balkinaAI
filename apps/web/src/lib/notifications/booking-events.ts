@@ -155,6 +155,7 @@ export async function notifyBookingDeclined(appointmentId: string, suggestedTime
       time: formatTime(ctx.start_time, tz),
       suggestedDate: suggestedTime ? formatDate(suggestedTime, tz) : '',
       suggestedTime: suggestedTime ? formatTime(suggestedTime, tz) : '',
+      suggestedTimeIso: suggestedTime ?? '',
     },
   });
 }
@@ -174,6 +175,29 @@ export async function notifyBookingNoShow(appointmentId: string) {
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
       staffName: ctx.staff?.name ?? '',
+      date: formatDate(ctx.start_time, tz),
+      time: formatTime(ctx.start_time, tz),
+    },
+  });
+}
+
+/** Customer notification when appointment is marked as completed */
+export async function notifyBookingCompleted(appointmentId: string) {
+  const ctx = await getAppointmentContext(appointmentId);
+  if (!ctx) return;
+  const tz = ctx.tenant_locations?.timezone ?? 'UTC';
+  const staffFirstName = (ctx.staff?.name ?? '').split(' ')[0] || 'your stylist';
+  await sendNotification({
+    type: 'booking_completed',
+    appointmentId,
+    recipientType: 'customer',
+    recipientId: ctx.customers.id,
+    data: {
+      customerName: ctx.customers.display_name ?? '',
+      serviceName: ctx.services.name,
+      businessName: ctx.tenants.name,
+      staffName: ctx.staff?.name ?? '',
+      staffFirstName,
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
     },

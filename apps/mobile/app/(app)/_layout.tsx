@@ -59,8 +59,11 @@ export default function AppTabsLayout() {
 
       responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data as { type?: string; appointmentId?: string } | undefined;
-        if (data?.type === 'booking_approved' || data?.type === 'booking_confirmed') {
+        if (data?.type === 'booking_approved' || data?.type === 'booking_confirmed' || data?.type === 'booking_completed') {
           router.navigate('/(app)/bookings');
+        } else if (data?.type === 'booking_declined' || data?.type === 'booking_no_show') {
+          // Navigate to chat for rebooking
+          router.navigate('/(app)/');
         }
       });
     } catch {

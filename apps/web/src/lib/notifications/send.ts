@@ -25,6 +25,7 @@ export type NotificationType =
   | 'booking_declined'
   | 'booking_no_show'
   | 'new_booking_assigned'
+  | 'booking_completed'
   | 'booking_cancelled_staff_notify'
   | 'daily_schedule_summary';
 
@@ -105,6 +106,13 @@ const TEMPLATES: Record<NotificationType, {
     push: {
       title: () => 'Missed Appointment',
       body: (d) => `You didn't make it to your ${d.serviceName} appointment with ${d.staffName} at ${d.businessName} for ${d.date} at ${d.time}.`,
+    },
+  },
+  booking_completed: {
+    sms: (d) => `Appointment Completed: Your ${d.serviceName} appointment with ${d.staffName} at ${d.businessName} is complete. Show ${d.staffFirstName} your appreciation by rating your experience on the Balkina app.`,
+    push: {
+      title: () => 'Appointment Completed',
+      body: (d) => `Show ${d.staffFirstName} your appreciation by rating your ${d.serviceName} experience at ${d.businessName}.`,
     },
   },
   new_booking_assigned: {
@@ -219,11 +227,16 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
       const { sendPushNotification } = await import('@balkina/notifications');
       for (const token of pushTokens) {
         try {
+          const pushData: Record<string, unknown> = { appointmentId: payload.appointmentId, type: payload.type };
+          // Pass extra data for actionable notifications
+          if (payload.data.suggestedTime) pushData.suggestedTime = payload.data.suggestedTime;
+          if (payload.data.suggestedDate) pushData.suggestedDate = payload.data.suggestedDate;
+          if (payload.data.suggestedTimeIso) pushData.suggestedTimeIso = payload.data.suggestedTimeIso;
           await sendPushNotification([{
             pushToken: token,
             title: template.push.title(payload.data),
             body: template.push.body(payload.data),
-            data: { appointmentId: payload.appointmentId, type: payload.type },
+            data: pushData,
           }]);
           console.log(`${tag} push sent to token ${token.slice(0, 20)}...`);
           await logEntry('push', 'sent');
