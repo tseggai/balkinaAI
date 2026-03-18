@@ -46,14 +46,25 @@ export async function GET(request: Request) {
 
   const now = new Date().toISOString();
 
+  // Get the tenant's timezone for accurate "today" calculation
+  const { data: locData } = await admin
+    .from('tenant_locations')
+    .select('timezone')
+    .eq('tenant_id', staff.tenant_id)
+    .limit(1)
+    .single();
+  const tz = (locData as { timezone: string } | null)?.timezone || 'America/New_York';
+
+  // Compute today's date in the tenant's timezone
+  const todayParts = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+
   if (date) {
     // Specific date filter
     const dayStart = `${date}T00:00:00.000Z`;
     const dayEnd = `${date}T23:59:59.999Z`;
     query = query.gte('start_time', dayStart).lte('start_time', dayEnd);
   } else if (period === 'today') {
-    const today = new Date().toISOString().split('T')[0];
-    query = query.gte('start_time', `${today}T00:00:00.000Z`).lte('start_time', `${today}T23:59:59.999Z`);
+    query = query.gte('start_time', `${todayParts}T00:00:00.000Z`).lte('start_time', `${todayParts}T23:59:59.999Z`);
   } else if (period === 'upcoming') {
     query = query.gte('start_time', now).in('status', ['pending', 'confirmed']);
   } else if (period === 'past') {

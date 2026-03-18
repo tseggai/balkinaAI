@@ -708,9 +708,17 @@ function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (
   const isAnyone = selectedIdx === -1;
   const selectedStaff = isAnyone ? null : data.items[selectedIdx];
   // Use all_slots (with available flag) if present, otherwise fall back to slots (all available)
-  const slots: TimeSlotData[] = isAnyone
+  const rawSlots: TimeSlotData[] = isAnyone
     ? (data.anyone_slots ?? [])
     : (selectedStaff?.all_slots ?? selectedStaff?.slots?.map((s) => ({ ...s, available: true })) ?? []);
+
+  // Client-side: mark past slots as unavailable (safety net for stale renders)
+  const nowMs = Date.now() + 15 * 60000; // 15-min buffer like server
+  const slots: TimeSlotData[] = rawSlots.map((s) => {
+    if (s.available === false) return s;
+    if (s.iso && new Date(s.iso).getTime() < nowMs) return { ...s, available: false };
+    return s;
+  });
 
   return (
     <View style={{ marginTop: 4, marginBottom: 2 }}>
