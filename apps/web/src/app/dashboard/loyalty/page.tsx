@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { BulkActionBar } from '@/components/bulk-action-bar';
 import { ImageUpload } from '@/components/image-upload';
 
@@ -79,6 +79,8 @@ export default function LoyaltyPage() {
   const [ruleTargetId, setRuleTargetId] = useState('');
   const [rulePoints, setRulePoints] = useState('');
 
+  const initialFormValues = useRef<Record<string, unknown>>({});
+
   // Tier form
   const [tierName, setTierName] = useState('');
   const [tierMinPoints, setTierMinPoints] = useState('');
@@ -134,7 +136,9 @@ export default function LoyaltyPage() {
     const prog = programs[index];
     if (!prog) return;
     setEditingIndex(index);
-    setForm({ ...prog });
+    const formValues = { ...prog };
+    setForm(formValues);
+    initialFormValues.current = JSON.parse(JSON.stringify(formValues));
     resetRuleTierForms();
     setShowForm(true);
   }
@@ -285,6 +289,7 @@ export default function LoyaltyPage() {
 
     const json = await res.json();
     if (!res.ok) { setError(json.error?.message ?? 'Failed to save'); setSaving(false); return; }
+    initialFormValues.current = JSON.parse(JSON.stringify(form));
     setSaving(false);
     // Refresh data without closing the panel
     fetchData();
@@ -306,6 +311,10 @@ export default function LoyaltyPage() {
   }
 
   const isEditing = editingIndex !== null;
+
+  // Dirty-state tracking
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialFormValues.current);
+
   const inputClass = isEditing
     ? 'h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3'
     : 'h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
@@ -742,7 +751,8 @@ export default function LoyaltyPage() {
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={saving}
+                  disabled={isEditing ? (!isDirty || saving) : saving}
+                  style={isEditing ? { opacity: (!isDirty || saving) ? 0.5 : 1 } : undefined}
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : isEditing ? 'Update' : 'Create Program'}

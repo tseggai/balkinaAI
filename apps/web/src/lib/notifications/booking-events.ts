@@ -53,6 +53,7 @@ function formatTime(iso: string, timezone: string): string {
   });
 }
 
+/** Customer notification when booking is auto-confirmed (no approval needed) */
 export async function notifyBookingConfirmed(appointmentId: string) {
   const ctx = await getAppointmentContext(appointmentId);
   if (!ctx) return;
@@ -66,12 +67,35 @@ export async function notifyBookingConfirmed(appointmentId: string) {
       customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
+      staffName: ctx.staff?.name ?? '',
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
     },
   });
 }
 
+/** Customer notification when booking requires approval (submitted, pending) */
+export async function notifyBookingSubmitted(appointmentId: string) {
+  const ctx = await getAppointmentContext(appointmentId);
+  if (!ctx) return;
+  const tz = ctx.tenant_locations?.timezone ?? 'UTC';
+  await sendNotification({
+    type: 'booking_submitted',
+    appointmentId,
+    recipientType: 'customer',
+    recipientId: ctx.customers.id,
+    data: {
+      customerName: ctx.customers.display_name ?? '',
+      serviceName: ctx.services.name,
+      businessName: ctx.tenants.name,
+      staffName: ctx.staff?.name ?? '',
+      date: formatDate(ctx.start_time, tz),
+      time: formatTime(ctx.start_time, tz),
+    },
+  });
+}
+
+/** Staff notification when a new booking is assigned to them */
 export async function notifyStaffNewBooking(appointmentId: string) {
   const ctx = await getAppointmentContext(appointmentId);
   if (!ctx || !ctx.staff) return;
@@ -91,6 +115,7 @@ export async function notifyStaffNewBooking(appointmentId: string) {
   });
 }
 
+/** Customer notification when staff approves a pending booking */
 export async function notifyBookingApproved(appointmentId: string) {
   const ctx = await getAppointmentContext(appointmentId);
   if (!ctx) return;
@@ -104,13 +129,15 @@ export async function notifyBookingApproved(appointmentId: string) {
       customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
+      staffName: ctx.staff?.name ?? '',
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
     },
   });
 }
 
-export async function notifyBookingDeclined(appointmentId: string) {
+/** Customer notification when staff declines a pending booking */
+export async function notifyBookingDeclined(appointmentId: string, suggestedTime?: string) {
   const ctx = await getAppointmentContext(appointmentId);
   if (!ctx) return;
   const tz = ctx.tenant_locations?.timezone ?? 'UTC';
@@ -123,6 +150,30 @@ export async function notifyBookingDeclined(appointmentId: string) {
       customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
+      staffName: ctx.staff?.name ?? '',
+      date: formatDate(ctx.start_time, tz),
+      time: formatTime(ctx.start_time, tz),
+      suggestedDate: suggestedTime ? formatDate(suggestedTime, tz) : '',
+      suggestedTime: suggestedTime ? formatTime(suggestedTime, tz) : '',
+    },
+  });
+}
+
+/** Customer notification when marked as no-show */
+export async function notifyBookingNoShow(appointmentId: string) {
+  const ctx = await getAppointmentContext(appointmentId);
+  if (!ctx) return;
+  const tz = ctx.tenant_locations?.timezone ?? 'UTC';
+  await sendNotification({
+    type: 'booking_no_show',
+    appointmentId,
+    recipientType: 'customer',
+    recipientId: ctx.customers.id,
+    data: {
+      customerName: ctx.customers.display_name ?? '',
+      serviceName: ctx.services.name,
+      businessName: ctx.tenants.name,
+      staffName: ctx.staff?.name ?? '',
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
     },
@@ -176,6 +227,7 @@ export async function notifyBookingCancelledByTenant(appointmentId: string) {
       customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
+      staffName: ctx.staff?.name ?? '',
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
     },

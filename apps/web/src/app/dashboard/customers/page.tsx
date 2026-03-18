@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { BulkActionBar } from '@/components/bulk-action-bar';
 import { ImageUpload } from '@/components/image-upload';
 
@@ -55,6 +55,9 @@ export default function CustomersPage() {
   // Bulk delete
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  // Dirty-state tracking for edit panel
+  const initialFormValues = useRef<Record<string, unknown>>({});
+
   const fetchCustomers = useCallback(async () => {
     const res = await fetch('/api/customers');
     const json = await res.json();
@@ -75,6 +78,16 @@ export default function CustomersPage() {
       setEditGender(selected.gender ?? '');
       setEditNote(selected.notes ?? '');
       setEditProfileImage(selected.profile_image_url ?? '');
+      initialFormValues.current = {
+        firstName: selected.first_name ?? '',
+        lastName: selected.last_name ?? '',
+        email: selected.email ?? '',
+        phone: selected.phone ?? '',
+        dob: selected.date_of_birth ? (selected.date_of_birth.split('T')[0] ?? '') : '',
+        gender: selected.gender ?? '',
+        note: selected.notes ?? '',
+        profileImage: selected.profile_image_url ?? '',
+      };
     }
   }, [selected]);
 
@@ -159,7 +172,19 @@ export default function CustomersPage() {
           profile_image_url: editProfileImage || null,
         }),
       });
-      if (res.ok) fetchCustomers();
+      if (res.ok) {
+        initialFormValues.current = {
+          firstName: editFirstName,
+          lastName: editLastName,
+          email: editEmail,
+          phone: editPhone,
+          dob: editDob,
+          gender: editGender,
+          note: editNote,
+          profileImage: editProfileImage,
+        };
+        fetchCustomers();
+      }
     } finally {
       setUpdateLoading(false);
     }
@@ -167,6 +192,16 @@ export default function CustomersPage() {
 
   const addInputClass = 'w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
   const editInputClass = 'w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3';
+
+  const isDirty =
+    editFirstName !== initialFormValues.current.firstName ||
+    editLastName !== initialFormValues.current.lastName ||
+    editEmail !== initialFormValues.current.email ||
+    editPhone !== initialFormValues.current.phone ||
+    editDob !== initialFormValues.current.dob ||
+    editGender !== initialFormValues.current.gender ||
+    editNote !== initialFormValues.current.note ||
+    editProfileImage !== initialFormValues.current.profileImage;
 
   return (
     <div className="relative h-full">
@@ -385,7 +420,7 @@ export default function CustomersPage() {
                   <button onClick={() => setSelected(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
                   <button
                     onClick={handleUpdateCustomer}
-                    disabled={updateLoading}
+                    disabled={!isDirty || updateLoading}
                     className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                   >
                     {updateLoading ? 'Saving...' : 'Update'}

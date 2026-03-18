@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { ImageUpload } from '@/components/image-upload';
 import { BulkActionBar } from '@/components/bulk-action-bar';
 
@@ -54,6 +54,7 @@ export default function PackagesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const initialFormValues = useRef<Record<string, unknown>>({});
 
   async function handleBulkDelete() {
     if (!confirm(`Delete ${selectedIds.length} package(s)?`)) return;
@@ -96,7 +97,7 @@ export default function PackagesPage() {
 
   function openEdit(pkg: Package) {
     setEditing(pkg);
-    setForm({
+    const formValues = {
       name: pkg.name,
       price: String(pkg.price),
       image_url: pkg.image_url ?? '',
@@ -106,13 +107,14 @@ export default function PackagesPage() {
       has_expiration: pkg.expiration_value !== null && pkg.expiration_value > 0,
       expiration_value: pkg.expiration_value ? String(pkg.expiration_value) : '',
       expiration_unit: pkg.expiration_unit ?? 'days',
-    });
-    setFormServices(
-      (pkg.package_services ?? []).map((ps) => ({
-        service_id: ps.service_id,
-        quantity: ps.quantity,
-      }))
-    );
+    };
+    setForm(formValues);
+    const svcList = (pkg.package_services ?? []).map((ps) => ({
+      service_id: ps.service_id,
+      quantity: ps.quantity,
+    }));
+    setFormServices(svcList);
+    initialFormValues.current = { ...formValues, formServices: svcList };
     setAddServiceId('');
     setAddServiceQty('1');
     setShowForm(true);
@@ -193,12 +195,12 @@ export default function PackagesPage() {
       const updatedPkg = refreshedPackages.find((p) => p.id === editing.id);
       if (updatedPkg) {
         setEditing(updatedPkg);
-        setFormServices(
-          (updatedPkg.package_services ?? []).map((ps) => ({
-            service_id: ps.service_id,
-            quantity: ps.quantity,
-          }))
-        );
+        const updatedSvcList = (updatedPkg.package_services ?? []).map((ps) => ({
+          service_id: ps.service_id,
+          quantity: ps.quantity,
+        }));
+        setFormServices(updatedSvcList);
+        initialFormValues.current = { ...form, formServices: updatedSvcList };
       }
     }
   }
@@ -216,6 +218,10 @@ export default function PackagesPage() {
       setSelectedIds(packages.map((p) => p.id));
     }
   }
+
+  // Dirty-state tracking
+  const currentPackageValues = { ...form, formServices };
+  const isDirty = JSON.stringify(currentPackageValues) !== JSON.stringify(initialFormValues.current);
 
   const isAddMode = showForm && !editing;
   const isEditMode = showForm && !!editing;
@@ -648,7 +654,8 @@ export default function PackagesPage() {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={saving}
+                  disabled={!isDirty || saving}
+                  style={{ opacity: (!isDirty || saving) ? 0.5 : 1 }}
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Update Package'}

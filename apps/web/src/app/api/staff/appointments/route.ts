@@ -88,6 +88,9 @@ export async function GET(request: Request) {
     const loc = row.tenant_locations as { name: string } | null;
     return {
       id: row.id,
+      tenant_id: row.tenant_id,
+      service_id: row.service_id,
+      staff_id: row.staff_id,
       customer_name: cust?.display_name ?? 'Guest',
       customer_phone: cust?.phone ?? null,
       service_name: svc?.name ?? 'Service',

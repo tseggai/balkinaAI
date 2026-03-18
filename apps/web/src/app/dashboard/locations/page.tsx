@@ -85,6 +85,8 @@ export default function LocationsPage() {
 
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  const initialFormValues = useRef<Record<string, unknown>>({});
+
   // General state
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -199,6 +201,19 @@ export default function LocationsPage() {
     setBookingLimitEnabled(hasLimit);
     setBookingLimitCapacity(String(loc.booking_limit_capacity ?? 1));
     setBookingLimitInterval(loc.booking_limit_interval ?? 'day');
+    initialFormValues.current = {
+      name: loc.name,
+      address: loc.address,
+      timezone: loc.timezone ?? '',
+      lat: loc.latitude,
+      lng: loc.longitude,
+      phone: loc.phone ?? '',
+      description: loc.description ?? '',
+      imageUrl: loc.image_url ?? '',
+      bookingLimitEnabled: hasLimit,
+      bookingLimitCapacity: String(loc.booking_limit_capacity ?? 1),
+      bookingLimitInterval: loc.booking_limit_interval ?? 'day',
+    };
     setError('');
     autocompleteRef.current = null;
     setShowPanel(true);
@@ -279,7 +294,18 @@ export default function LocationsPage() {
         setEditing(updatedLoc);
       }
     }
+    initialFormValues.current = {
+      name, address, timezone, lat, lng, phone, description, imageUrl,
+      bookingLimitEnabled, bookingLimitCapacity, bookingLimitInterval,
+    };
   }
+
+  // Dirty-state tracking
+  const currentLocationValues = {
+    name, address, timezone, lat, lng, phone, description, imageUrl,
+    bookingLimitEnabled, bookingLimitCapacity, bookingLimitInterval,
+  };
+  const isDirty = JSON.stringify(currentLocationValues) !== JSON.stringify(initialFormValues.current);
 
   // ── Slide-in Panel ─────────────────────────────────────────────────────────
 
@@ -528,7 +554,8 @@ export default function LocationsPage() {
               </button>
               <button
                 type="submit"
-                disabled={saving}
+                disabled={isEdit ? (!isDirty || saving) : saving}
+                style={isEdit ? { opacity: (!isDirty || saving) ? 0.5 : 1 } : undefined}
                 className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
                 {saving ? 'Saving...' : isEdit ? 'Update Location' : 'Add Location'}

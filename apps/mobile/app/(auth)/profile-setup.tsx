@@ -110,12 +110,18 @@ export default function ProfileSetupScreen() {
     // Upload avatar if selected
     const avatarUrl = await uploadAvatar(user.id);
 
-    // Create customer record
+    // Create or update customer record — preserve existing phone/email if already set
+    const { data: existing } = await supabase
+      .from('customers')
+      .select('phone, email')
+      .eq('id', user.id)
+      .single();
+
     const { error } = await supabase.from('customers').upsert({
       id: user.id,
       display_name: displayName.trim(),
-      email: user.email ?? null,
-      phone: user.phone ?? null,
+      email: (existing as { email: string | null } | null)?.email ?? user.email ?? null,
+      phone: (existing as { phone: string | null } | null)?.phone ?? user.phone ?? null,
     });
 
     if (error) {

@@ -1402,14 +1402,23 @@ export async function handleBookAppointment(
 
   const appointmentId = (appointment as { id: string }).id;
 
-  // Fire notifications (non-blocking)
-  const { notifyBookingConfirmed, notifyStaffNewBooking } = await import('@/lib/notifications/booking-events');
-  void Promise.allSettled([
-    ...(!requiresApproval ? [notifyBookingConfirmed(appointmentId).catch((e: unknown) => console.error('[chat/book] notifyBookingConfirmed error:', e))] : []),
-    notifyStaffNewBooking(appointmentId).catch((e: unknown) => console.error('[chat/book] notifyStaffNewBooking error:', e)),
-  ]).then((results) => {
-    console.log('[chat/book] notification results:', results.map((r) => r.status));
-  });
+  // Fire notifications — await so they complete before Vercel terminates the function
+  const { notifyBookingConfirmed, notifyBookingSubmitted, notifyStaffNewBooking } = await import('@/lib/notifications/booking-events');
+  try {
+    if (requiresApproval) {
+      await Promise.allSettled([
+        notifyBookingSubmitted(appointmentId),
+        notifyStaffNewBooking(appointmentId),
+      ]);
+    } else {
+      await Promise.allSettled([
+        notifyBookingConfirmed(appointmentId),
+        notifyStaffNewBooking(appointmentId),
+      ]);
+    }
+  } catch (e) {
+    console.error('[chat/book] notification error:', e);
+  }
 
   // ── Phase 3: Parallel post-insert operations ────────────────────────────────
   // Run extras lookup, coupon validation, loyalty program fetch, package decrement,

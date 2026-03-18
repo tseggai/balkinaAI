@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { ImageUpload } from '@/components/image-upload';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -181,6 +181,9 @@ export default function StaffPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Dirty-state tracking for the edit panel
+  const initialFormValues = useRef<Record<string, unknown>>({});
+
   // ── Data fetching ──────────────────────────────────────────────────────────
 
   const fetchStaff = useCallback(async () => {
@@ -338,6 +341,30 @@ export default function StaffPage() {
     setBookingLimitCapacity(String(s.booking_limit_capacity ?? 1));
     setBookingLimitInterval(s.booking_limit_interval ?? 'day');
 
+    // Snapshot initial form values for dirty-state tracking
+    const nameParts2 = (s.name || '').trim().split(/\s+/);
+    initialFormValues.current = {
+      firstName: nameParts2[0] ?? '',
+      lastName: nameParts2.slice(1).join(' '),
+      profession: s.profession ?? '',
+      email: s.email,
+      phone: s.phone ?? '',
+      imageUrl: s.image_url ?? '',
+      notes: s.notes ?? '',
+      isActive: s.is_active ?? s.status !== 'inactive',
+      selectedLocationIds: JSON.stringify((s.location_ids ?? []).slice().sort()),
+      selectedServiceIds: JSON.stringify((s.service_ids ?? []).slice().sort()),
+      schedule: JSON.stringify(parsed),
+      holidays: JSON.stringify((s.staff_holidays ?? []).map((h) => ({ date: h.date, note: (h as StaffHoliday).note ?? '' }))),
+      specialDays: JSON.stringify((s.staff_special_days ?? []).map((sd) => ({
+        date: sd.date, start_time: sd.start_time ?? '09:00', end_time: sd.end_time ?? '17:00',
+        is_day_off: sd.is_day_off ?? false, breaks: Array.isArray(sd.breaks) ? sd.breaks : [],
+      }))),
+      bookingLimitEnabled: hasLimit,
+      bookingLimitCapacity: String(s.booking_limit_capacity ?? 1),
+      bookingLimitInterval: s.booking_limit_interval ?? 'day',
+    };
+
     setError('');
     setShowPanel(true);
   }
@@ -473,6 +500,28 @@ export default function StaffPage() {
         setSelectedLocationIds(updatedStaff.location_ids ?? []);
         setSelectedServiceIds(updatedStaff.service_ids ?? []);
       }
+      // Snapshot current values as new baseline so the Update button becomes disabled
+      initialFormValues.current = {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        profession,
+        email,
+        phone,
+        imageUrl,
+        notes,
+        isActive,
+        selectedLocationIds: JSON.stringify((updatedStaff?.location_ids ?? selectedLocationIds).slice().sort()),
+        selectedServiceIds: JSON.stringify((updatedStaff?.service_ids ?? selectedServiceIds).slice().sort()),
+        schedule: JSON.stringify(schedule),
+        holidays: JSON.stringify(holidays.map((h) => ({ date: h.date, note: h.note || '' }))),
+        specialDays: JSON.stringify(specialDays.map((sd) => ({
+          date: sd.date, start_time: sd.start_time, end_time: sd.end_time,
+          is_day_off: sd.is_day_off, breaks: sd.breaks,
+        }))),
+        bookingLimitEnabled,
+        bookingLimitCapacity,
+        bookingLimitInterval,
+      };
     }
   }
 
@@ -1291,6 +1340,35 @@ export default function StaffPage() {
     }
   }
 
+  // ── Dirty-state check ────────────────────────────────────────────────────
+  const currentFormValues: Record<string, unknown> = {
+    firstName,
+    lastName,
+    profession,
+    email,
+    phone,
+    imageUrl,
+    notes,
+    isActive,
+    selectedLocationIds: JSON.stringify(selectedLocationIds.slice().sort()),
+    selectedServiceIds: JSON.stringify(selectedServiceIds.slice().sort()),
+    schedule: JSON.stringify(schedule),
+    holidays: JSON.stringify(holidays.map((h) => ({ date: h.date, note: h.note || '' }))),
+    specialDays: JSON.stringify(specialDays.map((sd) => ({
+      date: sd.date, start_time: sd.start_time, end_time: sd.end_time,
+      is_day_off: sd.is_day_off, breaks: sd.breaks,
+    }))),
+    bookingLimitEnabled,
+    bookingLimitCapacity,
+    bookingLimitInterval,
+  };
+
+  const isDirty = editing
+    ? Object.keys(currentFormValues).some(
+        (key) => JSON.stringify(currentFormValues[key]) !== JSON.stringify(initialFormValues.current[key])
+      )
+    : true;
+
   // ── Main Render ────────────────────────────────────────────────────────────
 
   return (
@@ -1610,8 +1688,8 @@ export default function StaffPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
-                  className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                  disabled={!isDirty || saving}
+                  className={`rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 ${!isDirty && editing ? 'cursor-not-allowed' : ''}`}
                 >
                   {saving ? 'Saving...' : editing ? 'Update' : 'Add Staff'}
                 </button>

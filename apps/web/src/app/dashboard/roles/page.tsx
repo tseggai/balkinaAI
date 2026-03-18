@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { BulkActionBar } from '@/components/bulk-action-bar';
 
 const MODULES = [
@@ -107,6 +107,7 @@ export default function RolesPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showStaffDropdown, setShowStaffDropdown] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const initialFormValues = useRef<Record<string, unknown>>({});
 
   async function handleBulkDelete() {
     if (!confirm(`Delete ${selectedIds.length} role(s)?`)) return;
@@ -146,8 +147,10 @@ export default function RolesPage() {
 
   function openEdit(role: Role) {
     setEditing(role);
-    setForm({ name: role.name, notes: role.notes ?? '' });
-    setSelectedStaff((role.staff_role_assignments ?? []).map((a) => a.staff_id));
+    const formValues = { name: role.name, notes: role.notes ?? '' };
+    setForm(formValues);
+    const staffIds = (role.staff_role_assignments ?? []).map((a) => a.staff_id);
+    setSelectedStaff(staffIds);
 
     const existing = role.role_permissions ?? [];
     const merged = MODULES.map((m) => {
@@ -156,6 +159,7 @@ export default function RolesPage() {
       return { module: m, can_view: false, can_add: false, can_edit: false, can_delete: false };
     });
     setPermissions(merged);
+    initialFormValues.current = { ...formValues, selectedStaff: staffIds, permissions: JSON.parse(JSON.stringify(merged)) };
     setError('');
     setShowPanel(true);
   }
@@ -261,6 +265,7 @@ export default function RolesPage() {
       const updatedRole = refreshedRoles.find((r) => r.id === editing.id);
       if (updatedRole) {
         setEditing(updatedRole);
+        initialFormValues.current = { ...form, selectedStaff, permissions: JSON.parse(JSON.stringify(permissions)) };
       }
     }
   }
@@ -278,6 +283,10 @@ export default function RolesPage() {
       setSelectedIds(roles.map((r) => r.id));
     }
   }
+
+  // Dirty-state tracking
+  const currentRoleValues = { ...form, selectedStaff, permissions: JSON.parse(JSON.stringify(permissions)) };
+  const isDirty = JSON.stringify(currentRoleValues) !== JSON.stringify(initialFormValues.current);
 
   const addInputClass =
     'w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
@@ -645,7 +654,8 @@ export default function RolesPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={editing ? (!isDirty || saving) : saving}
+                  style={editing ? { opacity: (!isDirty || saving) ? 0.5 : 1 } : undefined}
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : editing ? 'Update Role' : 'Create Role'}

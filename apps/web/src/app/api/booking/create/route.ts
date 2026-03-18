@@ -7,7 +7,7 @@
  */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
-import { notifyBookingConfirmed, notifyStaffNewBooking } from '@/lib/notifications/booking-events';
+import { notifyBookingConfirmed, notifyBookingSubmitted, notifyStaffNewBooking } from '@/lib/notifications/booking-events';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -107,13 +107,15 @@ export async function POST(request: Request) {
 
       // 4. Find or create customer
       (async () => {
-        // Helper: update existing customer with latest info when found
+        // Helper: fill in missing fields on existing customer — never overwrite phone/email set by tenant
         const patchExisting = async (id: string) => {
+          const { data: existing } = await supabase.from('customers').select('phone, email, user_id').eq('id', id).single();
+          const cur = existing as { phone: string | null; email: string | null; user_id: string | null } | null;
           const updates: Record<string, string> = {};
           if (customerName) updates.display_name = customerName;
-          if (customerPhone) updates.phone = customerPhone;
-          if (customerEmail) updates.email = customerEmail;
-          if (userId) updates.user_id = userId;
+          if (customerPhone && !cur?.phone) updates.phone = customerPhone;
+          if (customerEmail && !cur?.email) updates.email = customerEmail;
+          if (userId && !cur?.user_id) updates.user_id = userId;
           if (Object.keys(updates).length > 0) {
             await supabase.from('customers').update(updates as never).eq('id', id);
           }
@@ -326,14 +328,24 @@ export async function POST(request: Request) {
       }
     }
 
-    // Fire notifications (non-blocking but with logging)
-    // When staff requires approval, don't send "confirmed" to customer yet — staff must approve first
-    void Promise.allSettled([
-      ...(!requiresApproval ? [notifyBookingConfirmed(apptId).catch((e) => console.error('[booking/create] notifyBookingConfirmed error:', e))] : []),
-      notifyStaffNewBooking(apptId).catch((e) => console.error('[booking/create] notifyStaffNewBooking error:', e)),
-    ]).then((results) => {
-      console.log('[booking/create] notification results:', results.map((r) => r.status));
-    });
+    // Fire notifications — await so they complete before Vercel terminates the function
+    try {
+      if (requiresApproval) {
+        // Booking needs staff approval — notify customer it's submitted, notify staff to approve
+        await Promise.allSettled([
+          notifyBookingSubmitted(apptId),
+          notifyStaffNewBooking(apptId),
+        ]);
+      } else {
+        // Auto-confirmed — notify customer it's confirmed, notify staff of new booking
+        await Promise.allSettled([
+          notifyBookingConfirmed(apptId),
+          notifyStaffNewBooking(apptId),
+        ]);
+      }
+    } catch (e) {
+      console.error('[booking/create] notification error:', e);
+    }
 
     // 9. Format response with local times (timezone already available)
     const localDate = start.toLocaleDateString('en-US', {

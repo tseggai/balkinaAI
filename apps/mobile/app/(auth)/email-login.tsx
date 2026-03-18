@@ -77,13 +77,19 @@ export default function EmailLoginScreen() {
       return;
     }
 
-    // Create the customer record in the customers table
+    // Create or update customer record — preserve existing phone/email if already set by tenant
     if (data.user) {
+      const { data: existing } = await supabase
+        .from('customers')
+        .select('phone, email')
+        .eq('id', data.user.id)
+        .single();
+      const cur = existing as { phone: string | null; email: string | null } | null;
       await supabase.from('customers').upsert({
         id: data.user.id,
         display_name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim() || null,
+        email: email.trim() || cur?.email || null,
+        phone: phone.trim() || cur?.phone || null,
       });
     }
 

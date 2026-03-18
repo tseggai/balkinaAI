@@ -18,6 +18,7 @@ import {
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
@@ -1550,6 +1551,8 @@ export default function ChatScreen() {
   const [bookingState, setBookingState] = useState<BookingState>(INITIAL_BOOKING_STATE);
   const [categories, setCategories] = useState<{ id: string; name: string; slug: string }[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  // Full-screen confirmation modal state
+  const [confirmationModal, setConfirmationModal] = useState<ConfirmedCardData | null>(null);
   // Track recently displayed service cards so we can match taps to IDs
   const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; tenantId?: string; tenantName?: string }[]>([]);
   // Stores structured tool data from SSE for deterministic rendering
@@ -2122,10 +2125,8 @@ export default function ChatScreen() {
             longitude: result.longitude,
           };
 
-          const messageText = result.status === 'pending'
-            ? `Your appointment request has been sent!\n\n[[CARD:${JSON.stringify(confirmedCard)}]]`
-            : `Your booking is confirmed!\n\n[[CARD:${JSON.stringify(confirmedCard)}]]`;
-          addAssistantMessage(messageText);
+          // Show full-screen confirmation modal
+          setConfirmationModal(confirmedCard);
           setBookingState(INITIAL_BOOKING_STATE);
         } catch {
           addAssistantMessage('Connection error while creating booking. Please try again.');
@@ -2549,9 +2550,156 @@ export default function ChatScreen() {
         </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {/* Full-screen booking confirmation modal */}
+      <Modal
+        visible={confirmationModal !== null}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => {
+          setConfirmationModal(null);
+          resetConversation();
+        }}
+      >
+        <SafeAreaView style={fullScreenConfirmStyles.container}>
+          <View style={fullScreenConfirmStyles.content}>
+            {confirmationModal && (
+              <>
+                <View style={[
+                  fullScreenConfirmStyles.iconCircle,
+                  confirmationModal.status === 'pending' && { backgroundColor: '#F59E0B' },
+                ]}>
+                  <Ionicons
+                    name={confirmationModal.status === 'pending' ? 'time-outline' : 'checkmark'}
+                    size={44}
+                    color="#fff"
+                  />
+                </View>
+                <Text style={fullScreenConfirmStyles.title}>
+                  {confirmationModal.status === 'pending' ? 'Appointment Request Sent' : 'Appointment Confirmed!'}
+                </Text>
+                {confirmationModal.status === 'pending' && (
+                  <Text style={fullScreenConfirmStyles.subtitle}>
+                    Waiting for confirmation from {confirmationModal.staff}. You{"'"}ll be notified once approved.
+                  </Text>
+                )}
+
+                <View style={fullScreenConfirmStyles.detailsCard}>
+                  <View style={fullScreenConfirmStyles.detailRow}>
+                    <Ionicons name="cut-outline" size={18} color="#6B7FC4" />
+                    <Text style={fullScreenConfirmStyles.detailLabel}>Service</Text>
+                    <Text style={fullScreenConfirmStyles.detailValue}>{confirmationModal.package || confirmationModal.service}</Text>
+                  </View>
+                  {confirmationModal.extras.length > 0 && (
+                    <View style={fullScreenConfirmStyles.detailRow}>
+                      <Ionicons name="add-circle-outline" size={18} color="#6B7FC4" />
+                      <Text style={fullScreenConfirmStyles.detailLabel}>Extras</Text>
+                      <Text style={fullScreenConfirmStyles.detailValue}>{confirmationModal.extras.join(', ')}</Text>
+                    </View>
+                  )}
+                  <View style={fullScreenConfirmStyles.detailRow}>
+                    <Ionicons name="storefront-outline" size={18} color="#6B7FC4" />
+                    <Text style={fullScreenConfirmStyles.detailLabel}>Business</Text>
+                    <Text style={fullScreenConfirmStyles.detailValue}>{confirmationModal.business}</Text>
+                  </View>
+                  <View style={fullScreenConfirmStyles.detailRow}>
+                    <Ionicons name="person-outline" size={18} color="#6B7FC4" />
+                    <Text style={fullScreenConfirmStyles.detailLabel}>Staff</Text>
+                    <Text style={fullScreenConfirmStyles.detailValue}>{confirmationModal.staff}</Text>
+                  </View>
+                  <View style={fullScreenConfirmStyles.detailRow}>
+                    <Ionicons name="calendar-outline" size={18} color="#6B7FC4" />
+                    <Text style={fullScreenConfirmStyles.detailLabel}>Date</Text>
+                    <Text style={fullScreenConfirmStyles.detailValue}>{confirmationModal.date}</Text>
+                  </View>
+                  <View style={fullScreenConfirmStyles.detailRow}>
+                    <Ionicons name="time-outline" size={18} color="#6B7FC4" />
+                    <Text style={fullScreenConfirmStyles.detailLabel}>Time</Text>
+                    <Text style={fullScreenConfirmStyles.detailValue}>{confirmationModal.time}</Text>
+                  </View>
+                  <View style={fullScreenConfirmStyles.divider} />
+                  <View style={fullScreenConfirmStyles.detailRow}>
+                    <Ionicons name="cash-outline" size={18} color="#6B7FC4" />
+                    <Text style={fullScreenConfirmStyles.detailLabel}>Total</Text>
+                    <Text style={[fullScreenConfirmStyles.detailValue, { fontWeight: '700', fontSize: 18 }]}>${confirmationModal.total.toFixed(2)}</Text>
+                  </View>
+                  {confirmationModal.address ? (
+                    <View style={fullScreenConfirmStyles.detailRow}>
+                      <Ionicons name="location-outline" size={18} color="#6B7FC4" />
+                      <Text style={fullScreenConfirmStyles.detailLabel}>Address</Text>
+                      <Text style={fullScreenConfirmStyles.detailValue}>{confirmationModal.address}</Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {confirmationModal.points_earned > 0 && (
+                  <Text style={fullScreenConfirmStyles.pointsBadge}>+{confirmationModal.points_earned} pts earned</Text>
+                )}
+              </>
+            )}
+          </View>
+
+          {/* Bottom buttons */}
+          <View style={fullScreenConfirmStyles.bottomButtons}>
+            <TouchableOpacity
+              style={fullScreenConfirmStyles.doneBtn}
+              onPress={() => {
+                setConfirmationModal(null);
+                resetConversation();
+              }}
+            >
+              <Text style={fullScreenConfirmStyles.doneBtnText}>Done</Text>
+            </TouchableOpacity>
+            {confirmationModal && (confirmationModal.address || confirmationModal.latitude) && (
+              <TouchableOpacity
+                style={fullScreenConfirmStyles.directionsBtn}
+                onPress={() => {
+                  const data = confirmationModal;
+                  if (data.latitude && data.longitude) {
+                    const url = Platform.OS === 'ios'
+                      ? `maps://maps.apple.com/?daddr=${data.latitude},${data.longitude}`
+                      : `https://www.google.com/maps/dir/?api=1&destination=${data.latitude},${data.longitude}`;
+                    Linking.openURL(url);
+                  } else if (data.address) {
+                    const encoded = encodeURIComponent(data.address);
+                    const url = Platform.OS === 'ios'
+                      ? `maps://maps.apple.com/?daddr=${encoded}`
+                      : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
+                    Linking.openURL(url);
+                  }
+                  setConfirmationModal(null);
+                  resetConversation();
+                }}
+              >
+                <Ionicons name="navigate-outline" size={18} color="#6B7FC4" style={{ marginRight: 8 }} />
+                <Text style={fullScreenConfirmStyles.directionsBtnText}>Get Directions</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }
+
+const fullScreenConfirmStyles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f9fafb' },
+  content: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
+  iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#6B7FC4', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  title: { fontSize: 26, fontWeight: '800', color: '#111827', marginBottom: 8, textAlign: 'center' },
+  subtitle: { fontSize: 14, color: '#92400e', textAlign: 'center', marginBottom: 16, paddingHorizontal: 20 },
+  detailsCard: { width: '100%', backgroundColor: '#fff', borderRadius: 16, padding: 20, marginTop: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
+  detailRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  detailLabel: { fontSize: 14, fontWeight: '600', color: '#6b7280', marginLeft: 10, width: 70 },
+  detailValue: { fontSize: 15, color: '#111827', flex: 1, textAlign: 'right' },
+  divider: { height: 1, backgroundColor: '#e5e7eb', marginVertical: 8 },
+  pointsBadge: { fontSize: 14, fontWeight: '700', color: '#6B7FC4', marginTop: 16 },
+  bottomButtons: { paddingHorizontal: 24, paddingBottom: 20, gap: 12 },
+  doneBtn: { backgroundColor: '#6B7FC4', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  doneBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  directionsBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', borderRadius: 14, paddingVertical: 16, borderWidth: 2, borderColor: '#6B7FC4', backgroundColor: '#fff' },
+  directionsBtnText: { color: '#6B7FC4', fontSize: 17, fontWeight: '700' },
+});
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 

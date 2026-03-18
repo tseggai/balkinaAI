@@ -27,6 +27,7 @@ export default function SettingsPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const initialFormValues = useRef<Record<string, unknown>>({});
 
   const fetchTenant = useCallback(async () => {
     const supabase = createClient();
@@ -42,7 +43,9 @@ export default function SettingsPage() {
     const tenantInfo = data as TenantInfo | null;
     if (tenantInfo) {
       setTenant(tenantInfo);
-      setForm({ name: tenantInfo.name, phone: tenantInfo.phone ?? '' });
+      const formValues = { name: tenantInfo.name, phone: tenantInfo.phone ?? '' };
+      setForm(formValues);
+      initialFormValues.current = { ...formValues };
       setLogoPreview(tenantInfo.logo_url);
     }
     setLoading(false);
@@ -131,6 +134,7 @@ export default function SettingsPage() {
 
     setSaving(false);
     if (error) { setMessage('Failed to save'); return; }
+    initialFormValues.current = { ...form };
     setMessage('Settings saved!');
     fetchTenant();
   }
@@ -144,6 +148,9 @@ export default function SettingsPage() {
       window.location.href = json.data.url;
     }
   }
+
+  // Dirty-state tracking
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialFormValues.current);
 
   if (loading) {
     return <div className="p-6 text-center text-sm text-gray-500 lg:p-8">Loading...</div>;
@@ -242,7 +249,8 @@ export default function SettingsPage() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
             </div>
             {message && <p className={`text-sm ${message.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}>{message}</p>}
-            <button type="submit" disabled={saving}
+            <button type="submit" disabled={!isDirty || saving}
+              style={{ opacity: (!isDirty || saving) ? 0.5 : 1 }}
               className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
