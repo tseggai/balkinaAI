@@ -9,6 +9,8 @@ import {
   RefreshControl,
   Alert,
   Linking,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase, getAuthenticatedRole } from '@/lib/supabase';
@@ -17,6 +19,9 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.a
 
 interface StaffAppointment {
   id: string;
+  tenant_id: string;
+  service_id: string;
+  staff_id: string;
   customer_name: string;
   customer_phone: string | null;
   service_name: string;
@@ -31,6 +36,12 @@ interface StaffAppointment {
 }
 
 type TabKey = 'upcoming' | 'past' | 'pending';
+type DayOption = 'today' | 'tomorrow' | 'next_week';
+
+interface TimeSlot {
+  time: string;
+  iso: string;
+}
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   pending: { bg: '#fef3c7', text: '#92400e' },
@@ -51,6 +62,23 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function getDateForOption(option: DayOption): string {
+  const d = new Date();
+  if (option === 'tomorrow') d.setDate(d.getDate() + 1);
+  if (option === 'next_week') d.setDate(d.getDate() + 7);
+  return d.toISOString().split('T')[0];
+}
+
+function getDateLabel(option: DayOption): string {
+  const d = new Date();
+  if (option === 'tomorrow') d.setDate(d.getDate() + 1);
+  if (option === 'next_week') d.setDate(d.getDate() + 7);
+  const dayName = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  if (option === 'today') return `Today (${dayName})`;
+  if (option === 'tomorrow') return `Tomorrow (${dayName})`;
+  return dayName;
+}
+
 export default function StaffAppointments() {
   const [tab, setTab] = useState<TabKey>('upcoming');
   const [appointments, setAppointments] = useState<StaffAppointment[]>([]);
@@ -59,6 +87,14 @@ export default function StaffAppointments() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [staffId, setStaffId] = useState<string | null>(null);
+
+  // Decline/reschedule modal state
+  const [declineModalVisible, setDeclineModalVisible] = useState(false);
+  const [declineAppointment, setDeclineAppointment] = useState<StaffAppointment | null>(null);
+  const [selectedDay, setSelectedDay] = useState<DayOption | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [declineLoading, setDeclineLoading] = useState(false);
 
   // Get staff ID for realtime subscription
   useEffect(() => {
@@ -126,19 +162,22 @@ export default function StaffAppointments() {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  const updateStatus = useCallback(async (appointmentId: string, newStatus: string) => {
+  const updateStatus = useCallback(async (appointmentId: string, newStatus: string, suggestedTime?: string) => {
     setActionLoading(appointmentId);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
     try {
+      const reqBody: { status: string; suggestedTime?: string } = { status: newStatus };
+      if (suggestedTime) reqBody.suggestedTime = suggestedTime;
+
       const res = await fetch(`${API_BASE}/api/staff/appointments/${appointmentId}/status`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(reqBody),
       });
       const json = await res.json() as { error?: { message: string } | null };
       if (json.error) {
@@ -152,6 +191,67 @@ export default function StaffAppointments() {
       setActionLoading(null);
     }
   }, [fetchAppointments]);
+
+  // Open the decline modal
+  const openDeclineModal = useCallback((appt: StaffAppointment) => {
+    setDeclineAppointment(appt);
+    setSelectedDay(null);
+    setAvailableSlots([]);
+    setDeclineModalVisible(true);
+  }, []);
+
+  // Fetch available slots for a given day
+  const fetchSlots = useCallback(async (day: DayOption) => {
+    if (!declineAppointment) return;
+    setSelectedDay(day);
+    setSlotsLoading(true);
+    setAvailableSlots([]);
+
+    try {
+      const dateStr = getDateForOption(day);
+      const res = await fetch(`${API_BASE}/api/booking/staff-availability`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: declineAppointment.tenant_id,
+          serviceId: declineAppointment.service_id,
+          date: dateStr,
+          staffId: declineAppointment.staff_id,
+        }),
+      });
+      const json = await res.json() as { staff?: { slots?: { time: string; iso?: string }[] }[] };
+      const staffData = json.staff?.[0];
+      const slots: TimeSlot[] = (staffData?.slots ?? []).map((s) => ({
+        time: s.time,
+        iso: s.iso ?? `${dateStr}T${s.time}:00.000Z`,
+      }));
+      setAvailableSlots(slots);
+    } catch {
+      setAvailableSlots([]);
+    } finally {
+      setSlotsLoading(false);
+    }
+  }, [declineAppointment]);
+
+  // Decline with a suggested time
+  const handleDeclineWithSuggestion = useCallback(async (slotIso: string) => {
+    if (!declineAppointment) return;
+    setDeclineLoading(true);
+    await updateStatus(declineAppointment.id, 'cancelled', slotIso);
+    setDeclineLoading(false);
+    setDeclineModalVisible(false);
+    setDeclineAppointment(null);
+  }, [declineAppointment, updateStatus]);
+
+  // Decline without suggestion
+  const handleDeclineOnly = useCallback(async () => {
+    if (!declineAppointment) return;
+    setDeclineLoading(true);
+    await updateStatus(declineAppointment.id, 'cancelled');
+    setDeclineLoading(false);
+    setDeclineModalVisible(false);
+    setDeclineAppointment(null);
+  }, [declineAppointment, updateStatus]);
 
   const renderAppointment = ({ item }: { item: StaffAppointment }) => {
     const colors = STATUS_COLORS[item.status] ?? STATUS_COLORS.cancelled;
@@ -214,7 +314,7 @@ export default function StaffAppointments() {
                       <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#6B7FC4' }]} onPress={() => updateStatus(item.id, 'confirmed')}>
                         <Text style={styles.actionTextLight}>Accept</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#fee2e2' }]} onPress={() => updateStatus(item.id, 'cancelled')}>
+                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#fee2e2' }]} onPress={() => openDeclineModal(item)}>
                         <Text style={styles.actionTextDanger}>Decline</Text>
                       </TouchableOpacity>
                     </>
@@ -274,6 +374,94 @@ export default function StaffAppointments() {
           }
         />
       )}
+
+      {/* Decline / Reschedule Modal */}
+      <Modal
+        visible={declineModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDeclineModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Decline Appointment</Text>
+              <TouchableOpacity onPress={() => setDeclineModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            {declineAppointment && (
+              <Text style={styles.modalSubtitle}>
+                {declineAppointment.customer_name} — {declineAppointment.service_name} on{' '}
+                {formatDate(declineAppointment.start_time)} at {formatTime(declineAppointment.start_time)}
+              </Text>
+            )}
+
+            <Text style={styles.modalSectionTitle}>Suggest an alternative time</Text>
+
+            {/* Day picker */}
+            <View style={styles.dayPickerRow}>
+              {(['today', 'tomorrow', 'next_week'] as DayOption[]).map((day) => (
+                <TouchableOpacity
+                  key={day}
+                  style={[styles.dayBtn, selectedDay === day && styles.dayBtnActive]}
+                  onPress={() => fetchSlots(day)}
+                >
+                  <Text style={[styles.dayBtnText, selectedDay === day && styles.dayBtnTextActive]}>
+                    {day === 'today' ? 'Today' : day === 'tomorrow' ? 'Tomorrow' : 'Next Week'}
+                  </Text>
+                  <Text style={[styles.dayBtnDate, selectedDay === day && styles.dayBtnTextActive]}>
+                    {getDateLabel(day).replace(/.*\(/, '').replace(')', '')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Time slots */}
+            {selectedDay && (
+              <View style={styles.slotsContainer}>
+                {slotsLoading ? (
+                  <ActivityIndicator size="small" color="#6B7FC4" style={{ marginVertical: 20 }} />
+                ) : availableSlots.length === 0 ? (
+                  <Text style={styles.noSlotsText}>No available slots for this day</Text>
+                ) : (
+                  <ScrollView style={styles.slotsScroll} showsVerticalScrollIndicator={false}>
+                    <View style={styles.slotsGrid}>
+                      {availableSlots.map((slot) => (
+                        <TouchableOpacity
+                          key={slot.iso}
+                          style={styles.slotBtn}
+                          onPress={() => handleDeclineWithSuggestion(slot.iso)}
+                          disabled={declineLoading}
+                        >
+                          <Text style={styles.slotBtnText}>{slot.time}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
+              </View>
+            )}
+
+            {/* Divider */}
+            <View style={styles.modalDivider} />
+
+            {/* Decline without suggestion */}
+            <TouchableOpacity
+              style={styles.declineOnlyBtn}
+              onPress={handleDeclineOnly}
+              disabled={declineLoading}
+            >
+              {declineLoading ? (
+                <ActivityIndicator size="small" color="#991b1b" />
+              ) : (
+                <Text style={styles.declineOnlyText}>Decline Without Suggestion</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -308,4 +496,27 @@ const styles = StyleSheet.create({
   contactBtnText: { fontSize: 13, fontWeight: '600', color: '#6B7FC4' },
   emptyContainer: { alignItems: 'center', paddingTop: 60 },
   emptyText: { fontSize: 16, color: '#9ca3af', marginTop: 12 },
+
+  // Modal styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '80%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  modalSubtitle: { fontSize: 14, color: '#6b7280', marginBottom: 20 },
+  modalSectionTitle: { fontSize: 15, fontWeight: '600', color: '#374151', marginBottom: 12 },
+  dayPickerRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  dayBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb' },
+  dayBtnActive: { backgroundColor: '#6B7FC4', borderColor: '#6B7FC4' },
+  dayBtnText: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  dayBtnDate: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  dayBtnTextActive: { color: '#fff' },
+  slotsContainer: { marginBottom: 12 },
+  slotsScroll: { maxHeight: 200 },
+  slotsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  slotBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe' },
+  slotBtnText: { fontSize: 13, fontWeight: '600', color: '#1e40af' },
+  noSlotsText: { fontSize: 14, color: '#9ca3af', textAlign: 'center', paddingVertical: 20 },
+  modalDivider: { height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 },
+  declineOnlyBtn: { paddingVertical: 14, borderRadius: 10, alignItems: 'center', backgroundColor: '#fee2e2' },
+  declineOnlyText: { fontSize: 15, fontWeight: '600', color: '#991b1b' },
 });

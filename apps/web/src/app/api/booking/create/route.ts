@@ -7,7 +7,7 @@
  */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
-import { notifyBookingConfirmed, notifyStaffNewBooking } from '@/lib/notifications/booking-events';
+import { notifyBookingConfirmed, notifyBookingSubmitted, notifyStaffNewBooking } from '@/lib/notifications/booking-events';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -326,14 +326,24 @@ export async function POST(request: Request) {
       }
     }
 
-    // Fire notifications (non-blocking but with logging)
-    // When staff requires approval, don't send "confirmed" to customer yet — staff must approve first
-    void Promise.allSettled([
-      ...(!requiresApproval ? [notifyBookingConfirmed(apptId).catch((e) => console.error('[booking/create] notifyBookingConfirmed error:', e))] : []),
-      notifyStaffNewBooking(apptId).catch((e) => console.error('[booking/create] notifyStaffNewBooking error:', e)),
-    ]).then((results) => {
-      console.log('[booking/create] notification results:', results.map((r) => r.status));
-    });
+    // Fire notifications — await so they complete before Vercel terminates the function
+    try {
+      if (requiresApproval) {
+        // Booking needs staff approval — notify customer it's submitted, notify staff to approve
+        await Promise.allSettled([
+          notifyBookingSubmitted(apptId),
+          notifyStaffNewBooking(apptId),
+        ]);
+      } else {
+        // Auto-confirmed — notify customer it's confirmed, notify staff of new booking
+        await Promise.allSettled([
+          notifyBookingConfirmed(apptId),
+          notifyStaffNewBooking(apptId),
+        ]);
+      }
+    } catch (e) {
+      console.error('[booking/create] notification error:', e);
+    }
 
     // 9. Format response with local times (timezone already available)
     const localDate = start.toLocaleDateString('en-US', {

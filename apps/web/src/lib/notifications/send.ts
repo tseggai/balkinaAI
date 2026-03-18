@@ -7,12 +7,14 @@ function normalizePhone(raw: string): string {
 
 export type NotificationType =
   | 'booking_confirmed'
+  | 'booking_submitted'
   | 'booking_cancelled_by_customer'
   | 'booking_cancelled_by_tenant'
   | 'booking_reminder_24hr'
   | 'booking_reminder_2hr'
   | 'booking_approved'
   | 'booking_declined'
+  | 'booking_no_show'
   | 'new_booking_assigned'
   | 'booking_cancelled_staff_notify'
   | 'daily_schedule_summary';
@@ -30,10 +32,17 @@ const TEMPLATES: Record<NotificationType, {
   push: { title: (d: Record<string, string | number>) => string; body: (d: Record<string, string | number>) => string };
 }> = {
   booking_confirmed: {
-    sms: (d) => `Hi ${d.customerName}, your ${d.serviceName} at ${d.businessName} is confirmed for ${d.date} at ${d.time}. See you then!`,
+    sms: (d) => `Hi ${d.customerName}, your ${d.serviceName} appointment at ${d.businessName} with ${d.staffName} for ${d.date} at ${d.time} is confirmed. See you then!`,
     push: {
       title: () => 'Booking Confirmed',
-      body: (d) => `${d.serviceName} at ${d.businessName} on ${d.date} at ${d.time}`,
+      body: (d) => `Your ${d.serviceName} appointment at ${d.businessName} with ${d.staffName} for ${d.date} at ${d.time} is confirmed.`,
+    },
+  },
+  booking_submitted: {
+    sms: (d) => `Your appointment request for a ${d.serviceName} at ${d.businessName} with ${d.staffName} for ${d.date} at ${d.time} has been submitted.`,
+    push: {
+      title: () => 'Appointment Request Submitted',
+      body: (d) => `Your appointment request for a ${d.serviceName} at ${d.businessName} with ${d.staffName} for ${d.date} at ${d.time} has been submitted.`,
     },
   },
   booking_cancelled_by_customer: {
@@ -65,24 +74,35 @@ const TEMPLATES: Record<NotificationType, {
     },
   },
   booking_approved: {
-    sms: (d) => `Great news! Your ${d.serviceName} at ${d.businessName} on ${d.date} at ${d.time} has been approved.`,
+    sms: (d) => `Appointment Approved: ${d.staffName} has approved your appointment request for a ${d.serviceName} at ${d.businessName} for ${d.date} at ${d.time}.`,
     push: {
-      title: () => 'Booking Approved',
-      body: (d) => `${d.serviceName} at ${d.businessName} on ${d.date} at ${d.time}`,
+      title: () => 'Appointment Approved',
+      body: (d) => `${d.staffName} has approved your appointment request for a ${d.serviceName} at ${d.businessName} for ${d.date} at ${d.time}.`,
     },
   },
   booking_declined: {
-    sms: (d) => `Sorry, your ${d.serviceName} request at ${d.businessName} on ${d.date} was not available. Please try another time.`,
+    sms: (d) => d.suggestedTime
+      ? `Appointment Reschedule: ${d.staffName} at ${d.businessName} can accommodate your ${d.serviceName} appointment for ${d.suggestedDate} at ${d.suggestedTime} instead of your requested ${d.date} at ${d.time}.`
+      : `Appointment Update: ${d.staffName} at ${d.businessName} was unable to accommodate your ${d.serviceName} appointment for ${d.date} at ${d.time}. Please try another time.`,
     push: {
-      title: () => 'Booking Not Available',
-      body: (d) => `Your ${d.serviceName} request at ${d.businessName} was declined.`,
+      title: (d) => d.suggestedTime ? 'Appointment Reschedule' : 'Appointment Update',
+      body: (d) => d.suggestedTime
+        ? `${d.staffName} at ${d.businessName} can accommodate your ${d.serviceName} appointment for ${d.suggestedDate} at ${d.suggestedTime} instead of your requested ${d.date} at ${d.time}.`
+        : `${d.staffName} at ${d.businessName} was unable to accommodate your ${d.serviceName} appointment for ${d.date} at ${d.time}.`,
+    },
+  },
+  booking_no_show: {
+    sms: (d) => `You didn't make it to your ${d.serviceName} appointment with ${d.staffName} at ${d.businessName} for ${d.date} at ${d.time}. Would you like to book a new one?`,
+    push: {
+      title: () => 'Missed Appointment',
+      body: (d) => `You didn't make it to your ${d.serviceName} appointment with ${d.staffName} at ${d.businessName} for ${d.date} at ${d.time}.`,
     },
   },
   new_booking_assigned: {
-    sms: (d) => `New booking: ${d.customerName} — ${d.serviceName} on ${d.date} at ${d.time}.${d.requiresApproval ? ' Tap to approve.' : ''}`,
+    sms: (d) => `New Appointment: ${d.customerName} requested to book a ${d.serviceName} appointment for ${d.date} at ${d.time}.${d.requiresApproval ? ' Tap to approve or decline.' : ''}`,
     push: {
       title: () => 'New Appointment',
-      body: (d) => `${d.customerName} booked ${d.serviceName} on ${d.date} at ${d.time}`,
+      body: (d) => `${d.customerName} requested to book a ${d.serviceName} appointment for ${d.date} at ${d.time}.`,
     },
   },
   booking_cancelled_staff_notify: {

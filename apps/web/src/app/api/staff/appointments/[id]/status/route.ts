@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import {
   notifyBookingApproved,
+  notifyBookingDeclined,
+  notifyBookingNoShow,
   notifyBookingCancelledByTenant,
 } from '@/lib/notifications/booking-events';
 
@@ -40,8 +42,9 @@ export async function PATCH(
   const staff = await getStaffRecord(request);
   if (!staff) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
-  const body = await request.json() as { status: string };
+  const body = await request.json() as { status: string; suggestedTime?: string };
   const newStatus = body.status;
+  const suggestedTime = body.suggestedTime;
 
   if (!newStatus) {
     return NextResponse.json({ data: null, error: { message: 'Missing status' } }, { status: 400 });
@@ -84,18 +87,25 @@ export async function PATCH(
     return NextResponse.json({ data: null, error: { message: updateErr.message } }, { status: 500 });
   }
 
-  // Fire notifications (non-blocking but with logging)
+  // Fire notifications — AWAIT them so they complete before Vercel terminates the function
   console.log(`[staff/status] appointment ${params.id}: ${appointment.status} → ${newStatus}`);
-  void Promise.allSettled([
-    newStatus === 'confirmed'
-      ? notifyBookingApproved(params.id).catch((e) => console.error('[staff/status] notifyBookingApproved error:', e))
-      : Promise.resolve(),
-    newStatus === 'cancelled'
-      ? notifyBookingCancelledByTenant(params.id).catch((e) => console.error('[staff/status] notifyBookingCancelledByTenant error:', e))
-      : Promise.resolve(),
-  ]).then((results) => {
-    console.log('[staff/status] notification results:', results.map((r) => r.status));
-  });
+  try {
+    if (newStatus === 'confirmed') {
+      // Staff approved a pending booking
+      await notifyBookingApproved(params.id);
+    } else if (newStatus === 'cancelled' && appointment.status === 'pending') {
+      // Staff declined a pending booking request
+      await notifyBookingDeclined(params.id, suggestedTime);
+    } else if (newStatus === 'cancelled' && appointment.status === 'confirmed') {
+      // Staff cancelled an already-confirmed booking
+      await notifyBookingCancelledByTenant(params.id);
+    } else if (newStatus === 'no_show') {
+      // Staff marked customer as no-show
+      await notifyBookingNoShow(params.id);
+    }
+  } catch (e) {
+    console.error('[staff/status] notification error:', e);
+  }
 
   return NextResponse.json({ data: updated, error: null });
 }
