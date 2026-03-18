@@ -4,6 +4,7 @@ import {
   notifyBookingApproved,
   notifyBookingDeclined,
   notifyBookingNoShow,
+  notifyBookingCompleted,
   notifyBookingCancelledByTenant,
 } from '@/lib/notifications/booking-events';
 
@@ -99,6 +100,9 @@ export async function PATCH(
     } else if (newStatus === 'cancelled' && appointment.status === 'confirmed') {
       // Staff cancelled an already-confirmed booking
       await notifyBookingCancelledByTenant(params.id);
+    } else if (newStatus === 'completed') {
+      // Staff marked appointment as completed
+      await notifyBookingCompleted(params.id);
     } else if (newStatus === 'no_show') {
       // Staff marked customer as no-show
       await notifyBookingNoShow(params.id);
