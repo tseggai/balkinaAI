@@ -242,6 +242,7 @@ export async function notifyBookingCancelledByTenant(appointmentId: string) {
   const ctx = await getAppointmentContext(appointmentId);
   if (!ctx) return;
   const tz = ctx.tenant_locations?.timezone ?? 'UTC';
+  // Notify customer
   await sendNotification({
     type: 'booking_cancelled_by_tenant',
     appointmentId,
@@ -256,4 +257,19 @@ export async function notifyBookingCancelledByTenant(appointmentId: string) {
       time: formatTime(ctx.start_time, tz),
     },
   });
+  // Notify assigned staff that appointment was cancelled by tenant admin
+  if (ctx.staff) {
+    await sendNotification({
+      type: 'booking_cancelled_staff_notify',
+      appointmentId,
+      recipientType: 'staff',
+      recipientId: ctx.staff.id,
+      data: {
+        customerName: ctx.customers.display_name ?? '',
+        serviceName: ctx.services.name,
+        date: formatDate(ctx.start_time, tz),
+        time: formatTime(ctx.start_time, tz),
+      },
+    });
+  }
 }
