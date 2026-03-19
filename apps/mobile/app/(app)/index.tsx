@@ -705,6 +705,12 @@ function StaffCardRow({ items, onTap }: { items: StaffCardData[]; onTap: (name: 
 
 function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (msg: string) => void }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
+  // Re-render every 60 seconds so past-time greying stays current
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
   // -1 means "Anyone" is selected
   const isAnyone = selectedIdx === -1;
   const selectedStaff = isAnyone ? null : data.items[selectedIdx];
@@ -764,42 +770,32 @@ function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (
           </TouchableOpacity>
         ) : null}
       </ScrollView>
-      {slots.length > 0 ? (() => {
-        const hasAnyAvailable = slots.some((s) => s.available !== false);
-        if (!hasAnyAvailable && !isAnyone) {
-          return (
-            <View style={{ paddingVertical: 16, paddingHorizontal: 12, alignItems: 'center' }}>
-              <Text style={{ color: '#9ca3af', fontSize: 14 }}>Not available today</Text>
-            </View>
-          );
-        }
-        return (
-          <View style={combinedStyles.slotsContainer}>
-            {slots.map((slot, i) => {
-              const isAvailable = slot.available !== false;
-              const staffLabel = isAnyone ? '' : selectedStaff ? ` with ${selectedStaff.name}` : '';
-              const staffIdTag = isAnyone || !selectedStaff ? '' : ` [staff:${selectedStaff.id}]`;
-              return (
-                <TouchableOpacity
-                  key={`${slot.time}-${i}`}
-                  style={[
-                    combinedStyles.slotChip,
-                    !isAvailable && combinedStyles.slotChipUnavailable,
-                  ]}
-                  onPress={() => isAvailable ? onTap(`${slot.time}${staffLabel}${staffIdTag}`) : undefined}
-                  activeOpacity={isAvailable ? 0.7 : 1}
-                  disabled={!isAvailable}
-                >
-                  <Text style={[
-                    combinedStyles.slotChipText,
-                    !isAvailable && combinedStyles.slotChipTextUnavailable,
-                  ]}>{slot.time}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        );
-      })() : null}
+      {slots.length > 0 ? (
+        <View style={combinedStyles.slotsContainer}>
+          {slots.map((slot, i) => {
+            const isAvailable = slot.available !== false;
+            const staffLabel = isAnyone ? '' : selectedStaff ? ` with ${selectedStaff.name}` : '';
+            const staffIdTag = isAnyone || !selectedStaff ? '' : ` [staff:${selectedStaff.id}]`;
+            return (
+              <TouchableOpacity
+                key={`${slot.time}-${i}`}
+                style={[
+                  combinedStyles.slotChip,
+                  !isAvailable && combinedStyles.slotChipUnavailable,
+                ]}
+                onPress={() => isAvailable ? onTap(`${slot.time}${staffLabel}${staffIdTag}`) : undefined}
+                activeOpacity={isAvailable ? 0.7 : 1}
+                disabled={!isAvailable}
+              >
+                <Text style={[
+                  combinedStyles.slotChipText,
+                  !isAvailable && combinedStyles.slotChipTextUnavailable,
+                ]}>{slot.time}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : null}
     </View>
   );
 }
