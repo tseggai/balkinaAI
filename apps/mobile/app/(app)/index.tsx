@@ -705,6 +705,12 @@ function StaffCardRow({ items, onTap }: { items: StaffCardData[]; onTap: (name: 
 
 function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (msg: string) => void }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
+  // Re-render every 60 seconds so past-time greying stays current
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
   // -1 means "Anyone" is selected
   const isAnyone = selectedIdx === -1;
   const selectedStaff = isAnyone ? null : data.items[selectedIdx];
@@ -721,10 +727,21 @@ function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (
     return s;
   });
 
+  // Update available_slots_count based on current time (not stale server data)
+  const availableCount = slots.filter((s) => s.available !== false).length;
+
   return (
     <View style={{ marginTop: 4, marginBottom: 2 }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
-        {data.items.map((staff, idx) => (
+        {data.items.map((staff, idx) => {
+          // Recalculate slot count for this staff based on current time
+          const staffRawSlots = staff.all_slots ?? staff.slots?.map((s) => ({ ...s, available: true })) ?? [];
+          const staffAvailCount = staffRawSlots.filter((s) => {
+            if (s.available === false) return false;
+            if (s.iso && new Date(s.iso).getTime() < nowMs) return false;
+            return true;
+          }).length;
+          return (
           <TouchableOpacity
             key={staff.id}
             style={[
@@ -744,9 +761,10 @@ function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (
               )}
             </View>
             <Text style={richCardStyles.staffName} numberOfLines={1}>{staff.name}</Text>
-            <Text style={richCardStyles.staffSlots}>{staff.available_slots_count} slots</Text>
+            <Text style={richCardStyles.staffSlots}>{staffAvailCount} slots</Text>
           </TouchableOpacity>
-        ))}
+          );
+        })}
         {data.anyone_slots && data.anyone_slots.length > 0 && data.items.length > 1 ? (
           <TouchableOpacity
             style={[

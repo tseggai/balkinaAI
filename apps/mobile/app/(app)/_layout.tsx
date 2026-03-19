@@ -33,34 +33,10 @@ export default function AppTabsLayout() {
           return;
         }
 
-        // Try finding customer by user_id first, then fallback to id = auth uid
-        let customerId: string | null = null;
-        const { data: byUserId } = await supabase
-          .from('customers')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .limit(1)
-          .maybeSingle();
-        if (byUserId) {
-          customerId = (byUserId as { id: string }).id;
-        } else {
-          // Fallback: customer.id may equal auth user id directly
-          const { data: byId } = await supabase
-            .from('customers')
-            .select('id')
-            .eq('id', session.user.id)
-            .limit(1)
-            .maybeSingle();
-          if (byId) {
-            customerId = (byId as { id: string }).id;
-          }
-        }
-
-        if (!customerId) {
-          console.log('[push-reg] no customer record found for user', session.user.id);
-          return;
-        }
-
+        // Use session.user.id directly as customerId — in our schema customer.id = auth uid.
+        // DB queries fail here when the refresh token is expired (RLS sees null auth.uid()),
+        // so we skip the DB lookup entirely.
+        const customerId = session.user.id;
         console.log('[push-reg] registering push token for customer', customerId);
         registerPushToken({
           recipientType: 'customer',
