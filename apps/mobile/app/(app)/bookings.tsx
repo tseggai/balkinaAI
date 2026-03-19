@@ -12,6 +12,10 @@ import {
   Linking,
   Platform,
   Modal,
+  KeyboardAvoidingView,
+  Keyboard,
+  TouchableWithoutFeedback,
+  ScrollView,
 } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -606,63 +610,78 @@ export default function BookingsScreen() {
         animationType="slide"
         onRequestClose={() => setRatingModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Rate Your Experience</Text>
-              <TouchableOpacity onPress={() => setRatingModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalSubtitle}>How was your appointment?</Text>
-
-            {/* Star rating */}
-            <View style={styles.starsRow}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity key={star} onPress={() => setRatingValue(star)}>
-                  <Ionicons
-                    name={star <= ratingValue ? 'star' : 'star-outline'}
-                    size={40}
-                    color={star <= ratingValue ? '#f59e0b' : '#d1d5db'}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.ratingLabel}>
-              {ratingValue === 0 ? 'Tap a star to rate' :
-               ratingValue === 1 ? 'Poor' :
-               ratingValue === 2 ? 'Fair' :
-               ratingValue === 3 ? 'Good' :
-               ratingValue === 4 ? 'Great' : 'Excellent!'}
-            </Text>
-
-            {/* Optional comment */}
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Add a comment (optional)"
-              placeholderTextColor="#9ca3af"
-              value={ratingComment}
-              onChangeText={setRatingComment}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-
-            <TouchableOpacity
-              style={[styles.submitBtn, ratingValue === 0 && styles.submitBtnDisabled]}
-              onPress={handleSubmitRating}
-              disabled={ratingValue === 0 || ratingLoading}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={styles.keyboardAvoid}
             >
-              {ratingLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.submitBtnText}>Submit Review</Text>
-              )}
-            </TouchableOpacity>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Rate Your Experience</Text>
+                  <TouchableOpacity onPress={() => setRatingModalVisible(false)}>
+                    <Ionicons name="close" size={24} color="#6b7280" />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.modalSubtitle}>How was your appointment?</Text>
+
+                {/* Star rating */}
+                <View style={styles.starsRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity key={star} onPress={() => setRatingValue(star)}>
+                      <Ionicons
+                        name={star <= ratingValue ? 'star' : 'star-outline'}
+                        size={40}
+                        color={star <= ratingValue ? '#f59e0b' : '#d1d5db'}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={styles.ratingLabel}>
+                  {ratingValue === 0 ? 'Tap a star to rate' :
+                   ratingValue === 1 ? 'Poor' :
+                   ratingValue === 2 ? 'Fair' :
+                   ratingValue === 3 ? 'Good' :
+                   ratingValue === 4 ? 'Great' : 'Excellent!'}
+                </Text>
+
+                {/* Optional comment */}
+                <ScrollView keyboardShouldPersistTaps="handled" style={styles.ratingScroll}>
+                  <TextInput
+                    style={styles.commentInput}
+                    placeholder="Add a comment (optional)"
+                    placeholderTextColor="#9ca3af"
+                    value={ratingComment}
+                    onChangeText={setRatingComment}
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                    returnKeyType="done"
+                    blurOnSubmit
+                    onSubmitEditing={Keyboard.dismiss}
+                  />
+                </ScrollView>
+
+                <TouchableOpacity
+                  style={[styles.submitBtn, ratingValue === 0 && styles.submitBtnDisabled]}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    handleSubmitRating();
+                  }}
+                  disabled={ratingValue === 0 || ratingLoading}
+                >
+                  {ratingLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.submitBtnText}>Submit Review</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </KeyboardAvoidingView>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Accept Suggestion Modal */}
@@ -865,12 +884,14 @@ const styles = StyleSheet.create({
 
   // Modal styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  keyboardAvoid: { justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
   modalSubtitle: { fontSize: 14, color: '#6b7280', marginBottom: 20 },
 
   // Rating modal
+  ratingScroll: { maxHeight: 120 },
   starsRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 8 },
   ratingLabel: { fontSize: 14, fontWeight: '600', color: '#374151', textAlign: 'center', marginBottom: 16 },
   commentInput: {
