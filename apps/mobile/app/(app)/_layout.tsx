@@ -28,21 +28,49 @@ export default function AppTabsLayout() {
     (async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-        const { data: customer } = await supabase
+        if (!session) {
+          console.log('[push-reg] no session, skipping push token registration');
+          return;
+        }
+
+        // Try finding customer by user_id first, then fallback to id = auth uid
+        let customerId: string | null = null;
+        const { data: byUserId } = await supabase
           .from('customers')
           .select('id')
           .eq('user_id', session.user.id)
-          .single();
-        if (customer) {
-          registerPushToken({
-            recipientType: 'customer',
-            recipientId: (customer as { id: string }).id,
-            accessToken: session.access_token,
-          }).catch(() => { /* push registration is non-critical */ });
+          .limit(1)
+          .maybeSingle();
+        if (byUserId) {
+          customerId = (byUserId as { id: string }).id;
+        } else {
+          // Fallback: customer.id may equal auth user id directly
+          const { data: byId } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('id', session.user.id)
+            .limit(1)
+            .maybeSingle();
+          if (byId) {
+            customerId = (byId as { id: string }).id;
+          }
         }
-      } catch {
-        // Auth check is non-critical here — root layout handles auth
+
+        if (!customerId) {
+          console.log('[push-reg] no customer record found for user', session.user.id);
+          return;
+        }
+
+        console.log('[push-reg] registering push token for customer', customerId);
+        registerPushToken({
+          recipientType: 'customer',
+          recipientId: customerId,
+          accessToken: session.access_token,
+        }).catch((err) => {
+          console.warn('[push-reg] push token registration failed:', err);
+        });
+      } catch (err) {
+        console.warn('[push-reg] error during push setup:', err);
       }
     })();
   }, []);

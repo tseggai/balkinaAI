@@ -16,14 +16,22 @@ export async function registerPushToken(params: {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
-  if (finalStatus !== 'granted') return;
+  if (finalStatus !== 'granted') {
+    console.log('[push-reg] notification permission not granted:', finalStatus);
+    return;
+  }
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-  if (!projectId) return; // projectId required for push token registration
+  if (!projectId) {
+    console.warn('[push-reg] no EAS projectId found in app config');
+    return;
+  }
+
   const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+  console.log('[push-reg] got expo push token:', tokenData.data?.slice(0, 30) + '...');
 
   try {
-    await fetch(`${API_BASE}/api/push-tokens`, {
+    const response = await fetch(`${API_BASE}/api/push-tokens`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -36,7 +44,13 @@ export async function registerPushToken(params: {
         platform: Platform.OS === 'ios' ? 'ios' : 'android',
       }),
     });
-  } catch {
-    // Silent fail — push token registration is non-critical
+    if (!response.ok) {
+      const text = await response.text();
+      console.warn('[push-reg] API returned', response.status, text);
+    } else {
+      console.log('[push-reg] push token registered successfully');
+    }
+  } catch (err) {
+    console.warn('[push-reg] fetch failed:', err);
   }
 }
