@@ -5,6 +5,7 @@
  */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
+import { notifyBookingCancelledByCustomer } from '@/lib/notifications/booking-events';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -77,6 +78,13 @@ export async function POST(request: Request) {
 
     if (updateErr) {
       return NextResponse.json({ error: updateErr.message }, { status: 500, headers: CORS_HEADERS });
+    }
+
+    // Fire notifications — await so they complete before Vercel terminates the function
+    try {
+      await notifyBookingCancelledByCustomer(appointmentId);
+    } catch (e) {
+      console.error('[customer/bookings/cancel] notification error:', e);
     }
 
     return NextResponse.json({ success: true }, { headers: CORS_HEADERS });

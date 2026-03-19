@@ -215,12 +215,16 @@ export async function POST(request: Request) {
     } as never);
   }
 
-  // Fire notifications (non-blocking)
+  // Fire notifications — await so they complete before Vercel terminates the function
   if (appointmentData) {
-    void Promise.allSettled([
-      notifyBookingConfirmed(appointmentData.id),
-      notifyStaffNewBooking(appointmentData.id),
-    ]);
+    try {
+      await Promise.allSettled([
+        notifyBookingConfirmed(appointmentData.id),
+        notifyStaffNewBooking(appointmentData.id),
+      ]);
+    } catch (e) {
+      console.error('[appointments POST] notification error:', e);
+    }
   }
 
   return NextResponse.json({ data, error: null }, { status: 201 });
@@ -367,12 +371,14 @@ export async function PATCH(request: Request) {
     }
   }
 
-  // Fire cancellation notifications (non-blocking)
+  // Fire cancellation notifications — await so they complete before Vercel terminates the function
   if (updateFields.status === 'cancelled' && data) {
     const apptData = data as { id: string };
-    void Promise.allSettled([
-      notifyBookingCancelledByTenant(apptData.id),
-    ]);
+    try {
+      await notifyBookingCancelledByTenant(apptData.id);
+    } catch (e) {
+      console.error('[appointments PATCH] notification error:', e);
+    }
   }
 
   return NextResponse.json({ data, error: null });
