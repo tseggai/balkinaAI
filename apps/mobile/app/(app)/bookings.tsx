@@ -11,8 +11,9 @@ import {
   Alert,
   Linking,
   Platform,
+  Modal,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 
@@ -77,14 +78,17 @@ function BookingCardRow({
   onToggle,
   onCancel,
   onGetDirections,
+  onRate,
 }: {
   item: Appointment;
   expanded: boolean;
   onToggle: () => void;
   onCancel: (id: string) => void;
   onGetDirections: (item: Appointment) => void;
+  onRate: (id: string) => void;
 }) {
   const isCancellable = item.status === 'confirmed' || item.status === 'pending';
+  const isCompleted = item.status === 'completed';
   const hasLocation = !!(item.tenant_locations?.address || item.tenant_locations?.latitude);
 
   const { date, time } = formatDateTime(item.start_time);
@@ -160,6 +164,16 @@ function BookingCardRow({
               <Text style={styles.actionBtnText}>Cancel</Text>
             </TouchableOpacity>
           ) : null}
+          {isCompleted ? (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnRate]}
+              onPress={() => onRate(item.id)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="star-outline" size={18} color="#fff" />
+              <Text style={styles.actionBtnText}>Rate</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -180,6 +194,46 @@ export default function BookingsScreen() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [userId, setUserId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Rating modal state
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [ratingAppointmentId, setRatingAppointmentId] = useState<string | null>(null);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [ratingLoading, setRatingLoading] = useState(false);
+
+  // Accept-suggestion modal state
+  const [suggestionModalVisible, setSuggestionModalVisible] = useState(false);
+  const [suggestionAppointmentId, setSuggestionAppointmentId] = useState<string | null>(null);
+  const [suggestedTime, setSuggestedTime] = useState('');
+  const [suggestedDate, setSuggestedDate] = useState('');
+  const [suggestedTimeIso, setSuggestedTimeIso] = useState('');
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+
+  // Handle notification deep-link params
+  const params = useLocalSearchParams<{
+    action?: string;
+    appointmentId?: string;
+    suggestedTime?: string;
+    suggestedDate?: string;
+    suggestedTimeIso?: string;
+  }>();
+
+  useEffect(() => {
+    if (!params.action) return;
+    if (params.action === 'rate' && params.appointmentId) {
+      setRatingAppointmentId(params.appointmentId);
+      setRatingValue(0);
+      setRatingComment('');
+      setRatingModalVisible(true);
+    } else if (params.action === 'accept_suggestion' && params.appointmentId) {
+      setSuggestionAppointmentId(params.appointmentId);
+      setSuggestedTime(params.suggestedTime ?? '');
+      setSuggestedDate(params.suggestedDate ?? '');
+      setSuggestedTimeIso(params.suggestedTimeIso ?? '');
+      setSuggestionModalVisible(true);
+    }
+  }, [params.action, params.appointmentId, params.suggestedTime, params.suggestedDate, params.suggestedTimeIso]);
 
   const fetchAppointments = useCallback(async () => {
     setErrorMsg(null);
@@ -334,6 +388,76 @@ export default function BookingsScreen() {
     }
   }, []);
 
+  // Submit a review
+  const handleSubmitRating = useCallback(async () => {
+    if (!ratingAppointmentId || !userId || ratingValue === 0) return;
+    setRatingLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/customer/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appointmentId: ratingAppointmentId,
+          userId,
+          rating: ratingValue,
+          comment: ratingComment.trim() || undefined,
+        }),
+      });
+      if (res.ok) {
+        Alert.alert('Thank You!', 'Your review has been submitted.');
+        setRatingModalVisible(false);
+        setRatingAppointmentId(null);
+        setRatingValue(0);
+        setRatingComment('');
+      } else {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        Alert.alert('Error', err.error ?? 'Failed to submit review');
+      }
+    } catch {
+      Alert.alert('Error', 'Connection error. Please try again.');
+    } finally {
+      setRatingLoading(false);
+    }
+  }, [ratingAppointmentId, userId, ratingValue, ratingComment]);
+
+  // Accept a suggested reschedule time
+  const handleAcceptSuggestion = useCallback(async () => {
+    if (!suggestionAppointmentId || !userId || !suggestedTimeIso) return;
+    setSuggestionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/customer/bookings/accept-suggestion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appointmentId: suggestionAppointmentId,
+          userId,
+          suggestedTimeIso,
+        }),
+      });
+      if (res.ok) {
+        Alert.alert('Booked!', 'Your appointment has been rescheduled.');
+        setSuggestionModalVisible(false);
+        setSuggestionAppointmentId(null);
+        fetchAppointments();
+      } else {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        Alert.alert('Error', err.error ?? 'Failed to accept suggestion');
+      }
+    } catch {
+      Alert.alert('Error', 'Connection error. Please try again.');
+    } finally {
+      setSuggestionLoading(false);
+    }
+  }, [suggestionAppointmentId, userId, suggestedTimeIso, fetchAppointments]);
+
+  // Open the rating modal from a booking card
+  const openRatingModal = useCallback((appointmentId: string) => {
+    setRatingAppointmentId(appointmentId);
+    setRatingValue(0);
+    setRatingComment('');
+    setRatingModalVisible(true);
+  }, []);
+
   const renderItem = ({ item }: { item: Appointment }) => (
     <BookingCardRow
       item={item}
@@ -341,6 +465,7 @@ export default function BookingsScreen() {
       onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)}
       onCancel={handleCancel}
       onGetDirections={handleGetDirections}
+      onRate={openRatingModal}
     />
   );
 
@@ -473,6 +598,127 @@ export default function BookingsScreen() {
           }
         />
       )}
+
+      {/* Rating Modal */}
+      <Modal
+        visible={ratingModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRatingModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Rate Your Experience</Text>
+              <TouchableOpacity onPress={() => setRatingModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>How was your appointment?</Text>
+
+            {/* Star rating */}
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setRatingValue(star)}>
+                  <Ionicons
+                    name={star <= ratingValue ? 'star' : 'star-outline'}
+                    size={40}
+                    color={star <= ratingValue ? '#f59e0b' : '#d1d5db'}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.ratingLabel}>
+              {ratingValue === 0 ? 'Tap a star to rate' :
+               ratingValue === 1 ? 'Poor' :
+               ratingValue === 2 ? 'Fair' :
+               ratingValue === 3 ? 'Good' :
+               ratingValue === 4 ? 'Great' : 'Excellent!'}
+            </Text>
+
+            {/* Optional comment */}
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Add a comment (optional)"
+              placeholderTextColor="#9ca3af"
+              value={ratingComment}
+              onChangeText={setRatingComment}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity
+              style={[styles.submitBtn, ratingValue === 0 && styles.submitBtnDisabled]}
+              onPress={handleSubmitRating}
+              disabled={ratingValue === 0 || ratingLoading}
+            >
+              {ratingLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.submitBtnText}>Submit Review</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Accept Suggestion Modal */}
+      <Modal
+        visible={suggestionModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSuggestionModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reschedule Suggestion</Text>
+              <TouchableOpacity onPress={() => setSuggestionModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Your stylist has suggested a new time for your appointment:
+            </Text>
+
+            <View style={styles.suggestionCard}>
+              <Ionicons name="calendar-outline" size={24} color="#6B7FC4" />
+              <View style={styles.suggestionInfo}>
+                <Text style={styles.suggestionDate}>{suggestedDate}</Text>
+                <Text style={styles.suggestionTime}>{suggestedTime}</Text>
+              </View>
+            </View>
+
+            <View style={styles.suggestionActions}>
+              <TouchableOpacity
+                style={styles.acceptBtn}
+                onPress={handleAcceptSuggestion}
+                disabled={suggestionLoading}
+              >
+                {suggestionLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.acceptBtnText}>Accept & Book</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.declineSuggestionBtn}
+                onPress={() => {
+                  setSuggestionModalVisible(false);
+                  router.navigate('/(app)/');
+                }}
+              >
+                <Text style={styles.declineSuggestionText}>Find Another Time</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -562,6 +808,7 @@ const styles = StyleSheet.create({
   },
   actionBtnDirections: { backgroundColor: '#6B7FC4' },
   actionBtnCancel: { backgroundColor: '#ef4444' },
+  actionBtnRate: { backgroundColor: '#f59e0b' },
   actionBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
 
   card: {
@@ -615,4 +862,37 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   startChatBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+
+  // Modal styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  modalSubtitle: { fontSize: 14, color: '#6b7280', marginBottom: 20 },
+
+  // Rating modal
+  starsRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 8 },
+  ratingLabel: { fontSize: 14, fontWeight: '600', color: '#374151', textAlign: 'center', marginBottom: 16 },
+  commentInput: {
+    borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 12,
+    fontSize: 14, color: '#111827', minHeight: 80, marginBottom: 16,
+  },
+  submitBtn: { backgroundColor: '#6B7FC4', paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
+  submitBtnDisabled: { opacity: 0.4 },
+  submitBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+
+  // Suggestion modal
+  suggestionCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    backgroundColor: '#eff6ff', borderRadius: 12, padding: 16, marginBottom: 20,
+    borderWidth: 1, borderColor: '#bfdbfe',
+  },
+  suggestionInfo: { flex: 1 },
+  suggestionDate: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  suggestionTime: { fontSize: 14, color: '#6B7FC4', fontWeight: '600', marginTop: 2 },
+  suggestionActions: { gap: 10 },
+  acceptBtn: { backgroundColor: '#6B7FC4', paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
+  acceptBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  declineSuggestionBtn: { paddingVertical: 14, borderRadius: 10, alignItems: 'center', backgroundColor: '#f3f4f6' },
+  declineSuggestionText: { fontSize: 15, fontWeight: '600', color: '#374151' },
 });
