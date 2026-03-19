@@ -62,11 +62,36 @@ export default function AppTabsLayout() {
       });
 
       responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data as { type?: string; appointmentId?: string } | undefined;
-        if (data?.type === 'booking_approved' || data?.type === 'booking_confirmed' || data?.type === 'booking_completed') {
+        const data = response.notification.request.content.data as {
+          type?: string;
+          appointmentId?: string;
+          suggestedTime?: string;
+          suggestedDate?: string;
+          suggestedTimeIso?: string;
+        } | undefined;
+
+        if (data?.type === 'booking_completed' && data.appointmentId) {
+          // Navigate to bookings with rate action
+          router.navigate({
+            pathname: '/(app)/bookings',
+            params: { action: 'rate', appointmentId: data.appointmentId },
+          });
+        } else if (data?.type === 'booking_declined' && data.suggestedTimeIso && data.appointmentId) {
+          // Navigate to bookings with accept-suggestion action
+          router.navigate({
+            pathname: '/(app)/bookings',
+            params: {
+              action: 'accept_suggestion',
+              appointmentId: data.appointmentId,
+              suggestedTime: data.suggestedTime ?? '',
+              suggestedDate: data.suggestedDate ?? '',
+              suggestedTimeIso: data.suggestedTimeIso,
+            },
+          });
+        } else if (data?.type === 'booking_approved' || data?.type === 'booking_confirmed') {
           router.navigate('/(app)/bookings');
         } else if (data?.type === 'booking_declined' || data?.type === 'booking_no_show') {
-          // Navigate to chat for rebooking
+          // No suggestion — navigate to chat for rebooking
           router.navigate('/(app)/');
         }
       });
