@@ -40,6 +40,7 @@ interface BookingState {
   serviceDuration: number | null;
   depositEnabled: boolean;
   depositAmount: number | null;
+  depositType: 'fixed' | 'percentage' | null;
   date: string | null; // YYYY-MM-DD
   staffId: string | null;
   staffName: string | null;
@@ -61,6 +62,7 @@ const INITIAL_BOOKING_STATE: BookingState = {
   serviceDuration: null,
   depositEnabled: false,
   depositAmount: null,
+  depositType: null,
   date: null,
   staffId: null,
   staffName: null,
@@ -104,6 +106,7 @@ interface ServiceCardData {
   duration_minutes: number;
   deposit_enabled: boolean;
   deposit_amount?: number;
+  deposit_type?: 'fixed' | 'percentage';
 }
 
 interface StaffCardData {
@@ -181,6 +184,7 @@ interface ServiceChipData {
   duration_minutes: number;
   deposit_enabled?: boolean;
   deposit_amount?: number;
+  deposit_type?: 'fixed' | 'percentage';
 }
 
 interface BusinessWithServicesData {
@@ -563,7 +567,11 @@ function ServiceCardRow({ items, onTap }: { items: ServiceCardData[]; onTap: (na
             <Text style={richCardStyles.serviceDuration}>{svc.duration_minutes} min</Text>
             {svc.deposit_enabled && svc.deposit_amount ? (
               <View style={richCardStyles.depositBadge}>
-                <Text style={richCardStyles.depositText}>${svc.deposit_amount} deposit</Text>
+                <Text style={richCardStyles.depositText}>
+                  {svc.deposit_type === 'percentage'
+                    ? `${svc.deposit_amount}% deposit`
+                    : `$${svc.deposit_amount} deposit`}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -653,7 +661,11 @@ function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesDa
                   <View style={combinedStyles.serviceCardLgLeft}>
                     <Text style={[combinedStyles.serviceCardLgPrice, isSelected && combinedStyles.serviceCardLgPriceSelected]}>${svc.price}</Text>
                     {svc.deposit_enabled && svc.deposit_amount ? (
-                      <Text style={combinedStyles.serviceCardLgDepositText}>({Math.round((svc.deposit_amount / svc.price) * 100)}% deposit)</Text>
+                      <Text style={combinedStyles.serviceCardLgDepositText}>
+                        {svc.deposit_type === 'percentage'
+                          ? `(${svc.deposit_amount}% deposit)`
+                          : `($${svc.deposit_amount} deposit)`}
+                      </Text>
                     ) : null}
                   </View>
                   <Text style={[combinedStyles.serviceCardLgDuration, isSelected && combinedStyles.serviceCardLgDurationSelected]}>{svc.duration_minutes} min</Text>
@@ -1595,7 +1607,7 @@ export default function ChatScreen() {
   // Full-screen confirmation modal state
   const [confirmationModal, setConfirmationModal] = useState<ConfirmedCardData | null>(null);
   // Track recently displayed service cards so we can match taps to IDs
-  const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; tenantId?: string; tenantName?: string }[]>([]);
+  const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; tenantId?: string; tenantName?: string }[]>([]);
   // Stores structured tool data from SSE for deterministic rendering
   const pendingToolData = useRef<{ tool: string; data: Record<string, unknown> } | null>(null);
   // Stores last booking options so we can look up package/extras prices
@@ -1945,7 +1957,11 @@ export default function ChatScreen() {
       coupon_discount: 0,
       loyalty_discount: 0,
       total,
-      deposit_required: state.depositEnabled ? (state.depositAmount ?? 0) : undefined,
+      deposit_required: state.depositEnabled && state.depositAmount
+        ? (state.depositType === 'percentage'
+          ? Math.round(total * state.depositAmount / 100 * 100) / 100
+          : state.depositAmount)
+        : undefined,
       points_to_earn: 0,
     };
     addAssistantMessage(`Here's your booking summary:\n\n[[CARD:${JSON.stringify(card)}]]`);
@@ -1981,6 +1997,7 @@ export default function ChatScreen() {
             serviceDuration: matchedService.duration_minutes,
             depositEnabled: matchedService.deposit_enabled,
             depositAmount: matchedService.deposit_amount ?? null,
+            depositType: matchedService.deposit_type ?? null,
           };
           setBookingState(newState);
           // Show date picker locally — no GPT call needed
@@ -2353,7 +2370,7 @@ export default function ChatScreen() {
               distance_mi?: number;
               estimated_drive_minutes?: number;
               category?: string;
-              all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number; image_url?: string }[];
+              all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; image_url?: string }[];
             }[];
           };
           const businesses = toolData.businesses ?? [];
@@ -2375,6 +2392,7 @@ export default function ChatScreen() {
                   duration_minutes: s.duration_minutes,
                   deposit_enabled: s.deposit_enabled,
                   deposit_amount: s.deposit_amount,
+                  deposit_type: s.deposit_type,
                 })),
               })),
             };
@@ -2420,7 +2438,7 @@ export default function ChatScreen() {
             const cardData = JSON.parse(cm[1]!) as { type: string; [key: string]: unknown };
 
             if (cardData.type === 'service_cards') {
-              const items = cardData.items as { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number }[];
+              const items = cardData.items as { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage' }[];
               if (items?.length) {
                 const tenantIdFromBody = (body as { tenantId?: string }).tenantId;
                 lastDisplayedServices.current = items.map((s) => ({
@@ -2434,7 +2452,7 @@ export default function ChatScreen() {
             }
 
             if (cardData.type === 'business_with_services') {
-              const items = cardData.items as { id: string; name: string; services: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number }[] }[];
+              const items = cardData.items as { id: string; name: string; services: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage' }[] }[];
               if (items?.length) {
                 const allSvcs: typeof lastDisplayedServices.current = [];
                 for (const biz of items) {
