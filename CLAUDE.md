@@ -114,6 +114,59 @@ All tables require RLS enabled. Tenant data always filtered by tenant_id.
   ```
 - **Files involved**: `tool-handlers.ts`, `booking/create/route.ts`, `chat/route.ts`, `service-form.tsx`, `services/page.tsx`, `packages/shared/src/types/index.ts`.
 
+## Stripe Native Payments (Mobile)
+
+### Current Setup
+The mobile app uses `@stripe/stripe-react-native` for native in-app deposit payments via PaymentSheet (Apple Pay, Google Pay, card entry). However, this SDK requires **native modules** that are NOT available in Expo Go.
+
+### Expo Go Compatibility Wrapper
+All Stripe imports go through `apps/mobile/lib/stripe.tsx` — a safe wrapper that:
+- Tries to load the real `@stripe/stripe-react-native` at runtime
+- If native modules are missing (Expo Go), falls back to no-op stubs that show an alert: "Stripe payments require a development build"
+- Exports `SafeStripeProvider` (used in `_layout.tsx`) and `useStripe()` (used in `index.tsx`, `bookings.tsx`, `useDepositPayment.ts`)
+
+**NEVER import directly from `@stripe/stripe-react-native` in component files.** Always import from `@/lib/stripe`.
+
+### When Ready to Test Actual Payments
+1. **Use a development build**, not Expo Go:
+   ```bash
+   # iOS
+   npx expo run:ios
+   # Android
+   npx expo run:android
+   # Or use EAS Build
+   eas build --profile development --platform ios
+   ```
+2. **Ensure `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`** is set in `apps/mobile/.env`
+3. **Ensure the Stripe plugin** is in `app.json` under `plugins` (it already is):
+   ```json
+   ["@stripe/stripe-react-native", { "merchantIdentifier": "merchant.com.tseggaid.balkinaai", "enableGooglePay": true }]
+   ```
+4. **Version compatibility**: Expo 54 expects `@stripe/stripe-react-native@0.50.3`. If you see warnings, run:
+   ```bash
+   npx expo install @stripe/stripe-react-native
+   ```
+   This will install the Expo-compatible version.
+5. **Apple Pay** requires the merchant ID (`merchant.com.tseggaid.balkinaai`) to be configured in your Apple Developer account and Stripe dashboard.
+
+### Payment Flows (3 scenarios)
+- **Auto-confirmed + deposit**: Chat summary card shows "Pay deposit to confirm booking" -> PaymentSheet -> confirmation screen
+- **Request + pre-auth (Scenario 1)**: PaymentSheet authorizes funds (manual capture) -> request sent -> staff approves -> funds captured automatically
+- **Request + post-approval (Scenario 2)**: Normal request -> staff approves -> push notification `deposit_payment_required` -> customer taps -> navigates to Bookings -> in-app PaymentSheet
+
+### Files involved
+- `apps/mobile/lib/stripe.tsx` — Safe wrapper (SafeStripeProvider, useStripe)
+- `apps/mobile/lib/useDepositPayment.ts` — Reusable payment hook
+- `apps/mobile/app/_layout.tsx` — SafeStripeProvider at root
+- `apps/mobile/app/(app)/index.tsx` — Chat flow PaymentSheet integration
+- `apps/mobile/app/(app)/bookings.tsx` — Bookings screen Pay Deposit button + notification deep-link
+- `apps/mobile/app/(app)/_layout.tsx` — `deposit_payment_required` notification deep-link handler
+- `apps/web/src/app/api/payments/create-deposit/route.ts` — Creates/retrieves PaymentIntent
+- `apps/web/src/app/api/booking/create/route.ts` — Returns `payment_client_secret`, uses `capture_method: 'manual'` for requests
+- `apps/web/src/app/api/chat/tool-handlers.ts` — Chat booking flow PaymentIntent creation
+- `apps/web/src/app/api/staff/appointments/[id]/status/route.ts` — Captures held funds or sends deposit notification on approval
+- `apps/web/src/app/api/webhooks/stripe/route.ts` — Handles `payment_intent.succeeded` and `payment_intent.amount_capturable_updated`
+
 ## Stripe Rules (/packages/billing)
 - Webhook handler: /packages/api/routes/webhooks/stripe.ts
 - Always verify webhook signature with stripe.webhooks.constructEvent() before processing.
