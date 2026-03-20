@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { StripeProvider } from '@stripe/stripe-react-native';
+import { SafeStripeProvider } from '@/lib/stripe';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured, getAuthenticatedRole } from '@/lib/supabase';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -84,12 +84,12 @@ function RootLayoutContent() {
 export default function RootLayout() {
   return (
     <ErrorBoundary>
-      <StripeProvider
+      <SafeStripeProvider
         publishableKey={STRIPE_PUBLISHABLE_KEY}
         merchantIdentifier="merchant.com.tseggaid.balkinaai"
       >
         <RootLayoutContent />
-      </StripeProvider>
+      </SafeStripeProvider>
     </ErrorBoundary>
   );
 }

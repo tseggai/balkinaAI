@@ -21,7 +21,7 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useStripe } from '@stripe/stripe-react-native';
+import { useStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
