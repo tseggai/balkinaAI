@@ -2043,12 +2043,38 @@ export default function ChatScreen() {
       }
 
       // If we have date set but no time slot → user is picking a time slot
-      // Pattern: "10:00 AM with StaffName [staff:uuid]" or just "10:00 AM"
+      // But also allow changing the date (e.g. user taps "Tomorrow" after seeing "Today" slots)
       if (bookingState.date && !bookingState.timeSlot) {
+        // Allow date change: handle day chip clicks to switch dates
+        if (userText === 'Next Week') {
+          addUserMessage(userText);
+          const days = getNextWeekDays();
+          const buttonMarkup = days.map((d) => `[[button:${d}]]`).join('');
+          addAssistantMessage(`Pick a day next week:\n\n${buttonMarkup}`);
+          return true;
+        }
+        if (userText === 'Pick a date') {
+          addUserMessage(userText);
+          const days = getPickDateDays();
+          const buttonMarkup = days.map((d) => `[[button:${d}]]`).join('');
+          addAssistantMessage(`Choose a date:\n\n${buttonMarkup}`);
+          return true;
+        }
+        const dateButtons = [...getDateButtons(), ...getNextWeekDays(), ...getPickDateDays()];
+        if (dateButtons.includes(userText)) {
+          const dateStr = parseDateLabel(userText);
+          const newState = { ...bookingState, date: dateStr };
+          setBookingState(newState);
+          addUserMessage(userText);
+          fetchStaffAvailability(newState.tenantId!, newState.serviceId!, dateStr);
+          return true;
+        }
+
         // Extract staff ID tag if present, then strip it for the rest of parsing
         const staffIdMatch = userText.match(/\s*\[staff:([a-f0-9-]+)\]\s*$/i);
         const parsedStaffId = staffIdMatch ? staffIdMatch[1]! : null;
         const cleanText = staffIdMatch ? userText.replace(staffIdMatch[0], '') : userText;
+        // Pattern: "10:00 AM with StaffName [staff:uuid]" or just "10:00 AM"
         const timeMatch = cleanText.match(/^(\d{1,2}:\d{2}\s*[AP]M)\s*(?:with\s+(.+))?$/i);
         if (timeMatch) {
           const time = timeMatch[1]!;
@@ -2180,6 +2206,11 @@ export default function ChatScreen() {
             if (initError) {
               // Stripe unavailable (e.g. Expo Go) — skip payment, show confirmation card.
               // User can pay the deposit later from their Bookings tab.
+              addAssistantMessage(
+                result.status === 'pending'
+                  ? 'Your appointment request has been submitted! You can pay the deposit from your Bookings tab.'
+                  : 'Your booking is confirmed! You can pay the deposit from your Bookings tab.',
+              );
             } else {
               const { error: presentError } = await presentPaymentSheet();
 

@@ -54,7 +54,14 @@ export function useDepositPayment() {
       });
 
       if (initError) {
-        Alert.alert('Payment Error', initError.message);
+        if (initError.code === 'Unavailable') {
+          Alert.alert(
+            'Development Build Required',
+            'In-app payments are not available in Expo Go. To test payments, use a development build:\n\nnpx expo run:ios\nnpx expo run:android',
+          );
+        } else {
+          Alert.alert('Payment Error', initError.message);
+        }
         return { success: false, error: initError.message };
       }
 
