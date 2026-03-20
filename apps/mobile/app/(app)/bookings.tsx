@@ -33,6 +33,9 @@ interface Appointment {
   status: string;
   total_price: number;
   notes: string | null;
+  deposit_paid: boolean | null;
+  deposit_amount_paid: number | null;
+  stripe_payment_intent_id: string | null;
   services: { name: string } | null;
   staff: { name: string } | null;
   tenant_locations: { name: string; address?: string; latitude?: number; longitude?: number } | null;
@@ -83,6 +86,7 @@ function BookingCardRow({
   onCancel,
   onGetDirections,
   onRate,
+  onPayDeposit,
 }: {
   item: Appointment;
   expanded: boolean;
@@ -90,10 +94,12 @@ function BookingCardRow({
   onCancel: (id: string) => void;
   onGetDirections: (item: Appointment) => void;
   onRate: (id: string) => void;
+  onPayDeposit: (id: string) => void;
 }) {
   const isCancellable = item.status === 'confirmed' || item.status === 'pending';
   const isCompleted = item.status === 'completed';
   const hasLocation = !!(item.tenant_locations?.address || item.tenant_locations?.latitude);
+  const hasUnpaidDeposit = item.deposit_amount_paid != null && item.deposit_amount_paid > 0 && !item.deposit_paid && item.stripe_payment_intent_id;
 
   const { date, time } = formatDateTime(item.start_time);
   const statusColor = getStatusStyle(item.status);
@@ -143,11 +149,42 @@ function BookingCardRow({
             ${(item.total_price ?? 0).toFixed(2)}
           </Text>
         </View>
+
+        {/* Deposit status row */}
+        {item.deposit_amount_paid != null && item.deposit_amount_paid > 0 ? (
+          <View style={styles.depositRow}>
+            <Text style={[styles.depositText, { color: item.deposit_paid ? '#059669' : '#dc2626' }]}>
+              Deposit: ${item.deposit_amount_paid.toFixed(2)} {item.deposit_paid ? '(Paid)' : '(Due)'}
+            </Text>
+          </View>
+        ) : null}
       </TouchableOpacity>
+
+      {/* Pay Deposit button — always visible when deposit is due, no expand needed */}
+      {hasUnpaidDeposit && !expanded ? (
+        <TouchableOpacity
+          style={styles.payDepositBtn}
+          onPress={() => onPayDeposit(item.id)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="card-outline" size={18} color="#fff" />
+          <Text style={styles.payDepositBtnText}>Pay Deposit (${item.deposit_amount_paid!.toFixed(2)})</Text>
+        </TouchableOpacity>
+      ) : null}
 
       {/* Action buttons revealed on tap */}
       {expanded ? (
         <View style={styles.actionsRow}>
+          {hasUnpaidDeposit ? (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnPay]}
+              onPress={() => onPayDeposit(item.id)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="card-outline" size={18} color="#fff" />
+              <Text style={styles.actionBtnText}>Pay Deposit</Text>
+            </TouchableOpacity>
+          ) : null}
           {hasLocation ? (
             <TouchableOpacity
               style={[styles.actionBtn, styles.actionBtnDirections]}
@@ -462,6 +499,11 @@ export default function BookingsScreen() {
     setRatingModalVisible(true);
   }, []);
 
+  const handlePayDeposit = useCallback((appointmentId: string) => {
+    const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
+    Linking.openURL(`${baseUrl}/pay/${appointmentId}`);
+  }, []);
+
   const renderItem = ({ item }: { item: Appointment }) => (
     <BookingCardRow
       item={item}
@@ -470,6 +512,7 @@ export default function BookingsScreen() {
       onCancel={handleCancel}
       onGetDirections={handleGetDirections}
       onRate={openRatingModal}
+      onPayDeposit={handlePayDeposit}
     />
   );
 
@@ -828,6 +871,7 @@ const styles = StyleSheet.create({
   actionBtnDirections: { backgroundColor: '#6B7FC4' },
   actionBtnCancel: { backgroundColor: '#ef4444' },
   actionBtnRate: { backgroundColor: '#f59e0b' },
+  actionBtnPay: { backgroundColor: '#6366f1' },
   actionBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
 
   card: {
@@ -861,6 +905,19 @@ const styles = StyleSheet.create({
   dateTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   dateTimeText: { fontSize: 13, color: '#6b7280' },
   price: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  depositRow: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  depositText: { fontSize: 13, fontWeight: '600' },
+  payDepositBtn: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#6366f1',
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 8,
+    gap: 6,
+  },
+  payDepositBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
   empty: { alignItems: 'center', paddingTop: 80, gap: 8 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#374151', marginTop: 8 },
   emptySubtitle: {
