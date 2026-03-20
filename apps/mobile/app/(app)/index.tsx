@@ -2178,31 +2178,21 @@ export default function ChatScreen() {
             });
 
             if (initError) {
-              addAssistantMessage(`Booking created but payment setup failed: ${initError.message}. You can pay the deposit later from your Bookings tab.`);
-              setBookingState(INITIAL_BOOKING_STATE);
-              setIsLoading(false);
-              return true;
-            }
+              // Stripe unavailable (e.g. Expo Go) — skip payment, show confirmation card.
+              // User can pay the deposit later from their Bookings tab.
+            } else {
+              const { error: presentError } = await presentPaymentSheet();
 
-            const { error: presentError } = await presentPaymentSheet();
-
-            if (presentError) {
-              if (presentError.code === 'Canceled') {
-                addAssistantMessage(
-                  result.status === 'pending'
-                    ? 'Your appointment request has been submitted. You can pay the deposit anytime from your Bookings tab.'
-                    : 'Your booking is confirmed! You can pay the deposit anytime from your Bookings tab.',
-                );
+              if (presentError) {
+                if (presentError.code !== 'Canceled') {
+                  addAssistantMessage(`Payment failed: ${presentError.message}. You can retry from your Bookings tab.`);
+                }
+                // Continue to show confirmation card with deposit_paid: false
               } else {
-                addAssistantMessage(`Payment failed: ${presentError.message}. You can retry from your Bookings tab.`);
+                // Payment succeeded — mark deposit as paid in the confirmed card
+                result.deposit_paid = true;
               }
-              setBookingState(INITIAL_BOOKING_STATE);
-              setIsLoading(false);
-              return true;
             }
-
-            // Payment succeeded — mark deposit as paid in the confirmed card
-            result.deposit_paid = true;
           }
 
           // Build extras display with prices for confirmation

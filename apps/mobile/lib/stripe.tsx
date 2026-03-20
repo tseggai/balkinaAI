@@ -4,7 +4,7 @@
  * In Expo Go, no-op stubs are provided so the app doesn't crash.
  */
 import React from 'react';
-import { Alert } from 'react-native';
+
 
 type PaymentSheetError = { code: string; message: string };
 type InitResult = { error?: PaymentSheetError };
@@ -47,10 +47,9 @@ const EXPO_GO_ERROR: PaymentSheetError = {
 function fallbackUseStripe(): StripeHook {
   return {
     initPaymentSheet: async () => {
-      Alert.alert(
-        'Development Build Required',
-        'Stripe payments are not available in Expo Go. Please use a development build (npx expo run:ios or npx expo run:android).',
-      );
+      // Return error silently — callers already handle initError gracefully
+      // (e.g. "You can pay the deposit later from your Bookings tab").
+      // No Alert here; the disruptive dialog blocks the booking flow in Expo Go.
       return { error: EXPO_GO_ERROR };
     },
     presentPaymentSheet: async () => ({ error: EXPO_GO_ERROR }),
