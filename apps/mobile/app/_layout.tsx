@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured, getAuthenticatedRole } from '@/lib/supabase';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 
 function RootLayoutContent() {
   const [session, setSession] = useState<Session | null>(null);
@@ -81,7 +84,12 @@ function RootLayoutContent() {
 export default function RootLayout() {
   return (
     <ErrorBoundary>
-      <RootLayoutContent />
+      <StripeProvider
+        publishableKey={STRIPE_PUBLISHABLE_KEY}
+        merchantIdentifier="merchant.com.tseggaid.balkinaai"
+      >
+        <RootLayoutContent />
+      </StripeProvider>
     </ErrorBoundary>
   );
 }

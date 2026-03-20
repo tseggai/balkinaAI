@@ -76,6 +76,12 @@ export default function AppTabsLayout() {
             pathname: '/(app)/bookings',
             params: { action: 'rate', appointmentId: data.appointmentId },
           });
+        } else if (data?.type === 'deposit_payment_required' && data.appointmentId) {
+          // Staff approved a booking that requires deposit — open payment
+          router.navigate({
+            pathname: '/(app)/bookings',
+            params: { action: 'pay_deposit', appointmentId: data.appointmentId },
+          });
         } else if (data?.type === 'booking_declined' && data.suggestedTimeIso && data.appointmentId) {
           // Navigate to bookings with accept-suggestion action
           router.navigate({
