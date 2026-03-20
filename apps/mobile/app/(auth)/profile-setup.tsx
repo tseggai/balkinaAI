@@ -119,6 +119,7 @@ export default function ProfileSetupScreen() {
 
     const { error } = await supabase.from('customers').upsert({
       id: user.id,
+      user_id: user.id,
       display_name: displayName.trim(),
       email: (existing as { email: string | null } | null)?.email ?? user.email ?? null,
       phone: (existing as { phone: string | null } | null)?.phone ?? user.phone ?? null,

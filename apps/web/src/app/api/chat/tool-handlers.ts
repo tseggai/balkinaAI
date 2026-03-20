@@ -154,11 +154,14 @@ async function handleFindBusinessesInner(
       return { id: row.id, name: row.name, image_url: row.logo_url ?? undefined, category: cat, business_category: cat };
     }) as { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[] }[];
 
-    // Fetch locations
+    // Fetch locations and services in parallel (both depend on catBizIds only)
     const catBizIds = businesses.map((b) => b.id);
-    const { data: catLocs } = catBizIds.length > 0
-      ? await supabase.from('tenant_locations').select('tenant_id, name, address, latitude, longitude').in('tenant_id', catBizIds)
-      : { data: [] };
+    const [{ data: catLocs }, { data: catSvcs }] = catBizIds.length > 0
+      ? await Promise.all([
+          supabase.from('tenant_locations').select('tenant_id, name, address, latitude, longitude').in('tenant_id', catBizIds),
+          supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, image_url, visibility').in('tenant_id', catBizIds).eq('visibility', 'public'),
+        ])
+      : [{ data: [] }, { data: [] }];
 
     const catLocMap = new Map<string, { name: string; address: string; latitude: number | null; longitude: number | null }[]>();
     for (const loc of (catLocs ?? []) as { tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
@@ -166,11 +169,6 @@ async function handleFindBusinessesInner(
       existing.push({ name: loc.name, address: loc.address, latitude: loc.latitude, longitude: loc.longitude });
       catLocMap.set(loc.tenant_id, existing);
     }
-
-    // Fetch all services
-    const { data: catSvcs } = catBizIds.length > 0
-      ? await supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, image_url, visibility').in('tenant_id', catBizIds).eq('visibility', 'public')
-      : { data: [] };
 
     const catSvcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[]>();
     for (const svc of (catSvcs ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; image_url: string | null }[]) {
@@ -1325,12 +1323,14 @@ export async function handleBookAppointment(
       return { id: s?.id ?? null, name: s?.name ?? null, requiresApproval: s?.requires_approval ?? false };
     })(),
 
-    // 7. Tenant payments_enabled flag
-    supabase.from('tenants').select('payments_enabled').eq('id', tenantId).single(),
+    // 7. Tenant payments_enabled flag + stripe_account_id
+    supabase.from('tenants').select('payments_enabled, stripe_account_id').eq('id', tenantId).single(),
   ]);
 
   // Unpack payments_enabled flag (defaults to false if not found)
-  const paymentsEnabled = (tenantFlagResult.data as { payments_enabled: boolean } | null)?.payments_enabled ?? false;
+  const tenantFlags = tenantFlagResult.data as { payments_enabled: boolean; stripe_account_id: string | null } | null;
+  const paymentsEnabled = tenantFlags?.payments_enabled ?? false;
+  const tenantStripeAccountId = tenantFlags?.stripe_account_id ?? null;
 
   // Unpack service
   if (!serviceResult.data) return { success: false, error: 'Service not found' };
@@ -1407,6 +1407,47 @@ export async function handleBookAppointment(
   if (apptErr) return { success: false, error: apptErr.message };
 
   const appointmentId = (appointment as { id: string }).id;
+
+  // Create PaymentIntent for deposit if payments enabled and deposit required
+  let paymentUrl: string | null = null;
+  let _paymentClientSecret: string | null = null;
+  if (paymentsEnabled && depositAmount && depositAmount > 0 && tenantStripeAccountId) {
+    try {
+      const Stripe = (await import('stripe')).default;
+      const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2026-02-25.clover' });
+      const depositAmountCents = Math.round(depositAmount * 100);
+      const platformFeeCents = Math.round(depositAmountCents * 0.1); // 10% platform commission
+
+      const paymentIntent = await stripeClient.paymentIntents.create({
+        amount: depositAmountCents,
+        currency: 'usd',
+        automatic_payment_methods: { enabled: true },
+        transfer_data: { destination: tenantStripeAccountId },
+        application_fee_amount: platformFeeCents,
+        metadata: {
+          appointment_id: appointmentId,
+          customer_id: customerId,
+          payment_type: 'deposit',
+        },
+        description: `Deposit for ${(service as { name: string }).name}`,
+      });
+
+      // Store PaymentIntent ID on appointment
+      await supabase.from('appointments')
+        .update({ stripe_payment_intent_id: paymentIntent.id } as never)
+        .eq('id', appointmentId);
+
+      _paymentClientSecret = paymentIntent.client_secret;
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'https://balkina-ai.vercel.app';
+      paymentUrl = `${baseUrl}/pay/${appointmentId}`;
+      console.log('[chat/book] PaymentIntent created:', paymentIntent.id, 'for deposit:', depositAmount);
+    } catch (stripeErr) {
+      console.error('[chat/book] Stripe PaymentIntent creation failed:', stripeErr);
+      // Don't fail the booking — deposit payment can be collected later
+    }
+  }
 
   // Fire notifications — await so they complete before Vercel terminates the function
   const { notifyBookingConfirmed, notifyBookingSubmitted, notifyStaffNewBooking } = await import('@/lib/notifications/booking-events');
@@ -1593,10 +1634,13 @@ export async function handleBookAppointment(
       loyalty_points_earned: pointsEarned,
       total_price: finalTotal,
       deposit_amount: depositAmount,
+      deposit_paid: false,
       balance_due: finalTotal - (depositAmount ?? 0),
       used_package: useCustomerPackage,
       status: requiresApproval ? 'pending' : 'confirmed',
       requires_approval: requiresApproval,
+      payment_url: paymentUrl,
+      payment_required: !!(paymentsEnabled && depositAmount && depositAmount > 0),
     },
   };
 }

@@ -168,6 +168,10 @@ interface ConfirmedCardData {
   points_earned: number;
   latitude?: number;
   longitude?: number;
+  deposit_amount?: number;
+  deposit_paid?: boolean;
+  payment_url?: string;
+  payment_required?: boolean;
 }
 
 interface ServiceChipData {
@@ -1169,8 +1173,27 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
         </View>
       ) : null}
 
+      {data.deposit_amount && data.deposit_amount > 0 ? (
+        <View style={richCardStyles.confirmedRow}>
+          <Text style={richCardStyles.confirmedLabel}>Deposit:</Text>
+          <Text style={[richCardStyles.confirmedValue, { color: data.deposit_paid ? '#16a34a' : '#dc2626' }]}>
+            ${data.deposit_amount.toFixed(2)} {data.deposit_paid ? '(Paid)' : '(Due)'}
+          </Text>
+        </View>
+      ) : null}
+
       {data.points_earned > 0 ? (
         <Text style={richCardStyles.confirmedPoints}>+{data.points_earned} pts earned</Text>
+      ) : null}
+
+      {data.payment_required && !data.deposit_paid && data.payment_url ? (
+        <TouchableOpacity
+          style={{ marginTop: 12, backgroundColor: '#6366f1', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center' }}
+          onPress={() => Linking.openURL(data.payment_url!)}
+          activeOpacity={0.7}
+        >
+          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Pay Deposit (${data.deposit_amount?.toFixed(2)})</Text>
+        </TouchableOpacity>
       ) : null}
 
       {(data.address || data.latitude) ? (
@@ -2114,6 +2137,10 @@ export default function ChatScreen() {
             total: number;
             latitude?: number;
             longitude?: number;
+            deposit_amount?: number;
+            deposit_paid?: boolean;
+            payment_url?: string;
+            payment_required?: boolean;
           };
 
           // Build extras display with prices for confirmation
@@ -2141,6 +2168,10 @@ export default function ChatScreen() {
             points_earned: 0,
             latitude: result.latitude,
             longitude: result.longitude,
+            deposit_amount: result.deposit_amount,
+            deposit_paid: result.deposit_paid ?? false,
+            payment_url: result.payment_url,
+            payment_required: result.payment_required ?? false,
           };
 
           // Show full-screen confirmation modal

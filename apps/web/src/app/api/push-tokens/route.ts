@@ -33,6 +33,15 @@ export async function POST(request: Request) {
   const table = body.recipientType === 'customer' ? 'customer_push_tokens' : 'staff_push_tokens';
   const idColumn = body.recipientType === 'customer' ? 'customer_id' : 'staff_id';
 
+  // Delete old tokens for this recipient, then insert the current one.
+  // This prevents stale tokens from accumulating across app reinstalls/rebuilds
+  // and wasting Expo push API calls on every notification.
+  await admin.from(table).delete().eq(idColumn, body.recipientId).neq('token', body.token);
+
+  // Also remove this token if it was registered under a different recipient
+  // (e.g. same device switched accounts)
+  await admin.from(table).delete().eq('token', body.token).neq(idColumn, body.recipientId);
+
   const { error } = await admin
     .from(table)
     .upsert({
