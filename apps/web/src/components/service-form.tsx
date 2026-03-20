@@ -181,10 +181,12 @@ export function ServiceForm({
   service,
   onClose,
   onDelete,
+  paymentsEnabled = false,
 }: {
   service: Service | null;
   onClose: () => void;
   onDelete?: (id: string) => void;
+  paymentsEnabled?: boolean;
 }) {
   const isEditMode = Boolean(service?.id);
   const [activeTab, setActiveTab] = useState<TabKey>('details');
@@ -665,7 +667,8 @@ export function ServiceForm({
             </div>
           </div>
 
-          {/* Row 5: Enable Deposit */}
+          {/* Row 5: Enable Deposit (only when payments are enabled for this tenant) */}
+          {paymentsEnabled && (
           <div className="flex items-start">
             <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
               <input type="checkbox" checked={depositEnabled} onChange={(e) => setDepositEnabled(e.target.checked)} className="peer sr-only" />
@@ -694,6 +697,7 @@ export function ServiceForm({
               </div>
             )}
           </div>
+          )}
 
           {/* Row 6: Duration + Buffer (50% each) */}
           <div className="grid grid-cols-2 gap-3">
@@ -958,7 +962,8 @@ export function ServiceForm({
           </select>
         </div>
 
-        {/* Row 5: Enable Deposit */}
+        {/* Row 5: Enable Deposit (only when payments are enabled for this tenant) */}
+        {paymentsEnabled && (
         <div className="flex items-start">
           <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
             <input type="checkbox" checked={depositEnabled} onChange={(e) => setDepositEnabled(e.target.checked)} className="peer sr-only" />
@@ -992,6 +997,7 @@ export function ServiceForm({
             </div>
           )}
         </div>
+        )}
 
         {/* Row 6: Duration + Buffer (50% each) */}
         <div className="grid grid-cols-2 gap-3">

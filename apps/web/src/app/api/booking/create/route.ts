@@ -195,8 +195,8 @@ export async function POST(request: Request) {
         return { id: s?.id ?? null, name: body.staffName || s?.name || null, requiresApproval: s?.requires_approval ?? false };
       })(),
 
-      // 8. Tenant name
-      supabase.from('tenants').select('name').eq('id', tenantId).single(),
+      // 8. Tenant name + payments flag
+      supabase.from('tenants').select('name, payments_enabled').eq('id', tenantId).single(),
     ]);
 
     // Unpack service
@@ -228,7 +228,9 @@ export async function POST(request: Request) {
     const requiresApproval = staffResult.requiresApproval;
 
     // Unpack tenant
-    const businessName = (tenantResult.data as { name: string } | null)?.name ?? 'Business';
+    const tenantData = tenantResult.data as { name: string; payments_enabled: boolean } | null;
+    const businessName = tenantData?.name ?? 'Business';
+    const paymentsEnabled = tenantData?.payments_enabled ?? false;
 
     // 2. Parse start time (timezone already available from location query)
     let start: Date;
@@ -249,9 +251,9 @@ export async function POST(request: Request) {
 
     const end = new Date(start.getTime() + svc.duration_minutes * 60000);
 
-    // 3. Calculate deposit
+    // 3. Calculate deposit (skip if payments not enabled for this tenant)
     let depositAmount: number | null = null;
-    if (svc.deposit_enabled && svc.deposit_amount) {
+    if (paymentsEnabled && svc.deposit_enabled && svc.deposit_amount) {
       depositAmount =
         svc.deposit_type === 'percentage' ? (svc.price * svc.deposit_amount) / 100 : svc.deposit_amount;
     }

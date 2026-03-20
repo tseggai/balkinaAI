@@ -41,6 +41,7 @@ export interface Tenant {
   stripe_account_id: string | null;
   stripe_subscription_id: string | null;
   subscription_plan_id: UUID | null;
+  payments_enabled: boolean;
   status: TenantStatus;
   created_at: Timestamp;
 }
