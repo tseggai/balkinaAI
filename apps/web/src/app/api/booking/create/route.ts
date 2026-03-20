@@ -332,6 +332,7 @@ export async function POST(request: Request) {
 
     // Create PaymentIntent for deposit if payments enabled and deposit required
     let paymentUrl: string | null = null;
+    let paymentClientSecret: string | null = null;
     const paymentRequired = !!(paymentsEnabled && depositAmount && depositAmount > 0);
     const tenantStripeAccountId = tenantData?.stripe_account_id ?? null;
     if (paymentRequired && tenantStripeAccountId) {
@@ -341,16 +342,20 @@ export async function POST(request: Request) {
         const depositAmountCents = Math.round(depositAmount! * 100);
         const platformFeeCents = Math.round(depositAmountCents * 0.1);
 
+        // Use manual capture for request-flow (requires_approval) so funds are
+        // held but not charged until staff approves the booking.
         const paymentIntent = await stripeClient.paymentIntents.create({
           amount: depositAmountCents,
           currency: 'usd',
           automatic_payment_methods: { enabled: true },
+          capture_method: requiresApproval ? 'manual' : 'automatic',
           transfer_data: { destination: tenantStripeAccountId },
           application_fee_amount: platformFeeCents,
           metadata: {
             appointment_id: apptId,
             customer_id: customerId ?? '',
             payment_type: 'deposit',
+            capture_method: requiresApproval ? 'manual' : 'automatic',
           },
           description: `Deposit for ${svc.name} at ${businessName}`,
         });
@@ -359,11 +364,12 @@ export async function POST(request: Request) {
           .update({ stripe_payment_intent_id: paymentIntent.id } as never)
           .eq('id', apptId);
 
+        paymentClientSecret = paymentIntent.client_secret;
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}`
           : 'https://balkina-ai.vercel.app');
         paymentUrl = `${baseUrl}/pay/${apptId}`;
-        console.log('[booking/create] PaymentIntent created:', paymentIntent.id);
+        console.log('[booking/create] PaymentIntent created:', paymentIntent.id, requiresApproval ? '(manual capture)' : '(auto capture)');
       } catch (stripeErr) {
         console.error('[booking/create] Stripe PaymentIntent creation failed:', stripeErr);
       }
@@ -411,6 +417,7 @@ export async function POST(request: Request) {
         deposit_amount: depositAmount,
         deposit_paid: false,
         payment_url: paymentUrl,
+        payment_client_secret: paymentClientSecret,
         payment_required: paymentRequired,
         latitude: loc?.latitude ?? undefined,
         longitude: loc?.longitude ?? undefined,

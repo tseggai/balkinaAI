@@ -70,6 +70,20 @@ export async function POST(request: Request) {
         break;
       }
 
+      case 'payment_intent.amount_capturable_updated': {
+        // Funds authorized (manual capture) — record the PaymentIntent on the appointment
+        const pi = event.data.object as Stripe.PaymentIntent;
+        const appointmentId = pi.metadata?.appointment_id;
+        if (appointmentId && pi.metadata?.capture_method === 'manual') {
+          console.log(`[webhooks/stripe] funds authorized (manual capture) for appointment ${appointmentId}, PI ${pi.id}`);
+          await supabase
+            .from('appointments')
+            .update({ stripe_payment_intent_id: pi.id } as never)
+            .eq('id', appointmentId);
+        }
+        break;
+      }
+
       case 'payment_intent.payment_failed': {
         const pi = event.data.object as Stripe.PaymentIntent;
         const appointmentId = pi.metadata?.appointment_id;

@@ -27,7 +27,8 @@ export type NotificationType =
   | 'new_booking_assigned'
   | 'booking_completed'
   | 'booking_cancelled_staff_notify'
-  | 'daily_schedule_summary';
+  | 'daily_schedule_summary'
+  | 'deposit_payment_required';
 
 interface NotificationPayload {
   type: NotificationType;
@@ -134,6 +135,13 @@ const TEMPLATES: Record<NotificationType, {
     push: {
       title: (d) => `Good morning ${d.staffName}`,
       body: (d) => `You have ${d.appointmentCount} appointment${Number(d.appointmentCount) !== 1 ? 's' : ''} today. First at ${d.firstAppointmentTime}.`,
+    },
+  },
+  deposit_payment_required: {
+    sms: (d) => `Your ${d.serviceName} at ${d.businessName} for ${d.date} at ${d.time} has been approved! Please pay the $${d.depositAmount} deposit to complete your booking.`,
+    push: {
+      title: () => 'Deposit Payment Required',
+      body: (d) => `Your ${d.serviceName} at ${d.businessName} for ${d.date} at ${d.time} is approved! Tap to pay the $${d.depositAmount} deposit.`,
     },
   },
 };

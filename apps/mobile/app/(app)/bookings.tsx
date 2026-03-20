@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useStripe } from '@stripe/stripe-react-native';
 import { supabase } from '@/lib/supabase';
 
 const API_BASE =
@@ -225,6 +226,7 @@ function BookingCardRow({
 
 export default function BookingsScreen() {
   const router = useRouter();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -235,6 +237,7 @@ export default function BookingsScreen() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [userId, setUserId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   // Rating modal state
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
@@ -260,6 +263,9 @@ export default function BookingsScreen() {
     suggestedTimeIso?: string;
   }>();
 
+  // Track whether a notification-triggered payment has been handled
+  const payDepositHandled = useRef(false);
+
   useEffect(() => {
     if (!params.action) return;
     if (params.action === 'rate' && params.appointmentId) {
@@ -273,6 +279,10 @@ export default function BookingsScreen() {
       setSuggestedDate(params.suggestedDate ?? '');
       setSuggestedTimeIso(params.suggestedTimeIso ?? '');
       setSuggestionModalVisible(true);
+    } else if (params.action === 'pay_deposit' && params.appointmentId && !payDepositHandled.current) {
+      // Auto-trigger payment for notification deep-link (Scenario 2)
+      payDepositHandled.current = true;
+      handlePayDeposit(params.appointmentId);
     }
   }, [params.action, params.appointmentId, params.suggestedTime, params.suggestedDate, params.suggestedTimeIso]);
 
@@ -499,10 +509,61 @@ export default function BookingsScreen() {
     setRatingModalVisible(true);
   }, []);
 
-  const handlePayDeposit = useCallback((appointmentId: string) => {
-    const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
-    Linking.openURL(`${baseUrl}/pay/${appointmentId}`);
-  }, []);
+  const handlePayDeposit = useCallback(async (appointmentId: string) => {
+    setPaymentLoading(true);
+    try {
+      // 1. Fetch or create PaymentIntent
+      const res = await fetch(`${API_BASE}/api/payments/create-deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointmentId }),
+      });
+
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        Alert.alert('Payment Error', err.error ?? 'Failed to prepare payment');
+        return;
+      }
+
+      const { clientSecret } = (await res.json()) as { clientSecret: string };
+      if (!clientSecret) {
+        Alert.alert('Payment Error', 'No payment secret returned');
+        return;
+      }
+
+      // 2. Init PaymentSheet
+      const { error: initError } = await initPaymentSheet({
+        paymentIntentClientSecret: clientSecret,
+        merchantDisplayName: 'Balkina AI',
+        allowsDelayedPaymentMethods: false,
+        applePay: { merchantCountryCode: 'US' },
+        googlePay: { merchantCountryCode: 'US', testEnv: true },
+      });
+
+      if (initError) {
+        Alert.alert('Payment Error', initError.message);
+        return;
+      }
+
+      // 3. Present PaymentSheet
+      const { error: presentError } = await presentPaymentSheet();
+
+      if (presentError) {
+        if (presentError.code !== 'Canceled') {
+          Alert.alert('Payment Failed', presentError.message);
+        }
+        return;
+      }
+
+      // 4. Payment succeeded — refresh to show updated status
+      Alert.alert('Deposit Paid!', 'Your deposit has been processed successfully.');
+      fetchAppointments();
+    } catch {
+      Alert.alert('Error', 'Connection error. Please try again.');
+    } finally {
+      setPaymentLoading(false);
+    }
+  }, [initPaymentSheet, presentPaymentSheet, fetchAppointments]);
 
   const renderItem = ({ item }: { item: Appointment }) => (
     <BookingCardRow

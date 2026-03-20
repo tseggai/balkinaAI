@@ -21,6 +21,7 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useStripe } from '@stripe/stripe-react-native';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
@@ -1094,11 +1095,15 @@ function RichSummaryCard({ data, onButtonPress }: { data: SummaryCardData; onBut
       ) : null}
 
       <TouchableOpacity
-        style={richCardStyles.confirmBtn}
+        style={[richCardStyles.confirmBtn, data.deposit_required && data.deposit_required > 0 ? { backgroundColor: '#6366f1' } : undefined]}
         onPress={() => onButtonPress('Confirm Booking')}
         activeOpacity={0.7}
       >
-        <Text style={richCardStyles.confirmBtnText}>Confirm Booking</Text>
+        <Text style={richCardStyles.confirmBtnText}>
+          {data.deposit_required && data.deposit_required > 0
+            ? `Pay deposit to confirm booking`
+            : 'Confirm Booking'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -1592,6 +1597,7 @@ const chipStyles = StyleSheet.create({
 // ── Main Chat Screen ─────────────────────────────────────────────────────────
 
 export default function ChatScreen() {
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -2157,8 +2163,47 @@ export default function ChatScreen() {
             deposit_amount?: number;
             deposit_paid?: boolean;
             payment_url?: string;
+            payment_client_secret?: string;
             payment_required?: boolean;
           };
+
+          // If deposit payment is required, present native PaymentSheet
+          if (result.payment_required && result.payment_client_secret) {
+            const { error: initError } = await initPaymentSheet({
+              paymentIntentClientSecret: result.payment_client_secret,
+              merchantDisplayName: 'Balkina AI',
+              allowsDelayedPaymentMethods: false,
+              applePay: { merchantCountryCode: 'US' },
+              googlePay: { merchantCountryCode: 'US', testEnv: true },
+            });
+
+            if (initError) {
+              addAssistantMessage(`Booking created but payment setup failed: ${initError.message}. You can pay the deposit later from your Bookings tab.`);
+              setBookingState(INITIAL_BOOKING_STATE);
+              setIsLoading(false);
+              return true;
+            }
+
+            const { error: presentError } = await presentPaymentSheet();
+
+            if (presentError) {
+              if (presentError.code === 'Canceled') {
+                addAssistantMessage(
+                  result.status === 'pending'
+                    ? 'Your appointment request has been submitted. You can pay the deposit anytime from your Bookings tab.'
+                    : 'Your booking is confirmed! You can pay the deposit anytime from your Bookings tab.',
+                );
+              } else {
+                addAssistantMessage(`Payment failed: ${presentError.message}. You can retry from your Bookings tab.`);
+              }
+              setBookingState(INITIAL_BOOKING_STATE);
+              setIsLoading(false);
+              return true;
+            }
+
+            // Payment succeeded — mark deposit as paid in the confirmed card
+            result.deposit_paid = true;
+          }
 
           // Build extras display with prices for confirmation
           const confirmedExtras = bookingState.selectedExtras.map((name) => {

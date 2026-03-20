@@ -297,3 +297,26 @@ export async function notifyBookingCancelledByTenant(appointmentId: string) {
     });
   }
 }
+
+/** Customer notification when booking is approved and deposit payment is needed */
+export async function notifyDepositPaymentRequired(appointmentId: string, depositAmount: number) {
+  const ctx = await getAppointmentContext(appointmentId);
+  if (!ctx) { console.error('[notifications] notifyDepositPaymentRequired: no context for', appointmentId); return; }
+  if (!ctx.customers) { console.error('[notifications] notifyDepositPaymentRequired: no customer data for', appointmentId); return; }
+  const tz = ctx.tenant_locations?.timezone ?? 'UTC';
+  await sendNotification({
+    type: 'deposit_payment_required',
+    appointmentId,
+    recipientType: 'customer',
+    recipientId: ctx.customers.id,
+    data: {
+      customerName: ctx.customers.display_name ?? '',
+      serviceName: ctx.services.name,
+      businessName: ctx.tenants.name,
+      staffName: ctx.staff?.name ?? '',
+      date: formatDate(ctx.start_time, tz),
+      time: formatTime(ctx.start_time, tz),
+      depositAmount: depositAmount.toFixed(2),
+    },
+  });
+}

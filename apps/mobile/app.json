@@ -40,6 +40,13 @@
         {
           "locationWhenInUsePermission": "Balkina AI uses your location to find nearby businesses."
         }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.tseggaid.balkinaai",
+          "enableGooglePay": true
+        }
       ]
     ],
     "experiments": {

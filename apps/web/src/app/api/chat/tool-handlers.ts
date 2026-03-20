@@ -1410,7 +1410,7 @@ export async function handleBookAppointment(
 
   // Create PaymentIntent for deposit if payments enabled and deposit required
   let paymentUrl: string | null = null;
-  let _paymentClientSecret: string | null = null;
+  let paymentClientSecret: string | null = null;
   if (paymentsEnabled && depositAmount && depositAmount > 0 && tenantStripeAccountId) {
     try {
       const Stripe = (await import('stripe')).default;
@@ -1418,16 +1418,20 @@ export async function handleBookAppointment(
       const depositAmountCents = Math.round(depositAmount * 100);
       const platformFeeCents = Math.round(depositAmountCents * 0.1); // 10% platform commission
 
+      // Use manual capture for request-flow (requires_approval) so funds are
+      // held but not charged until staff approves the booking.
       const paymentIntent = await stripeClient.paymentIntents.create({
         amount: depositAmountCents,
         currency: 'usd',
         automatic_payment_methods: { enabled: true },
+        capture_method: requiresApproval ? 'manual' : 'automatic',
         transfer_data: { destination: tenantStripeAccountId },
         application_fee_amount: platformFeeCents,
         metadata: {
           appointment_id: appointmentId,
           customer_id: customerId,
           payment_type: 'deposit',
+          capture_method: requiresApproval ? 'manual' : 'automatic',
         },
         description: `Deposit for ${(service as { name: string }).name}`,
       });
@@ -1437,12 +1441,12 @@ export async function handleBookAppointment(
         .update({ stripe_payment_intent_id: paymentIntent.id } as never)
         .eq('id', appointmentId);
 
-      _paymentClientSecret = paymentIntent.client_secret;
+      paymentClientSecret = paymentIntent.client_secret;
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
         : 'https://balkina-ai.vercel.app';
       paymentUrl = `${baseUrl}/pay/${appointmentId}`;
-      console.log('[chat/book] PaymentIntent created:', paymentIntent.id, 'for deposit:', depositAmount);
+      console.log('[chat/book] PaymentIntent created:', paymentIntent.id, 'for deposit:', depositAmount, requiresApproval ? '(manual capture)' : '(auto capture)');
     } catch (stripeErr) {
       console.error('[chat/book] Stripe PaymentIntent creation failed:', stripeErr);
       // Don't fail the booking — deposit payment can be collected later
@@ -1640,6 +1644,7 @@ export async function handleBookAppointment(
       status: requiresApproval ? 'pending' : 'confirmed',
       requires_approval: requiresApproval,
       payment_url: paymentUrl,
+      payment_client_secret: paymentClientSecret,
       payment_required: !!(paymentsEnabled && depositAmount && depositAmount > 0),
     },
   };
