@@ -1255,7 +1255,7 @@ export async function handleBookAppointment(
 
   const needsTimezone = !/Z$|[+-]\d{2}:\d{2}$/.test(startTime);
 
-  const [serviceResult, customerResult, locationResult, staffResult] = await Promise.all([
+  const [serviceResult, customerResult, locationResult, staffResult, tenantFlagResult] = await Promise.all([
     // 1. Service details
     supabase.from('services').select('*').eq('id', serviceId).single(),
 
@@ -1324,7 +1324,13 @@ export async function handleBookAppointment(
       const s = (data as { id: string; name: string; requires_approval: boolean }[] | null)?.[0];
       return { id: s?.id ?? null, name: s?.name ?? null, requiresApproval: s?.requires_approval ?? false };
     })(),
+
+    // 7. Tenant payments_enabled flag
+    supabase.from('tenants').select('payments_enabled').eq('id', tenantId).single(),
   ]);
+
+  // Unpack payments_enabled flag (defaults to false if not found)
+  const paymentsEnabled = (tenantFlagResult.data as { payments_enabled: boolean } | null)?.payments_enabled ?? false;
 
   // Unpack service
   if (!serviceResult.data) return { success: false, error: 'Service not found' };
@@ -1368,9 +1374,9 @@ export async function handleBookAppointment(
 
   const end = new Date(start.getTime() + svc.duration_minutes * 60000);
 
-  // 3. Calculate deposit
+  // 3. Calculate deposit (skip if payments not enabled for this tenant)
   let depositAmount: number | null = null;
-  if (svc.deposit_enabled && svc.deposit_amount) {
+  if (paymentsEnabled && svc.deposit_enabled && svc.deposit_amount) {
     depositAmount = svc.deposit_type === 'percentage'
       ? (svc.price * svc.deposit_amount) / 100
       : svc.deposit_amount;

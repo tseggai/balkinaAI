@@ -291,6 +291,7 @@ function buildTenantSystemPrompt(
   userId: string | null,
   currentDate: string,
   dateInfo?: { todayISO: string; tomorrowISO: string; endOfWeekISO: string; nextWeekMondayISO: string; nextWeekSundayISO: string; currentHourPST: number },
+  paymentsEnabled = false,
 ): string {
   let customerSection: string;
   if (userId) {
@@ -357,8 +358,10 @@ Extract all info from user's message first (service, date, time, staff). Never r
 GATES: Steps 4 and 5 are mandatory checks — never skip. Always WAIT for user response at steps 4 and 5. Never call create_booking without showing summary_card and receiving explicit confirmation.
 
 ## Key Rules
-- Show price and deposit before booking. Must have customer name and phone before booking.
-- Deposit: "This service requires a $X deposit. Remaining $Y due at appointment." → [[button:Yes, Book with Deposit]] [[button:Choose Another Service]]
+- Show price before booking. Must have customer name and phone before booking.
+${paymentsEnabled
+  ? '- Deposit: "This service requires a $X deposit. Remaining $Y due at appointment." → [[button:Yes, Book with Deposit]] [[button:Choose Another Service]]'
+  : '- Payments and deposits are NOT enabled for this business. Do NOT mention deposits, online payments, or payment collection. Bookings are confirmed directly without any payment step. Payment is handled at the business location.'}
 - Time conflicts: show alternative slots, never just state the conflict.
 - Reschedule: use reschedule_appointment (never cancel+rebook). Confirm which appointment. "push/move/change it" = last discussed appointment only.
 - Directions: call get_directions, show distance + [[link:Get Directions|url]]. Don't rebook.
@@ -512,11 +515,12 @@ export async function POST(request: Request) {
   // 1. Resolve tenant (optional — null in discovery mode)
   let tenantName = 'Balkina AI';
   let resolvedTenantId = tenantId ?? '';
+  let tenantPaymentsEnabled = false;
 
   if (tenantId) {
     const { data: tenantData, error: tenantErr } = await supabase
       .from('tenants')
-      .select('id, name, status')
+      .select('id, name, status, payments_enabled')
       .eq('id', tenantId)
       .single();
 
@@ -524,7 +528,7 @@ export async function POST(request: Request) {
       console.error('[chat] Tenant lookup failed:', tenantErr.message);
     }
 
-    const tenant = tenantData as { id: string; name: string; status: string } | null;
+    const tenant = tenantData as { id: string; name: string; status: string; payments_enabled: boolean } | null;
     if (!tenant || tenant.status !== 'active') {
       return new Response(JSON.stringify({ error: 'Business not found or inactive' }), {
         status: 404,
@@ -533,6 +537,7 @@ export async function POST(request: Request) {
     }
     tenantName = tenant.name;
     resolvedTenantId = tenant.id;
+    tenantPaymentsEnabled = tenant.payments_enabled ?? false;
   }
 
   // 2. Get or create chat session
@@ -744,6 +749,7 @@ export async function POST(request: Request) {
         resolvedUserId,
         currentDateTime,
         dateInfo,
+        tenantPaymentsEnabled,
       )
     : buildDiscoverySystemPrompt(
         resolvedName,

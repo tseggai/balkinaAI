@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { ServiceForm } from '@/components/service-form';
+import { useSupabase } from '@/lib/supabase/client';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -569,6 +570,17 @@ export default function ServicesPage() {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [paymentsEnabled, setPaymentsEnabled] = useState(false);
+
+  const supabase = useSupabase();
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from('tenants').select('payments_enabled').eq('user_id', user.id).single();
+      if (data) setPaymentsEnabled((data as { payments_enabled: boolean }).payments_enabled);
+    })();
+  }, [supabase]);
 
   const fetchServices = useCallback(async () => {
     const res = await fetch('/api/services');
@@ -926,6 +938,7 @@ export default function ServicesPage() {
                 service={editing}
                 onClose={handleClose}
                 onDelete={handleDelete}
+                paymentsEnabled={paymentsEnabled}
               />
             </div>
           </div>

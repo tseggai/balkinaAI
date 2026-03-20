@@ -92,6 +92,28 @@ All tables require RLS enabled. Tenant data always filtered by tenant_id.
 - Always show price and deposit amount before any payment tool call.
 - Stream all responses. Never wait for full completion before rendering.
 
+## Feature Flags
+
+### payments_enabled (per-tenant)
+- **Column**: `tenants.payments_enabled` (BOOLEAN, default false) — Migration 025.
+- **Purpose**: Gates deposits, Stripe Connect payments, and checkout for regions where Stripe is not available.
+- **When false**:
+  - Deposit calculation is skipped in chat (`tool-handlers.ts`) and REST (`/api/booking/create`) booking flows.
+  - "Enable Deposit" toggle is hidden in the service form (`service-form.tsx`).
+  - Chat system prompt tells the AI not to mention deposits or online payments.
+  - Bookings are created with `deposit_amount_paid: null`, `balance_due: null`.
+- **When true**: Full deposit + Stripe payment flow activates. No code changes needed.
+- **How to toggle**:
+  ```sql
+  -- Enable payments for a tenant
+  UPDATE tenants SET payments_enabled = true WHERE id = '<tenant-id>';
+  -- Disable payments for a tenant
+  UPDATE tenants SET payments_enabled = false WHERE id = '<tenant-id>';
+  -- Check current state
+  SELECT id, name, payments_enabled FROM tenants;
+  ```
+- **Files involved**: `tool-handlers.ts`, `booking/create/route.ts`, `chat/route.ts`, `service-form.tsx`, `services/page.tsx`, `packages/shared/src/types/index.ts`.
+
 ## Stripe Rules (/packages/billing)
 - Webhook handler: /packages/api/routes/webhooks/stripe.ts
 - Always verify webhook signature with stripe.webhooks.constructEvent() before processing.
