@@ -319,7 +319,7 @@ Card types and fields:
 - staff_with_slots: items[]{id, name, image_url, available_slots_count, slots[]{time, iso, staff_name?}}, anyone_slots?[]{time, iso, staff_name}
 - booking_options: packages[]{id, name, image_url, price, sessions_count, customer_owned, sessions_remaining?}, extras[]{id, name, price, duration_minutes}
 - summary_card: service, package?, extras[], business, staff, date, time, address, subtotal, extras_total, package_discount, coupon_discount, loyalty_discount, total, deposit_required?, points_to_earn
-- confirmed_card: service, package?, extras[], business, staff, date, time, address, total, points_earned, latitude?, longitude?
+- confirmed_card: service, package?, extras[], business, staff, date, time, address, total, points_earned, latitude?, longitude?, deposit_amount?, deposit_paid?, payment_url?, payment_required?
 
 COMBINED CARDS: The app renders staff_with_slots as staff avatars (horizontally scrollable) with time slot chips below the selected staff. booking_options renders package chips + extras grid together with one "Done" button. This reduces user taps and API calls.
 
@@ -407,7 +407,7 @@ Card types and fields:
 - staff_with_slots: items[]{id, name, image_url, available_slots_count, slots[]{time, iso, staff_name?}}, anyone_slots?[]{time, iso, staff_name}
 - booking_options: packages[]{id, name, image_url, price, sessions_count, customer_owned, sessions_remaining?}, extras[]{id, name, price, duration_minutes}
 - summary_card: service, package?, extras[], business, staff, date, time, address, subtotal, extras_total, package_discount, coupon_discount, loyalty_discount, total, deposit_required?, points_to_earn
-- confirmed_card: service, package?, extras[], business, staff, date, time, address, total, points_earned, latitude?, longitude?
+- confirmed_card: service, package?, extras[], business, staff, date, time, address, total, points_earned, latitude?, longitude?, deposit_amount?, deposit_paid?, payment_url?, payment_required?
 
 COMBINED CARDS: The app renders business_with_services as business cards (horizontally scrollable) with service chips below the selected business. staff_with_slots shows staff avatars with time slot chips below. booking_options renders package chips + extras grid together. This reduces user taps and API calls.
 

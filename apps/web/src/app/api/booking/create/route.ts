@@ -196,7 +196,7 @@ export async function POST(request: Request) {
       })(),
 
       // 8. Tenant name + payments flag
-      supabase.from('tenants').select('name, payments_enabled').eq('id', tenantId).single(),
+      supabase.from('tenants').select('name, payments_enabled, stripe_account_id').eq('id', tenantId).single(),
     ]);
 
     // Unpack service
@@ -228,7 +228,7 @@ export async function POST(request: Request) {
     const requiresApproval = staffResult.requiresApproval;
 
     // Unpack tenant
-    const tenantData = tenantResult.data as { name: string; payments_enabled: boolean } | null;
+    const tenantData = tenantResult.data as { name: string; payments_enabled: boolean; stripe_account_id: string | null } | null;
     const businessName = tenantData?.name ?? 'Business';
     const paymentsEnabled = tenantData?.payments_enabled ?? false;
 
@@ -330,6 +330,45 @@ export async function POST(request: Request) {
       }
     }
 
+    // Create PaymentIntent for deposit if payments enabled and deposit required
+    let paymentUrl: string | null = null;
+    const paymentRequired = !!(paymentsEnabled && depositAmount && depositAmount > 0);
+    const tenantStripeAccountId = tenantData?.stripe_account_id ?? null;
+    if (paymentRequired && tenantStripeAccountId) {
+      try {
+        const Stripe = (await import('stripe')).default;
+        const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2026-02-25.clover' });
+        const depositAmountCents = Math.round(depositAmount! * 100);
+        const platformFeeCents = Math.round(depositAmountCents * 0.1);
+
+        const paymentIntent = await stripeClient.paymentIntents.create({
+          amount: depositAmountCents,
+          currency: 'usd',
+          automatic_payment_methods: { enabled: true },
+          transfer_data: { destination: tenantStripeAccountId },
+          application_fee_amount: platformFeeCents,
+          metadata: {
+            appointment_id: apptId,
+            customer_id: customerId ?? '',
+            payment_type: 'deposit',
+          },
+          description: `Deposit for ${svc.name} at ${businessName}`,
+        });
+
+        await supabase.from('appointments')
+          .update({ stripe_payment_intent_id: paymentIntent.id } as never)
+          .eq('id', apptId);
+
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : 'https://balkina-ai.vercel.app');
+        paymentUrl = `${baseUrl}/pay/${apptId}`;
+        console.log('[booking/create] PaymentIntent created:', paymentIntent.id);
+      } catch (stripeErr) {
+        console.error('[booking/create] Stripe PaymentIntent creation failed:', stripeErr);
+      }
+    }
+
     // Fire notifications — await so they complete before Vercel terminates the function
     try {
       if (requiresApproval) {
@@ -370,6 +409,9 @@ export async function POST(request: Request) {
         address: loc?.address ?? '',
         total: finalTotal,
         deposit_amount: depositAmount,
+        deposit_paid: false,
+        payment_url: paymentUrl,
+        payment_required: paymentRequired,
         latitude: loc?.latitude ?? undefined,
         longitude: loc?.longitude ?? undefined,
       },

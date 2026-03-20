@@ -1,0 +1,121 @@
+import { NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/server';
+import Stripe from 'stripe';
+
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2026-02-25.clover',
+  });
+}
+
+export async function POST(request: Request) {
+  const signature = request.headers.get('stripe-signature');
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!signature || !webhookSecret) {
+    return NextResponse.json({ error: 'Missing signature or webhook secret' }, { status: 400 });
+  }
+
+  const body = await request.text();
+
+  let event: Stripe.Event;
+  try {
+    event = getStripe().webhooks.constructEvent(body, signature, webhookSecret);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Invalid signature';
+    console.error('[webhooks/stripe] signature verification failed:', message);
+    return NextResponse.json({ error: `Webhook signature verification failed: ${message}` }, { status: 400 });
+  }
+
+  const supabase = createAdminClient();
+
+  // Idempotency check
+  const { data: existing } = await supabase
+    .from('stripe_webhook_events')
+    .select('id')
+    .eq('stripe_event_id', event.id)
+    .single();
+
+  if (existing) {
+    return NextResponse.json({ received: true, status: 'already_processed' });
+  }
+
+  try {
+    switch (event.type) {
+      case 'payment_intent.succeeded': {
+        const pi = event.data.object as Stripe.PaymentIntent;
+        const appointmentId = pi.metadata?.appointment_id;
+        const paymentType = pi.metadata?.payment_type;
+        if (!appointmentId) break;
+
+        console.log(`[webhooks/stripe] payment_intent.succeeded for appointment ${appointmentId}, type=${paymentType}`);
+
+        if (paymentType === 'deposit') {
+          await supabase
+            .from('appointments')
+            .update({
+              deposit_paid: true,
+              deposit_amount_paid: pi.amount / 100,
+              stripe_payment_intent_id: pi.id,
+            } as never)
+            .eq('id', appointmentId);
+        } else if (paymentType === 'balance') {
+          await supabase
+            .from('appointments')
+            .update({
+              balance_due: 0,
+            } as never)
+            .eq('id', appointmentId);
+        }
+        break;
+      }
+
+      case 'payment_intent.payment_failed': {
+        const pi = event.data.object as Stripe.PaymentIntent;
+        const appointmentId = pi.metadata?.appointment_id;
+        if (appointmentId) {
+          console.log(`[webhooks/stripe] payment_intent.payment_failed for appointment ${appointmentId}`);
+        }
+        break;
+      }
+
+      case 'charge.refunded': {
+        const charge = event.data.object as Stripe.Charge;
+        const paymentIntentId = typeof charge.payment_intent === 'string'
+          ? charge.payment_intent
+          : (charge.payment_intent as Stripe.PaymentIntent | null)?.id;
+
+        if (paymentIntentId) {
+          const { data: appointment } = await supabase
+            .from('appointments')
+            .select('id, total_price, deposit_amount_paid')
+            .eq('stripe_payment_intent_id', paymentIntentId)
+            .single();
+
+          if (appointment) {
+            const refundedAmount = (charge.amount_refunded ?? 0) / 100;
+            await supabase
+              .from('appointments')
+              .update({
+                status: 'cancelled' as const,
+                balance_due: (appointment.total_price ?? 0) - ((appointment.deposit_amount_paid ?? 0) - refundedAmount),
+              } as never)
+              .eq('id', appointment.id);
+          }
+        }
+        break;
+      }
+
+      default:
+        break;
+    }
+
+    // Mark event as processed
+    await supabase.from('stripe_webhook_events').insert({ stripe_event_id: event.id } as never);
+
+    return NextResponse.json({ received: true });
+  } catch (err) {
+    console.error(`[webhooks/stripe] processing error for ${event.type}:`, err);
+    return NextResponse.json({ error: 'Processing failed' }, { status: 500 });
+  }
+}
