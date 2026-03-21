@@ -18,6 +18,7 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [elementReady, setElementReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -43,24 +44,34 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
     }
   }, [stripe, elements, onSuccess]);
 
+  const isDisabled = !stripe || !elementReady || isProcessing;
+
   return (
     <form onSubmit={handleSubmit}>
-      <PaymentElement />
+      {!elementReady && (
+        <p style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0', fontSize: 14 }}>
+          Loading payment form...
+        </p>
+      )}
+      <PaymentElement
+        onReady={() => setElementReady(true)}
+        onLoadError={(() => setError('Failed to load payment form')) as never}
+      />
       {error && <p style={{ color: '#ef4444', marginTop: 12, fontSize: 14 }}>{error}</p>}
       <button
         type="submit"
-        disabled={!stripe || isProcessing}
+        disabled={isDisabled}
         style={{
           marginTop: 24,
           width: '100%',
           padding: '14px 0',
-          backgroundColor: isProcessing ? '#94a3b8' : '#6366f1',
+          backgroundColor: isDisabled ? '#94a3b8' : '#6366f1',
           color: '#fff',
           border: 'none',
           borderRadius: 8,
           fontSize: 16,
           fontWeight: 600,
-          cursor: isProcessing ? 'not-allowed' : 'pointer',
+          cursor: isDisabled ? 'not-allowed' : 'pointer',
         }}
       >
         {isProcessing ? 'Processing...' : 'Pay Deposit'}

@@ -88,6 +88,11 @@ export default function PaymentWebViewModal({
           javaScriptEnabled
           domStorageEnabled
           sharedCookiesEnabled
+          thirdPartyCookiesEnabled
+          originWhitelist={['*']}
+          allowsInlineMediaPlayback
+          mixedContentMode="compatibility"
+          onShouldStartLoadWithRequest={() => true}
         />
 
         {loading && (
