@@ -2193,7 +2193,7 @@ export default function ChatScreen() {
             payment_required?: boolean;
           };
 
-          // If deposit payment is required, present native PaymentSheet
+          // If deposit payment is required, try native PaymentSheet first, fall back to web checkout
           if (result.payment_required && result.payment_client_secret) {
             const { error: initError } = await initPaymentSheet({
               paymentIntentClientSecret: result.payment_client_secret,
@@ -2204,13 +2204,11 @@ export default function ChatScreen() {
             });
 
             if (initError) {
-              // Stripe unavailable (e.g. Expo Go) — skip payment, show confirmation card.
-              // User can pay the deposit later from their Bookings tab.
-              addAssistantMessage(
-                result.status === 'pending'
-                  ? 'Your appointment request has been submitted! You can pay the deposit from your Bookings tab.'
-                  : 'Your booking is confirmed! You can pay the deposit from your Bookings tab.',
-              );
+              // Native Stripe unavailable (e.g. Expo Go) — open web checkout
+              if (result.payment_url) {
+                Linking.openURL(result.payment_url);
+              }
+              // Confirmation card will show with "Pay Deposit" web link as fallback
             } else {
               const { error: presentError } = await presentPaymentSheet();
 
@@ -2765,6 +2763,16 @@ export default function ChatScreen() {
                   ) : null}
                 </View>
 
+                {confirmationModal.deposit_amount && confirmationModal.deposit_amount > 0 ? (
+                  <View style={fullScreenConfirmStyles.detailRow}>
+                    <Ionicons name="card-outline" size={18} color="#6B7FC4" />
+                    <Text style={fullScreenConfirmStyles.detailLabel}>Deposit</Text>
+                    <Text style={[fullScreenConfirmStyles.detailValue, { color: confirmationModal.deposit_paid ? '#059669' : '#dc2626', fontWeight: '600' }]}>
+                      ${confirmationModal.deposit_amount.toFixed(2)} {confirmationModal.deposit_paid ? '(Paid)' : '(Due)'}
+                    </Text>
+                  </View>
+                ) : null}
+
                 {confirmationModal.points_earned > 0 && (
                   <Text style={fullScreenConfirmStyles.pointsBadge}>+{confirmationModal.points_earned} pts earned</Text>
                 )}
@@ -2774,6 +2782,17 @@ export default function ChatScreen() {
 
           {/* Bottom buttons */}
           <View style={fullScreenConfirmStyles.bottomButtons}>
+            {confirmationModal && confirmationModal.payment_required && !confirmationModal.deposit_paid && confirmationModal.payment_url ? (
+              <TouchableOpacity
+                style={[fullScreenConfirmStyles.doneBtn, { backgroundColor: '#6366f1' }]}
+                onPress={() => {
+                  Linking.openURL(confirmationModal.payment_url!);
+                }}
+              >
+                <Ionicons name="card-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+                <Text style={fullScreenConfirmStyles.doneBtnText}>Pay Deposit (${confirmationModal.deposit_amount?.toFixed(2)})</Text>
+              </TouchableOpacity>
+            ) : null}
             <TouchableOpacity
               style={fullScreenConfirmStyles.doneBtn}
               onPress={() => {

@@ -541,6 +541,12 @@ export default function BookingsScreen() {
       });
 
       if (initError) {
+        // Native Stripe unavailable (e.g. Expo Go) — fall back to web checkout
+        if (initError.code === 'Unavailable') {
+          const payUrl = `${API_BASE}/pay/${appointmentId}`;
+          Linking.openURL(payUrl);
+          return;
+        }
         Alert.alert('Payment Error', initError.message);
         return;
       }
