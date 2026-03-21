@@ -21,6 +21,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
+import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 
 const API_BASE =
   process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
@@ -509,6 +510,9 @@ export default function BookingsScreen() {
     setRatingModalVisible(true);
   }, []);
 
+  // In-app payment WebView modal state
+  const [paymentModal, setPaymentModal] = useState<{ appointmentId: string; depositAmount?: number } | null>(null);
+
   const handlePayDeposit = useCallback(async (appointmentId: string) => {
     setPaymentLoading(true);
     try {
@@ -525,7 +529,7 @@ export default function BookingsScreen() {
         return;
       }
 
-      const { clientSecret } = (await res.json()) as { clientSecret: string };
+      const { clientSecret, amount } = (await res.json()) as { clientSecret: string; amount?: number };
       if (!clientSecret) {
         Alert.alert('Payment Error', 'No payment secret returned');
         return;
@@ -541,6 +545,14 @@ export default function BookingsScreen() {
       });
 
       if (initError) {
+        // Native Stripe unavailable (e.g. Expo Go) — open in-app WebView payment modal
+        if (initError.code === 'Unavailable') {
+          setPaymentModal({
+            appointmentId,
+            depositAmount: amount ? amount / 100 : undefined,
+          });
+          return;
+        }
         Alert.alert('Payment Error', initError.message);
         return;
       }
@@ -842,6 +854,21 @@ export default function BookingsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* In-app payment WebView modal (fallback when native Stripe unavailable) */}
+      {paymentModal && (
+        <PaymentWebViewModal
+          visible={true}
+          appointmentId={paymentModal.appointmentId}
+          depositAmount={paymentModal.depositAmount}
+          onSuccess={() => {
+            setPaymentModal(null);
+            Alert.alert('Deposit Paid!', 'Your deposit has been successfully processed.');
+            fetchAppointments();
+          }}
+          onClose={() => setPaymentModal(null)}
+        />
+      )}
     </View>
   );
 }
