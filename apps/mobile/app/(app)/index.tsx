@@ -24,6 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
+import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -1203,10 +1204,10 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
         <Text style={richCardStyles.confirmedPoints}>+{data.points_earned} pts earned</Text>
       ) : null}
 
-      {data.payment_required && !data.deposit_paid && data.payment_url ? (
+      {data.payment_required && !data.deposit_paid && data.appointmentId ? (
         <TouchableOpacity
           style={{ marginTop: 12, backgroundColor: '#6366f1', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center' }}
-          onPress={() => Linking.openURL(data.payment_url!)}
+          onPress={() => onButtonPress(`pay_deposit:${data.appointmentId}:${data.deposit_amount ?? 0}`)}
           activeOpacity={0.7}
         >
           <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Pay Deposit (${data.deposit_amount?.toFixed(2)})</Text>
@@ -1612,6 +1613,8 @@ export default function ChatScreen() {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   // Full-screen confirmation modal state
   const [confirmationModal, setConfirmationModal] = useState<ConfirmedCardData | null>(null);
+  // In-app payment WebView modal state
+  const [paymentModal, setPaymentModal] = useState<{ appointmentId: string; depositAmount?: number; pendingCard?: ConfirmedCardData } | null>(null);
   // Track recently displayed service cards so we can match taps to IDs
   const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; tenantId?: string; tenantName?: string }[]>([]);
   // Stores structured tool data from SSE for deterministic rendering
@@ -2193,37 +2196,6 @@ export default function ChatScreen() {
             payment_required?: boolean;
           };
 
-          // If deposit payment is required, try native PaymentSheet first, fall back to web checkout
-          if (result.payment_required && result.payment_client_secret) {
-            const { error: initError } = await initPaymentSheet({
-              paymentIntentClientSecret: result.payment_client_secret,
-              merchantDisplayName: 'Balkina AI',
-              allowsDelayedPaymentMethods: false,
-              applePay: { merchantCountryCode: 'US' },
-              googlePay: { merchantCountryCode: 'US', testEnv: true },
-            });
-
-            if (initError) {
-              // Native Stripe unavailable (e.g. Expo Go) — open web checkout
-              if (result.payment_url) {
-                Linking.openURL(result.payment_url);
-              }
-              // Confirmation card will show with "Pay Deposit" web link as fallback
-            } else {
-              const { error: presentError } = await presentPaymentSheet();
-
-              if (presentError) {
-                if (presentError.code !== 'Canceled') {
-                  addAssistantMessage(`Payment failed: ${presentError.message}. You can retry from your Bookings tab.`);
-                }
-                // Continue to show confirmation card with deposit_paid: false
-              } else {
-                // Payment succeeded — mark deposit as paid in the confirmed card
-                result.deposit_paid = true;
-              }
-            }
-          }
-
           // Build extras display with prices for confirmation
           const confirmedExtras = bookingState.selectedExtras.map((name) => {
             const extra = lastBookingOptions.current?.extras.find((e) => e.name === name);
@@ -2254,6 +2226,42 @@ export default function ChatScreen() {
             payment_url: result.payment_url,
             payment_required: result.payment_required ?? false,
           };
+
+          // If deposit payment is required, try native PaymentSheet first, fall back to in-app WebView
+          if (result.payment_required && result.payment_client_secret) {
+            const { error: initError } = await initPaymentSheet({
+              paymentIntentClientSecret: result.payment_client_secret,
+              merchantDisplayName: 'Balkina AI',
+              allowsDelayedPaymentMethods: false,
+              applePay: { merchantCountryCode: 'US' },
+              googlePay: { merchantCountryCode: 'US', testEnv: true },
+            });
+
+            if (initError) {
+              // Native Stripe unavailable (e.g. Expo Go) — open in-app WebView payment modal.
+              // Store the pending card so it shows after payment succeeds.
+              setPaymentModal({
+                appointmentId: result.appointment_id,
+                depositAmount: result.deposit_amount,
+                pendingCard: confirmedCard,
+              });
+              setBookingState(INITIAL_BOOKING_STATE);
+              setIsLoading(false);
+              return true;
+            } else {
+              const { error: presentError } = await presentPaymentSheet();
+
+              if (presentError) {
+                if (presentError.code !== 'Canceled') {
+                  addAssistantMessage(`Payment failed: ${presentError.message}. You can retry from your Bookings tab.`);
+                }
+                // Continue to show confirmation card with deposit_paid: false
+              } else {
+                // Payment succeeded — mark deposit as paid in the confirmed card
+                confirmedCard.deposit_paid = true;
+              }
+            }
+          }
 
           // Show full-screen confirmation modal
           setConfirmationModal(confirmedCard);
@@ -2554,7 +2562,19 @@ export default function ChatScreen() {
   );
 
   const handleButtonPress = useCallback(
-    (label: string) => { sendMessage(label); },
+    (label: string) => {
+      // Intercept pay_deposit commands from confirmed cards
+      if (label.startsWith('pay_deposit:')) {
+        const parts = label.split(':');
+        const appointmentId = parts[1];
+        const depositAmount = parseFloat(parts[2] || '0') || undefined;
+        if (appointmentId) {
+          setPaymentModal({ appointmentId, depositAmount });
+        }
+        return;
+      }
+      sendMessage(label);
+    },
     [sendMessage],
   );
 
@@ -2782,11 +2802,18 @@ export default function ChatScreen() {
 
           {/* Bottom buttons */}
           <View style={fullScreenConfirmStyles.bottomButtons}>
-            {confirmationModal && confirmationModal.payment_required && !confirmationModal.deposit_paid && confirmationModal.payment_url ? (
+            {confirmationModal && confirmationModal.payment_required && !confirmationModal.deposit_paid && confirmationModal.appointmentId ? (
               <TouchableOpacity
                 style={[fullScreenConfirmStyles.doneBtn, { backgroundColor: '#6366f1' }]}
                 onPress={() => {
-                  Linking.openURL(confirmationModal.payment_url!);
+                  // Open in-app WebView payment modal
+                  const card = confirmationModal;
+                  setConfirmationModal(null);
+                  setPaymentModal({
+                    appointmentId: card.appointmentId!,
+                    depositAmount: card.deposit_amount,
+                    pendingCard: card,
+                  });
                 }}
               >
                 <Ionicons name="card-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
@@ -2830,6 +2857,31 @@ export default function ChatScreen() {
           </View>
         </SafeAreaView>
       </Modal>
+
+      {/* In-app payment WebView modal (fallback when native Stripe unavailable) */}
+      {paymentModal && (
+        <PaymentWebViewModal
+          visible={true}
+          appointmentId={paymentModal.appointmentId}
+          depositAmount={paymentModal.depositAmount}
+          onSuccess={() => {
+            const card = paymentModal.pendingCard;
+            setPaymentModal(null);
+            if (card) {
+              card.deposit_paid = true;
+              setConfirmationModal(card);
+            }
+          }}
+          onClose={() => {
+            const card = paymentModal.pendingCard;
+            setPaymentModal(null);
+            if (card) {
+              // Show confirmation card with deposit still unpaid
+              setConfirmationModal(card);
+            }
+          }}
+        />
+      )}
     </View>
   );
 }
