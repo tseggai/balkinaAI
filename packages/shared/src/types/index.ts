@@ -107,11 +107,20 @@ export interface ServiceExtra {
 
 export interface Customer {
   id: UUID; // References auth.users
+  user_id: UUID | null;
   display_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   phone: string | null;
   email: string | null;
+  date_of_birth: DateString | null;
+  gender: string | null;
+  profile_image_url: string | null;
   push_token: string | null;
   location_sharing_enabled: boolean;
+  notify_sms: boolean;
+  notify_push: boolean;
+  notify_email: boolean;
   created_at: Timestamp;
 }
 
