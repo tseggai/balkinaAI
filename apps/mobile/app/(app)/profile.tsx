@@ -34,7 +34,12 @@ interface CustomerProfile {
   profile_image_url: string | null;
 }
 
-const GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
+const GENDER_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'non-binary', label: 'Non-binary' },
+  { value: 'prefer-not-to-say', label: 'Prefer not to say' },
+];
 
 // ── Main Screen ──────────────────────────────────────────────────────────────
 
@@ -237,7 +242,8 @@ function EditProfileModal({
   const [firstName, setFirstName] = useState(profile.first_name ?? '');
   const [lastName, setLastName] = useState(profile.last_name ?? '');
   const [phone, setPhone] = useState(profile.phone ?? '');
-  const [dateOfBirth, setDateOfBirth] = useState(profile.date_of_birth ?? '');
+  const [birthdayMonth, setBirthdayMonth] = useState('');
+  const [birthdayDay, setBirthdayDay] = useState('');
   const [gender, setGender] = useState(profile.gender ?? '');
   const [avatarUri, setAvatarUri] = useState<string | null>(profile.profile_image_url ?? null);
   const [newAvatarLocal, setNewAvatarLocal] = useState<string | null>(null);
@@ -248,7 +254,15 @@ function EditProfileModal({
     setFirstName(profile.first_name ?? '');
     setLastName(profile.last_name ?? '');
     setPhone(profile.phone ?? '');
-    setDateOfBirth(profile.date_of_birth ?? '');
+    // Parse date_of_birth (YYYY-MM-DD) into month/day
+    if (profile.date_of_birth) {
+      const parts = profile.date_of_birth.split('T')[0].split('-');
+      setBirthdayMonth(parts[1] ?? '');
+      setBirthdayDay(parts[2] ?? '');
+    } else {
+      setBirthdayMonth('');
+      setBirthdayDay('');
+    }
     setGender(profile.gender ?? '');
     setAvatarUri(profile.profile_image_url ?? null);
     setNewAvatarLocal(null);
@@ -306,22 +320,37 @@ function EditProfileModal({
     if (!token) { setSaving(false); return; }
 
     try {
-      const uploadedUrl = await uploadAvatar();
-
       const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
+
+      // Build birthday as YYYY-MM-DD (using 2000 as placeholder year)
+      let birthdayValue: string | null = null;
+      const mm = birthdayMonth.trim().padStart(2, '0');
+      const dd = birthdayDay.trim().padStart(2, '0');
+      if (mm && dd && parseInt(mm, 10) >= 1 && parseInt(mm, 10) <= 12 && parseInt(dd, 10) >= 1 && parseInt(dd, 10) <= 31) {
+        birthdayValue = `2000-${mm}-${dd}`;
+      }
+
+      // Only include profile_image_url when a new image was actually picked
+      const payload: Record<string, unknown> = {
+        display_name: displayName,
+        first_name: firstName.trim(),
+        last_name: lastName.trim() || undefined,
+        phone: phone.trim() || undefined,
+        date_of_birth: birthdayValue,
+        gender: gender || null,
+      };
+
+      if (newAvatarLocal) {
+        const uploadedUrl = await uploadAvatar();
+        if (uploadedUrl) {
+          payload.profile_image_url = uploadedUrl;
+        }
+      }
 
       const res = await fetch(`${API_BASE}/api/customers/profile`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          display_name: displayName,
-          first_name: firstName.trim(),
-          last_name: lastName.trim() || undefined,
-          phone: phone.trim() || undefined,
-          date_of_birth: dateOfBirth.trim() || null,
-          gender: gender || null,
-          profile_image_url: uploadedUrl,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();
@@ -429,15 +458,28 @@ function EditProfileModal({
             <View style={styles.formDivider} />
 
             <View style={styles.formRow}>
-              <Text style={styles.formLabel}>Date of Birth</Text>
-              <TextInput
-                style={styles.formInput}
-                value={dateOfBirth}
-                onChangeText={setDateOfBirth}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#c9cdd4"
-                keyboardType="numbers-and-punctuation"
-              />
+              <Text style={styles.formLabel}>Birthday</Text>
+              <View style={styles.birthdayRow}>
+                <TextInput
+                  style={styles.birthdayInput}
+                  value={birthdayMonth}
+                  onChangeText={(t) => setBirthdayMonth(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                  placeholder="MM"
+                  placeholderTextColor="#c9cdd4"
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+                <Text style={styles.birthdaySep}>/</Text>
+                <TextInput
+                  style={styles.birthdayInput}
+                  value={birthdayDay}
+                  onChangeText={(t) => setBirthdayDay(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                  placeholder="DD"
+                  placeholderTextColor="#c9cdd4"
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+              </View>
             </View>
             <View style={styles.formDivider} />
 
@@ -445,7 +487,7 @@ function EditProfileModal({
               <Text style={styles.formLabel}>Gender</Text>
               <View style={styles.formSelectRow}>
                 <Text style={gender ? styles.formSelectText : styles.formSelectPlaceholder}>
-                  {gender || 'Select'}
+                  {GENDER_OPTIONS.find((o) => o.value === gender)?.label || 'Select'}
                 </Text>
                 <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
               </View>
@@ -469,14 +511,14 @@ function EditProfileModal({
               <Text style={styles.pickerTitle}>Select Gender</Text>
               {GENDER_OPTIONS.map((option) => (
                 <TouchableOpacity
-                  key={option}
-                  style={[styles.pickerOption, gender === option && styles.pickerOptionActive]}
-                  onPress={() => { setGender(option); setGenderPickerVisible(false); }}
+                  key={option.value}
+                  style={[styles.pickerOption, gender === option.value && styles.pickerOptionActive]}
+                  onPress={() => { setGender(option.value); setGenderPickerVisible(false); }}
                 >
-                  <Text style={[styles.pickerOptionText, gender === option && styles.pickerOptionTextActive]}>
-                    {option}
+                  <Text style={[styles.pickerOptionText, gender === option.value && styles.pickerOptionTextActive]}>
+                    {option.label}
                   </Text>
-                  {gender === option && <Ionicons name="checkmark-circle" size={22} color="#6B7FC4" />}
+                  {gender === option.value && <Ionicons name="checkmark-circle" size={22} color="#6B7FC4" />}
                 </TouchableOpacity>
               ))}
               <TouchableOpacity
@@ -589,6 +631,11 @@ const styles = StyleSheet.create({
   formValueReadonly: {
     flex: 1, fontSize: 15, color: '#9ca3af', textAlign: 'right',
   },
+  birthdayRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  birthdayInput: {
+    width: 42, fontSize: 15, color: '#111827', textAlign: 'center', paddingVertical: 0,
+  },
+  birthdaySep: { fontSize: 15, color: '#9ca3af' },
   formSelectRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   formSelectText: { fontSize: 15, color: '#111827' },
   formSelectPlaceholder: { fontSize: 15, color: '#c9cdd4' },

@@ -372,18 +372,28 @@ function EditStaffModal({
     if (!token) { setSaving(false); return; }
 
     try {
-      const uploadedUrl = await uploadAvatar();
       const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
+
+      // Only include image_url when a new image was actually picked
+      const payload: Record<string, unknown> = {
+        name: fullName,
+        phone: phone.trim() || undefined,
+        profession: profession.trim() || null,
+      };
+
+      let finalImageUrl = profile.image_url;
+      if (newAvatarLocal) {
+        const uploadedUrl = await uploadAvatar();
+        if (uploadedUrl) {
+          payload.image_url = uploadedUrl;
+          finalImageUrl = uploadedUrl;
+        }
+      }
 
       const res = await fetch(`${API_BASE}/api/staff/profile`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: fullName,
-          phone: phone.trim() || undefined,
-          profession: profession.trim() || null,
-          image_url: uploadedUrl,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();
@@ -393,7 +403,7 @@ function EditStaffModal({
           name: fullName,
           phone: phone.trim() || null,
           profession: profession.trim() || null,
-          image_url: uploadedUrl,
+          image_url: finalImageUrl,
         });
       } else {
         Alert.alert('Error', json.error ?? 'Failed to update profile');
