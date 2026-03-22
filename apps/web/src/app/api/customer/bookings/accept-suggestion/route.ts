@@ -1,12 +1,17 @@
 /**
  * POST /api/customer/bookings/accept-suggestion
- * Accept a staff's suggested reschedule time by creating a new booking
- * based on the original cancelled appointment's details.
+ * Accept a staff's suggested reschedule time by reactivating the original
+ * cancelled appointment with the new time. The staff already pre-approved
+ * the suggested time, so no new approval cycle is needed.
+ *
+ * - If deposit is required: status → 'approved' (customer must pay deposit)
+ * - If no deposit: status → 'confirmed'
+ *
  * Body: { appointmentId (the cancelled one), userId, suggestedTimeIso }
  */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
-import { notifyBookingSubmitted, notifyBookingConfirmed, notifyStaffNewBooking } from '@/lib/notifications/booking-events';
+import { notifyBookingConfirmed, notifyDepositPaymentRequired } from '@/lib/notifications/booking-events';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -65,8 +70,9 @@ export async function POST(request: Request) {
       .from('appointments')
       .select(`
         id, status, customer_id, tenant_id, service_id, staff_id, location_id, total_price,
-        services(duration_minutes),
-        staff(requires_approval)
+        deposit_paid,
+        services(duration_minutes, deposit_enabled, deposit_amount, deposit_type, price),
+        tenants(payments_enabled)
       `)
       .eq('id', appointmentId)
       .eq('customer_id', customerId)
@@ -79,9 +85,9 @@ export async function POST(request: Request) {
     const orig = origAppt as unknown as {
       id: string; status: string; customer_id: string; tenant_id: string;
       service_id: string; staff_id: string | null; location_id: string | null;
-      total_price: number;
-      services: { duration_minutes: number } | null;
-      staff: { requires_approval: boolean } | null;
+      total_price: number; deposit_paid: boolean | null;
+      services: { duration_minutes: number; deposit_enabled: boolean | null; deposit_amount: number | null; deposit_type: string | null; price: number | null } | null;
+      tenants: { payments_enabled: boolean | null } | null;
     };
 
     if (orig.status !== 'cancelled') {
@@ -104,52 +110,46 @@ export async function POST(request: Request) {
       );
     }
 
-    const requiresApproval = orig.staff?.requires_approval ?? false;
+    // Determine status: staff already approved the time they suggested,
+    // so no new approval loop. If deposit is required → 'approved' (deposit due).
+    // If no deposit → 'confirmed' directly.
+    const paymentsEnabled = orig.tenants?.payments_enabled ?? false;
+    const hasDeposit = paymentsEnabled && orig.services?.deposit_enabled && orig.services?.deposit_amount;
+    const depositAlreadyPaid = orig.deposit_paid === true;
+    const newStatus = (hasDeposit && !depositAlreadyPaid) ? 'approved' : 'confirmed';
 
-    // Create new appointment
-    const { data: newAppt, error: insertErr } = await supabase
+    // Reactivate the original appointment with new time — no new row needed
+    const { error: updateErr } = await supabase
       .from('appointments')
-      .insert({
-        customer_id: customerId,
-        tenant_id: orig.tenant_id,
-        service_id: orig.service_id,
-        staff_id: orig.staff_id,
-        location_id: orig.location_id,
+      .update({
         start_time: start.toISOString(),
         end_time: end.toISOString(),
-        status: requiresApproval ? 'pending' : 'confirmed',
-        total_price: orig.total_price,
-        deposit_paid: false,
-        notes: `Rescheduled from appointment ${orig.id.slice(0, 8)}`,
+        status: newStatus,
+        notes: `Rescheduled (accepted staff suggestion)`,
       } as never)
-      .select()
-      .single();
+      .eq('id', appointmentId);
 
-    if (insertErr) {
-      return NextResponse.json({ error: insertErr.message }, { status: 500, headers: CORS_HEADERS });
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 500, headers: CORS_HEADERS });
     }
-
-    const newApptId = (newAppt as { id: string }).id;
 
     // Fire notifications
     try {
-      if (requiresApproval) {
-        await Promise.allSettled([
-          notifyBookingSubmitted(newApptId),
-          notifyStaffNewBooking(newApptId),
-        ]);
+      if (newStatus === 'approved' && hasDeposit) {
+        const svc = orig.services!;
+        const depositAmount = svc.deposit_type === 'percentage'
+          ? Math.round((svc.price ?? 0) * (svc.deposit_amount ?? 0) / 100 * 100) / 100
+          : (svc.deposit_amount ?? 0);
+        await notifyDepositPaymentRequired(appointmentId, depositAmount);
       } else {
-        await Promise.allSettled([
-          notifyBookingConfirmed(newApptId),
-          notifyStaffNewBooking(newApptId),
-        ]);
+        await notifyBookingConfirmed(appointmentId);
       }
     } catch (e) {
       console.error('[accept-suggestion] notification error:', e);
     }
 
     return NextResponse.json(
-      { success: true, appointmentId: newApptId, status: requiresApproval ? 'pending' : 'confirmed' },
+      { success: true, appointmentId, status: newStatus },
       { headers: CORS_HEADERS },
     );
   } catch (err) {

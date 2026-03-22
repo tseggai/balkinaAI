@@ -1975,25 +1975,27 @@ export default function AppointmentsPage() {
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h3 className="text-lg font-bold text-gray-900 mb-1">Decline Appointment</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Optionally suggest up to 2 alternative time slots for the customer.
+              Suggest 2 alternative time slots for the customer to choose from.
             </p>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Alternative 1 (optional)</label>
+                <label className="block text-xs text-gray-500 mb-1">Alternative 1 <span className="text-red-500">*</span></label>
                 <input
                   type="datetime-local"
                   value={declineSuggestedTime1}
                   onChange={(e) => setDeclineSuggestedTime1(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  required
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Alternative 2 (optional)</label>
+                <label className="block text-xs text-gray-500 mb-1">Alternative 2 <span className="text-red-500">*</span></label>
                 <input
                   type="datetime-local"
                   value={declineSuggestedTime2}
                   onChange={(e) => setDeclineSuggestedTime2(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  required
                 />
               </div>
             </div>
@@ -2007,7 +2009,7 @@ export default function AppointmentsPage() {
               </button>
               <button
                 onClick={handleDeclineWithSuggestions}
-                disabled={declineLoading}
+                disabled={declineLoading || !declineSuggestedTime1 || !declineSuggestedTime2}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {declineLoading ? 'Declining...' : 'Decline Appointment'}

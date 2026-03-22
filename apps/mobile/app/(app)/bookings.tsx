@@ -520,7 +520,11 @@ export default function BookingsScreen() {
         }),
       });
       if (res.ok) {
-        Alert.alert('Booked!', 'Your appointment has been rescheduled.');
+        const result = (await res.json().catch(() => ({}))) as { status?: string };
+        const msg = result.status === 'approved'
+          ? 'Your appointment has been rescheduled. Please pay the deposit to confirm.'
+          : 'Your appointment has been confirmed!';
+        Alert.alert('Rescheduled!', msg);
         setSuggestionModalVisible(false);
         setSuggestionAppointmentId(null);
         fetchAppointments();
