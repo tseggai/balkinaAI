@@ -74,7 +74,11 @@ export default function CustomersPage() {
       setEditLastName(selected.last_name ?? '');
       setEditEmail(selected.email ?? '');
       setEditPhone(selected.phone ?? '');
-      setEditDob(selected.date_of_birth ? (selected.date_of_birth.split('T')[0] ?? '') : '');
+      // Convert YYYY-MM-DD to MM/DD for birthday display
+      const rawDob = selected.date_of_birth ? selected.date_of_birth.split('T')[0] : '';
+      const dobParts = rawDob ? rawDob.split('-') : [];
+      const mmdd = dobParts.length >= 3 ? `${dobParts[1]}/${dobParts[2]}` : '';
+      setEditDob(mmdd);
       setEditGender(selected.gender ?? '');
       setEditNote(selected.notes ?? '');
       setEditProfileImage(selected.profile_image_url ?? '');
@@ -83,7 +87,7 @@ export default function CustomersPage() {
         lastName: selected.last_name ?? '',
         email: selected.email ?? '',
         phone: selected.phone ?? '',
-        dob: selected.date_of_birth ? (selected.date_of_birth.split('T')[0] ?? '') : '',
+        dob: mmdd,
         gender: selected.gender ?? '',
         note: selected.notes ?? '',
         profileImage: selected.profile_image_url ?? '',
@@ -129,7 +133,7 @@ export default function CustomersPage() {
           display_name: (newFirstName.trim() + ' ' + newLastName.trim()).trim(),
           email: newEmail.trim() || null,
           phone: newPhone.trim() || null,
-          date_of_birth: newDob || null,
+          date_of_birth: newDob ? (() => { const p = newDob.split('/'); const mm = p[0] ?? ''; const dd = p[1] ?? ''; return p.length === 2 && mm && dd ? `2000-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}` : null; })() : null,
           gender: newGender || null,
           notes: newNote.trim() || null,
           profile_image_url: newProfileImage || null,
@@ -166,7 +170,7 @@ export default function CustomersPage() {
           display_name: (editFirstName.trim() + ' ' + editLastName.trim()).trim() || null,
           email: editEmail.trim() || null,
           phone: editPhone.trim() || null,
-          date_of_birth: editDob || null,
+          date_of_birth: editDob ? (() => { const p = editDob.split('/'); const mm = p[0] ?? ''; const dd = p[1] ?? ''; return p.length === 2 && mm && dd ? `2000-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}` : null; })() : null,
           gender: editGender || null,
           notes: editNote.trim() || null,
           profile_image_url: editProfileImage || null,
@@ -346,11 +350,11 @@ export default function CustomersPage() {
                   </div>
                 </div>
 
-                {/* Row 4: Date of Birth (50%) + Gender (50%) */}
+                {/* Row 4: Birthday (50%) + Gender (50%) */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs text-gray-400">Date of Birth</label>
-                    <input type="date" value={editDob} onChange={(e) => setEditDob(e.target.value)} className={editInputClass} />
+                    <label className="block text-xs text-gray-400">Birthday</label>
+                    <input type="text" value={editDob} onChange={(e) => setEditDob(e.target.value)} placeholder="MM/DD" className={editInputClass} />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-400">Gender</label>
@@ -463,9 +467,9 @@ export default function CustomersPage() {
                   <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="Phone" className={addInputClass} />
                 </div>
 
-                {/* Row 4: Date of Birth (50%) + Gender (50%) */}
+                {/* Row 4: Birthday (50%) + Gender (50%) */}
                 <div className="grid grid-cols-2 gap-4">
-                  <input type="date" value={newDob} onChange={(e) => setNewDob(e.target.value)} placeholder="Date of Birth" className={addInputClass} />
+                  <input type="text" value={newDob} onChange={(e) => setNewDob(e.target.value)} placeholder="Birthday (MM/DD)" className={addInputClass} />
                   <select value={newGender} onChange={(e) => setNewGender(e.target.value)} className={addInputClass}>
                     <option value="">Gender</option>
                     <option value="male">Male</option>
