@@ -322,7 +322,7 @@ function EditStaffModal({
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -334,30 +334,36 @@ function EditStaffModal({
   };
 
   const uploadAvatar = async (): Promise<string | null> => {
-    if (!newAvatarLocal) return profile.image_url ?? null;
+    if (!newAvatarLocal) return null;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      const token = await getToken();
+      if (!token) return null;
 
-      const response = await fetch(newAvatarLocal);
-      const blob = await response.blob();
-      const fileExt = newAvatarLocal.split('.').pop() ?? 'jpg';
-      const filePath = `${user.id}/avatar.${fileExt}`;
+      const uriParts = newAvatarLocal.split('.');
+      const fileExt = uriParts[uriParts.length - 1] ?? 'jpg';
 
-      const { error } = await supabase.storage
-        .from('staff-avatars')
-        .upload(filePath, blob, { upsert: true, contentType: `image/${fileExt}` });
+      const formData = new FormData();
+      formData.append('file', {
+        uri: newAvatarLocal,
+        name: `avatar.${fileExt}`,
+        type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
+      } as unknown as Blob);
 
-      if (error) return profile.image_url ?? null;
+      const res = await fetch(`${API_BASE}/api/avatar`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
 
-      const { data: urlData } = supabase.storage
-        .from('staff-avatars')
-        .getPublicUrl(filePath);
+      const json = await res.json();
+      if (json.url) return json.url;
 
-      return urlData.publicUrl;
-    } catch {
-      return profile.image_url ?? null;
+      console.warn('[avatar-upload] failed:', json.error);
+      return null;
+    } catch (err) {
+      console.warn('[avatar-upload] error:', err);
+      return null;
     }
   };
 
