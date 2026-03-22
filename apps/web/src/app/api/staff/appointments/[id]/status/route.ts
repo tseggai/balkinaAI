@@ -33,7 +33,8 @@ async function getStaffRecord(request: Request) {
 }
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  pending: ['confirmed', 'cancelled'],
+  pending: ['approved', 'confirmed', 'cancelled'],
+  approved: ['confirmed', 'cancelled'],
   confirmed: ['completed', 'no_show', 'cancelled'],
 };
 
@@ -88,10 +89,26 @@ export async function PATCH(
     }, { status: 400 });
   }
 
+  // Determine the actual status to write:
+  // When staff "confirms" a pending appointment that has an unpaid deposit,
+  // set it to "approved" (deposit due) instead of "confirmed".
+  const hasDeposit = appointment.services?.deposit_enabled && appointment.services?.deposit_amount;
+  const depositPaid = appointment.deposit_paid === true;
+  let effectiveStatus = newStatus;
+
+  if (
+    newStatus === 'confirmed' &&
+    appointment.status === 'pending' &&
+    hasDeposit &&
+    !depositPaid
+  ) {
+    effectiveStatus = 'approved';
+  }
+
   // Update appointment status
   const { data: updated, error: updateErr } = await admin
     .from('appointments')
-    .update({ status: newStatus } as never)
+    .update({ status: effectiveStatus } as never)
     .eq('id', params.id)
     .select()
     .single();
@@ -101,28 +118,25 @@ export async function PATCH(
   }
 
   // Fire notifications — AWAIT them so they complete before Vercel terminates the function
-  console.log(`[staff/status] appointment ${params.id}: ${appointment.status} → ${newStatus}`);
+  console.log(`[staff/status] appointment ${params.id}: ${appointment.status} → ${effectiveStatus}`);
   try {
-    if (newStatus === 'confirmed') {
-      // Staff approved a pending booking — notify customer
-      const hasDeposit = appointment.services?.deposit_enabled && appointment.services?.deposit_amount;
-      const depositPaid = appointment.deposit_paid === true;
-
+    if (effectiveStatus === 'approved') {
+      // Staff approved a pending booking with deposit required
       await notifyBookingApproved(params.id);
 
-      if (hasDeposit && !depositPaid) {
-        // Deposit required but not yet paid — notify customer to pay deposit now
-        const svc = appointment.services!;
-        const depositAmount = svc.deposit_type === 'percentage'
-          ? Math.round((svc.price ?? 0) * (svc.deposit_amount ?? 0) / 100 * 100) / 100
-          : (svc.deposit_amount ?? 0);
-        await notifyDepositPaymentRequired(params.id, depositAmount);
-      }
+      const svc = appointment.services!;
+      const depositAmount = svc.deposit_type === 'percentage'
+        ? Math.round((svc.price ?? 0) * (svc.deposit_amount ?? 0) / 100 * 100) / 100
+        : (svc.deposit_amount ?? 0);
+      await notifyDepositPaymentRequired(params.id, depositAmount);
+    } else if (effectiveStatus === 'confirmed' && appointment.status === 'pending') {
+      // Staff confirmed a pending booking (no deposit required)
+      await notifyBookingApproved(params.id);
     } else if (newStatus === 'cancelled' && appointment.status === 'pending') {
       // Staff declined a pending booking request
       await notifyBookingDeclined(params.id, suggestedTimes);
-    } else if (newStatus === 'cancelled' && appointment.status === 'confirmed') {
-      // Staff cancelled an already-confirmed booking
+    } else if (newStatus === 'cancelled' && (appointment.status === 'confirmed' || appointment.status === 'approved')) {
+      // Staff cancelled an already-confirmed/approved booking
       await notifyBookingCancelledByTenant(params.id);
     } else if (newStatus === 'completed') {
       // Staff marked appointment as completed

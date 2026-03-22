@@ -51,13 +51,25 @@ export async function POST(request: Request) {
         console.log(`[webhooks/stripe] payment_intent.succeeded for appointment ${appointmentId}, type=${paymentType}`);
 
         if (paymentType === 'deposit') {
+          // Check if appointment is in 'approved' status — auto-confirm on deposit payment
+          const { data: apptRow } = await supabase
+            .from('appointments')
+            .select('status')
+            .eq('id', appointmentId)
+            .single();
+
+          const updateData: Record<string, unknown> = {
+            deposit_paid: true,
+            deposit_amount_paid: pi.amount / 100,
+            stripe_payment_intent_id: pi.id,
+          };
+          if ((apptRow as { status: string } | null)?.status === 'approved') {
+            updateData.status = 'confirmed';
+          }
+
           await supabase
             .from('appointments')
-            .update({
-              deposit_paid: true,
-              deposit_amount_paid: pi.amount / 100,
-              stripe_payment_intent_id: pi.id,
-            } as never)
+            .update(updateData as never)
             .eq('id', appointmentId);
         } else if (paymentType === 'balance') {
           await supabase
