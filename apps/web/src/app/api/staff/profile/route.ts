@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
   const { data: staffMember, error } = await admin
     .from('staff')
-    .select('id, tenant_id, user_id, name, email, phone, image_url, requires_approval, notify_sms, notify_push')
+    .select('id, tenant_id, user_id, name, email, phone, image_url, profession, requires_approval, notify_sms, notify_push')
     .eq('user_id', user.id)
     .single();
 
@@ -30,8 +30,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Staff not found' }, { status: 404 });
   }
 
-  // Get tenant name
-  const sm = staffMember as { id: string; tenant_id: string; name: string; email: string | null; phone: string | null; image_url: string | null; requires_approval: boolean; notify_sms: boolean | null; notify_push: boolean | null };
+  const sm = staffMember as {
+    id: string; tenant_id: string; name: string; email: string | null;
+    phone: string | null; image_url: string | null; profession: string | null;
+    requires_approval: boolean; notify_sms: boolean | null; notify_push: boolean | null;
+  };
+
   const { data: tenant } = await admin
     .from('tenants')
     .select('name')
@@ -74,6 +78,7 @@ export async function PATCH(request: Request) {
     notify_push?: boolean;
     name?: string;
     phone?: string;
+    profession?: string | null;
     image_url?: string | null;
   };
 
@@ -82,6 +87,11 @@ export async function PATCH(request: Request) {
   if (typeof body.notify_push === 'boolean') updateFields.notify_push = body.notify_push;
   if (typeof body.name === 'string' && body.name.trim().length > 0) updateFields.name = body.name.trim();
   if (typeof body.phone === 'string' && body.phone.trim().length > 0) updateFields.phone = body.phone.trim();
+  if ('profession' in body) {
+    updateFields.profession = typeof body.profession === 'string' && body.profession.trim().length > 0
+      ? body.profession.trim()
+      : null;
+  }
   if ('image_url' in body) {
     updateFields.image_url = typeof body.image_url === 'string' && body.image_url.trim().length > 0
       ? body.image_url.trim()
