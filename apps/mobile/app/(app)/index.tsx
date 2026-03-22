@@ -1096,15 +1096,11 @@ function RichSummaryCard({ data, onButtonPress }: { data: SummaryCardData; onBut
       ) : null}
 
       <TouchableOpacity
-        style={[richCardStyles.confirmBtn, data.deposit_required && data.deposit_required > 0 ? { backgroundColor: '#6366f1' } : undefined]}
+        style={richCardStyles.confirmBtn}
         onPress={() => onButtonPress('Confirm Booking')}
         activeOpacity={0.7}
       >
-        <Text style={richCardStyles.confirmBtnText}>
-          {data.deposit_required && data.deposit_required > 0
-            ? `Pay deposit to confirm booking`
-            : 'Confirm Booking'}
-        </Text>
+        <Text style={richCardStyles.confirmBtnText}>Confirm Booking</Text>
       </TouchableOpacity>
     </View>
   );
@@ -1206,7 +1202,7 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
 
       {data.payment_required && !data.deposit_paid && data.appointmentId ? (
         <TouchableOpacity
-          style={{ marginTop: 12, backgroundColor: '#6366f1', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center' }}
+          style={{ marginTop: 12, backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center' }}
           onPress={() => onButtonPress(`pay_deposit:${data.appointmentId}:${data.deposit_amount ?? 0}`)}
           activeOpacity={0.7}
         >
@@ -1279,7 +1275,7 @@ const richCardStyles = StyleSheet.create({
   extrasChipNameSelected: { color: '#4338ca' },
   extrasChipDetail: { fontSize: 12, color: '#9ca3af', marginTop: 4 },
   extrasChipDetailSelected: { color: '#6B7FC4' },
-  extrasDoneBtn: { backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 10 },
+  extrasDoneBtn: { backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 10 },
   extrasDoneBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   // Summary card
   summaryCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
@@ -1292,9 +1288,9 @@ const richCardStyles = StyleSheet.create({
   summaryDeposit: { fontSize: 12, color: '#92400e', marginTop: 4 },
   summaryPoints: { fontSize: 13, fontWeight: '600', color: '#d97706', marginTop: 4 },
   divider: { borderTopWidth: 1, borderTopColor: '#e5e7eb', marginVertical: 12 },
-  confirmBtn: { backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
+  confirmBtn: { backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  changeBtn: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6B7FC4', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 8 },
+  changeBtn: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6B7FC4', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   changeBtnText: { color: '#6B7FC4', fontSize: 14, fontWeight: '600' },
   // Confirmed card
   confirmedCard: { backgroundColor: '#EBF0FA', borderRadius: 16, padding: 20, alignItems: 'center' },
@@ -1305,12 +1301,12 @@ const richCardStyles = StyleSheet.create({
   confirmedLabel: { fontSize: 14, fontWeight: '700', color: '#374151', marginRight: 4 },
   confirmedValue: { fontSize: 14, color: '#111827', flexShrink: 1 },
   confirmedPoints: { fontSize: 13, fontWeight: '600', color: '#6B7FC4', marginTop: 8 },
-  directionsBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 10, backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignSelf: 'flex-start' },
-  directionsBtnCenter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, alignSelf: 'center', width: '80%' },
+  directionsBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 10, backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 14, paddingHorizontal: 14, alignSelf: 'flex-start' },
+  directionsBtnCenter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 14, paddingHorizontal: 20, alignSelf: 'center', width: '80%' },
   directionsBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
   confirmedDivider: { borderTopWidth: 1, borderTopColor: '#d1d5db', marginVertical: 12, width: '100%' },
   confirmedActions: { flexDirection: 'row', gap: 10, marginTop: 4, width: '100%' },
-  confirmedActionBtn: { flex: 1, backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  confirmedActionBtn: { flex: 1, backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   confirmedActionBtnSecondary: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#6B7FC4' },
   confirmedActionText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   confirmedActionTextSecondary: { color: '#6B7FC4' },
@@ -2781,17 +2777,16 @@ export default function ChatScreen() {
                       <Text style={fullScreenConfirmStyles.detailValue}>{confirmationModal.address}</Text>
                     </View>
                   ) : null}
+                  {confirmationModal.deposit_amount && confirmationModal.deposit_amount > 0 ? (
+                    <View style={fullScreenConfirmStyles.detailRow}>
+                      <Ionicons name="card-outline" size={18} color="#6B7FC4" />
+                      <Text style={fullScreenConfirmStyles.detailLabel}>Deposit</Text>
+                      <Text style={[fullScreenConfirmStyles.detailValue, { color: confirmationModal.deposit_paid ? '#059669' : '#dc2626', fontWeight: '600' }]}>
+                        ${confirmationModal.deposit_amount.toFixed(2)} {confirmationModal.deposit_paid ? '(Paid)' : '(Due)'}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
-
-                {confirmationModal.deposit_amount && confirmationModal.deposit_amount > 0 ? (
-                  <View style={fullScreenConfirmStyles.detailRow}>
-                    <Ionicons name="card-outline" size={18} color="#6B7FC4" />
-                    <Text style={fullScreenConfirmStyles.detailLabel}>Deposit</Text>
-                    <Text style={[fullScreenConfirmStyles.detailValue, { color: confirmationModal.deposit_paid ? '#059669' : '#dc2626', fontWeight: '600' }]}>
-                      ${confirmationModal.deposit_amount.toFixed(2)} {confirmationModal.deposit_paid ? '(Paid)' : '(Due)'}
-                    </Text>
-                  </View>
-                ) : null}
 
                 {confirmationModal.points_earned > 0 && (
                   <Text style={fullScreenConfirmStyles.pointsBadge}>+{confirmationModal.points_earned} pts earned</Text>
@@ -2804,7 +2799,7 @@ export default function ChatScreen() {
           <View style={fullScreenConfirmStyles.bottomButtons}>
             {confirmationModal && confirmationModal.payment_required && !confirmationModal.deposit_paid && confirmationModal.appointmentId ? (
               <TouchableOpacity
-                style={[fullScreenConfirmStyles.doneBtn, { backgroundColor: '#6366f1' }]}
+                style={fullScreenConfirmStyles.doneBtn}
                 onPress={() => {
                   // Open in-app WebView payment modal
                   const card = confirmationModal;
@@ -2899,9 +2894,9 @@ const fullScreenConfirmStyles = StyleSheet.create({
   divider: { height: 1, backgroundColor: '#e5e7eb', marginVertical: 8 },
   pointsBadge: { fontSize: 14, fontWeight: '700', color: '#6B7FC4', marginTop: 16 },
   bottomButtons: { paddingHorizontal: 24, paddingBottom: 20, gap: 12 },
-  doneBtn: { backgroundColor: '#6B7FC4', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  doneBtn: { backgroundColor: '#6B7FC4', borderRadius: 14, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   doneBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  directionsBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', borderRadius: 14, paddingVertical: 16, borderWidth: 2, borderColor: '#6B7FC4', backgroundColor: '#fff' },
+  directionsBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', borderRadius: 14, paddingVertical: 14, borderWidth: 2, borderColor: '#6B7FC4', backgroundColor: '#fff' },
   directionsBtnText: { color: '#6B7FC4', fontSize: 17, fontWeight: '700' },
 });
 

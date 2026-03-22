@@ -101,7 +101,7 @@ function BookingCardRow({
   const isCancellable = item.status === 'confirmed' || item.status === 'pending';
   const isCompleted = item.status === 'completed';
   const hasLocation = !!(item.tenant_locations?.address || item.tenant_locations?.latitude);
-  const hasUnpaidDeposit = item.deposit_amount_paid != null && item.deposit_amount_paid > 0 && !item.deposit_paid && item.stripe_payment_intent_id;
+  const hasUnpaidDeposit = item.deposit_amount_paid != null && item.deposit_amount_paid > 0 && item.deposit_paid !== true && (item.status === 'confirmed' || item.status === 'pending');
 
   const { date, time } = formatDateTime(item.start_time);
   const statusColor = getStatusStyle(item.status);
@@ -250,9 +250,8 @@ export default function BookingsScreen() {
   // Accept-suggestion modal state
   const [suggestionModalVisible, setSuggestionModalVisible] = useState(false);
   const [suggestionAppointmentId, setSuggestionAppointmentId] = useState<string | null>(null);
-  const [suggestedTime, setSuggestedTime] = useState('');
-  const [suggestedDate, setSuggestedDate] = useState('');
-  const [suggestedTimeIso, setSuggestedTimeIso] = useState('');
+  const [suggestedTimeOptions, setSuggestedTimeOptions] = useState<{ date: string; time: string; iso: string }[]>([]);
+  const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState(0);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
 
   // Handle notification deep-link params
@@ -262,6 +261,7 @@ export default function BookingsScreen() {
     suggestedTime?: string;
     suggestedDate?: string;
     suggestedTimeIso?: string;
+    suggestedTimes?: string;
   }>();
 
   // Track whether a notification-triggered payment has been handled
@@ -276,9 +276,16 @@ export default function BookingsScreen() {
       setRatingModalVisible(true);
     } else if (params.action === 'accept_suggestion' && params.appointmentId) {
       setSuggestionAppointmentId(params.appointmentId);
-      setSuggestedTime(params.suggestedTime ?? '');
-      setSuggestedDate(params.suggestedDate ?? '');
-      setSuggestedTimeIso(params.suggestedTimeIso ?? '');
+      // Parse suggested times — support both new array format and legacy single fields
+      let options: { date: string; time: string; iso: string }[] = [];
+      if (params.suggestedTimes) {
+        try { options = JSON.parse(params.suggestedTimes) as { date: string; time: string; iso: string }[]; } catch { /* ignore */ }
+      }
+      if (options.length === 0 && params.suggestedTimeIso) {
+        options = [{ date: params.suggestedDate ?? '', time: params.suggestedTime ?? '', iso: params.suggestedTimeIso }];
+      }
+      setSuggestedTimeOptions(options);
+      setSelectedSuggestionIdx(0);
       setSuggestionModalVisible(true);
     } else if (params.action === 'pay_deposit' && params.appointmentId && !payDepositHandled.current) {
       // Auto-trigger payment for notification deep-link (Scenario 2)
@@ -474,7 +481,8 @@ export default function BookingsScreen() {
 
   // Accept a suggested reschedule time
   const handleAcceptSuggestion = useCallback(async () => {
-    if (!suggestionAppointmentId || !userId || !suggestedTimeIso) return;
+    const selected = suggestedTimeOptions[selectedSuggestionIdx];
+    if (!suggestionAppointmentId || !userId || !selected?.iso) return;
     setSuggestionLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/customer/bookings/accept-suggestion`, {
@@ -483,7 +491,7 @@ export default function BookingsScreen() {
         body: JSON.stringify({
           appointmentId: suggestionAppointmentId,
           userId,
-          suggestedTimeIso,
+          suggestedTimeIso: selected.iso,
         }),
       });
       if (res.ok) {
@@ -500,7 +508,7 @@ export default function BookingsScreen() {
     } finally {
       setSuggestionLoading(false);
     }
-  }, [suggestionAppointmentId, userId, suggestedTimeIso, fetchAppointments]);
+  }, [suggestionAppointmentId, userId, suggestedTimeOptions, selectedSuggestionIdx, fetchAppointments]);
 
   // Open the rating modal from a booking card
   const openRatingModal = useCallback((appointmentId: string) => {
@@ -817,22 +825,35 @@ export default function BookingsScreen() {
             </View>
 
             <Text style={styles.modalSubtitle}>
-              Your stylist has suggested a new time for your appointment:
+              Your stylist has suggested {suggestedTimeOptions.length > 1 ? 'alternative times' : 'a new time'} for your appointment:
             </Text>
 
-            <View style={styles.suggestionCard}>
-              <Ionicons name="calendar-outline" size={24} color="#6B7FC4" />
-              <View style={styles.suggestionInfo}>
-                <Text style={styles.suggestionDate}>{suggestedDate}</Text>
-                <Text style={styles.suggestionTime}>{suggestedTime}</Text>
-              </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+              {suggestedTimeOptions.map((opt, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={[
+                    styles.suggestionCard,
+                    { flex: 1, marginBottom: 0 },
+                    idx === selectedSuggestionIdx && { borderColor: '#6B7FC4', borderWidth: 2 },
+                  ]}
+                  onPress={() => setSelectedSuggestionIdx(idx)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="calendar-outline" size={22} color="#6B7FC4" />
+                  <View style={styles.suggestionInfo}>
+                    <Text style={styles.suggestionDate}>{opt.date}</Text>
+                    <Text style={styles.suggestionTime}>{opt.time}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </View>
 
             <View style={styles.suggestionActions}>
               <TouchableOpacity
                 style={styles.acceptBtn}
                 onPress={handleAcceptSuggestion}
-                disabled={suggestionLoading}
+                disabled={suggestionLoading || suggestedTimeOptions.length === 0}
               >
                 {suggestionLoading ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -952,14 +973,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 14,
     borderRadius: 10,
     gap: 6,
   },
   actionBtnDirections: { backgroundColor: '#6B7FC4' },
   actionBtnCancel: { backgroundColor: '#ef4444' },
   actionBtnRate: { backgroundColor: '#f59e0b' },
-  actionBtnPay: { backgroundColor: '#6366f1' },
+  actionBtnPay: { backgroundColor: '#6B7FC4' },
   actionBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
 
   card: {
@@ -999,8 +1020,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#6366f1',
-    paddingVertical: 12,
+    backgroundColor: '#6B7FC4',
+    paddingVertical: 14,
     borderRadius: 10,
     marginTop: 8,
     gap: 6,
@@ -1020,7 +1041,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#6B7FC4',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 24,
     marginTop: 16,
     gap: 8,

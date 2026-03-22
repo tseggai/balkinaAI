@@ -82,7 +82,7 @@ export default function AppTabsLayout() {
             pathname: '/(app)/bookings',
             params: { action: 'pay_deposit', appointmentId: data.appointmentId },
           });
-        } else if (data?.type === 'booking_declined' && data.suggestedTimeIso && data.appointmentId) {
+        } else if (data?.type === 'booking_declined' && (data.suggestedTimeIso || data.suggestedTimes) && data.appointmentId) {
           // Navigate to bookings with accept-suggestion action
           router.navigate({
             pathname: '/(app)/bookings',
@@ -91,7 +91,8 @@ export default function AppTabsLayout() {
               appointmentId: data.appointmentId,
               suggestedTime: data.suggestedTime ?? '',
               suggestedDate: data.suggestedDate ?? '',
-              suggestedTimeIso: data.suggestedTimeIso,
+              suggestedTimeIso: data.suggestedTimeIso ?? '',
+              suggestedTimes: data.suggestedTimes ?? '',
             },
           });
         } else if (data?.type === 'booking_approved' || data?.type === 'booking_confirmed') {

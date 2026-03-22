@@ -238,6 +238,12 @@ export default function AppointmentsPage() {
   // Edit panel: status picker popover
   const [showStatusPicker, setShowStatusPicker] = useState(false);
 
+  // Decline modal — shown when staff cancels a pending appointment
+  const [declineModalOpen, setDeclineModalOpen] = useState(false);
+  const [declineSuggestedTime1, setDeclineSuggestedTime1] = useState('');
+  const [declineSuggestedTime2, setDeclineSuggestedTime2] = useState('');
+  const [declineLoading, setDeclineLoading] = useState(false);
+
   // Dirty-state tracking for the edit panel
   const initialFormValues = useRef<Record<string, unknown>>({});
 
@@ -647,6 +653,36 @@ export default function AppointmentsPage() {
     await fetch(`/api/appointments?id=${id}`, { method: 'DELETE' });
     closePanel();
     fetchAppointments();
+  }
+
+  async function handleDeclineWithSuggestions() {
+    if (!editing) return;
+    setDeclineLoading(true);
+    try {
+      const suggestedTimes: string[] = [];
+      if (declineSuggestedTime1) suggestedTimes.push(new Date(declineSuggestedTime1).toISOString());
+      if (declineSuggestedTime2) suggestedTimes.push(new Date(declineSuggestedTime2).toISOString());
+
+      const res = await fetch(`/api/staff/appointments/${editing.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled', suggestedTimes }),
+      });
+      const json = await res.json() as { error?: { message: string } };
+      if (!res.ok) {
+        setFormError(json.error?.message ?? 'Failed to decline appointment');
+      } else {
+        setDeclineModalOpen(false);
+        setDeclineSuggestedTime1('');
+        setDeclineSuggestedTime2('');
+        closePanel();
+        fetchAppointments();
+      }
+    } catch {
+      setFormError('Connection error while declining.');
+    } finally {
+      setDeclineLoading(false);
+    }
   }
 
   // ----------------------------------------------------------
@@ -1667,7 +1703,14 @@ export default function AppointmentsPage() {
                               <button
                                 key={s}
                                 type="button"
-                                onClick={() => { setFormStatus(s); setShowStatusPicker(false); }}
+                                onClick={() => {
+                                  if (s === 'cancelled' && editing?.status === 'pending') {
+                                    setShowStatusPicker(false);
+                                    setDeclineModalOpen(true);
+                                    return;
+                                  }
+                                  setFormStatus(s); setShowStatusPicker(false);
+                                }}
                                 className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 ${formStatus === s ? 'bg-gray-50 font-medium' : ''}`}
                               >
                                 <span className={`inline-block h-2 w-2 rounded-full ${sc.dot}`} />
@@ -1923,6 +1966,53 @@ export default function AppointmentsPage() {
             </div>
           </div>
         </>
+      )}
+      {/* Decline modal — suggest alternative times */}
+      {declineModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Decline Appointment</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Optionally suggest up to 2 alternative time slots for the customer.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Alternative 1 (optional)</label>
+                <input
+                  type="datetime-local"
+                  value={declineSuggestedTime1}
+                  onChange={(e) => setDeclineSuggestedTime1(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Alternative 2 (optional)</label>
+                <input
+                  type="datetime-local"
+                  value={declineSuggestedTime2}
+                  onChange={(e) => setDeclineSuggestedTime2(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+              </div>
+            </div>
+            {formError && <p className="mt-2 text-sm text-red-600">{formError}</p>}
+            <div className="mt-5 flex gap-3 justify-end">
+              <button
+                onClick={() => { setDeclineModalOpen(false); setFormError(''); }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeclineWithSuggestions}
+                disabled={declineLoading}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {declineLoading ? 'Declining...' : 'Decline Appointment'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

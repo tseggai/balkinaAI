@@ -240,6 +240,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<vo
           if (payload.data.suggestedTime) pushData.suggestedTime = payload.data.suggestedTime;
           if (payload.data.suggestedDate) pushData.suggestedDate = payload.data.suggestedDate;
           if (payload.data.suggestedTimeIso) pushData.suggestedTimeIso = payload.data.suggestedTimeIso;
+          if (payload.data.suggestedTimes) pushData.suggestedTimes = JSON.stringify(payload.data.suggestedTimes);
           await sendPushNotification([{
             pushToken: token,
             title: template.push.title(payload.data),
