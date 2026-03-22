@@ -97,6 +97,8 @@ interface BusinessCardData {
   distance_mi: number;
   drive_minutes: number;
   category: string;
+  avg_rating?: number;
+  review_count?: number;
 }
 
 interface ServiceCardData {
@@ -535,6 +537,12 @@ function BusinessCardRow({ items, onTap }: { items: BusinessCardData[]; onTap: (
           </View>
           <View style={richCardStyles.businessInfo}>
             <Text style={richCardStyles.businessName} numberOfLines={2}>{biz.name}</Text>
+            {biz.avg_rating ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                <Text style={{ color: '#f59e0b', fontSize: 12 }}>{'★'.repeat(Math.round(biz.avg_rating))}</Text>
+                <Text style={{ color: '#9ca3af', fontSize: 11, marginLeft: 3 }}>{biz.avg_rating} ({biz.review_count ?? 0})</Text>
+              </View>
+            ) : null}
             <Text style={richCardStyles.businessDistance}>{biz.distance_mi} mi</Text>
             <Text style={richCardStyles.businessDrive}>{biz.drive_minutes} min drive</Text>
           </View>
@@ -637,6 +645,12 @@ function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesDa
               </View>
               <View style={richCardStyles.businessInfo}>
                 <Text style={richCardStyles.businessName} numberOfLines={2}>{biz.name}</Text>
+                {biz.avg_rating ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                    <Text style={{ color: '#f59e0b', fontSize: 12 }}>{'★'.repeat(Math.round(biz.avg_rating))}</Text>
+                    <Text style={{ color: '#9ca3af', fontSize: 11, marginLeft: 3 }}>{biz.avg_rating} ({biz.review_count ?? 0})</Text>
+                  </View>
+                ) : null}
                 <Text style={richCardStyles.businessDistance}>{biz.distance_mi} mi</Text>
                 <Text style={richCardStyles.businessDrive}>{biz.drive_minutes} min drive</Text>
               </View>
@@ -2438,6 +2452,8 @@ export default function ChatScreen() {
               distance_mi?: number;
               estimated_drive_minutes?: number;
               category?: string;
+              avg_rating?: number;
+              review_count?: number;
               all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; image_url?: string }[];
             }[];
           };
@@ -2453,6 +2469,8 @@ export default function ChatScreen() {
                 distance_mi: b.distance_mi ?? 0,
                 drive_minutes: b.estimated_drive_minutes ?? 0,
                 category: b.category ?? '',
+                avg_rating: b.avg_rating,
+                review_count: b.review_count ?? 0,
                 services: (b.all_services ?? []).map((s) => ({
                   id: s.id,
                   name: s.name,
