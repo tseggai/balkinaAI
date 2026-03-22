@@ -49,10 +49,24 @@ type SortOrder = 'date_asc' | 'date_desc';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case 'approved': return 'Approved';
+    case 'confirmed': return 'Confirmed';
+    case 'pending': return 'Pending';
+    case 'completed': return 'Completed';
+    case 'cancelled': return 'Cancelled';
+    case 'no_show': return 'No Show';
+    default: return status;
+  }
+}
+
 function getStatusStyle(status: string): { bg: string; text: string } {
   switch (status) {
     case 'confirmed':
       return { bg: '#dbeafe', text: '#1d4ed8' };
+    case 'approved':
+      return { bg: '#e0e7ff', text: '#4338ca' };
     case 'pending':
       return { bg: '#fef3c7', text: '#92400e' };
     case 'completed':
@@ -98,10 +112,10 @@ function BookingCardRow({
   onRate: (id: string) => void;
   onPayDeposit: (id: string) => void;
 }) {
-  const isCancellable = item.status === 'confirmed' || item.status === 'pending';
+  const isCancellable = item.status === 'confirmed' || item.status === 'approved' || item.status === 'pending';
   const isCompleted = item.status === 'completed';
   const hasLocation = !!(item.tenant_locations?.address || item.tenant_locations?.latitude);
-  const hasUnpaidDeposit = item.deposit_amount_paid != null && item.deposit_amount_paid > 0 && item.deposit_paid !== true && (item.status === 'confirmed' || item.status === 'pending');
+  const hasUnpaidDeposit = item.deposit_amount_paid != null && item.deposit_amount_paid > 0 && item.deposit_paid !== true && (item.status === 'approved' || item.status === 'confirmed' || item.status === 'pending');
 
   const { date, time } = formatDateTime(item.start_time);
   const statusColor = getStatusStyle(item.status);
@@ -123,7 +137,7 @@ function BookingCardRow({
           </Text>
           <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
             <Text style={[styles.statusText, { color: statusColor.text }]}>
-              {item.status}
+              {getStatusLabel(item.status)}
             </Text>
           </View>
         </View>
@@ -353,7 +367,7 @@ export default function BookingsScreen() {
     }, [fetchAppointments]),
   );
 
-  // Realtime subscription for appointment status changes
+  // Realtime subscription for appointment status/deposit changes
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
@@ -361,9 +375,20 @@ export default function BookingsScreen() {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'appointments',
+          filter: `customer_id=eq.${userId}`,
+        },
+        () => { fetchAppointments(); },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'appointments',
+          filter: `customer_id=eq.${userId}`,
         },
         () => { fetchAppointments(); },
       )
@@ -825,11 +850,11 @@ export default function BookingsScreen() {
             </View>
 
             <Text style={styles.modalSubtitle}>
-              Your stylist has suggested {suggestedTimeOptions.length > 1 ? 'alternative times' : 'a new time'} for your appointment:
+              Your stylist has suggested {(suggestedTimeOptions ?? []).length > 1 ? 'alternative times' : 'a new time'} for your appointment:
             </Text>
 
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
-              {suggestedTimeOptions.map((opt, idx) => (
+              {(suggestedTimeOptions ?? []).map((opt, idx) => (
                 <TouchableOpacity
                   key={idx}
                   style={[
@@ -882,8 +907,17 @@ export default function BookingsScreen() {
           visible={true}
           appointmentId={paymentModal.appointmentId}
           depositAmount={paymentModal.depositAmount}
-          onSuccess={() => {
+          onSuccess={async () => {
+            const apptId = paymentModal.appointmentId;
             setPaymentModal(null);
+            // Verify deposit is marked paid in DB (webhook may not have fired yet)
+            try {
+              await fetch(`${API_BASE}/api/payments/verify-deposit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ appointmentId: apptId }),
+              });
+            } catch { /* best-effort */ }
             Alert.alert('Deposit Paid!', 'Your deposit has been successfully processed.');
             fetchAppointments();
           }}

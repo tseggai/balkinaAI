@@ -2859,9 +2859,18 @@ export default function ChatScreen() {
           visible={true}
           appointmentId={paymentModal.appointmentId}
           depositAmount={paymentModal.depositAmount}
-          onSuccess={() => {
+          onSuccess={async () => {
             const card = paymentModal.pendingCard;
+            const apptId = paymentModal.appointmentId;
             setPaymentModal(null);
+            // Verify deposit is marked paid in DB
+            try {
+              await fetch(`${API_BASE}/api/payments/verify-deposit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ appointmentId: apptId }),
+              });
+            } catch { /* best-effort */ }
             if (card) {
               card.deposit_paid = true;
               setConfirmationModal(card);

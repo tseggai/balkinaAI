@@ -8,6 +8,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 
 type AppointmentStatus =
   | 'pending'
+  | 'approved'
   | 'confirmed'
   | 'completed'
   | 'cancelled'
@@ -104,11 +105,12 @@ interface CustomField {
 // ---------------------------------------------------------------------------
 
 const STATUS_OPTIONS: AppointmentStatus[] = [
-  'pending', 'confirmed', 'completed', 'cancelled', 'no_show', 'rescheduled', 'rejected', 'emergency',
+  'pending', 'approved', 'confirmed', 'completed', 'cancelled', 'no_show', 'rescheduled', 'rejected', 'emergency',
 ];
 
 const statusConfig: Record<AppointmentStatus, { bg: string; text: string; dot: string; label: string }> = {
   pending:     { bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500',   label: 'Pending' },
+  approved:    { bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500',  label: 'Approved' },
   confirmed:   { bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500',    label: 'Confirmed' },
   completed:   { bg: 'bg-green-50',   text: 'text-green-700',   dot: 'bg-green-500',   label: 'Completed' },
   cancelled:   { bg: 'bg-red-50',     text: 'text-red-700',     dot: 'bg-red-500',     label: 'Cancelled' },

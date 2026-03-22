@@ -110,7 +110,7 @@ export async function GET(request: Request) {
     if (isUpcoming) {
       query = query
         .gte('start_time', todayISO)
-        .in('status', ['pending', 'confirmed']);
+        .in('status', ['pending', 'approved', 'confirmed']);
     } else {
       query = query.or(
         `start_time.lt.${now},status.eq.completed,status.eq.cancelled`,
