@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
-import Stripe from 'stripe';
 import {
   notifyBookingApproved,
   notifyBookingDeclined,
@@ -45,9 +44,10 @@ export async function PATCH(
   const staff = await getStaffRecord(request);
   if (!staff) return NextResponse.json({ data: null, error: { message: 'Unauthorized' } }, { status: 401 });
 
-  const body = await request.json() as { status: string; suggestedTime?: string };
+  const body = await request.json() as { status: string; suggestedTime?: string; suggestedTimes?: string[] };
   const newStatus = body.status;
-  const suggestedTime = body.suggestedTime;
+  // Support both single suggestedTime (legacy) and suggestedTimes array (up to 2 alternatives)
+  const suggestedTimes = body.suggestedTimes ?? (body.suggestedTime ? [body.suggestedTime] : []);
 
   if (!newStatus) {
     return NextResponse.json({ data: null, error: { message: 'Missing status' } }, { status: 400 });
@@ -104,45 +104,23 @@ export async function PATCH(
   console.log(`[staff/status] appointment ${params.id}: ${appointment.status} → ${newStatus}`);
   try {
     if (newStatus === 'confirmed') {
-      // Staff approved a pending booking — handle deposit scenarios
+      // Staff approved a pending booking — notify customer
       const hasDeposit = appointment.services?.deposit_enabled && appointment.services?.deposit_amount;
       const depositPaid = appointment.deposit_paid === true;
 
-      if (hasDeposit && !depositPaid && appointment.stripe_payment_intent_id) {
-        // Scenario 1: Customer already authorized payment (manual capture) — capture funds now
-        try {
-          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2026-02-25.clover' });
-          const pi = await stripe.paymentIntents.retrieve(appointment.stripe_payment_intent_id);
-          if (pi.status === 'requires_capture') {
-            await stripe.paymentIntents.capture(appointment.stripe_payment_intent_id);
-            console.log(`[staff/status] captured held funds for PI ${appointment.stripe_payment_intent_id}`);
-            // Webhook will handle marking deposit_paid=true, but also update here for immediate consistency
-            await admin
-              .from('appointments')
-              .update({ deposit_paid: true, deposit_amount_paid: pi.amount / 100 } as never)
-              .eq('id', params.id);
-          } else {
-            console.log(`[staff/status] PI ${appointment.stripe_payment_intent_id} status is ${pi.status}, not capturing`);
-          }
-        } catch (captureErr) {
-          console.error(`[staff/status] failed to capture PI ${appointment.stripe_payment_intent_id}:`, captureErr);
-        }
-        await notifyBookingApproved(params.id);
-      } else if (hasDeposit && !depositPaid) {
-        // Scenario 2: No PaymentIntent yet — notify customer to pay deposit
+      await notifyBookingApproved(params.id);
+
+      if (hasDeposit && !depositPaid) {
+        // Deposit required but not yet paid — notify customer to pay deposit now
         const svc = appointment.services!;
         const depositAmount = svc.deposit_type === 'percentage'
           ? Math.round((svc.price ?? 0) * (svc.deposit_amount ?? 0) / 100 * 100) / 100
           : (svc.deposit_amount ?? 0);
-        await notifyBookingApproved(params.id);
         await notifyDepositPaymentRequired(params.id, depositAmount);
-      } else {
-        // No deposit required or already paid — standard approval
-        await notifyBookingApproved(params.id);
       }
     } else if (newStatus === 'cancelled' && appointment.status === 'pending') {
       // Staff declined a pending booking request
-      await notifyBookingDeclined(params.id, suggestedTime);
+      await notifyBookingDeclined(params.id, suggestedTimes);
     } else if (newStatus === 'cancelled' && appointment.status === 'confirmed') {
       // Staff cancelled an already-confirmed booking
       await notifyBookingCancelledByTenant(params.id);

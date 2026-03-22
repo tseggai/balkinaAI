@@ -97,7 +97,7 @@ export default function PaymentWebViewModal({
 
         {loading && (
           <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#6366f1" />
+            <ActivityIndicator size="large" color="#6B7FC4" />
             <Text style={styles.loadingText}>Loading payment...</Text>
           </View>
         )}

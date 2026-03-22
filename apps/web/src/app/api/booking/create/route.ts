@@ -330,10 +330,11 @@ export async function POST(request: Request) {
       }
     }
 
-    // Create PaymentIntent for deposit if payments enabled and deposit required
+    // Create PaymentIntent for deposit if payments enabled and deposit required.
+    // Skip for requires_approval bookings — deposit is collected AFTER staff approves.
     let paymentUrl: string | null = null;
     let paymentClientSecret: string | null = null;
-    const paymentRequired = !!(paymentsEnabled && depositAmount && depositAmount > 0);
+    const paymentRequired = !!(paymentsEnabled && depositAmount && depositAmount > 0 && !requiresApproval);
     const tenantStripeAccountId = tenantData?.stripe_account_id ?? null;
     if (paymentRequired && tenantStripeAccountId) {
       try {
@@ -342,20 +343,16 @@ export async function POST(request: Request) {
         const depositAmountCents = Math.round(depositAmount! * 100);
         const platformFeeCents = Math.round(depositAmountCents * 0.1);
 
-        // Use manual capture for request-flow (requires_approval) so funds are
-        // held but not charged until staff approves the booking.
         const paymentIntent = await stripeClient.paymentIntents.create({
           amount: depositAmountCents,
           currency: 'usd',
           automatic_payment_methods: { enabled: true },
-          capture_method: requiresApproval ? 'manual' : 'automatic',
           transfer_data: { destination: tenantStripeAccountId },
           application_fee_amount: platformFeeCents,
           metadata: {
             appointment_id: apptId,
             customer_id: customerId ?? '',
             payment_type: 'deposit',
-            capture_method: requiresApproval ? 'manual' : 'automatic',
           },
           description: `Deposit for ${svc.name} at ${businessName}`,
         });

@@ -156,11 +156,18 @@ export async function notifyBookingApproved(appointmentId: string) {
 }
 
 /** Customer notification when staff declines a pending booking */
-export async function notifyBookingDeclined(appointmentId: string, suggestedTime?: string) {
+export async function notifyBookingDeclined(appointmentId: string, suggestedTimes?: string[]) {
   const ctx = await getAppointmentContext(appointmentId);
   if (!ctx) { console.error('[notifications] notifyBookingDeclined: no context for', appointmentId); return; }
   if (!ctx.customers) { console.error('[notifications] notifyBookingDeclined: no customer data for', appointmentId); return; }
   const tz = ctx.tenant_locations?.timezone ?? 'UTC';
+  const times = suggestedTimes ?? [];
+  // Build suggested times array for the notification payload
+  const suggestedTimesData = times.map((t) => ({
+    date: formatDate(t, tz),
+    time: formatTime(t, tz),
+    iso: t,
+  }));
   await sendNotification({
     type: 'booking_declined',
     appointmentId,
@@ -173,9 +180,12 @@ export async function notifyBookingDeclined(appointmentId: string, suggestedTime
       staffName: ctx.staff?.name ?? '',
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
-      suggestedDate: suggestedTime ? formatDate(suggestedTime, tz) : '',
-      suggestedTime: suggestedTime ? formatTime(suggestedTime, tz) : '',
-      suggestedTimeIso: suggestedTime ?? '',
+      // Legacy single fields (first suggestion or empty)
+      suggestedDate: suggestedTimesData[0]?.date ?? '',
+      suggestedTime: suggestedTimesData[0]?.time ?? '',
+      suggestedTimeIso: suggestedTimesData[0]?.iso ?? '',
+      // New array field for multiple alternatives (serialized for Record<string, string | number>)
+      suggestedTimes: JSON.stringify(suggestedTimesData),
     },
   });
 }
