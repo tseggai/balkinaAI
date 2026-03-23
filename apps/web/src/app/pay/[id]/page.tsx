@@ -152,7 +152,7 @@ const spinnerStyle: React.CSSProperties = {
   width: 32,
   height: 32,
   border: '3px solid #e5e7eb',
-  borderTopColor: '#6366f1',
+  borderTopColor: '#6B7FC4',
   borderRadius: '50%',
   animation: 'spin 0.8s linear infinite',
 };

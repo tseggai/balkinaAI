@@ -4,7 +4,7 @@
 -- ── Extended service columns ──────────────────────────────────────────────────
 
 ALTER TABLE services ADD COLUMN IF NOT EXISTS image_url text;
-ALTER TABLE services ADD COLUMN IF NOT EXISTS color text DEFAULT '#6366f1';
+ALTER TABLE services ADD COLUMN IF NOT EXISTS color text DEFAULT '#6B7FC4';
 ALTER TABLE services ADD COLUMN IF NOT EXISTS buffer_time_before integer DEFAULT 0;
 ALTER TABLE services ADD COLUMN IF NOT EXISTS buffer_time_after integer DEFAULT 0;
 ALTER TABLE services ADD COLUMN IF NOT EXISTS custom_duration boolean DEFAULT false;

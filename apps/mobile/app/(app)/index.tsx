@@ -1516,7 +1516,7 @@ function MessageBubble({
                       onPress={() => Linking.openURL(link.url)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="navigate-outline" size={14} color="#4f46e5" style={{ marginRight: 4 }} />
+                      <Ionicons name="navigate-outline" size={14} color="#6B7FC4" style={{ marginRight: 4 }} />
                       <Text style={bubbleStyles.linkButtonText}>{link.label}</Text>
                     </TouchableOpacity>
                   ))}
@@ -1554,7 +1554,7 @@ function MessageBubble({
                       onPress={() => Linking.openURL(link.url)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="navigate-outline" size={14} color="#4f46e5" style={{ marginRight: 4 }} />
+                      <Ionicons name="navigate-outline" size={14} color="#6B7FC4" style={{ marginRight: 4 }} />
                       <Text style={bubbleStyles.linkButtonText}>{link.label}</Text>
                     </TouchableOpacity>
                   ))}
@@ -1587,7 +1587,7 @@ const bubbleStyles = StyleSheet.create({
   textAssistant: { color: '#111827' },
   buttonsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   linkButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#eef2ff', borderWidth: 1, borderColor: '#c7d2fe', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
-  linkButtonText: { fontSize: 14, fontWeight: '600', color: '#4f46e5' },
+  linkButtonText: { fontSize: 14, fontWeight: '600', color: '#6B7FC4' },
 });
 
 // ── Suggestion Chip ──────────────────────────────────────────────────────────

@@ -84,7 +84,7 @@ export default function LoyaltyPage() {
   // Tier form
   const [tierName, setTierName] = useState('');
   const [tierMinPoints, setTierMinPoints] = useState('');
-  const [tierColor, setTierColor] = useState('#6366f1');
+  const [tierColor, setTierColor] = useState('#6B7FC4');
   const [tierBenefits, setTierBenefits] = useState('');
 
   const fetchData = useCallback(async () => {
@@ -149,7 +149,7 @@ export default function LoyaltyPage() {
     setRulePoints('');
     setTierName('');
     setTierMinPoints('');
-    setTierColor('#6366f1');
+    setTierColor('#6B7FC4');
     setTierBenefits('');
     setError('');
   }
@@ -188,7 +188,7 @@ export default function LoyaltyPage() {
     });
     setTierName('');
     setTierMinPoints('');
-    setTierColor('#6366f1');
+    setTierColor('#6B7FC4');
     setTierBenefits('');
   }
 
