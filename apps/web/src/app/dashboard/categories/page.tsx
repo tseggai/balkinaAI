@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 
-const PRESET_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444'];
+const PRESET_COLORS = ['#6B7FC4', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444'];
 
 interface Category {
   id: string;
@@ -31,7 +31,7 @@ export default function CategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [showPanel, setShowPanel] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
-  const [form, setForm] = useState({ name: '', color: '#6366f1', parent_id: '', description: '' });
+  const [form, setForm] = useState({ name: '', color: '#6B7FC4', parent_id: '', description: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -52,7 +52,7 @@ export default function CategoriesPage() {
 
   function openNew() {
     setEditing(null);
-    setForm({ name: '', color: '#6366f1', parent_id: '', description: '' });
+    setForm({ name: '', color: '#6B7FC4', parent_id: '', description: '' });
     setError('');
     setShowPanel(true);
   }
@@ -61,7 +61,7 @@ export default function CategoriesPage() {
     setEditing(cat);
     const formValues = {
       name: cat.name,
-      color: cat.color || '#6366f1',
+      color: cat.color || '#6B7FC4',
       parent_id: cat.parent_id ?? '',
       description: cat.description ?? '',
     };

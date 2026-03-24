@@ -523,7 +523,7 @@ function DiagramServiceCard({
       <div className="flex items-center gap-2">
         <div
           className="h-3 w-3 flex-shrink-0 rounded-full"
-          style={{ backgroundColor: service.color || '#6366f1' }}
+          style={{ backgroundColor: service.color || '#6B7FC4' }}
         />
         <span className="line-clamp-2 text-sm font-semibold leading-tight text-gray-900">{service.name}</span>
       </div>

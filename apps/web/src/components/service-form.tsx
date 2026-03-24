@@ -429,7 +429,7 @@ export function ServiceForm({
       category_name: categoryName || null,
       description: description || null,
       image_url: imageUrl || null,
-      color: service?.color ?? '#6366f1',
+      color: service?.color ?? '#6B7FC4',
       price: Number(price),
       duration_minutes: Number(duration),
       deposit_enabled: depositEnabled,

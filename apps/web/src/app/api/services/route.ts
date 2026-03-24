@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       deposit_type: body.deposit_type || null,
       deposit_amount: body.deposit_amount || null,
       image_url: body.image_url || null,
-      color: body.color || '#6366f1',
+      color: body.color || '#6B7FC4',
       description: body.description || null,
       buffer_time_before: body.buffer_time_before ?? 0,
       buffer_time_after: body.buffer_time_after ?? 0,
