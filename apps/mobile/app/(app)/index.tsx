@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -26,383 +26,42 @@ import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
 import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
+import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
+import {
+  getDateButtons,
+  getNextWeekDays,
+  getPickDateDays,
+  parseDateLabel,
+  formatHumanDate,
+  getAllDateLabels,
+} from '@/lib/useBookingFlow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const API_BASE = 'https://balkina-ai.vercel.app';
 
-// ── Booking State (Phase 2 — client-side flow) ──────────────────────────────
-
-interface BookingState {
-  tenantId: string | null;
-  tenantName: string | null;
-  serviceId: string | null;
-  serviceName: string | null;
-  servicePrice: number | null;
-  serviceDuration: number | null;
-  depositEnabled: boolean;
-  depositAmount: number | null;
-  depositType: 'fixed' | 'percentage' | null;
-  date: string | null; // YYYY-MM-DD
-  staffId: string | null;
-  staffName: string | null;
-  timeSlot: string | null; // display time like "10:00 AM"
-  timeSlotIso: string | null; // ISO string
-  selectedPackage: string | null;
-  selectedExtras: string[];
-  extrasTotal: number;
-  packagePrice: number;
-  address: string | null;
-}
-
-const INITIAL_BOOKING_STATE: BookingState = {
-  tenantId: null,
-  tenantName: null,
-  serviceId: null,
-  serviceName: null,
-  servicePrice: null,
-  serviceDuration: null,
-  depositEnabled: false,
-  depositAmount: null,
-  depositType: null,
-  date: null,
-  staffId: null,
-  staffName: null,
-  timeSlot: null,
-  timeSlotIso: null,
-  selectedPackage: null,
-  selectedExtras: [],
-  extrasTotal: 0,
-  packagePrice: 0,
-  address: null,
-};
-
-// ── Types ────────────────────────────────────────────────────────────────────
-
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  type?: 'text' | 'businesses' | 'booking_confirmation';
-  isStreaming?: boolean;
-}
-
-// ── Card Types ───────────────────────────────────────────────────────────────
-
-interface BusinessCardData {
-  type: 'business_card';
-  id: string;
-  name: string;
-  image_url?: string;
-  distance_mi: number;
-  drive_minutes: number;
-  category: string;
-  avg_rating?: number;
-  review_count?: number;
-}
-
-interface ServiceCardData {
-  type: 'service_card';
-  id: string;
-  name: string;
-  image_url?: string;
-  price: number;
-  duration_minutes: number;
-  deposit_enabled: boolean;
-  deposit_amount?: number;
-  deposit_type?: 'fixed' | 'percentage';
-}
-
-interface StaffCardData {
-  type: 'staff_card';
-  id: string;
-  name: string;
-  image_url?: string;
-  available_slots_count: number;
-}
-
-interface PackageCardData {
-  type: 'package_card';
-  id: string;
-  name: string;
-  image_url?: string;
-  price: number;
-  services_count: number;
-  service_names: string[];
-  expiration_label?: string;
-  customer_owned: boolean;
-  sessions_remaining?: number;
-}
-
-interface ExtrasGridData {
-  type: 'extras_grid';
-  extras: Array<{ id: string; name: string; price: number; duration_minutes: number; selected?: boolean }>;
-}
-
-interface SummaryCardData {
-  type: 'summary_card';
-  service: string;
-  package?: string;
-  extras: string[];
-  business: string;
-  staff: string;
-  date: string;
-  time: string;
-  address: string;
-  subtotal: number;
-  extras_total: number;
-  package_discount: number;
-  coupon_discount: number;
-  loyalty_discount: number;
-  total: number;
-  deposit_required?: number;
-  points_to_earn: number;
-}
-
-interface ConfirmedCardData {
-  type: 'confirmed_card';
-  status: 'confirmed' | 'pending' | 'cancelled';
-  appointmentId?: string;
-  service: string;
-  package?: string;
-  extras: string[];
-  business: string;
-  staff: string;
-  date: string;
-  time: string;
-  address: string;
-  total: number;
-  points_earned: number;
-  latitude?: number;
-  longitude?: number;
-  deposit_amount?: number;
-  deposit_paid?: boolean;
-  payment_url?: string;
-  payment_required?: boolean;
-}
-
-interface ServiceChipData {
-  id: string;
-  name: string;
-  price: number;
-  duration_minutes: number;
-  deposit_enabled?: boolean;
-  deposit_amount?: number;
-  deposit_type?: 'fixed' | 'percentage';
-}
-
-interface BusinessWithServicesData {
-  type: 'business_with_services';
-  items: Array<BusinessCardData & { services: ServiceChipData[] }>;
-}
-
-interface TimeSlotData {
-  time: string;
-  iso: string;
-  staff_name?: string;
-  available?: boolean;
-}
-
-interface StaffWithSlotsData {
-  type: 'staff_with_slots';
-  items: Array<StaffCardData & { slots: TimeSlotData[]; all_slots?: TimeSlotData[] }>;
-  anyone_slots?: Array<TimeSlotData>;
-}
-
-interface BookingOptionsData {
-  type: 'booking_options';
-  packages: PackageCardData[];
-  extras: Array<{ id: string; name: string; price: number; duration_minutes: number }>;
-}
-
-type CardData =
-  | { type: 'business_cards'; items: BusinessCardData[] }
-  | { type: 'service_cards'; items: ServiceCardData[] }
-  | { type: 'staff_cards'; items: StaffCardData[] }
-  | { type: 'package_cards'; items: PackageCardData[] }
-  | ExtrasGridData
-  | SummaryCardData
-  | ConfirmedCardData
-  | BusinessWithServicesData
-  | StaffWithSlotsData
-  | BookingOptionsData;
-
-interface ParsedSegment {
-  kind: 'text' | 'card';
-  text?: string;
-  card?: CardData;
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function generateId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-  });
-}
-
-function cleanAIMessage(text: string): string {
-  return text
-    .replace(/^\d+\.\s*$/gm, '')
-    .replace(/^-\s*$/gm, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-// ── Fallback: detect plain-text summary and convert to card ──────────────
-
-function tryParseSummaryText(text: string): SummaryCardData | null {
-  if (!text.includes('summary of your booking') && !text.includes('booking summary')) return null;
-
-  const extract = (label: string): string => {
-    const regex = new RegExp(`[-\\*]*\\s*\\*{0,2}${label}:?\\*{0,2}\\s*(.+)`, 'i');
-    const m = text.match(regex);
-    return m?.[1]?.trim() ?? '';
-  };
-
-  const service = extract('Service');
-  const business = extract('Business');
-  if (!service || !business) return null;
-
-  const totalMatch = text.match(/total\s+is\s+\*{0,2}\$?([\d.]+)\*{0,2}/i) ?? text.match(/\*{0,2}Total(?:\s*Price)?:?\*{0,2}\s*\$?([\d.]+)/i);
-  const total = totalMatch ? parseFloat(totalMatch[1]!) : 0;
-
-  const subtotalMatch = text.match(/Subtotal:?\*{0,2}\s*\$?([\d.]+)/i);
-  const subtotal = subtotalMatch ? parseFloat(subtotalMatch[1]!) : total;
-
-  const extrasStr = extract('Extras');
-  const extras = extrasStr && extrasStr.toLowerCase() !== 'none' ? extrasStr.split(',').map(e => e.trim()) : [];
-
-  return {
-    type: 'summary_card',
-    service,
-    extras,
-    business,
-    staff: extract('Staff'),
-    date: extract('Date'),
-    time: extract('Time'),
-    address: extract('Address'),
-    subtotal,
-    extras_total: 0,
-    package_discount: 0,
-    coupon_discount: 0,
-    loyalty_discount: 0,
-    total,
-    points_to_earn: 0,
-  };
-}
-
-// ── Fallback: detect plain-text confirmed booking and convert to card ────
-
-function tryParseConfirmedText(text: string): ConfirmedCardData | null {
-  if (!text.includes('booking is confirmed') && !text.includes('Appointment Confirmed')) return null;
-
-  const extract = (label: string): string => {
-    const regex = new RegExp(`[-\\*]*\\s*\\*{0,2}${label}:?\\*{0,2}\\s*(.+)`, 'i');
-    const m = text.match(regex);
-    return m?.[1]?.trim() ?? '';
-  };
-
-  const service = extract('Service');
-  const business = extract('Business');
-  if (!service || !business) return null;
-
-  const totalMatch = text.match(/\*{0,2}Total(?:\s*Price)?:?\*{0,2}\s*\$?([\d.]+)/i);
-  const total = totalMatch ? parseFloat(totalMatch[1]!) : 0;
-
-  const extrasStr = extract('Extras');
-  const extras = extrasStr && extrasStr.toLowerCase() !== 'none' ? extrasStr.split(',').map(e => e.trim()) : [];
-
-  return {
-    type: 'confirmed_card',
-    status: 'confirmed',
-    service,
-    extras,
-    business,
-    staff: extract('Staff'),
-    date: extract('Date'),
-    time: extract('Time'),
-    address: extract('Address'),
-    total,
-    points_earned: 0,
-  };
-}
-
-// ── Parse [[CARD:...]] blocks from message content ─────────────────────────
-
-function parseCardBlocks(content: string): ParsedSegment[] {
-  const segments: ParsedSegment[] = [];
-  const regex = /\[\[CARD:([\s\S]*?)\]\]/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      const textBefore = content.slice(lastIndex, match.index).trim();
-      if (textBefore) segments.push({ kind: 'text', text: textBefore });
-    }
-    try {
-      const cardData = JSON.parse(match[1]!) as CardData;
-      segments.push({ kind: 'card', card: cardData });
-    } catch {
-      // Malformed JSON — render as text
-      segments.push({ kind: 'text', text: match[0] });
-    }
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < content.length) {
-    const remaining = content.slice(lastIndex).trim();
-    if (remaining) segments.push({ kind: 'text', text: remaining });
-  }
-
-  if (segments.length > 0) return segments;
-
-  // Fallback: detect plain-text summary and convert to structured card
-  const summaryCard = tryParseSummaryText(content);
-  if (summaryCard) {
-    return [{ kind: 'card', card: summaryCard }];
-  }
-
-  // Fallback: detect plain-text confirmed booking and convert to structured card
-  const confirmedCard = tryParseConfirmedText(content);
-  if (confirmedCard) {
-    return [{ kind: 'card', card: confirmedCard }];
-  }
-
-  return [{ kind: 'text', text: content }];
-}
-
-// ── Parse [[button:...]] and [[link:Label|URL]] ─────────────────────────────
-
-interface ParsedLink {
-  label: string;
-  url: string;
-}
-
-function parseMessageContent(content: string): { text: string; buttons: string[]; links: ParsedLink[] } {
-  const buttonRegex = /\[\[button:([^\]]+)\]\]/g;
-  const linkRegex = /\[\[link:([^|]+)\|([^\]]+)\]\]/g;
-  const buttons: string[] = [];
-  const links: ParsedLink[] = [];
-
-  let text = content.replace(linkRegex, (_match, label: string, url: string) => {
-    links.push({ label: label.trim(), url: url.trim() });
-    return '';
-  });
-
-  text = text.replace(buttonRegex, (_match, label: string) => {
-    buttons.push(label.trim());
-    return '';
-  })
-    .replace(/^[ \t]+$/gm, '')
-    .replace(/\n{2,}/g, '\n')
-    .replace(/^\n+|\n+$/g, '')
-    .trim();
-
-  return { text, buttons, links };
-}
+import {
+  generateId,
+  cleanAIMessage,
+  parseCardBlocks,
+  parseMessageContent,
+  nameToColor,
+  getInitials,
+  type BusinessCardData,
+  type ServiceCardData,
+  type StaffCardData,
+  type PackageCardData,
+  type ExtrasGridData,
+  type SummaryCardData,
+  type ConfirmedCardData,
+  type ServiceChipData,
+  type BusinessWithServicesData,
+  type TimeSlotData,
+  type StaffWithSlotsData,
+  type BookingOptionsData,
+  type CardData,
+  type ChatMessage,
+} from '@/lib/chatUtils';
 
 // ── Parse inline markdown (**bold** and *italic*) ───────────────────────────
 
@@ -453,26 +112,6 @@ function renderFormattedText(
   return parts.length > 0 ? parts : [<Text key={0} style={baseStyle}>{text}</Text>];
 }
 
-// ── Color hash for initials ──────────────────────────────────────────────────
-
-function nameToColor(name: string): string {
-  const colors = ['#6B7FC4', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6'];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length]!;
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-}
-
 // ── Typing Indicator ─────────────────────────────────────────────────────────
 
 function TypingIndicator() {
@@ -518,7 +157,7 @@ const typingStyles = StyleSheet.create({
 
 // ── Business Card Row ────────────────────────────────────────────────────────
 
-function BusinessCardRow({ items, onTap }: { items: BusinessCardData[]; onTap: (name: string) => void }) {
+const BusinessCardRow = React.memo(function BusinessCardRow({ items, onTap }: { items: BusinessCardData[]; onTap: (name: string) => void }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2, flexGrow: 0 }}>
       {items.map((biz) => (
@@ -550,11 +189,11 @@ function BusinessCardRow({ items, onTap }: { items: BusinessCardData[]; onTap: (
       ))}
     </ScrollView>
   );
-}
+});
 
 // ── Service Card Row ─────────────────────────────────────────────────────────
 
-function ServiceCardRow({ items, onTap }: { items: ServiceCardData[]; onTap: (name: string) => void }) {
+const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap }: { items: ServiceCardData[]; onTap: (name: string) => void }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2, flexGrow: 0 }}>
       {items.map((svc) => (
@@ -589,11 +228,11 @@ function ServiceCardRow({ items, onTap }: { items: ServiceCardData[]; onTap: (na
       ))}
     </ScrollView>
   );
-}
+});
 
 // ── Business With Services Row (combined card) ──────────────────────────────
 
-function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesData; onTap: (msg: string) => void }) {
+const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesData; onTap: (msg: string) => void }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [selectedSvcId, setSelectedSvcId] = useState<string | null>(null);
   const selectedBiz = data.items[selectedIdx];
@@ -693,11 +332,11 @@ function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesDa
       ) : null}
     </View>
   );
-}
+});
 
 // ── Staff Card Row ───────────────────────────────────────────────────────────
 
-function StaffCardRow({ items, onTap }: { items: StaffCardData[]; onTap: (name: string) => void }) {
+const StaffCardRow = React.memo(function StaffCardRow({ items, onTap }: { items: StaffCardData[]; onTap: (name: string) => void }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2, flexGrow: 0 }}>
       {items.map((staff) => (
@@ -731,11 +370,11 @@ function StaffCardRow({ items, onTap }: { items: StaffCardData[]; onTap: (name: 
       </TouchableOpacity>
     </ScrollView>
   );
-}
+});
 
 // ── Staff With Slots Row (combined card) ─────────────────────────────────────
 
-function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (msg: string) => void }) {
+const StaffWithSlotsRow = React.memo(function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (msg: string) => void }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   // Re-render every 60 seconds so past-time greying stays current
   const [, setTick] = useState(0);
@@ -842,11 +481,11 @@ function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (
       ) : null}
     </View>
   );
-}
+});
 
 // ── Package Card Row ─────────────────────────────────────────────────────────
 
-function PackageCardRow({ items, onTap }: { items: PackageCardData[]; onTap: (name: string) => void }) {
+const PackageCardRow = React.memo(function PackageCardRow({ items, onTap }: { items: PackageCardData[]; onTap: (name: string) => void }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2, flexGrow: 0 }}>
       {items.map((pkg) => (
@@ -899,7 +538,7 @@ function PackageCardRow({ items, onTap }: { items: PackageCardData[]; onTap: (na
       </TouchableOpacity>
     </ScrollView>
   );
-}
+});
 
 // ── Extras Grid ──────────────────────────────────────────────────────────────
 
@@ -1053,7 +692,7 @@ function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData;
 
 // ── Summary Card (structured) ────────────────────────────────────────────────
 
-function RichSummaryCard({ data, onButtonPress }: { data: SummaryCardData; onButtonPress: (label: string) => void }) {
+const RichSummaryCard = React.memo(function RichSummaryCard({ data, onButtonPress }: { data: SummaryCardData; onButtonPress: (label: string) => void }) {
   const displayService = data.package || data.service;
   return (
     <View style={richCardStyles.summaryCard}>
@@ -1118,11 +757,11 @@ function RichSummaryCard({ data, onButtonPress }: { data: SummaryCardData; onBut
       </TouchableOpacity>
     </View>
   );
-}
+});
 
 // ── Confirmed Card (structured) ──────────────────────────────────────────────
 
-function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; onButtonPress: (label: string) => void }) {
+const RichConfirmedCard = React.memo(function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; onButtonPress: (label: string) => void }) {
   const openDirections = () => {
     if (data.latitude && data.longitude) {
       const url = Platform.OS === 'ios'
@@ -1236,7 +875,7 @@ function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; o
       ) : null}
     </View>
   );
-}
+});
 
 // ── Rich Card Styles ─────────────────────────────────────────────────────────
 
@@ -1437,7 +1076,7 @@ function CardRenderer({ card, onButtonPress, onSubmit }: { card: CardData; onBut
 
 // ── Message Bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({
+const MessageBubble = React.memo(function MessageBubble({
   message,
   onButtonPress,
 }: {
@@ -1573,7 +1212,7 @@ function MessageBubble({
       )}
     </Animated.View>
   );
-}
+});
 
 const bubbleStyles = StyleSheet.create({
   wrapper: { paddingHorizontal: 12, marginVertical: 3, maxWidth: '88%', flexGrow: 0, flexShrink: 0 },
@@ -1755,67 +1394,12 @@ export default function ChatScreen() {
     return id;
   }, []);
 
-  // Generate date buttons for the next 7 days
-  const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-  // Get all date button labels (Today, Tomorrow, and 14 more days)
-  const getDateButtons = useCallback(() => {
-    return ['Today', 'Tomorrow', 'Next Week', 'Pick a date'];
-  }, []);
-
-  // Get next week's days (starting from the next Monday, or 2 days from now if that's sooner)
-  const getNextWeekDays = useCallback(() => {
-    const today = new Date();
-    const days: string[] = [];
-    // Start from 2 days out, show 7 days
-    for (let i = 2; i <= 8; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      days.push(`${DAY_NAMES[d.getDay()]} ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`);
-    }
-    return days;
-  }, []);
-
-  // Get extended date range (2 weeks out)
-  const getPickDateDays = useCallback(() => {
-    const today = new Date();
-    const days: string[] = [];
-    for (let i = 2; i <= 14; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      days.push(`${DAY_NAMES[d.getDay()]} ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`);
-    }
-    return days;
-  }, []);
-
-  // Parse a date button label back to YYYY-MM-DD
-  const parseDateLabel = useCallback((label: string): string => {
-    const today = new Date();
-    if (label === 'Today') {
-      return today.toISOString().split('T')[0]!;
-    }
-    if (label === 'Tomorrow') {
-      const d = new Date(today);
-      d.setDate(today.getDate() + 1);
-      return d.toISOString().split('T')[0]!;
-    }
-    // Parse "Wed Mar 15" style — search up to 30 days out
-    for (let i = 2; i <= 30; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      const check = `${DAY_NAMES[d.getDay()]} ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
-      if (check === label) return d.toISOString().split('T')[0]!;
-    }
-    return today.toISOString().split('T')[0]!;
-  }, []);
-
   // Show date picker buttons locally
   const showDatePicker = useCallback(() => {
     const buttons = getDateButtons();
     const buttonMarkup = buttons.map((b) => `[[button:${b}]]`).join('');
     addAssistantMessage(`When would you like your appointment?\n\n${buttonMarkup}`);
-  }, [getDateButtons, addAssistantMessage]);
+  }, [addAssistantMessage]);
 
   // Fetch staff + availability from direct API
   const fetchStaffAvailability = useCallback(async (tenantId: string, serviceId: string, date: string) => {
@@ -1953,12 +1537,6 @@ export default function ChatScreen() {
       return extra ? `${name} (+$${extra.price.toFixed(2)})` : name;
     });
 
-    // Format date as human-readable (e.g. "Thursday, March 19, 2026")
-    const formatHumanDate = (dateStr: string): string => {
-      if (!dateStr) return '';
-      const d = new Date(dateStr + 'T12:00:00');
-      return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    };
 
     const card: SummaryCardData = {
       type: 'summary_card',
@@ -2044,7 +1622,7 @@ export default function ChatScreen() {
           return true;
         }
         // Handle Today, Tomorrow, or expanded day selection
-        const dateButtons = [...getDateButtons(), ...getNextWeekDays(), ...getPickDateDays()];
+        const dateButtons = getAllDateLabels();
         if (dateButtons.includes(userText)) {
           const dateStr = parseDateLabel(userText);
           const newState = { ...bookingState, date: dateStr };
@@ -2073,7 +1651,7 @@ export default function ChatScreen() {
           addAssistantMessage(`Choose a date:\n\n${buttonMarkup}`);
           return true;
         }
-        const dateButtons = [...getDateButtons(), ...getNextWeekDays(), ...getPickDateDays()];
+        const dateButtons = getAllDateLabels();
         if (dateButtons.includes(userText)) {
           const dateStr = parseDateLabel(userText);
           const newState = { ...bookingState, date: dateStr };
@@ -2285,7 +1863,7 @@ export default function ChatScreen() {
 
       return false;
     },
-    [bookingState, getDateButtons, parseDateLabel, addUserMessage, addAssistantMessage, fetchStaffAvailability, fetchBookingOptions, showSummaryCard, userId, customerName, customerPhone, customerEmail],
+    [bookingState, addUserMessage, addAssistantMessage, fetchStaffAvailability, fetchBookingOptions, showSummaryCard, userId, customerName, customerPhone, customerEmail],
   );
 
   const sendMessage = useCallback(

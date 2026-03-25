@@ -292,6 +292,7 @@ function buildTenantSystemPrompt(
   currentDate: string,
   dateInfo?: { todayISO: string; tomorrowISO: string; endOfWeekISO: string; nextWeekMondayISO: string; nextWeekSundayISO: string; currentHourPST: number },
   paymentsEnabled = false,
+  behaviorContext = '',
 ): string {
   let customerSection: string;
   if (userId) {
@@ -357,7 +358,7 @@ Extract all info from user's message first (service, date, time, staff). Never r
 
 GATES: Steps 4 and 5 are mandatory checks — never skip. Always WAIT for user response at steps 4 and 5. Never call create_booking without showing summary_card and receiving explicit confirmation.
 
-## Key Rules
+${behaviorContext}## Key Rules
 - Show price before booking. Must have customer name and phone before booking.
 ${paymentsEnabled
   ? '- Deposit: "This service requires a $X deposit. Remaining $Y due at appointment." → [[button:Yes, Book with Deposit]] [[button:Choose Another Service]]'
@@ -381,6 +382,7 @@ function buildDiscoverySystemPrompt(
   currentDate: string,
   userLocation?: { latitude: number; longitude: number } | null,
   dateInfo?: { todayISO: string; tomorrowISO: string; endOfWeekISO: string; nextWeekMondayISO: string; nextWeekSundayISO: string; currentHourPST: number },
+  behaviorContext = '',
 ): string {
   let customerSection: string;
   if (userId) {
@@ -455,7 +457,7 @@ CATEGORY BROWSING: When user message contains [category_id:UUID], extract the UU
 
 GATES: Steps 4 and 5 are mandatory checks — never skip. Always WAIT for user response at steps 4 and 5. Never call create_booking without showing summary_card and receiving explicit confirmation.
 
-## Key Rules
+${behaviorContext}## Key Rules
 - Never invent data. Only present what tool calls return. Copy names, IDs, distances EXACTLY from results.
 - find_businesses: call fresh for each new booking intent or service type change. Empty query = all nearby businesses.
 - tenant_id from find_businesses must be passed in ALL subsequent tool calls. Never mix data between tenants. Never reuse tenantId from a previous booking.
@@ -741,6 +743,70 @@ export async function POST(request: Request) {
 
   const dateInfo = { todayISO, tomorrowISO: tomorrowISO!, endOfWeekISO: endOfWeekISO!, nextWeekMondayISO, nextWeekSundayISO, currentHourPST: pstHour };
 
+  // Fetch behavior profiles for AI context
+  let behaviorProfiles: { service_id: string; avg_interval_days: number | null; predicted_next_date: string | null; service_name?: string }[] = [];
+  if (userId) {
+    const { data: profiles } = await supabase
+      .from('customer_behavior_profiles')
+      .select('service_id, avg_interval_days, last_booking_date, predicted_next_date')
+      .eq('customer_id', userId)
+      .not('avg_interval_days', 'is', null);
+
+    if (profiles && profiles.length > 0) {
+      // Enrich with service names
+      const serviceIds = profiles.map(p => p.service_id);
+      const { data: services } = await supabase
+        .from('services')
+        .select('id, name')
+        .in('id', serviceIds);
+      const serviceMap = new Map((services ?? []).map(s => [s.id, s.name]));
+
+      behaviorProfiles = profiles.map(p => ({
+        ...p,
+        service_name: serviceMap.get(p.service_id) ?? p.service_id,
+      }));
+    }
+  }
+
+  // Fetch recent completed/confirmed appointments for AI context
+  let recentBookings: { service_name: string; date: string; status: string; tenant_name: string }[] = [];
+  if (userId) {
+    const { data: recentAppts } = await supabase
+      .from('appointments')
+      .select('start_time, status, services(name), tenants(name)')
+      .eq('customer_id', userId)
+      .in('status', ['completed', 'confirmed'])
+      .order('start_time', { ascending: false })
+      .limit(5);
+
+    if (recentAppts) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      recentBookings = recentAppts.map((a: any) => ({
+        service_name: a.services?.name ?? 'Unknown',
+        date: a.start_time,
+        status: a.status,
+        tenant_name: a.tenants?.name ?? 'Unknown',
+      }));
+    }
+  }
+
+  // Build behavior context string for system prompt
+  let behaviorContext = '';
+  if (behaviorProfiles.length > 0) {
+    behaviorContext += '\n## Customer Behavior Patterns\n';
+    behaviorContext += behaviorProfiles.map(p =>
+      `- ${p.service_name}: avg every ${p.avg_interval_days} days, next predicted: ${p.predicted_next_date ?? 'unknown'}`
+    ).join('\n');
+    behaviorContext += '\nUse these patterns to proactively suggest rebookings when relevant.\n';
+  }
+  if (recentBookings.length > 0) {
+    behaviorContext += '\n## Recent Booking History\n';
+    behaviorContext += recentBookings.map(b =>
+      `- ${b.service_name} at ${b.tenant_name}: ${new Date(b.date).toLocaleDateString()} (${b.status})`
+    ).join('\n');
+    behaviorContext += '\n';
+  }
+
   const systemPrompt = tenantId
     ? buildTenantSystemPrompt(
         tenantName,
@@ -751,6 +817,7 @@ export async function POST(request: Request) {
         currentDateTime,
         dateInfo,
         tenantPaymentsEnabled,
+        behaviorContext,
       )
     : buildDiscoverySystemPrompt(
         resolvedName,
@@ -760,6 +827,7 @@ export async function POST(request: Request) {
         currentDateTime,
         userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
         dateInfo,
+        behaviorContext,
       );
 
   // 6. Stream response from OpenAI with tool loop
