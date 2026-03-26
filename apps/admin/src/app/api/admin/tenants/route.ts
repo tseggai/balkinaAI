@@ -12,13 +12,33 @@ export async function GET(request: Request) {
   const search = searchParams.get('search');
   const planFilter = searchParams.get('plan');
   const paymentsFilter = searchParams.get('payments');
+  const categoryFilter = searchParams.get('category');
+  const cityFilter = searchParams.get('city');
   const sortBy = searchParams.get('sort') ?? 'created_at';
   const sortDir = searchParams.get('dir') === 'asc' ? true : false;
+
+  // If filtering by city, first find tenant IDs that have locations in that city
+  let cityTenantIds: string[] | null = null;
+  if (cityFilter) {
+    const { data: cityLocs } = await auth.supabase
+      .from('tenant_locations')
+      .select('tenant_id')
+      .or(`name.ilike.%${cityFilter}%,address.ilike.%${cityFilter}%`);
+    cityTenantIds = [...new Set(((cityLocs ?? []) as { tenant_id: string }[]).map(l => l.tenant_id))];
+    if (cityTenantIds.length === 0) {
+      // No tenants in this city — return empty
+      const { data: plans } = await auth.supabase.from('subscription_plans').select('id, name').order('name');
+      const { data: cats } = await auth.supabase.from('categories').select('id, name').order('name');
+      const { data: cities } = await auth.supabase.from('tenant_locations').select('name');
+      const cityNames = extractCityNames(cities as { name: string }[] | null);
+      return NextResponse.json({ data: [], total: 0, page, per_page: perPage, plans: plans ?? [], categories: cats ?? [], cities: cityNames });
+    }
+  }
 
   const from = (page - 1) * perPage;
   let query = auth.supabase
     .from('tenants')
-    .select('id, name, owner_name, email, phone, status, payments_enabled, avg_rating, review_count, logo_url, created_at, subscription_plan_id, subscription_plans(id, name)', { count: 'exact' })
+    .select('id, name, owner_name, email, phone, status, payments_enabled, avg_rating, review_count, logo_url, category_id, created_at, subscription_plan_id, subscription_plans(id, name), categories(id, name)', { count: 'exact' })
     .range(from, from + perPage - 1);
 
   // Filters
@@ -27,6 +47,8 @@ export async function GET(request: Request) {
   if (planFilter) query = query.eq('subscription_plan_id', planFilter);
   if (paymentsFilter === 'true') query = query.eq('payments_enabled', true);
   if (paymentsFilter === 'false') query = query.eq('payments_enabled', false);
+  if (categoryFilter) query = query.eq('category_id', categoryFilter);
+  if (cityTenantIds) query = query.in('id', cityTenantIds);
 
   // Sort
   const validSorts = ['created_at', 'name', 'avg_rating', 'review_count', 'status'];
@@ -40,50 +62,52 @@ export async function GET(request: Request) {
   const tenants = data ?? [];
   const tenantIds = tenants.map((t: { id: string }) => t.id);
 
-  // Fetch counts for these tenants in parallel
+  // Fetch counts and filter options in parallel
   const locationCounts: Record<string, number> = {};
   const staffCounts: Record<string, number> = {};
   const serviceCounts: Record<string, number> = {};
+  const tenantCities: Record<string, string[]> = {};
 
-  if (tenantIds.length > 0) {
-    const [locResult, staffResult, serviceResult] = await Promise.all([
-      auth.supabase
-        .from('tenant_locations')
-        .select('tenant_id')
-        .in('tenant_id', tenantIds),
-      auth.supabase
-        .from('staff')
-        .select('tenant_id')
-        .in('tenant_id', tenantIds),
-      auth.supabase
-        .from('services')
-        .select('tenant_id')
-        .in('tenant_id', tenantIds),
-    ]);
+  const [locResult, staffResult, serviceResult, plansResult, catsResult, allLocsResult] = await Promise.all([
+    tenantIds.length > 0
+      ? auth.supabase.from('tenant_locations').select('tenant_id, name').in('tenant_id', tenantIds)
+      : Promise.resolve({ data: [] }),
+    tenantIds.length > 0
+      ? auth.supabase.from('staff').select('tenant_id').in('tenant_id', tenantIds)
+      : Promise.resolve({ data: [] }),
+    tenantIds.length > 0
+      ? auth.supabase.from('services').select('tenant_id').in('tenant_id', tenantIds)
+      : Promise.resolve({ data: [] }),
+    auth.supabase.from('subscription_plans').select('id, name').order('name'),
+    auth.supabase.from('categories').select('id, name').order('name'),
+    auth.supabase.from('tenant_locations').select('name'),
+  ]);
 
-    // Count per tenant
-    for (const row of (locResult.data ?? []) as { tenant_id: string }[]) {
-      locationCounts[row.tenant_id] = (locationCounts[row.tenant_id] ?? 0) + 1;
-    }
-    for (const row of (staffResult.data ?? []) as { tenant_id: string }[]) {
-      staffCounts[row.tenant_id] = (staffCounts[row.tenant_id] ?? 0) + 1;
-    }
-    for (const row of (serviceResult.data ?? []) as { tenant_id: string }[]) {
-      serviceCounts[row.tenant_id] = (serviceCounts[row.tenant_id] ?? 0) + 1;
-    }
+  for (const row of ((locResult.data ?? []) as { tenant_id: string; name: string }[])) {
+    locationCounts[row.tenant_id] = (locationCounts[row.tenant_id] ?? 0) + 1;
+    // Extract city from location name (format: "Business Name - City")
+    const dashIdx = row.name.lastIndexOf(' - ');
+    const city = dashIdx > 0 ? row.name.slice(dashIdx + 3) : row.name;
+    const arr = tenantCities[row.tenant_id] ?? [];
+    if (!arr.includes(city)) arr.push(city);
+    tenantCities[row.tenant_id] = arr;
+  }
+  for (const row of ((staffResult.data ?? []) as { tenant_id: string }[])) {
+    staffCounts[row.tenant_id] = (staffCounts[row.tenant_id] ?? 0) + 1;
+  }
+  for (const row of ((serviceResult.data ?? []) as { tenant_id: string }[])) {
+    serviceCounts[row.tenant_id] = (serviceCounts[row.tenant_id] ?? 0) + 1;
   }
 
-  // Fetch available plans for filter dropdown
-  const { data: plans } = await auth.supabase
-    .from('subscription_plans')
-    .select('id, name')
-    .order('name');
+  // Build unique city list from all locations
+  const cityNames = extractCityNames(allLocsResult.data as { name: string }[] | null);
 
   const enriched = tenants.map((t: { id: string }) => ({
     ...t,
     location_count: locationCounts[t.id] ?? 0,
     staff_count: staffCounts[t.id] ?? 0,
     service_count: serviceCounts[t.id] ?? 0,
+    cities: tenantCities[t.id] ?? [],
   }));
 
   return NextResponse.json({
@@ -91,8 +115,24 @@ export async function GET(request: Request) {
     total: count ?? 0,
     page,
     per_page: perPage,
-    plans: plans ?? [],
+    plans: plansResult.data ?? [],
+    categories: catsResult.data ?? [],
+    cities: cityNames,
   });
+}
+
+function extractCityNames(locs: { name: string }[] | null): string[] {
+  if (!locs) return [];
+  const cities = new Set<string>();
+  for (const loc of locs) {
+    const dashIdx = loc.name.lastIndexOf(' - ');
+    if (dashIdx > 0) {
+      cities.add(loc.name.slice(dashIdx + 3));
+    } else {
+      cities.add(loc.name);
+    }
+  }
+  return [...cities].sort();
 }
 
 export async function POST(request: Request) {
@@ -115,7 +155,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'name, owner_name, and email are required' }, { status: 400 });
   }
 
-  // Create tenant without auth user (admin-created tenants don't have login accounts)
   const insert: Record<string, unknown> = {
     name,
     owner_name,
@@ -143,13 +182,27 @@ export async function PATCH(request: Request) {
   if (!auth.admin) return auth.response;
 
   const body = await request.json();
-  const { id, status, payments_enabled } = body as { id: string; status?: string; payments_enabled?: boolean };
+  const { id, ...fields } = body as {
+    id: string;
+    name?: string;
+    owner_name?: string;
+    email?: string;
+    phone?: string;
+    status?: string;
+    payments_enabled?: boolean;
+    category_id?: string | null;
+    subscription_plan_id?: string | null;
+  };
 
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
+  const allowedFields = ['name', 'owner_name', 'email', 'phone', 'status', 'payments_enabled', 'category_id', 'subscription_plan_id'];
   const updates: Record<string, unknown> = {};
-  if (status !== undefined) updates.status = status;
-  if (payments_enabled !== undefined) updates.payments_enabled = payments_enabled;
+  for (const key of allowedFields) {
+    if ((fields as Record<string, unknown>)[key] !== undefined) {
+      updates[key] = (fields as Record<string, unknown>)[key];
+    }
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
@@ -159,7 +212,7 @@ export async function PATCH(request: Request) {
     .from('tenants')
     .update(updates)
     .eq('id', id)
-    .select()
+    .select('*, subscription_plans(id, name), categories(id, name)')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
