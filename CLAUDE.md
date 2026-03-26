@@ -43,6 +43,15 @@ Balkina AI is an AI-powered appointment booking marketplace hosted at balkina.ai
 /docs              — Feature specs and architecture docs
 ```
 
+## REST-First Pattern
+The mobile app uses **REST endpoints for all deterministic flows** (staff availability, time slots, booking creation) and reserves the AI chat for conversational discovery only. This avoids unnecessary token usage.
+
+- `/api/booking/staff-availability` — Mobile calls this REST endpoint directly for staff list + time slots (NOT the AI chat's `check_availability` tool)
+- `/api/booking/create` — Direct REST call for booking creation
+- AI chat tools (`check_availability`, `get_staff`, `create_booking`) are only used when the customer is interacting through the chat interface
+
+**Rule**: If a flow is deterministic (fixed inputs → fixed outputs), use a REST endpoint. Only use AI where natural language understanding or conversational context is needed.
+
 ## Code Standards
 - TypeScript everywhere. Strict mode ON. Zero type errors tolerated.
 - Zod for all input validation at API boundaries.
