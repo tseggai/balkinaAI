@@ -247,10 +247,10 @@ async function handleFindBusinessesInner(
           }
         }
       }
-      // Filter services to only those available at the closest location
+      // Filter services to only those available at the closest location and attach closest_location_id
       businesses = businesses.map((b) => {
         const closest = locMap.get(b.id);
-        return { ...b, all_services: filterServicesForLocation(b.all_services ?? [], closest?.locationId, svcLocMap) };
+        return { ...b, all_services: filterServicesForLocation(b.all_services ?? [], closest?.locationId, svcLocMap), closest_location_id: closest?.locationId };
       });
       businesses = businesses
         .map((b) => {
@@ -513,10 +513,10 @@ async function handleFindBusinessesInner(
           }
         }
 
-        // Filter services to only those available at the closest location
+        // Filter services to only those available at the closest location and attach closest_location_id
         businesses = businesses.map((b) => {
           const closest = locMap.get(b.id);
-          return { ...b, all_services: filterServicesForLocation(b.all_services ?? [], closest?.locationId, svcLocMap) };
+          return { ...b, all_services: filterServicesForLocation(b.all_services ?? [], closest?.locationId, svcLocMap), closest_location_id: closest?.locationId };
         });
 
         const businessesWithDistance = businesses.map((b) => {
@@ -638,10 +638,10 @@ async function handleFindBusinessesInner(
           }
         }
       }
-      // Filter services to only those available at the closest location
+      // Filter services to only those available at the closest location and attach closest_location_id
       businesses = businesses.map((b) => {
         const closest = locMap.get(b.id);
-        return { ...b, all_services: filterServicesForLocation((b as { all_services?: ServiceRow[] }).all_services ?? [], closest?.locationId, noQuerySvcLocMap) };
+        return { ...b, all_services: filterServicesForLocation((b as { all_services?: ServiceRow[] }).all_services ?? [], closest?.locationId, noQuerySvcLocMap), closest_location_id: closest?.locationId };
       }) as typeof businesses;
 
       const businessesWithDistance = businesses
@@ -843,10 +843,10 @@ async function handleFindBusinessesInner(
         }
       }
     }
-    // Filter services to only those available at the closest location
+    // Filter services to only those available at the closest location and attach closest_location_id
     businesses = businesses.map((b) => {
       const closest = locMap.get(b.id);
-      return { ...b, all_services: filterServicesForLocation(b.all_services ?? [], closest?.locationId, querySvcLocMap) };
+      return { ...b, all_services: filterServicesForLocation(b.all_services ?? [], closest?.locationId, querySvcLocMap), closest_location_id: closest?.locationId };
     });
     businesses = businesses
       .map((b) => {
@@ -1024,6 +1024,7 @@ export async function handleGetStaff(
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
   const serviceId = input.service_id as string | undefined;
+  const locationId = input.location_id as string | undefined;
 
   if (serviceId) {
     // Return only staff assigned to this specific service
@@ -1034,9 +1035,32 @@ export async function handleGetStaff(
 
     if (error) return { success: false, error: error.message };
 
-    const staffList = ((data ?? []) as unknown as { staff: { id: string; name: string; image_url: string | null; availability_schedule: unknown } | null }[])
+    let staffList = ((data ?? []) as unknown as { staff: { id: string; name: string; image_url: string | null; availability_schedule: unknown } | null }[])
       .map((ss) => ss.staff)
-      .filter(Boolean);
+      .filter(Boolean) as { id: string; name: string; image_url: string | null; availability_schedule: unknown }[];
+
+    // Filter by location if specified
+    if (locationId && staffList.length > 0) {
+      const staffIds = staffList.map((s) => s.id);
+      const { data: staffLocs } = await supabase
+        .from('staff_locations')
+        .select('staff_id')
+        .in('staff_id', staffIds)
+        .eq('location_id', locationId);
+
+      const staffAtLocation = new Set(((staffLocs ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
+
+      // Also check which staff have NO location assignments (available everywhere)
+      const { data: allStaffLocs } = await supabase
+        .from('staff_locations')
+        .select('staff_id')
+        .in('staff_id', staffIds);
+
+      const staffWithAnyLocation = new Set(((allStaffLocs ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
+
+      // Keep staff who: are assigned to this location OR have no location assignments at all
+      staffList = staffList.filter((s) => staffAtLocation.has(s.id) || !staffWithAnyLocation.has(s.id));
+    }
 
     return { success: true, data: staffList };
   }
@@ -1063,6 +1087,7 @@ export async function handleCheckAvailability(
   const serviceId = input.service_id as string;
   const date = input.date as string; // YYYY-MM-DD
   const staffId = input.staff_id as string | undefined;
+  const locationId = input.location_id as string | undefined;
   const offset = (input.offset as number) || 0;
   const MAX_SLOTS = 6;
 
@@ -1115,6 +1140,19 @@ export async function handleCheckAvailability(
     return { success: true, data: { available_slots: [], message: 'No staff assigned to this service', date, service_duration_minutes: svc.duration_minutes } };
   }
 
+  // 3b. Filter staff by location if specified
+  if (locationId && eligibleStaff.length > 0) {
+    const eStaffIds = eligibleStaff.map((s) => s.id);
+    const [{ data: staffAtLoc }, { data: allStaffLocs }] = await Promise.all([
+      supabase.from('staff_locations').select('staff_id').in('staff_id', eStaffIds).eq('location_id', locationId),
+      supabase.from('staff_locations').select('staff_id').in('staff_id', eStaffIds),
+    ]);
+    const atLocation = new Set(((staffAtLoc ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
+    const hasAnyLocation = new Set(((allStaffLocs ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
+    // Keep staff assigned to this location OR staff with no location assignments (available everywhere)
+    eligibleStaff = eligibleStaff.filter((s) => atLocation.has(s.id) || !hasAnyLocation.has(s.id));
+  }
+
   // Filter to requested staff if specified
   if (staffId) {
     eligibleStaff = eligibleStaff.filter((s) => s.id === staffId);
@@ -1148,8 +1186,18 @@ export async function handleCheckAvailability(
 
   const holidayStaffIds = new Set(((staffHolidays ?? []) as { staff_id: string }[]).map((h) => h.staff_id));
 
-  // 5. Resolve the tenant's timezone so we generate slots in local time
-  const timezone = await getTenantTimezone(supabase, tenantId);
+  // 5. Resolve timezone — use specific location if provided, otherwise tenant's first location
+  let timezone: string;
+  if (locationId) {
+    const { data: locTz } = await supabase
+      .from('tenant_locations')
+      .select('timezone')
+      .eq('id', locationId)
+      .single();
+    timezone = (locTz as { timezone: string } | null)?.timezone || await getTenantTimezone(supabase, tenantId);
+  } else {
+    timezone = await getTenantTimezone(supabase, tenantId);
+  }
 
   // Query existing appointments for the entire local day (converted to UTC range)
   const dayStartUtc = localTimeToUTC(date, '00:00', timezone).toISOString();
