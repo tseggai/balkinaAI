@@ -1408,7 +1408,7 @@ export default function ChatScreen() {
       const res = await fetch(`${API_BASE}/api/booking/staff-availability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId, serviceId, date, customerId: null, userId }),
+        body: JSON.stringify({ tenantId, serviceId, date, customerId: null, userId, userLatitude: userCoords?.latitude, userLongitude: userCoords?.longitude }),
       });
       if (!res.ok) {
         addAssistantMessage('Sorry, I could not check availability. Please try again.');
@@ -1453,7 +1453,7 @@ export default function ChatScreen() {
       addAssistantMessage('Connection error while checking availability. Please try again.');
     }
     setIsLoading(false);
-  }, [userId, addAssistantMessage]);
+  }, [userId, userCoords, addAssistantMessage]);
 
   // Fetch packages + extras from direct API
   const fetchBookingOptions = useCallback(async (tenantId: string, serviceId: string) => {

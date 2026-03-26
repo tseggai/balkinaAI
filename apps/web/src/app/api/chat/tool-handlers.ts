@@ -155,15 +155,21 @@ async function inferLocationForService(
       .in('id', locIds);
     let bestId: string | undefined;
     let bestDist = Infinity;
-    for (const loc of (locs ?? []) as { id: string; latitude: number | null; longitude: number | null }[]) {
-      if (loc.latitude && loc.longitude) {
-        const dist = haversineKm(userLocation.latitude, userLocation.longitude, loc.latitude, loc.longitude);
+    console.log('[inferLocation] raw locs from DB:', JSON.stringify(locs));
+    for (const loc of (locs ?? []) as { id: string; latitude: unknown; longitude: unknown }[]) {
+      // Supabase numeric columns return as strings — explicitly convert
+      const lat = Number(loc.latitude);
+      const lng = Number(loc.longitude);
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        const dist = haversineKm(userLocation.latitude, userLocation.longitude, lat, lng);
+        console.log('[inferLocation] loc:', loc.id, 'lat:', lat, 'lng:', lng, 'dist:', dist.toFixed(2), 'km');
         if (dist < bestDist) {
           bestDist = dist;
           bestId = loc.id;
         }
       }
     }
+    console.log('[inferLocation] bestId:', bestId, 'bestDist:', bestDist.toFixed(2), 'km');
     if (bestId) return bestId;
   }
 
@@ -1118,9 +1124,9 @@ export async function handleGetStaff(
       data: staffList,
       _debug: {
         serviceId,
-        locationId: locationId ?? null,
+        locationId: locationId ?? 'NOT_INFERRED',
         locationSource: input.location_id ? 'ai_provided' : (locationId ? 'auto_inferred' : 'none'),
-        userLocation: userLocation ? `${userLocation.latitude},${userLocation.longitude}` : null,
+        userLocation: userLocation ? `${userLocation.latitude},${userLocation.longitude}` : 'NONE',
         allStaffBeforeFilter: ((data ?? []) as unknown as { staff: { id: string; name: string } | null }[]).map(ss => ss.staff?.name).filter(Boolean),
         staffAfterFilter: staffList.map(s => s.name),
       },
@@ -1414,6 +1420,20 @@ export async function handleCheckAvailability(
   // Build debug info
   const nowUtc = new Date().toISOString();
   const nowPlus15Debug = new Date(Date.now() + 15 * 60000).toISOString();
+  const allStaffBeforeFilter = ((serviceStaffRows ?? []) as unknown as { staff: { name: string } | null }[]).map(ss => ss.staff?.name).filter(Boolean);
+
+  const debugInfo = {
+    locationId: locationId ?? 'NOT_INFERRED',
+    locationSource: input.location_id ? 'ai_provided' : (locationId ? 'auto_inferred' : 'none'),
+    timezone,
+    userLocation: userLocation ? `${userLocation.latitude},${userLocation.longitude}` : 'NONE',
+    serverNowUtc: nowUtc,
+    filterCutoffUtc: nowPlus15Debug,
+    allStaffForService: allStaffBeforeFilter,
+    eligibleStaffAfterLocationFilter: (staffList as { name: string }[]).map(s => s.name),
+    slotsGenerated: totalSlots,
+  };
+  console.log('[check_availability] DEBUG:', JSON.stringify(debugInfo));
 
   return {
     success: true,
@@ -1426,17 +1446,9 @@ export async function handleCheckAvailability(
       has_more: hasMore,
       next_offset: hasMore ? offset + MAX_SLOTS : null,
       customer_appointments_on_this_day: customerAppointments.length > 0 ? customerAppointments : undefined,
+      _debug_availability: debugInfo,
     },
-    _debug: {
-      locationId: locationId ?? null,
-      locationSource: input.location_id ? 'ai_provided' : (locationId ? 'auto_inferred' : 'none'),
-      timezone,
-      userLocation: userLocation ? `${userLocation.latitude},${userLocation.longitude}` : null,
-      serverNowUtc: nowUtc,
-      filterCutoffUtc: nowPlus15Debug,
-      eligibleStaffNames: (staffList as { name: string }[]).map(s => s.name),
-      slotsGeneratedBeforePagination: totalSlots,
-    },
+    _debug: debugInfo,
   };
 }
 
