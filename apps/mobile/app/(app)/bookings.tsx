@@ -40,7 +40,7 @@ interface Appointment {
   stripe_payment_intent_id: string | null;
   services: { name: string } | null;
   staff: { name: string } | null;
-  tenant_locations: { name: string; address?: string; lat?: number; lng?: number } | null;
+  tenant_locations: { name: string; address?: string; latitude?: number; longitude?: number } | null;
   tenants: { name: string } | null;
 }
 
@@ -114,7 +114,7 @@ function BookingCardRow({
 }) {
   const isCancellable = item.status === 'confirmed' || item.status === 'approved' || item.status === 'pending';
   const isCompleted = item.status === 'completed';
-  const hasLocation = !!(item.tenant_locations?.address || item.tenant_locations?.lat);
+  const hasLocation = !!(item.tenant_locations?.address || item.tenant_locations?.latitude);
   const hasUnpaidDeposit = item.deposit_amount_paid != null && item.deposit_amount_paid > 0 && item.deposit_paid !== true && (item.status === 'approved' || item.status === 'confirmed' || item.status === 'pending');
 
   const { date, time } = formatDateTime(item.start_time);
@@ -458,10 +458,10 @@ export default function BookingsScreen() {
   const handleGetDirections = useCallback((item: Appointment) => {
     const loc = item.tenant_locations;
     if (!loc) return;
-    if (loc.lat && loc.lng) {
+    if (loc.latitude && loc.longitude) {
       const url = Platform.OS === 'ios'
-        ? `maps://maps.apple.com/?daddr=${loc.lat},${loc.lng}`
-        : `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
+        ? `maps://maps.apple.com/?daddr=${loc.latitude},${loc.longitude}`
+        : `https://www.google.com/maps/dir/?api=1&destination=${loc.latitude},${loc.longitude}`;
       Linking.openURL(url);
     } else if (loc.address) {
       const encoded = encodeURIComponent(loc.address);
