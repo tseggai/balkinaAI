@@ -16,6 +16,14 @@ interface Tenant {
   logo_url: string | null;
   created_at: string;
   subscription_plans: { id: string; name: string } | null;
+  location_count: number;
+  staff_count: number;
+  service_count: number;
+}
+
+interface Plan {
+  id: string;
+  name: string;
 }
 
 const STATUS_OPTIONS = ['active', 'inactive', 'suspended', 'pending_subscription', 'past_due'];
@@ -27,14 +35,27 @@ const STATUS_BADGE: Record<string, string> = {
   past_due: 'bg-orange-100 text-orange-700',
 };
 
+const SORT_OPTIONS = [
+  { value: 'created_at', label: 'Newest first' },
+  { value: 'created_at:asc', label: 'Oldest first' },
+  { value: 'name:asc', label: 'Name A–Z' },
+  { value: 'name', label: 'Name Z–A' },
+  { value: 'avg_rating', label: 'Highest rated' },
+  { value: 'review_count', label: 'Most reviews' },
+];
+
 export default function TenantsPage() {
   const router = useRouter();
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [planFilter, setPlanFilter] = useState('');
+  const [paymentsFilter, setPaymentsFilter] = useState('');
+  const [sortOption, setSortOption] = useState('created_at');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState('');
   const [saving, setSaving] = useState(false);
@@ -47,13 +68,21 @@ export default function TenantsPage() {
     params.set('per_page', String(perPage));
     if (search) params.set('search', search);
     if (statusFilter) params.set('status', statusFilter);
+    if (planFilter) params.set('plan', planFilter);
+    if (paymentsFilter) params.set('payments', paymentsFilter);
+
+    // Parse sort option (e.g. "name:asc" or "created_at")
+    const parts = sortOption.split(':');
+    params.set('sort', parts[0] ?? 'created_at');
+    if (parts[1]) params.set('dir', parts[1]);
 
     const res = await fetch(`/api/admin/tenants?${params}`);
     const json = await res.json();
     setTenants(json.data ?? []);
     setTotal(json.total ?? 0);
+    if (json.plans) setPlans(json.plans);
     setLoading(false);
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, planFilter, paymentsFilter, sortOption]);
 
   useEffect(() => {
     fetchTenants();
@@ -80,13 +109,18 @@ export default function TenantsPage() {
     fetchTenants();
   }
 
+  const hasFilters = search || statusFilter || planFilter || paymentsFilter || sortOption !== 'created_at';
   const totalPages = Math.ceil(total / perPage);
 
   return (
     <div className="p-6 lg:p-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Tenants</h1>
-        <p className="mt-1 text-sm text-gray-500">Manage all businesses on the platform.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Tenants</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {total} business{total !== 1 ? 'es' : ''} on the platform
+          </p>
+        </div>
       </div>
 
       {/* Filters */}
@@ -108,9 +142,40 @@ export default function TenantsPage() {
             <option key={s} value={s}>{s.replace('_', ' ')}</option>
           ))}
         </select>
-        {(search || statusFilter) && (
-          <button onClick={() => { setSearch(''); setStatusFilter(''); setPage(1); }} className="text-sm font-medium text-brand-600 hover:text-brand-700">
-            Clear
+        <select
+          value={planFilter}
+          onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }}
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        >
+          <option value="">All Plans</option>
+          {plans.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+        <select
+          value={paymentsFilter}
+          onChange={(e) => { setPaymentsFilter(e.target.value); setPage(1); }}
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        >
+          <option value="">All Payment Status</option>
+          <option value="true">Payments Enabled</option>
+          <option value="false">Payments Disabled</option>
+        </select>
+        <select
+          value={sortOption}
+          onChange={(e) => { setSortOption(e.target.value); setPage(1); }}
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        >
+          {SORT_OPTIONS.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+        {hasFilters && (
+          <button
+            onClick={() => { setSearch(''); setStatusFilter(''); setPlanFilter(''); setPaymentsFilter(''); setSortOption('created_at'); setPage(1); }}
+            className="text-sm font-medium text-brand-600 hover:text-brand-700"
+          >
+            Clear all
           </button>
         )}
       </div>
@@ -122,7 +187,7 @@ export default function TenantsPage() {
         </div>
       ) : (
         <>
-          <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white">
             {tenants.length > 0 ? (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -131,6 +196,9 @@ export default function TenantsPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Owner</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Plan</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Loc</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Staff</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Svc</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Payments</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Rating</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Joined</th>
@@ -142,7 +210,7 @@ export default function TenantsPage() {
                     <tr key={tenant.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
                         <button onClick={() => router.push(`/dashboard/tenants/${tenant.id}`)} className="flex items-center gap-2 text-left">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
                             {tenant.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
@@ -189,6 +257,9 @@ export default function TenantsPage() {
                           </span>
                         )}
                       </td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-600">{tenant.location_count}</td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-600">{tenant.staff_count}</td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-600">{tenant.service_count}</td>
                       <td className="px-4 py-3">
                         <button
                           onClick={() => togglePayments(tenant.id, tenant.payments_enabled)}
@@ -206,7 +277,7 @@ export default function TenantsPage() {
                           <span>{tenant.avg_rating.toFixed(1)} ({tenant.review_count})</span>
                         ) : '—'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-400">
+                      <td className="px-4 py-3 text-sm text-gray-400 whitespace-nowrap">
                         {new Date(tenant.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3 text-right">
