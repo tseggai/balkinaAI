@@ -119,7 +119,7 @@ export default function LocationsPage() {
   useEffect(() => {
     if (!mapsLoaded || !showPanel || !addressInputRef.current || autocompleteRef.current) return;
     const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
-      types: ['address'],
+      types: ['establishment', 'geocode'],
     });
     autocompleteRef.current = autocomplete;
 
