@@ -3,7 +3,7 @@
  * Direct REST endpoint for client-side booking flow (Phase 2).
  * Returns staff list with available time slots — no GPT involvement.
  *
- * Body: { tenantId, serviceId, date, staffId?, customerId?, userId? }
+ * Body: { tenantId, serviceId, date, staffId?, customerId?, userId?, locationId?, userLatitude?, userLongitude? }
  */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
@@ -28,6 +28,57 @@ function localTimeToUTC(dateStr: string, timeStr: string, timezone: string): Dat
   return new Date(asUtc.getTime() - offsetMs);
 }
 
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Auto-infer the closest location for a service based on user coordinates.
+ */
+async function inferLocationForService(
+  supabase: ReturnType<typeof createAdminClient>,
+  serviceId: string,
+  userLocation?: { latitude: number; longitude: number } | null,
+): Promise<string | undefined> {
+  const { data: svcLocs } = await supabase
+    .from('service_locations')
+    .select('location_id')
+    .eq('service_id', serviceId);
+  const locIds = ((svcLocs ?? []) as { location_id: string }[]).map((sl) => sl.location_id);
+
+  if (locIds.length === 0) return undefined;
+  if (locIds.length === 1) return locIds[0];
+
+  if (userLocation) {
+    const { data: locs } = await supabase
+      .from('tenant_locations')
+      .select('id, latitude, longitude')
+      .in('id', locIds);
+    let bestId: string | undefined;
+    let bestDist = Infinity;
+    for (const loc of (locs ?? []) as { id: string; latitude: unknown; longitude: unknown }[]) {
+      const lat = Number(loc.latitude);
+      const lng = Number(loc.longitude);
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        const dist = haversineKm(userLocation.latitude, userLocation.longitude, lat, lng);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestId = loc.id;
+        }
+      }
+    }
+    if (bestId) return bestId;
+  }
+
+  return locIds[0];
+}
+
 export async function OPTIONS() {
   return new Response(null, { headers: CORS_HEADERS });
 }
@@ -41,9 +92,13 @@ export async function POST(request: Request) {
       staffId?: string;
       customerId?: string;
       userId?: string;
+      locationId?: string;
+      userLatitude?: number;
+      userLongitude?: number;
     };
 
-    const { tenantId, serviceId, date, staffId, customerId, userId } = body;
+    const { tenantId, serviceId, date, staffId, customerId, userId, userLatitude, userLongitude } = body;
+    let locationId = body.locationId;
 
     if (!tenantId || !serviceId || !date) {
       return NextResponse.json({ error: 'tenantId, serviceId, and date are required' }, { status: 400, headers: CORS_HEADERS });
@@ -54,6 +109,13 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAdminClient();
+
+    // Auto-infer location from service_locations + user GPS
+    const userLocation = userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null;
+    if (!locationId) {
+      locationId = await inferLocationForService(supabase, serviceId, userLocation);
+      console.log('[staff-availability] auto-inferred locationId:', locationId, 'userLocation:', userLocation ? `${userLocation.latitude},${userLocation.longitude}` : 'none');
+    }
 
     // 1. Get service details including buffer times
     const { data: service, error: svcErr } = await supabase
@@ -89,13 +151,19 @@ export async function POST(request: Request) {
         .from('service_staff')
         .select('staff_id, staff:staff_id(id, name, image_url, availability_schedule)')
         .eq('service_id', serviceId),
-      // 5. Tenant timezone + address
-      supabase
-        .from('tenant_locations')
-        .select('timezone, address')
-        .eq('tenant_id', tenantId)
-        .limit(1)
-        .single(),
+      // 5. Tenant timezone + address — use specific location if inferred, otherwise first location
+      locationId
+        ? supabase
+            .from('tenant_locations')
+            .select('timezone, address')
+            .eq('id', locationId)
+            .single()
+        : supabase
+            .from('tenant_locations')
+            .select('timezone, address')
+            .eq('tenant_id', tenantId)
+            .limit(1)
+            .single(),
     ]);
 
     const serviceSpecialDay = (specialDaysResult.data ?? [])[0] as { is_day_off: boolean; start_time: string | null; end_time: string | null; breaks: unknown } | undefined;
@@ -124,6 +192,20 @@ export async function POST(request: Request) {
       }, { headers: CORS_HEADERS });
     }
 
+    // Filter staff by location if location is known
+    if (locationId && eligibleStaff.length > 0) {
+      const eStaffIds = eligibleStaff.map((s) => s.id);
+      const [{ data: staffAtLoc }, { data: allStaffLocs }] = await Promise.all([
+        supabase.from('staff_locations').select('staff_id').in('staff_id', eStaffIds).eq('location_id', locationId),
+        supabase.from('staff_locations').select('staff_id').in('staff_id', eStaffIds),
+      ]);
+      const atLocation = new Set(((staffAtLoc ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
+      const hasAnyLocation = new Set(((allStaffLocs ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
+      // Keep staff assigned to this location OR staff with no location assignments (available everywhere)
+      eligibleStaff = eligibleStaff.filter((s) => atLocation.has(s.id) || !hasAnyLocation.has(s.id));
+      console.log('[staff-availability] staff after location filter:', eligibleStaff.map(s => s.name), 'locationId:', locationId);
+    }
+
     if (staffId) {
       eligibleStaff = eligibleStaff.filter((s) => s.id === staffId);
     }
@@ -133,7 +215,7 @@ export async function POST(request: Request) {
         staff: [],
         slots: [],
         date,
-        message: 'Requested staff is not assigned to this service.',
+        message: 'No staff available at this location for this service.',
       }, { headers: CORS_HEADERS });
     }
 
@@ -141,6 +223,7 @@ export async function POST(request: Request) {
     const timezone = locationData?.timezone || 'UTC';
     const address = locationData?.address || null;
     const staffIds = eligibleStaff.map((s) => s.id);
+    console.log('[staff-availability] timezone:', timezone, 'locationId:', locationId, 'eligible staff:', eligibleStaff.map(s => s.name));
 
     // 4. Staff special days, holidays, and existing appointments — in parallel
     const dayStartUtc = localTimeToUTC(date, '00:00', timezone).toISOString();
