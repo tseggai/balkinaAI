@@ -127,6 +127,48 @@ function filterServicesForLocation(
 }
 
 /**
+ * Auto-infer the best location for a service when the AI doesn't pass location_id.
+ * Uses service_locations + user coordinates to pick the closest matching location.
+ */
+async function inferLocationForService(
+  supabase: AdminClient,
+  serviceId: string,
+  userLocation?: { latitude: number; longitude: number } | null,
+): Promise<string | undefined> {
+  const { data: svcLocs } = await supabase
+    .from('service_locations')
+    .select('location_id')
+    .eq('service_id', serviceId);
+  const locIds = ((svcLocs ?? []) as { location_id: string }[]).map((sl) => sl.location_id);
+
+  if (locIds.length === 0) return undefined; // Service at all locations — can't infer
+  if (locIds.length === 1) return locIds[0]; // Only one location — easy
+
+  // Multiple locations — pick the closest to user if coordinates available
+  if (userLocation) {
+    const { data: locs } = await supabase
+      .from('tenant_locations')
+      .select('id, latitude, longitude')
+      .in('id', locIds);
+    let bestId: string | undefined;
+    let bestDist = Infinity;
+    for (const loc of (locs ?? []) as { id: string; latitude: number | null; longitude: number | null }[]) {
+      if (loc.latitude && loc.longitude) {
+        const dist = haversineKm(userLocation.latitude, userLocation.longitude, loc.latitude, loc.longitude);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestId = loc.id;
+        }
+      }
+    }
+    if (bestId) return bestId;
+  }
+
+  // No user location — just pick the first
+  return locIds[0];
+}
+
+/**
  * Build a service→locations map from service_locations rows.
  */
 function buildSvcLocMap(rows: { service_id: string; location_id: string }[]): Map<string, Set<string>> {
@@ -1022,9 +1064,15 @@ export async function handleGetStaff(
   supabase: AdminClient,
   tenantId: string,
   input: Record<string, unknown>,
+  userLocation?: { latitude: number; longitude: number } | null,
 ): Promise<ToolResult> {
   const serviceId = input.service_id as string | undefined;
-  const locationId = input.location_id as string | undefined;
+  let locationId = input.location_id as string | undefined;
+
+  // Auto-infer location from service_locations when AI doesn't pass location_id
+  if (!locationId && serviceId) {
+    locationId = await inferLocationForService(supabase, serviceId, userLocation);
+  }
 
   if (serviceId) {
     // Return only staff assigned to this specific service
@@ -1083,16 +1131,22 @@ export async function handleCheckAvailability(
   tenantId: string,
   input: Record<string, unknown>,
   sessionInfo?: { customerId: string | null; customerName: string | null; customerPhone: string | null; chatSessionId: string; userId: string | null },
+  userLocation?: { latitude: number; longitude: number } | null,
 ): Promise<ToolResult> {
   const serviceId = input.service_id as string;
   const date = input.date as string; // YYYY-MM-DD
   const staffId = input.staff_id as string | undefined;
-  const locationId = input.location_id as string | undefined;
+  let locationId = input.location_id as string | undefined;
   const offset = (input.offset as number) || 0;
   const MAX_SLOTS = 6;
 
   if (!serviceId || !date) {
     return { success: false, error: 'service_id and date are required' };
+  }
+
+  // Auto-infer location from service_locations when AI doesn't pass location_id
+  if (!locationId) {
+    locationId = await inferLocationForService(supabase, serviceId, userLocation);
   }
 
   // Validate date format — must be YYYY-MM-DD
@@ -2481,9 +2535,9 @@ export async function executeTool(
         return await handleGetServiceDetails(supabase, tenantId, toolInput);
       case 'search_tenants':
       case 'get_staff':
-        return await handleGetStaff(supabase, tenantId, toolInput);
+        return await handleGetStaff(supabase, tenantId, toolInput, userLocation);
       case 'check_availability':
-        return await handleCheckAvailability(supabase, tenantId, toolInput, sessionInfo);
+        return await handleCheckAvailability(supabase, tenantId, toolInput, sessionInfo, userLocation);
       case 'create_booking':
         return await handleBookAppointment(supabase, tenantId, toolInput, sessionInfo);
       case 'cancel_appointment':
