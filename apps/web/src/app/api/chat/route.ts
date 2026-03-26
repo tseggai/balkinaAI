@@ -58,12 +58,13 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_staff',
-      description: 'List staff members. When service_id is provided, returns ONLY staff assigned to that service. Always pass service_id when a service has been selected.',
+      description: 'List staff members. When service_id is provided, returns ONLY staff assigned to that service. When location_id is also provided, further filters to staff who work at that location. Always pass service_id and location_id when available.',
       parameters: {
         type: 'object',
         properties: {
           ...tenantIdProp,
           service_id: { type: 'string', description: 'The service ID to get assigned staff for. Always pass this when a service has been selected.' },
+          location_id: { type: 'string', description: 'The location ID to filter staff by. Always pass this when a location is known (from find_businesses results).' },
         },
         required: [],
       },
@@ -73,13 +74,14 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'check_availability',
-      description: 'Check available time slots for a service on a given date. Returns max 6 slots per call with has_more flag. Use offset to paginate. Each slot has a local_time field (e.g. "10:00 AM") — always use this for display instead of the raw ISO time field. Only returns slots for staff ASSIGNED to the service.',
+      description: 'Check available time slots for a service on a given date. Returns max 6 slots per call with has_more flag. Use offset to paginate. Each slot has a local_time field (e.g. "10:00 AM") — always use this for display instead of the raw ISO time field. Only returns slots for staff ASSIGNED to the service AND working at the specified location.',
       parameters: {
         type: 'object',
         properties: {
           ...tenantIdProp,
           service_id: { type: 'string', description: 'UUID of the service (REQUIRED). Available slots only come from staff assigned to this service.' },
           staff_id: { type: 'string', description: 'UUID of preferred staff member (optional). Must be a staff member assigned to the service.' },
+          location_id: { type: 'string', description: 'UUID of the tenant location. Pass this to filter staff to those working at this location and use correct timezone. Always pass when available.' },
           date: { type: 'string', description: 'Date to check availability for in YYYY-MM-DD format. NEVER pass "tomorrow" — always resolve to actual date.' },
           offset: { type: 'number', description: 'Starting index for pagination (default 0). Use previous offset + 6 to get next page.' },
         },
@@ -344,7 +346,7 @@ Extract all info from user's message first (service, date, time, staff). Never r
 
 1. get_services → service_cards (include ALL services — never truncate. Map image_url from each service's image_url field)
 2. Ask date → [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-3. COMBINED STEP — call get_staff AND check_availability for EACH staff in the SAME tool round. Render as ONE staff_with_slots card:
+3. COMBINED STEP — call get_staff (with location_id) AND check_availability (with location_id) for EACH staff in the SAME tool round. ALWAYS pass location_id to both calls so only staff working at the selected location appear and timezone is correct. Render as ONE staff_with_slots card:
    [[CARD:{"type":"staff_with_slots","items":[{"id":"staff-uuid","name":"Marcus","image_url":null,"available_slots_count":4,"slots":[{"time":"10:00 AM","iso":"2026-03-13T18:00:00Z"},{"time":"10:30 AM","iso":"2026-03-13T18:30:00Z"}]}],"anyone_slots":[{"time":"10:00 AM","iso":"...","staff_name":"Marcus"},{"time":"11:00 AM","iso":"...","staff_name":"Emily"}]}]]
    If only 1 staff: still use staff_with_slots but with just that one staff member.
    User taps a time slot → app sends "[time] with [staff name]".
@@ -369,7 +371,7 @@ ${paymentsEnabled
 - Directions: call get_directions, show distance + [[link:Get Directions|url]]. Don't rebook.
 - Appointments: use get_booking_details to list, cancel_appointment to cancel, reschedule_appointment to move. Fetch list first, never ask for ID.
 - Multi-intent: decompose into sequential steps, handle first part, then coordinate the rest.
-- Never invent data. Only present what tool calls return. Never mix data between tenants. Always pass serviceId to get_staff and check_availability. Never show extras from a different service.
+- Never invent data. Only present what tool calls return. Never mix data between tenants. Always pass serviceId AND location_id to get_staff and check_availability. Never show extras from a different service.
 - If loyalty points_to_earn = 0, don't mention loyalty at all. Set points_earned to 0 in confirmed_card.
 - Only help with booking at ${tenantName}. No medical, legal, or financial advice.
 `;
@@ -446,7 +448,7 @@ CATEGORY BROWSING: When user message contains [category_id:UUID], extract the UU
    User taps a service chip → app sends "[service name] at [business name]".
    If user already specified a service type, auto-match from the services list.
 2. Ask date → [[button:Today]] [[button:Tomorrow]] [[button:Next Week]] [[button:Pick a Date]]
-3. COMBINED STEP — call get_staff AND check_availability for EACH staff in the SAME tool round. Render as ONE staff_with_slots card:
+3. COMBINED STEP — call get_staff (with location_id) AND check_availability (with location_id) for EACH staff in the SAME tool round. ALWAYS pass location_id to both calls — use the closest location from find_businesses results. This filters staff to only those working at the selected location and uses the correct timezone. Render as ONE staff_with_slots card:
    [[CARD:{"type":"staff_with_slots","items":[{"id":"staff-uuid","name":"Marcus","image_url":null,"available_slots_count":4,"slots":[{"time":"10:00 AM","iso":"2026-03-13T18:00:00Z"}]}],"anyone_slots":[{"time":"10:00 AM","iso":"...","staff_name":"Marcus"}]}]]
    If only 1 staff: still use staff_with_slots with just that one staff member.
    User taps a time slot → app sends "[time] with [staff name]".
@@ -463,7 +465,7 @@ ${behaviorContext}## Key Rules
 - Never invent data. Only present what tool calls return. Copy names, IDs, distances EXACTLY from results.
 - find_businesses: call fresh for each new booking intent or service type change. Empty query = all nearby businesses.
 - tenant_id from find_businesses must be passed in ALL subsequent tool calls. Never mix data between tenants. Never reuse tenantId from a previous booking.
-- Always pass serviceId to get_staff and check_availability. Never show extras from a different service.
+- Always pass serviceId AND location_id (closest_location_id from find_businesses) to get_staff and check_availability. This ensures only staff at the selected location appear and the correct timezone is used. Never show extras from a different service.
 - In discovery mode, use business_with_services to show businesses with their services in one card. Don't show staff until after service is selected.
 - Show price and deposit before booking. Must have customer name and phone before booking.
 - Deposit: "This service requires a $X deposit. Remaining $Y due at appointment." → [[button:Yes, Book with Deposit]] [[button:Choose Another Service]]
