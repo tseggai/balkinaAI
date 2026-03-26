@@ -107,6 +107,38 @@ function estimateDriveMinutes(distanceKm: number): number {
   return Math.max(1, Math.round((distanceKm / avgSpeedKmh) * 60));
 }
 
+type ServiceRow = { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null };
+
+/**
+ * Filter services to only those available at a specific location.
+ * A service is available if it has NO entries in service_locations (all locations) or includes the given location ID.
+ */
+function filterServicesForLocation(
+  services: ServiceRow[],
+  closestLocationId: string | undefined,
+  svcLocMap: Map<string, Set<string>>,
+): ServiceRow[] {
+  if (!closestLocationId) return services;
+  return services.filter((svc) => {
+    const assignedLocs = svcLocMap.get(svc.id);
+    if (!assignedLocs || assignedLocs.size === 0) return true;
+    return assignedLocs.has(closestLocationId);
+  });
+}
+
+/**
+ * Build a service→locations map from service_locations rows.
+ */
+function buildSvcLocMap(rows: { service_id: string; location_id: string }[]): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  for (const sl of rows) {
+    const existing = map.get(sl.service_id) ?? new Set();
+    existing.add(sl.location_id);
+    map.set(sl.service_id, existing);
+  }
+  return map;
+}
+
 export async function handleFindBusinesses(
   supabase: AdminClient,
   _tenantId: string,
@@ -176,17 +208,21 @@ async function handleFindBusinessesInner(
 
     // Fetch locations and services in parallel (both depend on catBizIds only)
     const catBizIds = businesses.map((b) => b.id);
-    const [{ data: catLocs }, { data: catSvcs }] = catBizIds.length > 0
+    const [{ data: catLocs }, { data: catSvcs }, { data: catSvcLocs }] = catBizIds.length > 0
       ? await Promise.all([
-          supabase.from('tenant_locations').select('tenant_id, name, address, latitude, longitude').in('tenant_id', catBizIds),
+          supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', catBizIds),
           supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility').in('tenant_id', catBizIds).eq('visibility', 'public'),
+          supabase.from('service_locations').select('service_id, location_id'),
         ])
-      : [{ data: [] }, { data: [] }];
+      : [{ data: [] }, { data: [] }, { data: [] }];
 
-    const catLocMap = new Map<string, { name: string; address: string; latitude: number | null; longitude: number | null }[]>();
-    for (const loc of (catLocs ?? []) as { tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
+    // Build service→locations map for filtering
+    const svcLocMap = buildSvcLocMap((catSvcLocs ?? []) as { service_id: string; location_id: string }[]);
+
+    const catLocMap = new Map<string, { id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]>();
+    for (const loc of (catLocs ?? []) as { id: string; tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
       const existing = catLocMap.get(loc.tenant_id) ?? [];
-      existing.push({ name: loc.name, address: loc.address, latitude: loc.latitude, longitude: loc.longitude });
+      existing.push({ id: loc.id, name: loc.name, address: loc.address, latitude: loc.latitude, longitude: loc.longitude });
       catLocMap.set(loc.tenant_id, existing);
     }
 
@@ -201,16 +237,21 @@ async function handleFindBusinessesInner(
     // Sort by proximity if location available
     if (userLat && userLng) {
       // Pick the CLOSEST location per tenant (not just the first one)
-      const locMap = new Map<string, { latitude: number; longitude: number; distance: number }>();
-      for (const loc of (catLocs ?? []) as { tenant_id: string; latitude: number | null; longitude: number | null }[]) {
+      const locMap = new Map<string, { locationId: string; latitude: number; longitude: number; distance: number }>();
+      for (const loc of (catLocs ?? []) as { id: string; tenant_id: string; latitude: number | null; longitude: number | null }[]) {
         if (loc.latitude && loc.longitude) {
           const dist = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
           const existing = locMap.get(loc.tenant_id);
           if (!existing || dist < existing.distance) {
-            locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude, distance: dist });
+            locMap.set(loc.tenant_id, { locationId: loc.id, latitude: loc.latitude, longitude: loc.longitude, distance: dist });
           }
         }
       }
+      // Filter services to only those available at the closest location
+      businesses = businesses.map((b) => {
+        const closest = locMap.get(b.id);
+        return { ...b, all_services: filterServicesForLocation(b.all_services ?? [], closest?.locationId, svcLocMap) };
+      });
       businesses = businesses
         .map((b) => {
           const loc = locMap.get(b.id);
@@ -427,25 +468,22 @@ async function handleFindBusinessesInner(
     if (serviceTenantMap.size > 0) {
       let businesses: { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; matched_services?: string[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[] = Array.from(serviceTenantMap.values());
 
-      // Fetch locations
+      // Fetch locations, services, and service_locations in parallel
       const bizIds = businesses.map((b) => b.id);
-      const { data: bizLocations } = bizIds.length > 0
-        ? await supabase.from('tenant_locations').select('tenant_id, name, address, latitude, longitude').in('tenant_id', bizIds)
-        : { data: [] };
+      const [{ data: bizLocations }, { data: allBizServices }, { data: bizSvcLocs }] = bizIds.length > 0
+        ? await Promise.all([
+            supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', bizIds),
+            supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility').in('tenant_id', bizIds).eq('visibility', 'public'),
+            supabase.from('service_locations').select('service_id, location_id'),
+          ])
+        : [{ data: [] }, { data: [] }, { data: [] }];
 
       console.log('[find_businesses] bizLocations count:', bizLocations?.length);
 
-      // Fetch ALL services for each business so the AI can show them all (not just matched ones)
-      const { data: allBizServices } = bizIds.length > 0
-        ? await supabase
-            .from('services')
-            .select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility')
-            .in('tenant_id', bizIds)
-            .eq('visibility', 'public')
-        : { data: [] };
+      const svcLocMap = buildSvcLocMap((bizSvcLocs ?? []) as { service_id: string; location_id: string }[]);
 
-      const bizSvcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]>();
-      for (const svc of (allBizServices ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]) {
+      const bizSvcMap = new Map<string, ServiceRow[]>();
+      for (const svc of (allBizServices ?? []) as (ServiceRow & { tenant_id: string })[]) {
         const existing = bizSvcMap.get(svc.tenant_id) ?? [];
         existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url });
         bizSvcMap.set(svc.tenant_id, existing);
@@ -455,7 +493,7 @@ async function handleFindBusinessesInner(
       businesses = businesses.map((b) => ({ ...b, all_services: bizSvcMap.get(b.id) ?? [] }));
 
       const bizLocMap = new Map<string, { name: string; address: string; latitude: number | null; longitude: number | null }[]>();
-      for (const loc of (bizLocations ?? []) as { tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
+      for (const loc of (bizLocations ?? []) as { id: string; tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
         const existing = bizLocMap.get(loc.tenant_id) ?? [];
         existing.push({ name: loc.name, address: loc.address, latitude: loc.latitude, longitude: loc.longitude });
         bizLocMap.set(loc.tenant_id, existing);
@@ -464,16 +502,22 @@ async function handleFindBusinessesInner(
       // Sort by proximity if user location available
       if (userLat && userLng) {
         // Pick the CLOSEST location per tenant
-        const locMap = new Map<string, { latitude: number; longitude: number; distance: number }>();
-        for (const loc of (bizLocations ?? []) as { tenant_id: string; latitude: number | null; longitude: number | null }[]) {
+        const locMap = new Map<string, { locationId: string; latitude: number; longitude: number; distance: number }>();
+        for (const loc of (bizLocations ?? []) as { id: string; tenant_id: string; latitude: number | null; longitude: number | null }[]) {
           if (loc.latitude && loc.longitude) {
             const dist = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
             const existing = locMap.get(loc.tenant_id);
             if (!existing || dist < existing.distance) {
-              locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude, distance: dist });
+              locMap.set(loc.tenant_id, { locationId: loc.id, latitude: loc.latitude, longitude: loc.longitude, distance: dist });
             }
           }
         }
+
+        // Filter services to only those available at the closest location
+        businesses = businesses.map((b) => {
+          const closest = locMap.get(b.id);
+          return { ...b, all_services: filterServicesForLocation(b.all_services ?? [], closest?.locationId, svcLocMap) };
+        });
 
         const businessesWithDistance = businesses.map((b) => {
           const loc = locMap.get(b.id);
@@ -552,17 +596,20 @@ async function handleFindBusinessesInner(
     }) as { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[];
     let locationNote: string | undefined;
 
-    // Fetch locations with addresses for all businesses
+    // Fetch locations, services, and service_locations in parallel
     const tenantIdsAll = businesses.map((b) => b.id);
-    const { data: locationsAll } = tenantIdsAll.length > 0
-      ? await supabase
-          .from('tenant_locations')
-          .select('tenant_id, name, address, latitude, longitude')
-          .in('tenant_id', tenantIdsAll)
-      : { data: [] };
+    const [{ data: locationsAll }, { data: noQueryServices }, { data: noQuerySvcLocs }] = tenantIdsAll.length > 0
+      ? await Promise.all([
+          supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', tenantIdsAll),
+          supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility').in('tenant_id', tenantIdsAll).eq('visibility', 'public'),
+          supabase.from('service_locations').select('service_id, location_id'),
+        ])
+      : [{ data: [] }, { data: [] }, { data: [] }];
+
+    const noQuerySvcLocMap = buildSvcLocMap((noQuerySvcLocs ?? []) as { service_id: string; location_id: string }[]);
 
     const locAllMap = new Map<string, { name: string; address: string; latitude: number | null; longitude: number | null }[]>();
-    for (const loc of (locationsAll ?? []) as { tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
+    for (const loc of (locationsAll ?? []) as { id: string; tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
       const existing = locAllMap.get(loc.tenant_id) ?? [];
       existing.push({ name: loc.name, address: loc.address, latitude: loc.latitude, longitude: loc.longitude });
       locAllMap.set(loc.tenant_id, existing);
@@ -570,17 +617,8 @@ async function handleFindBusinessesInner(
 
     console.log('[find_businesses] no-query locationsAll count:', locationsAll?.length);
 
-    // Fetch ALL services for each business so the AI can show them all
-    const { data: noQueryServices } = tenantIdsAll.length > 0
-      ? await supabase
-          .from('services')
-          .select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility')
-          .in('tenant_id', tenantIdsAll)
-          .eq('visibility', 'public')
-      : { data: [] };
-
-    const noQuerySvcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]>();
-    for (const svc of (noQueryServices ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]) {
+    const noQuerySvcMap = new Map<string, ServiceRow[]>();
+    for (const svc of (noQueryServices ?? []) as (ServiceRow & { tenant_id: string })[]) {
       const existing = noQuerySvcMap.get(svc.tenant_id) ?? [];
       existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url });
       noQuerySvcMap.set(svc.tenant_id, existing);
@@ -590,16 +628,22 @@ async function handleFindBusinessesInner(
     // If user location available, sort by proximity
     if (userLat && userLng && businesses.length > 0) {
       // Pick the CLOSEST location per tenant
-      const locMap = new Map<string, { latitude: number; longitude: number; distance: number }>();
-      for (const loc of (locationsAll ?? []) as { tenant_id: string; latitude: number | null; longitude: number | null }[]) {
+      const locMap = new Map<string, { locationId: string; latitude: number; longitude: number; distance: number }>();
+      for (const loc of (locationsAll ?? []) as { id: string; tenant_id: string; latitude: number | null; longitude: number | null }[]) {
         if (loc.latitude && loc.longitude) {
           const dist = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
           const existing = locMap.get(loc.tenant_id);
           if (!existing || dist < existing.distance) {
-            locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude, distance: dist });
+            locMap.set(loc.tenant_id, { locationId: loc.id, latitude: loc.latitude, longitude: loc.longitude, distance: dist });
           }
         }
       }
+      // Filter services to only those available at the closest location
+      businesses = businesses.map((b) => {
+        const closest = locMap.get(b.id);
+        return { ...b, all_services: filterServicesForLocation((b as { all_services?: ServiceRow[] }).all_services ?? [], closest?.locationId, noQuerySvcLocMap) };
+      }) as typeof businesses;
+
       const businessesWithDistance = businesses
         .map((b) => {
           const loc = locMap.get(b.id);
@@ -615,7 +659,6 @@ async function handleFindBusinessesInner(
       console.log('[find_businesses] no-query sample distances:', businessesWithDistance.slice(0, 3).map(b => ({ name: b.name, dist: b.distance_km })));
 
       businesses = businessesWithDistance
-        // Only filter out businesses that HAVE coordinates and are outside radius; keep those without coords
         .filter((b) => b.distance_km !== undefined && b.distance_km <= radiusKm)
         .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
 
@@ -754,39 +797,33 @@ async function handleFindBusinessesInner(
     console.log('[find_businesses] query path: after category-priority filter:', tenantMap.size, 'tenants');
   }
 
-  let businesses: { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; matched_services?: string[]; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[] }[] = Array.from(tenantMap.values()).map((t) => ({
+  let businesses: { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; matched_services?: string[]; all_services?: ServiceRow[]; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[] }[] = Array.from(tenantMap.values()).map((t) => ({
     ...t,
     matched_services: tenantMatchedServices.get(t.id),
   }));
   let locationNote: string | undefined;
 
-  // Fetch locations with addresses for all businesses
+  // Fetch locations, services, and service_locations in parallel
   const bizIds = businesses.map((b) => b.id);
-  const { data: bizLocations } = bizIds.length > 0
-    ? await supabase
-        .from('tenant_locations')
-        .select('tenant_id, name, address, latitude, longitude')
-        .in('tenant_id', bizIds)
-    : { data: [] };
+  const [{ data: bizLocations }, { data: queryBizServices }, { data: querySvcLocs }] = bizIds.length > 0
+    ? await Promise.all([
+        supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', bizIds),
+        supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility').in('tenant_id', bizIds).eq('visibility', 'public'),
+        supabase.from('service_locations').select('service_id, location_id'),
+      ])
+    : [{ data: [] }, { data: [] }, { data: [] }];
+
+  const querySvcLocMap = buildSvcLocMap((querySvcLocs ?? []) as { service_id: string; location_id: string }[]);
 
   const bizLocMap = new Map<string, { name: string; address: string; latitude: number | null; longitude: number | null }[]>();
-  for (const loc of (bizLocations ?? []) as { tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
+  for (const loc of (bizLocations ?? []) as { id: string; tenant_id: string; name: string; address: string; latitude: number | null; longitude: number | null }[]) {
     const existing = bizLocMap.get(loc.tenant_id) ?? [];
     existing.push({ name: loc.name, address: loc.address, latitude: loc.latitude, longitude: loc.longitude });
     bizLocMap.set(loc.tenant_id, existing);
   }
 
-  // Fetch ALL services for each business
-  const { data: queryBizServices } = bizIds.length > 0
-    ? await supabase
-        .from('services')
-        .select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility')
-        .in('tenant_id', bizIds)
-        .eq('visibility', 'public')
-    : { data: [] };
-
-  const querySvcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]>();
-  for (const svc of (queryBizServices ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]) {
+  const querySvcMap = new Map<string, ServiceRow[]>();
+  for (const svc of (queryBizServices ?? []) as (ServiceRow & { tenant_id: string })[]) {
     const existing = querySvcMap.get(svc.tenant_id) ?? [];
     existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url });
     querySvcMap.set(svc.tenant_id, existing);
@@ -796,16 +833,21 @@ async function handleFindBusinessesInner(
   // Sort by proximity if user location is available
   if (userLat && userLng && businesses.length > 0) {
     // Pick the CLOSEST location per tenant
-    const locMap = new Map<string, { latitude: number; longitude: number; distance: number }>();
-    for (const loc of (bizLocations ?? []) as { tenant_id: string; latitude: number | null; longitude: number | null }[]) {
+    const locMap = new Map<string, { locationId: string; latitude: number; longitude: number; distance: number }>();
+    for (const loc of (bizLocations ?? []) as { id: string; tenant_id: string; latitude: number | null; longitude: number | null }[]) {
       if (loc.latitude && loc.longitude) {
         const dist = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
         const existing = locMap.get(loc.tenant_id);
         if (!existing || dist < existing.distance) {
-          locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude, distance: dist });
+          locMap.set(loc.tenant_id, { locationId: loc.id, latitude: loc.latitude, longitude: loc.longitude, distance: dist });
         }
       }
     }
+    // Filter services to only those available at the closest location
+    businesses = businesses.map((b) => {
+      const closest = locMap.get(b.id);
+      return { ...b, all_services: filterServicesForLocation(b.all_services ?? [], closest?.locationId, querySvcLocMap) };
+    });
     businesses = businesses
       .map((b) => {
         const loc = locMap.get(b.id);
