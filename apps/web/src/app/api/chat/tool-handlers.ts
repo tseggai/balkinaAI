@@ -11,6 +11,7 @@ interface ToolResult {
   success: boolean;
   data?: unknown;
   error?: string;
+  _debug?: unknown;
 }
 
 // ── Timezone helpers ────────────────────────────────────────────────────────
@@ -1112,7 +1113,18 @@ export async function handleGetStaff(
       console.log('[get_staff] after location filter:', staffList.map(s => s.name));
     }
 
-    return { success: true, data: staffList };
+    return {
+      success: true,
+      data: staffList,
+      _debug: {
+        serviceId,
+        locationId: locationId ?? null,
+        locationSource: input.location_id ? 'ai_provided' : (locationId ? 'auto_inferred' : 'none'),
+        userLocation: userLocation ? `${userLocation.latitude},${userLocation.longitude}` : null,
+        allStaffBeforeFilter: ((data ?? []) as unknown as { staff: { id: string; name: string } | null }[]).map(ss => ss.staff?.name).filter(Boolean),
+        staffAfterFilter: staffList.map(s => s.name),
+      },
+    };
   }
 
   // Fallback: all active staff for tenant
@@ -1399,6 +1411,10 @@ export async function handleCheckAvailability(
   const pagedSlots = slots.slice(offset, offset + MAX_SLOTS);
   const hasMore = offset + MAX_SLOTS < totalSlots;
 
+  // Build debug info
+  const nowUtc = new Date().toISOString();
+  const nowPlus15Debug = new Date(Date.now() + 15 * 60000).toISOString();
+
   return {
     success: true,
     data: {
@@ -1410,6 +1426,16 @@ export async function handleCheckAvailability(
       has_more: hasMore,
       next_offset: hasMore ? offset + MAX_SLOTS : null,
       customer_appointments_on_this_day: customerAppointments.length > 0 ? customerAppointments : undefined,
+    },
+    _debug: {
+      locationId: locationId ?? null,
+      locationSource: input.location_id ? 'ai_provided' : (locationId ? 'auto_inferred' : 'none'),
+      timezone,
+      userLocation: userLocation ? `${userLocation.latitude},${userLocation.longitude}` : null,
+      serverNowUtc: nowUtc,
+      filterCutoffUtc: nowPlus15Debug,
+      eligibleStaffNames: (staffList as { name: string }[]).map(s => s.name),
+      slotsGeneratedBeforePagination: totalSlots,
     },
   };
 }

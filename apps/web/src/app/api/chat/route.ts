@@ -976,6 +976,15 @@ export async function POST(request: Request) {
                 );
               }
             }
+
+            // Stream debug info for get_staff and check_availability
+            if ((toolCall.name === 'get_staff' || toolCall.name === 'check_availability') && result && typeof result === 'object' && '_debug' in result) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: 'debug', tool: toolCall.name, debug: (result as { _debug: unknown })._debug })}\n\n`,
+                ),
+              );
+            }
           }
 
           // Save the assistant message with tool calls and results

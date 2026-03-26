@@ -1950,6 +1950,8 @@ export default function ChatScreen() {
                 fullText += event.content ?? '';
               } else if (event.type === 'tool_data') {
                 pendingToolData.current = { tool: event.tool ?? '', data: event.data ?? {} };
+              } else if (event.type === 'debug') {
+                console.log(`[DEBUG ${event.tool}]`, JSON.stringify((event as { debug?: unknown }).debug, null, 2));
               } else if (event.type === 'error' && event.content) {
                 fullText = `Sorry, something went wrong: ${event.content}`;
               }
@@ -1984,6 +1986,8 @@ export default function ChatScreen() {
                   chunkText = fullText;
                 } else if (event.type === 'tool_data') {
                   pendingToolData.current = { tool: event.tool ?? '', data: event.data ?? {} };
+                } else if (event.type === 'debug') {
+                  console.log(`[DEBUG ${event.tool}]`, JSON.stringify((event as { debug?: unknown }).debug, null, 2));
                 } else if (event.type === 'error' && event.content) {
                   fullText = `Sorry, something went wrong: ${event.content}`;
                 }
