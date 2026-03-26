@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Tenant {
   id: string;
@@ -27,6 +28,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function TenantsPage() {
+  const router = useRouter();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -139,15 +141,15 @@ export default function TenantsPage() {
                   {tenants.map((tenant) => (
                     <tr key={tenant.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                        <button onClick={() => router.push(`/dashboard/tenants/${tenant.id}`)} className="flex items-center gap-2 text-left">
                           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
                             {tenant.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-gray-900">{tenant.name}</p>
+                            <p className="text-sm font-medium text-gray-900 hover:text-brand-600">{tenant.name}</p>
                             <p className="text-xs text-gray-400">{tenant.email ?? '—'}</p>
                           </div>
-                        </div>
+                        </button>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{tenant.owner_name ?? '—'}</td>
                       <td className="px-4 py-3">
@@ -208,12 +210,20 @@ export default function TenantsPage() {
                         {new Date(tenant.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => { setEditingId(tenant.id); setEditStatus(tenant.status); }}
-                          className="text-sm font-medium text-brand-600 hover:text-brand-700"
-                        >
-                          Edit
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => router.push(`/dashboard/tenants/${tenant.id}`)}
+                            className="text-sm font-medium text-gray-600 hover:text-gray-800"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => { setEditingId(tenant.id); setEditStatus(tenant.status); }}
+                            className="text-sm font-medium text-brand-600 hover:text-brand-700"
+                          >
+                            Edit
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
