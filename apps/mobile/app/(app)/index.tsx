@@ -299,11 +299,11 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
       </View>
       {services.length > 0 && selectedBiz ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 10 }}>
-          {services.map((svc) => {
+          {services.map((svc, svcIdx) => {
             const isSelected = selectedSvcId === svc.id;
             return (
               <TouchableOpacity
-                key={svc.id}
+                key={`${selectedBiz.id}-${svc.id}-${svcIdx}`}
                 style={[combinedStyles.serviceCardLg, isSelected && combinedStyles.serviceCardLgSelected]}
                 onPress={() => {
                   setSelectedSvcId(svc.id);

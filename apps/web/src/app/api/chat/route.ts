@@ -232,6 +232,7 @@ const findBusinessesTool: OpenAI.ChatCompletionTool = {
         query: { type: 'string', description: 'Search query - service type, category, or business name. Use empty string to list ALL nearby businesses.' },
         category_id: { type: 'string', description: 'UUID of a category to filter businesses by. When provided, returns ONLY businesses in this exact category. Use this instead of query when the user browses by category.' },
         service_type: { type: 'string', description: 'Optional service type to filter businesses by (e.g. "haircut", "massage"). Only returns businesses with at least 1 active staff with schedule availability.' },
+        location_query: { type: 'string', description: 'City name, zip code, or place name to search near (e.g. "Tivat", "Montenegro", "94538"). Geocoded to coordinates automatically. Use this when the user provides a city/zip instead of coordinates.' },
         latitude: { type: 'number', description: 'User latitude for proximity search (optional)' },
         longitude: { type: 'number', description: 'User longitude for proximity search (optional)' },
         radius_km: { type: 'number', description: 'Search radius in km (default 50)' },
@@ -429,6 +430,7 @@ ${customerSection}
 
 ## Location
 ${userLocation ? `User location: ${userLocation.latitude}, ${userLocation.longitude}. Skip asking for location — pass coordinates to find_businesses.` : 'No location yet. Ask: [[button:Near Me]] [[button:Enter City/Zip]]'}
+When user provides a city name, zip code, or place name (e.g. "Tivat", "Montenegro", "94538"), pass it as location_query to find_businesses. The tool will geocode it automatically. Also pass coordinates if available — location_query overrides them when no coordinates are given.
 
 ## Booking Flow (strict order, one step per message, skip steps already answered)
 Extract all info from user's message first (service type, business, date, time, staff). Never re-ask answered questions.
@@ -474,6 +476,7 @@ ${behaviorContext}## Key Rules
 - Pagination: track offset per session. "Show More" → offset + limit. "Show all" → merge previous + new results.
 - If loyalty points_to_earn = 0, don't mention loyalty at all. Set points_earned to 0 in confirmed_card.
 - If find_businesses returns no results, say "I didn't find any [service] providers in your area" and offer: [[button:Search by City/Zip]] [[button:Show All Businesses]] [[button:Try Different Service]]. Never blame a "technical issue".
+- When user taps "Search by City/Zip" and provides a city/zip, call find_businesses with location_query set to the city/zip text. Do NOT just echo it back — actually search.
 - Only help with finding businesses and booking on Balkina AI. No medical, legal, or financial advice.
 `;
 }
