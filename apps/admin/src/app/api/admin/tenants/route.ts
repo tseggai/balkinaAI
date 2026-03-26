@@ -95,6 +95,49 @@ export async function GET(request: Request) {
   });
 }
 
+export async function POST(request: Request) {
+  const auth = await requireAdmin();
+  if (!auth.admin) return auth.response;
+
+  const body = await request.json();
+  const { name, owner_name, email, phone, category_id, subscription_plan_id, status, payments_enabled } = body as {
+    name: string;
+    owner_name: string;
+    email: string;
+    phone?: string;
+    category_id?: string;
+    subscription_plan_id?: string;
+    status?: string;
+    payments_enabled?: boolean;
+  };
+
+  if (!name || !owner_name || !email) {
+    return NextResponse.json({ error: 'name, owner_name, and email are required' }, { status: 400 });
+  }
+
+  // Create tenant without auth user (admin-created tenants don't have login accounts)
+  const insert: Record<string, unknown> = {
+    name,
+    owner_name,
+    email,
+    phone: phone || null,
+    category_id: category_id || null,
+    subscription_plan_id: subscription_plan_id || null,
+    status: status || 'active',
+    payments_enabled: payments_enabled ?? false,
+  };
+
+  const { data, error } = await auth.supabase
+    .from('tenants')
+    .insert(insert as never)
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ data }, { status: 201 });
+}
+
 export async function PATCH(request: Request) {
   const auth = await requireAdmin();
   if (!auth.admin) return auth.response;

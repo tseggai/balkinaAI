@@ -59,6 +59,15 @@ export default function TenantsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [bulkCount, setBulkCount] = useState(10);
+  const [bulking, setBulking] = useState(false);
+  const [bulkResult, setBulkResult] = useState<string | null>(null);
+  const [newTenant, setNewTenant] = useState({
+    name: '', owner_name: '', email: '', phone: '', category_id: '', subscription_plan_id: '', status: 'active', payments_enabled: false,
+  });
   const perPage = 20;
 
   const fetchTenants = useCallback(async () => {
@@ -109,6 +118,48 @@ export default function TenantsPage() {
     fetchTenants();
   }
 
+  async function handleCreate() {
+    if (!newTenant.name || !newTenant.owner_name || !newTenant.email) {
+      setCreateError('Name, owner name, and email are required.');
+      return;
+    }
+    setCreating(true);
+    setCreateError('');
+    const res = await fetch('/api/admin/tenants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newTenant),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setCreateError(json.error ?? 'Failed to create tenant');
+      setCreating(false);
+      return;
+    }
+    setShowCreate(false);
+    setNewTenant({ name: '', owner_name: '', email: '', phone: '', category_id: '', subscription_plan_id: '', status: 'active', payments_enabled: false });
+    setCreating(false);
+    fetchTenants();
+  }
+
+  async function handleBulkCreate() {
+    setBulking(true);
+    setBulkResult(null);
+    const res = await fetch('/api/admin/tenants/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count: bulkCount, with_locations: true, with_staff: true, with_services: true }),
+    });
+    const json = await res.json();
+    setBulking(false);
+    if (res.ok) {
+      setBulkResult(`Created ${json.created} test tenants with locations, staff, and services.`);
+      fetchTenants();
+    } else {
+      setBulkResult(`Error: ${json.error}`);
+    }
+  }
+
   const hasFilters = search || statusFilter || planFilter || paymentsFilter || sortOption !== 'created_at';
   const totalPages = Math.ceil(total / perPage);
 
@@ -120,6 +171,31 @@ export default function TenantsPage() {
           <p className="mt-1 text-sm text-gray-500">
             {total} business{total !== 1 ? 'es' : ''} on the platform
           </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5">
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={bulkCount}
+              onChange={(e) => setBulkCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
+              className="w-12 text-center text-sm text-gray-700 focus:outline-none"
+            />
+            <button
+              onClick={handleBulkCreate}
+              disabled={bulking}
+              className="text-sm font-medium text-gray-600 hover:text-gray-800 disabled:opacity-50"
+            >
+              {bulking ? 'Creating...' : 'Bulk Create'}
+            </button>
+          </div>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            Add Tenant
+          </button>
         </div>
       </div>
 
@@ -179,6 +255,13 @@ export default function TenantsPage() {
           </button>
         )}
       </div>
+
+      {bulkResult && (
+        <div className="mt-4 flex items-center justify-between rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-700">
+          <span>{bulkResult}</span>
+          <button onClick={() => setBulkResult(null)} className="font-medium hover:text-blue-900">Dismiss</button>
+        </div>
+      )}
 
       {/* Table */}
       {loading ? (
@@ -326,6 +409,113 @@ export default function TenantsPage() {
             </div>
           )}
         </>
+      )}
+      {/* Create Tenant Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-bold text-gray-900">Add Tenant</h2>
+            <p className="mt-1 text-sm text-gray-500">Create a new business on the platform.</p>
+
+            {createError && (
+              <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</div>
+            )}
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Business Name *</label>
+                <input
+                  type="text"
+                  value={newTenant.name}
+                  onChange={(e) => setNewTenant({ ...newTenant, name: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Owner Name *</label>
+                  <input
+                    type="text"
+                    value={newTenant.owner_name}
+                    onChange={(e) => setNewTenant({ ...newTenant, owner_name: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email *</label>
+                  <input
+                    type="email"
+                    value={newTenant.email}
+                    onChange={(e) => setNewTenant({ ...newTenant, email: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Phone</label>
+                <input
+                  type="tel"
+                  value={newTenant.phone}
+                  onChange={(e) => setNewTenant({ ...newTenant, phone: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Plan</label>
+                  <select
+                    value={newTenant.subscription_plan_id}
+                    onChange={(e) => setNewTenant({ ...newTenant, subscription_plan_id: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  >
+                    <option value="">No Plan</option>
+                    {plans.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Status</label>
+                  <select
+                    value={newTenant.status}
+                    onChange={(e) => setNewTenant({ ...newTenant, status: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  >
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="payments_enabled"
+                  checked={newTenant.payments_enabled}
+                  onChange={(e) => setNewTenant({ ...newTenant, payments_enabled: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                <label htmlFor="payments_enabled" className="text-sm text-gray-700">Enable payments</label>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => { setShowCreate(false); setCreateError(''); }}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={creating}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                {creating ? 'Creating...' : 'Create Tenant'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
