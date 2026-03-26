@@ -13,18 +13,22 @@ const BUSINESS_TYPES = [
 const FIRST_NAMES = ['James', 'Maria', 'David', 'Sarah', 'Michael', 'Emma', 'Robert', 'Lisa', 'Carlos', 'Fatima', 'Ahmed', 'Yuki', 'Olga', 'Chen', 'Priya'];
 const LAST_NAMES = ['Johnson', 'Garcia', 'Williams', 'Martinez', 'Brown', 'Lee', 'Wilson', 'Anderson', 'Taylor', 'Thomas', 'Moore', 'Jackson', 'White', 'Harris', 'Clark'];
 
-const CITIES = [
+// Fallback cities used when no custom locations are provided
+const DEFAULT_CITIES: LocationInput[] = [
   { name: 'San Francisco', lat: 37.7749, lng: -122.4194, tz: 'America/Los_Angeles' },
   { name: 'New York', lat: 40.7128, lng: -74.0060, tz: 'America/New_York' },
   { name: 'Chicago', lat: 41.8781, lng: -87.6298, tz: 'America/Chicago' },
   { name: 'Miami', lat: 25.7617, lng: -80.1918, tz: 'America/New_York' },
-  { name: 'Austin', lat: 30.2672, lng: -97.7431, tz: 'America/Chicago' },
-  { name: 'Seattle', lat: 47.6062, lng: -122.3321, tz: 'America/Los_Angeles' },
-  { name: 'Denver', lat: 39.7392, lng: -104.9903, tz: 'America/Denver' },
   { name: 'London', lat: 51.5074, lng: -0.1278, tz: 'Europe/London' },
-  { name: 'Dubai', lat: 25.2048, lng: 55.2708, tz: 'Asia/Dubai' },
-  { name: 'Tokyo', lat: 35.6762, lng: 139.6503, tz: 'Asia/Tokyo' },
 ];
+
+interface LocationInput {
+  name: string;
+  lat: number;
+  lng: number;
+  tz: string;
+  address?: string;
+}
 
 const STAFF_NAMES = [
   'Alex Rivera', 'Jordan Smith', 'Taylor Kim', 'Morgan Lee', 'Casey Brown',
@@ -78,9 +82,16 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const count = Math.min(50, Math.max(1, parseInt(body.count ?? '10', 10)));
-  const withLocations = body.with_locations !== false;
   const withStaff = body.with_staff !== false;
   const withServices = body.with_services !== false;
+
+  // Custom locations: array of { name, lat, lng, tz, address? }
+  // If provided, ALL tenants get exactly these locations (for geo-testing)
+  // If not provided, each tenant gets 1-3 random cities from defaults
+  const customLocations: LocationInput[] | null =
+    Array.isArray(body.locations) && body.locations.length > 0
+      ? body.locations
+      : null;
 
   // Fetch categories for matching
   const { data: categories } = await auth.supabase
@@ -135,30 +146,29 @@ export async function POST(request: Request) {
     const locationIds: string[] = [];
     const staffIds: string[] = [];
 
-    // Create 1-3 locations
-    if (withLocations) {
-      const numLocations = Math.floor(Math.random() * 3) + 1;
-      const cities = [...CITIES].sort(() => Math.random() - 0.5).slice(0, numLocations);
+    // Create locations
+    const citiesToUse = customLocations
+      ? customLocations
+      : [...DEFAULT_CITIES].sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 3) + 1);
 
-      for (const city of cities) {
-        const { data: loc } = await auth.supabase
-          .from('tenant_locations')
-          .insert({
-            tenant_id: tenantId,
-            name: `${bizName} - ${city.name}`,
-            address: `${Math.floor(100 + Math.random() * 9900)} Main St, ${city.name}`,
-            latitude: city.lat + randomFloat(-0.02, 0.02),
-            longitude: city.lng + randomFloat(-0.02, 0.02),
-            timezone: city.tz,
-            phone: `+1${Math.floor(2000000000 + Math.random() * 8000000000)}`,
-          } as never)
-          .select('id')
-          .single();
+    for (const city of citiesToUse) {
+      const { data: loc } = await auth.supabase
+        .from('tenant_locations')
+        .insert({
+          tenant_id: tenantId,
+          name: `${bizName} - ${city.name}`,
+          address: city.address ?? `${Math.floor(100 + Math.random() * 9900)} Main St, ${city.name}`,
+          latitude: city.lat + randomFloat(-0.005, 0.005),
+          longitude: city.lng + randomFloat(-0.005, 0.005),
+          timezone: city.tz,
+          phone: `+1${Math.floor(2000000000 + Math.random() * 8000000000)}`,
+        } as never)
+        .select('id')
+        .single();
 
-        if (loc) {
-          locationIds.push((loc as { id: string }).id);
-          locCount++;
-        }
+      if (loc) {
+        locationIds.push((loc as { id: string }).id);
+        locCount++;
       }
     }
 

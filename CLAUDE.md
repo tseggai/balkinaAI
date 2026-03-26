@@ -93,7 +93,7 @@ All tables require RLS enabled. Tenant data always filtered by tenant_id.
 
 ## AI Chatbot Rules
 - **Production model: OpenAI GPT-4o-mini** via `/apps/web/src/app/api/chat/route.ts` with function calling.
-- Cost analysis (100 tenants, 30 bookings/day): GPT-4o-mini ~$440/mo vs Claude Haiku ~$2,430/mo vs Claude Sonnet ~$9,120/mo. GPT-4o-mini is the only viable option at $10/tenant pricing.
+- Cost analysis (100 tenants, 30 bookings/day): GPT-4o-mini ~$440/mo vs GPT-4o ~$7,330/mo vs Claude Haiku ~$2,430/mo vs Claude Sonnet ~$9,120/mo. GPT-4o-mini is the only viable option at $10/tenant pricing.
 - `/packages/ai/` contains a Claude API integration (claude-sonnet-4-6) preserved as a premium tier option for future use. It is NOT the active chat backend.
 - Tool definitions live inline in the chat route (OpenAI function calling format). The `/packages/ai/tools/` definitions are Claude-format equivalents.
 - System prompt built in the chat route — injects customer profile, location, past bookings, behavior patterns.

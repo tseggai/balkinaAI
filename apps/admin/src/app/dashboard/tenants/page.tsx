@@ -65,6 +65,14 @@ export default function TenantsPage() {
   const [bulkCount, setBulkCount] = useState(10);
   const [bulking, setBulking] = useState(false);
   const [bulkResult, setBulkResult] = useState<string | null>(null);
+  const [showBulkConfig, setShowBulkConfig] = useState(false);
+  type BulkLoc = { name: string; lat: string; lng: string; tz: string; address: string };
+  const [bulkLocations, setBulkLocations] = useState<BulkLoc[]>([
+    { name: '', lat: '', lng: '', tz: '', address: '' },
+  ]);
+  const updateBulkLoc = (idx: number, field: keyof BulkLoc, value: string) => {
+    setBulkLocations(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
+  };
   const [newTenant, setNewTenant] = useState({
     name: '', owner_name: '', email: '', phone: '', category_id: '', subscription_plan_id: '', status: 'active', payments_enabled: false,
   });
@@ -145,15 +153,30 @@ export default function TenantsPage() {
   async function handleBulkCreate() {
     setBulking(true);
     setBulkResult(null);
+
+    // Build locations array from non-empty entries
+    const locations = bulkLocations
+      .filter(l => l.name && l.lat && l.lng && l.tz)
+      .map(l => ({ name: l.name, lat: parseFloat(l.lat), lng: parseFloat(l.lng), tz: l.tz, address: l.address || undefined }));
+
     const res = await fetch('/api/admin/tenants/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ count: bulkCount, with_locations: true, with_staff: true, with_services: true }),
+      body: JSON.stringify({
+        count: bulkCount,
+        with_staff: true,
+        with_services: true,
+        locations: locations.length > 0 ? locations : undefined,
+      }),
     });
     const json = await res.json();
     setBulking(false);
+    setShowBulkConfig(false);
     if (res.ok) {
-      setBulkResult(`Created ${json.created} test tenants with locations, staff, and services.`);
+      const locSummary = locations.length > 0
+        ? ` in ${locations.map(l => l.name).join(', ')}`
+        : ' with random locations';
+      setBulkResult(`Created ${json.created} test tenants${locSummary}.`);
       fetchTenants();
     } else {
       setBulkResult(`Error: ${json.error}`);
@@ -173,23 +196,12 @@ export default function TenantsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5">
-            <input
-              type="number"
-              min={1}
-              max={50}
-              value={bulkCount}
-              onChange={(e) => setBulkCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
-              className="w-12 text-center text-sm text-gray-700 focus:outline-none"
-            />
-            <button
-              onClick={handleBulkCreate}
-              disabled={bulking}
-              className="text-sm font-medium text-gray-600 hover:text-gray-800 disabled:opacity-50"
-            >
-              {bulking ? 'Creating...' : 'Bulk Create'}
-            </button>
-          </div>
+          <button
+            onClick={() => setShowBulkConfig(true)}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Bulk Create
+          </button>
           <button
             onClick={() => setShowCreate(true)}
             className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
@@ -512,6 +524,148 @@ export default function TenantsPage() {
                 className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
                 {creating ? 'Creating...' : 'Create Tenant'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Create Modal */}
+      {showBulkConfig && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-bold text-gray-900">Bulk Create Test Tenants</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Create multiple test businesses with staff, services, and location assignments.
+              Specify locations so testers in those areas can discover them.
+            </p>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">Number of tenants</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={bulkCount}
+                onChange={(e) => setBulkCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
+                className="mt-1 w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700">
+                  Locations <span className="text-gray-400 font-normal">(each tenant gets all locations listed below)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setBulkLocations([...bulkLocations, { name: '', lat: '', lng: '', tz: '', address: '' }])}
+                  className="text-sm font-medium text-brand-600 hover:text-brand-700"
+                >
+                  + Add location
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-400">Leave empty to use random default cities. Fill in to target specific areas for testers.</p>
+
+              <div className="mt-2 space-y-3">
+                {bulkLocations.map((loc, idx) => (
+                  <div key={idx} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-gray-500">Location {idx + 1}</span>
+                      {bulkLocations.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setBulkLocations(bulkLocations.filter((_, i) => i !== idx))}
+                          className="text-xs text-red-500 hover:text-red-700"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="City name (e.g. Valencia)"
+                        value={loc.name}
+                        onChange={(e) => updateBulkLoc(idx, 'name', e.target.value)}
+                        className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Timezone (e.g. Europe/Madrid)"
+                        value={loc.tz}
+                        onChange={(e) => updateBulkLoc(idx, 'tz', e.target.value)}
+                        className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Latitude (e.g. 39.4699)"
+                        value={loc.lat}
+                        onChange={(e) => updateBulkLoc(idx, 'lat', e.target.value)}
+                        className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Longitude (e.g. -0.3763)"
+                        value={loc.lng}
+                        onChange={(e) => updateBulkLoc(idx, 'lng', e.target.value)}
+                        className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Address (optional, e.g. Carrer de Colón 42, Valencia)"
+                      value={loc.address}
+                      onChange={(e) => updateBulkLoc(idx, 'address', e.target.value)}
+                      className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Preset buttons for common test locations */}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="text-xs text-gray-400 self-center">Quick add:</span>
+                {[
+                  { name: 'Valencia', lat: '39.4699', lng: '-0.3763', tz: 'Europe/Madrid', address: '' },
+                  { name: 'Berlin', lat: '52.5200', lng: '13.4050', tz: 'Europe/Berlin', address: '' },
+                  { name: 'Tivat', lat: '42.4357', lng: '18.6936', tz: 'Europe/Amsterdam', address: '' },
+                  { name: 'San Francisco', lat: '37.7749', lng: '-122.4194', tz: 'America/Los_Angeles', address: '' },
+                  { name: 'Dubai', lat: '25.2048', lng: '55.2708', tz: 'Asia/Dubai', address: '' },
+                  { name: 'London', lat: '51.5074', lng: '-0.1278', tz: 'Europe/London', address: '' },
+                ].map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() => {
+                      const idx = bulkLocations.findIndex(l => !l.name && !l.lat && !l.lng && !l.tz);
+                      if (idx >= 0) {
+                        setBulkLocations(prev => prev.map((l, i) => i === idx ? preset : l));
+                      } else {
+                        setBulkLocations(prev => [...prev, preset]);
+                      }
+                    }}
+                    className="rounded-full border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-100 hover:border-gray-400"
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowBulkConfig(false)}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkCreate}
+                disabled={bulking}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                {bulking ? 'Creating...' : `Create ${bulkCount} Tenants`}
               </button>
             </div>
           </div>
