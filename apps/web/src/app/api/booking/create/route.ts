@@ -162,7 +162,7 @@ export async function POST(request: Request) {
       })(),
 
       // 5. Location (includes timezone, address, coordinates)
-      supabase.from('tenant_locations').select('id, address, latitude, longitude, timezone')
+      supabase.from('tenant_locations').select('id, address, lat, lng, timezone')
         .eq('tenant_id', tenantId).limit(1),
 
       // 6. Staff — prefer service_staff assignment over random tenant staff
@@ -218,7 +218,7 @@ export async function POST(request: Request) {
     const customerId = customerResult.id;
 
     // Unpack location
-    const loc = (locationResult.data as { id: string; address: string; latitude: number | null; longitude: number | null; timezone: string }[] | null)?.[0];
+    const loc = (locationResult.data as { id: string; address: string; lat: number | null; lng: number | null; timezone: string }[] | null)?.[0];
     const locationId = loc?.id ?? null;
     const tz = loc?.timezone || 'America/Los_Angeles';
 
@@ -416,8 +416,8 @@ export async function POST(request: Request) {
         payment_url: paymentUrl,
         payment_client_secret: paymentClientSecret,
         payment_required: paymentRequired,
-        latitude: loc?.latitude ?? undefined,
-        longitude: loc?.longitude ?? undefined,
+        latitude: loc?.lat ?? undefined,
+        longitude: loc?.lng ?? undefined,
       },
       { headers: CORS_HEADERS },
     );
