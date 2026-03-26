@@ -135,11 +135,13 @@ async function inferLocationForService(
   serviceId: string,
   userLocation?: { latitude: number; longitude: number } | null,
 ): Promise<string | undefined> {
-  const { data: svcLocs } = await supabase
+  const { data: svcLocs, error: svcLocErr } = await supabase
     .from('service_locations')
     .select('location_id')
     .eq('service_id', serviceId);
   const locIds = ((svcLocs ?? []) as { location_id: string }[]).map((sl) => sl.location_id);
+
+  console.log('[inferLocation] serviceId:', serviceId, 'service_locations count:', locIds.length, 'locIds:', locIds, 'error:', svcLocErr?.message);
 
   if (locIds.length === 0) return undefined; // Service at all locations — can't infer
   if (locIds.length === 1) return locIds[0]; // Only one location — easy
@@ -1072,6 +1074,9 @@ export async function handleGetStaff(
   // Auto-infer location from service_locations when AI doesn't pass location_id
   if (!locationId && serviceId) {
     locationId = await inferLocationForService(supabase, serviceId, userLocation);
+    console.log('[get_staff] auto-inferred locationId:', locationId, 'userLocation:', userLocation ? `${userLocation.latitude},${userLocation.longitude}` : 'none');
+  } else {
+    console.log('[get_staff] locationId from AI:', locationId);
   }
 
   if (serviceId) {
@@ -1087,27 +1092,24 @@ export async function handleGetStaff(
       .map((ss) => ss.staff)
       .filter(Boolean) as { id: string; name: string; image_url: string | null; availability_schedule: unknown }[];
 
+    console.log('[get_staff] all staff for service:', staffList.map(s => s.name), 'locationId:', locationId);
+
     // Filter by location if specified
     if (locationId && staffList.length > 0) {
       const staffIds = staffList.map((s) => s.id);
-      const { data: staffLocs } = await supabase
-        .from('staff_locations')
-        .select('staff_id')
-        .in('staff_id', staffIds)
-        .eq('location_id', locationId);
+      const [{ data: staffLocs }, { data: allStaffLocs }] = await Promise.all([
+        supabase.from('staff_locations').select('staff_id').in('staff_id', staffIds).eq('location_id', locationId),
+        supabase.from('staff_locations').select('staff_id').in('staff_id', staffIds),
+      ]);
 
       const staffAtLocation = new Set(((staffLocs ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
-
-      // Also check which staff have NO location assignments (available everywhere)
-      const { data: allStaffLocs } = await supabase
-        .from('staff_locations')
-        .select('staff_id')
-        .in('staff_id', staffIds);
-
       const staffWithAnyLocation = new Set(((allStaffLocs ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
+
+      console.log('[get_staff] staffAtLocation:', [...staffAtLocation], 'staffWithAnyLocation:', [...staffWithAnyLocation]);
 
       // Keep staff who: are assigned to this location OR have no location assignments at all
       staffList = staffList.filter((s) => staffAtLocation.has(s.id) || !staffWithAnyLocation.has(s.id));
+      console.log('[get_staff] after location filter:', staffList.map(s => s.name));
     }
 
     return { success: true, data: staffList };
@@ -1147,6 +1149,9 @@ export async function handleCheckAvailability(
   // Auto-infer location from service_locations when AI doesn't pass location_id
   if (!locationId) {
     locationId = await inferLocationForService(supabase, serviceId, userLocation);
+    console.log('[check_availability] auto-inferred locationId:', locationId, 'userLocation:', userLocation ? `${userLocation.latitude},${userLocation.longitude}` : 'none');
+  } else {
+    console.log('[check_availability] locationId from AI:', locationId);
   }
 
   // Validate date format — must be YYYY-MM-DD
@@ -1195,6 +1200,7 @@ export async function handleCheckAvailability(
   }
 
   // 3b. Filter staff by location if specified
+  console.log('[check_availability] eligible staff before location filter:', eligibleStaff.map(s => s.name), 'locationId:', locationId);
   if (locationId && eligibleStaff.length > 0) {
     const eStaffIds = eligibleStaff.map((s) => s.id);
     const [{ data: staffAtLoc }, { data: allStaffLocs }] = await Promise.all([
@@ -1203,8 +1209,10 @@ export async function handleCheckAvailability(
     ]);
     const atLocation = new Set(((staffAtLoc ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
     const hasAnyLocation = new Set(((allStaffLocs ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
+    console.log('[check_availability] atLocation:', [...atLocation], 'hasAnyLocation:', [...hasAnyLocation]);
     // Keep staff assigned to this location OR staff with no location assignments (available everywhere)
     eligibleStaff = eligibleStaff.filter((s) => atLocation.has(s.id) || !hasAnyLocation.has(s.id));
+    console.log('[check_availability] eligible staff after location filter:', eligibleStaff.map(s => s.name));
   }
 
   // Filter to requested staff if specified
@@ -1252,6 +1260,7 @@ export async function handleCheckAvailability(
   } else {
     timezone = await getTenantTimezone(supabase, tenantId);
   }
+  console.log('[check_availability] timezone:', timezone, 'locationId:', locationId, 'date:', date, 'now:', new Date().toISOString());
 
   // Query existing appointments for the entire local day (converted to UTC range)
   const dayStartUtc = localTimeToUTC(date, '00:00', timezone).toISOString();
