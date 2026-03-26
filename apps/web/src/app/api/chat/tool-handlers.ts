@@ -127,16 +127,36 @@ async function handleFindBusinessesInner(
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
   const query = ((input.query as string) || '').trim();
-  const userLat = input.latitude as number | undefined;
-  const userLng = input.longitude as number | undefined;
-  const radiusKm = (input.radius_km as number) || 200; // was 50 — widened for debugging
+  let userLat = input.latitude as number | undefined;
+  let userLng = input.longitude as number | undefined;
+  const radiusKm = (input.radius_km as number) || 200;
   const offset = (input.offset as number) || 0;
   const limit = (input.limit as number) || 8;
 
   const serviceType = ((input.service_type as string) || '').trim();
   const categoryId = ((input.category_id as string) || '').trim();
+  const locationQuery = ((input.location_query as string) || '').trim();
 
-  console.log('[find_businesses] START params:', JSON.stringify({ query, serviceType, categoryId, userLat, userLng, radiusKm, offset, limit }));
+  // Geocode location_query (city/zip) to coordinates if no lat/lng provided
+  if (locationQuery && !userLat && !userLng) {
+    try {
+      const geoApiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+      if (geoApiKey) {
+        const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(locationQuery)}&key=${geoApiKey}`;
+        const geoRes = await fetch(geoUrl);
+        const geoData = await geoRes.json() as { results?: { geometry?: { location?: { lat: number; lng: number } } }[]; status?: string };
+        if (geoData.results?.[0]?.geometry?.location) {
+          userLat = geoData.results[0].geometry.location.lat;
+          userLng = geoData.results[0].geometry.location.lng;
+          console.log('[find_businesses] geocoded location_query:', locationQuery, '→', userLat, userLng);
+        }
+      }
+    } catch (err) {
+      console.error('[find_businesses] geocoding failed:', err);
+    }
+  }
+
+  console.log('[find_businesses] START params:', JSON.stringify({ query, serviceType, categoryId, locationQuery, userLat, userLng, radiusKm, offset, limit }));
 
   // ── Fast path: filter by category_id directly from DB ─────────────────────
   if (categoryId) {
@@ -180,22 +200,26 @@ async function handleFindBusinessesInner(
 
     // Sort by proximity if location available
     if (userLat && userLng) {
-      const locMap = new Map<string, { latitude: number; longitude: number }>();
+      // Pick the CLOSEST location per tenant (not just the first one)
+      const locMap = new Map<string, { latitude: number; longitude: number; distance: number }>();
       for (const loc of (catLocs ?? []) as { tenant_id: string; latitude: number | null; longitude: number | null }[]) {
-        if (loc.latitude && loc.longitude && !locMap.has(loc.tenant_id)) {
-          locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude });
+        if (loc.latitude && loc.longitude) {
+          const dist = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
+          const existing = locMap.get(loc.tenant_id);
+          if (!existing || dist < existing.distance) {
+            locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude, distance: dist });
+          }
         }
       }
       businesses = businesses
         .map((b) => {
           const loc = locMap.get(b.id);
           if (!loc) return b;
-          const distance = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
-          const distKm = Math.round(distance * 10) / 10;
+          const distKm = Math.round(loc.distance * 10) / 10;
           const distMi = Math.round(distKm * 0.621371 * 10) / 10;
           return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm) };
         })
-        .filter((b) => b.distance_km === undefined || b.distance_km <= radiusKm)
+        .filter((b) => b.distance_km !== undefined && b.distance_km <= radiusKm)
         .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
     }
 
@@ -439,10 +463,15 @@ async function handleFindBusinessesInner(
 
       // Sort by proximity if user location available
       if (userLat && userLng) {
-        const locMap = new Map<string, { latitude: number; longitude: number }>();
+        // Pick the CLOSEST location per tenant
+        const locMap = new Map<string, { latitude: number; longitude: number; distance: number }>();
         for (const loc of (bizLocations ?? []) as { tenant_id: string; latitude: number | null; longitude: number | null }[]) {
-          if (loc.latitude && loc.longitude && !locMap.has(loc.tenant_id)) {
-            locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude });
+          if (loc.latitude && loc.longitude) {
+            const dist = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
+            const existing = locMap.get(loc.tenant_id);
+            if (!existing || dist < existing.distance) {
+              locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude, distance: dist });
+            }
           }
         }
 
@@ -451,8 +480,7 @@ async function handleFindBusinessesInner(
           if (!loc) {
             return { ...b, distance_km: undefined, distance_mi: undefined, estimated_drive_minutes: undefined, locations: bizLocMap.get(b.id) ?? [] };
           }
-          const distance = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
-          const distKm = Math.round(distance * 10) / 10;
+          const distKm = Math.round(loc.distance * 10) / 10;
           const distMi = Math.round(distKm * 0.621371 * 10) / 10;
           return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: bizLocMap.get(b.id) ?? [] };
         });
@@ -461,7 +489,7 @@ async function handleFindBusinessesInner(
         console.log('[find_businesses] sample distances:', businessesWithDistance.slice(0, 3).map(b => ({ name: b.name, dist: b.distance_km })));
 
         businesses = businessesWithDistance
-          .filter((b) => b.distance_km === undefined || b.distance_km <= radiusKm)
+          .filter((b) => b.distance_km !== undefined && b.distance_km <= radiusKm)
           .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
 
         console.log('[find_businesses] after proximity filter count:', businesses.length, 'radiusKm used:', radiusKm);
@@ -561,10 +589,15 @@ async function handleFindBusinessesInner(
 
     // If user location available, sort by proximity
     if (userLat && userLng && businesses.length > 0) {
-      const locMap = new Map<string, { latitude: number; longitude: number }>();
+      // Pick the CLOSEST location per tenant
+      const locMap = new Map<string, { latitude: number; longitude: number; distance: number }>();
       for (const loc of (locationsAll ?? []) as { tenant_id: string; latitude: number | null; longitude: number | null }[]) {
-        if (loc.latitude && loc.longitude && !locMap.has(loc.tenant_id)) {
-          locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude });
+        if (loc.latitude && loc.longitude) {
+          const dist = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
+          const existing = locMap.get(loc.tenant_id);
+          if (!existing || dist < existing.distance) {
+            locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude, distance: dist });
+          }
         }
       }
       const businessesWithDistance = businesses
@@ -573,8 +606,7 @@ async function handleFindBusinessesInner(
           if (!loc) {
             return { ...b, distance_km: undefined, distance_mi: undefined, estimated_drive_minutes: undefined, locations: locAllMap.get(b.id) ?? [] };
           }
-          const distance = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
-          const distKm = Math.round(distance * 10) / 10;
+          const distKm = Math.round(loc.distance * 10) / 10;
           const distMi = Math.round(distKm * 0.621371 * 10) / 10;
           return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: locAllMap.get(b.id) ?? [] };
         });
@@ -584,7 +616,7 @@ async function handleFindBusinessesInner(
 
       businesses = businessesWithDistance
         // Only filter out businesses that HAVE coordinates and are outside radius; keep those without coords
-        .filter((b) => b.distance_km === undefined || b.distance_km <= radiusKm)
+        .filter((b) => b.distance_km !== undefined && b.distance_km <= radiusKm)
         .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
 
       console.log('[find_businesses] no-query after proximity filter count:', businesses.length, 'radiusKm used:', radiusKm);
@@ -763,10 +795,15 @@ async function handleFindBusinessesInner(
 
   // Sort by proximity if user location is available
   if (userLat && userLng && businesses.length > 0) {
-    const locMap = new Map<string, { latitude: number; longitude: number }>();
+    // Pick the CLOSEST location per tenant
+    const locMap = new Map<string, { latitude: number; longitude: number; distance: number }>();
     for (const loc of (bizLocations ?? []) as { tenant_id: string; latitude: number | null; longitude: number | null }[]) {
-      if (loc.latitude && loc.longitude && !locMap.has(loc.tenant_id)) {
-        locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude });
+      if (loc.latitude && loc.longitude) {
+        const dist = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
+        const existing = locMap.get(loc.tenant_id);
+        if (!existing || dist < existing.distance) {
+          locMap.set(loc.tenant_id, { latitude: loc.latitude, longitude: loc.longitude, distance: dist });
+        }
       }
     }
     businesses = businesses
@@ -775,12 +812,11 @@ async function handleFindBusinessesInner(
         if (!loc) {
           return { ...b, distance_km: undefined, distance_mi: undefined, estimated_drive_minutes: undefined, locations: bizLocMap.get(b.id) ?? [] };
         }
-        const distance = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
-        const distKm = Math.round(distance * 10) / 10;
+        const distKm = Math.round(loc.distance * 10) / 10;
         const distMi = Math.round(distKm * 0.621371 * 10) / 10;
         return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm), locations: bizLocMap.get(b.id) ?? [] };
       })
-      .filter((b) => b.distance_km === undefined || b.distance_km <= radiusKm)
+      .filter((b) => b.distance_km !== undefined && b.distance_km <= radiusKm)
       .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
   } else {
     businesses = businesses.map((b) => ({ ...b, locations: bizLocMap.get(b.id) ?? [] }));
