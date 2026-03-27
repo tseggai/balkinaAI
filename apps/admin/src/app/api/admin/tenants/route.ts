@@ -23,14 +23,13 @@ export async function GET(request: Request) {
     const { data: cityLocs } = await auth.supabase
       .from('tenant_locations')
       .select('tenant_id')
-      .or(`name.ilike.%${cityFilter}%,address.ilike.%${cityFilter}%`);
+      .ilike('address', `%${cityFilter}%`);
     cityTenantIds = [...new Set(((cityLocs ?? []) as { tenant_id: string }[]).map(l => l.tenant_id))];
     if (cityTenantIds.length === 0) {
-      // No tenants in this city — return empty
       const { data: plans } = await auth.supabase.from('subscription_plans').select('id, name').order('name');
       const { data: cats } = await auth.supabase.from('categories').select('id, name').order('name');
-      const { data: cities } = await auth.supabase.from('tenant_locations').select('name');
-      const cityNames = extractCityNames(cities as { name: string }[] | null);
+      const { data: cities } = await auth.supabase.from('tenant_locations').select('address');
+      const cityNames = extractCityNames(cities as { address: string }[] | null);
       return NextResponse.json({ data: [], total: 0, page, per_page: perPage, plans: plans ?? [], categories: cats ?? [], cities: cityNames });
     }
   }
@@ -70,7 +69,7 @@ export async function GET(request: Request) {
 
   const [locResult, staffResult, serviceResult, plansResult, catsResult, allLocsResult] = await Promise.all([
     tenantIds.length > 0
-      ? auth.supabase.from('tenant_locations').select('tenant_id, name').in('tenant_id', tenantIds)
+      ? auth.supabase.from('tenant_locations').select('tenant_id, address').in('tenant_id', tenantIds)
       : Promise.resolve({ data: [] }),
     tenantIds.length > 0
       ? auth.supabase.from('staff').select('tenant_id').in('tenant_id', tenantIds)
@@ -80,17 +79,17 @@ export async function GET(request: Request) {
       : Promise.resolve({ data: [] }),
     auth.supabase.from('subscription_plans').select('id, name').order('name'),
     auth.supabase.from('categories').select('id, name').order('name'),
-    auth.supabase.from('tenant_locations').select('name'),
+    auth.supabase.from('tenant_locations').select('address'),
   ]);
 
-  for (const row of ((locResult.data ?? []) as { tenant_id: string; name: string }[])) {
+  for (const row of ((locResult.data ?? []) as { tenant_id: string; address: string | null }[])) {
     locationCounts[row.tenant_id] = (locationCounts[row.tenant_id] ?? 0) + 1;
-    // Extract city from location name (format: "Business Name - City")
-    const dashIdx = row.name.lastIndexOf(' - ');
-    const city = dashIdx > 0 ? row.name.slice(dashIdx + 3) : row.name;
-    const arr = tenantCities[row.tenant_id] ?? [];
-    if (!arr.includes(city)) arr.push(city);
-    tenantCities[row.tenant_id] = arr;
+    const city = extractCityFromAddress(row.address);
+    if (city) {
+      const arr = tenantCities[row.tenant_id] ?? [];
+      if (!arr.includes(city)) arr.push(city);
+      tenantCities[row.tenant_id] = arr;
+    }
   }
   for (const row of ((staffResult.data ?? []) as { tenant_id: string }[])) {
     staffCounts[row.tenant_id] = (staffCounts[row.tenant_id] ?? 0) + 1;
@@ -100,7 +99,7 @@ export async function GET(request: Request) {
   }
 
   // Build unique city list from all locations
-  const cityNames = extractCityNames(allLocsResult.data as { name: string }[] | null);
+  const cityNames = extractCityNames(allLocsResult.data as { address: string | null }[] | null);
 
   const enriched = tenants.map((t: { id: string }) => ({
     ...t,
@@ -121,16 +120,22 @@ export async function GET(request: Request) {
   });
 }
 
-function extractCityNames(locs: { name: string }[] | null): string[] {
+// Extract city from address like "123 Main St, San Francisco" or "Carrer de Colón 42, Valencia, Spain"
+// Takes the second-to-last comma segment, or last segment if only one comma
+function extractCityFromAddress(address: string | null): string | null {
+  if (!address) return null;
+  const parts = address.split(',').map(s => s.trim()).filter(Boolean);
+  if (parts.length >= 2) return parts[parts.length - 2] ?? null;
+  if (parts.length === 1) return parts[0] ?? null;
+  return null;
+}
+
+function extractCityNames(locs: { address: string | null }[] | null): string[] {
   if (!locs) return [];
   const cities = new Set<string>();
   for (const loc of locs) {
-    const dashIdx = loc.name.lastIndexOf(' - ');
-    if (dashIdx > 0) {
-      cities.add(loc.name.slice(dashIdx + 3));
-    } else {
-      cities.add(loc.name);
-    }
+    const city = extractCityFromAddress(loc.address);
+    if (city) cities.add(city);
   }
   return [...cities].sort();
 }
