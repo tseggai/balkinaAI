@@ -2085,11 +2085,21 @@ export default function ChatScreen() {
                 })),
               })),
             };
-            // Replace any AI-generated business_with_services card in fullText
-            const existingCardRegex = /\[\[CARD:\{[^]*?"type"\s*:\s*"business_with_services"[^]*?\}\]\]/;
+            // Replace any AI-generated business cards in fullText (both business_cards and business_with_services types)
+            const businessCardRegex = /\[\[CARD:\{[^]*?"type"\s*:\s*"business(?:_cards|_with_services)"[^]*?\}\]\]/g;
             const newCardTag = `[[CARD:${JSON.stringify(cardObj)}]]`;
-            if (existingCardRegex.test(fullText)) {
-              fullText = fullText.replace(existingCardRegex, newCardTag);
+            if (businessCardRegex.test(fullText)) {
+              // Reset regex lastIndex after test()
+              businessCardRegex.lastIndex = 0;
+              // Replace first match, remove any additional matches
+              let replaced = false;
+              fullText = fullText.replace(businessCardRegex, () => {
+                if (!replaced) {
+                  replaced = true;
+                  return newCardTag;
+                }
+                return '';
+              });
             } else {
               // AI didn't generate a card — append one
               fullText += `\n\n${newCardTag}`;
