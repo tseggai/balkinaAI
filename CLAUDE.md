@@ -238,6 +238,11 @@ The /api/chat endpoint accepts tenantId as OPTIONAL. When no tenantId is provide
 - Uses find_businesses tool to search for matching tenants
 - Once user picks a business, proceeds with normal booking flow
 
+## Deployment
+- **Tenant Panel (apps/web)**: Deployed to Vercel as `balkina-ai` project. Live at balkina-ai.vercel.app.
+- **Admin Panel (apps/admin)**: Currently runs locally on `localhost:3001`. Requires `.env.local` with `GOOGLE_MAPS_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+- **TODO (next phase)**: Deploy admin panel to Vercel as a separate project (e.g., `balkina-admin`), root directory `apps/admin`, with its own domain (e.g., `admin.balkina.ai`).
+
 ## When Stuck
 - Check /docs/ for detailed module specs.
 - Check /packages/shared/types before creating new types.
