@@ -271,7 +271,7 @@ export async function POST(request: Request) {
     const category = categoryList.length > 0 ? categoryList[i % categoryList.length] : null;
     const categoryId = category?.id ?? null;
     const bizType = category ? (categoryToBizType.get(category.id) ?? randomItem(BUSINESS_TYPES)) : randomItem(BUSINESS_TYPES);
-    const bizName = randomItem(bizType.names) + ` #${Date.now().toString(36).slice(-4)}`;
+    const bizName = randomItem(bizType.names);
     const firstName = randomItem(FIRST_NAMES);
     const lastName = randomItem(LAST_NAMES);
     const ownerName = `${firstName} ${lastName}`;
