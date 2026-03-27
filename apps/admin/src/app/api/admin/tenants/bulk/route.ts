@@ -15,11 +15,11 @@ const LAST_NAMES = ['Johnson', 'Garcia', 'Williams', 'Martinez', 'Brown', 'Lee',
 
 // Fallback cities used when no custom locations are provided
 const DEFAULT_CITIES: LocationInput[] = [
-  { name: 'San Francisco', lat: 37.7749, lng: -122.4194, tz: 'America/Los_Angeles' },
-  { name: 'New York', lat: 40.7128, lng: -74.0060, tz: 'America/New_York' },
-  { name: 'Chicago', lat: 41.8781, lng: -87.6298, tz: 'America/Chicago' },
-  { name: 'Miami', lat: 25.7617, lng: -80.1918, tz: 'America/New_York' },
-  { name: 'London', lat: 51.5074, lng: -0.1278, tz: 'Europe/London' },
+  { name: 'San Francisco', state: 'CA', country: 'United States', lat: 37.7749, lng: -122.4194, tz: 'America/Los_Angeles' },
+  { name: 'New York', state: 'NY', country: 'United States', lat: 40.7128, lng: -74.0060, tz: 'America/New_York' },
+  { name: 'Chicago', state: 'IL', country: 'United States', lat: 41.8781, lng: -87.6298, tz: 'America/Chicago' },
+  { name: 'Miami', state: 'FL', country: 'United States', lat: 25.7617, lng: -80.1918, tz: 'America/New_York' },
+  { name: 'London', country: 'United Kingdom', lat: 51.5074, lng: -0.1278, tz: 'Europe/London' },
 ];
 
 interface LocationInput {
@@ -28,6 +28,8 @@ interface LocationInput {
   lng: number;
   tz: string;
   address?: string;
+  state?: string;
+  country?: string;
 }
 
 const STAFF_NAMES = [
@@ -153,16 +155,19 @@ export async function POST(request: Request) {
 
     for (const cityData of citiesToUse) {
       const streetNum = Math.floor(100 + Math.random() * 9900);
-      const fullAddress = cityData.address ?? `${streetNum} Main St, ${cityData.name}`;
+      const streetName = `${streetNum} Main St`;
+      const addressParts = [streetName, cityData.name, cityData.state, cityData.country].filter(Boolean);
+      const fullAddress = cityData.address ?? addressParts.join(', ');
       const { data: loc } = await auth.supabase
         .from('tenant_locations')
         .insert({
           tenant_id: tenantId,
           name: `${bizName} - ${cityData.name}`,
           address: fullAddress,
-          street_address: cityData.address ? null : `${streetNum} Main St`,
+          street_address: cityData.address ? null : streetName,
           city: cityData.name,
-          country: null,
+          state: cityData.state ?? null,
+          country: cityData.country ?? null,
           latitude: cityData.lat + randomFloat(-0.005, 0.005),
           longitude: cityData.lng + randomFloat(-0.005, 0.005),
           timezone: cityData.tz,
