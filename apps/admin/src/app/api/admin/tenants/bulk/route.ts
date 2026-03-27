@@ -260,6 +260,16 @@ export async function POST(request: Request) {
       const names = [...STAFF_NAMES].sort(() => Math.random() - 0.5).slice(0, numStaff);
 
       for (const staffName of names) {
+        // Generate a realistic weekly schedule (Mon-Sat, ~9AM-5PM with slight variation)
+        const scheduleStart = 8 + Math.floor(Math.random() * 2); // 8 or 9
+        const scheduleEnd = 17 + Math.floor(Math.random() * 2);  // 17 or 18
+        const startTime = `${String(scheduleStart).padStart(2, '0')}:00`;
+        const endTime = `${String(scheduleEnd).padStart(2, '0')}:00`;
+        const availabilitySchedule: Record<string, { start: string; end: string }> = {};
+        for (const day of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']) {
+          availabilitySchedule[day] = { start: startTime, end: endTime };
+        }
+
         const { data: s } = await auth.supabase
           .from('staff')
           .insert({
@@ -267,6 +277,7 @@ export async function POST(request: Request) {
             name: staffName,
             email: `${staffName.toLowerCase().replace(' ', '.')}+${Date.now().toString(36).slice(-3)}@test.balkina.ai`,
             status: 'active',
+            availability_schedule: availabilitySchedule,
           } as never)
           .select('id')
           .single();
