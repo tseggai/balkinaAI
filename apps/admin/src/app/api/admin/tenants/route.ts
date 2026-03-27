@@ -125,7 +125,7 @@ export async function POST(request: Request) {
   if (!auth.admin) return auth.response;
 
   const body = await request.json();
-  const { name, owner_name, email, phone, category_id, subscription_plan_id, status, payments_enabled } = body as {
+  const { name, owner_name, email, phone, category_id, subscription_plan_id, status, payments_enabled, location_city, location_country } = body as {
     name: string;
     owner_name: string;
     email: string;
@@ -134,6 +134,8 @@ export async function POST(request: Request) {
     subscription_plan_id?: string;
     status?: string;
     payments_enabled?: boolean;
+    location_city?: string;
+    location_country?: string;
   };
 
   if (!name || !owner_name || !email) {
@@ -158,6 +160,22 @@ export async function POST(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Optionally create a location if city provided
+  if (location_city && data) {
+    const tenantId = (data as { id: string }).id;
+    const geocoded = await geocodeCity(location_city, location_country);
+    await auth.supabase.from('tenant_locations').insert({
+      tenant_id: tenantId,
+      name: `${name} - ${location_city}`,
+      address: [location_city, location_country].filter(Boolean).join(', '),
+      city: location_city,
+      country: location_country || null,
+      latitude: geocoded?.lat ?? null,
+      longitude: geocoded?.lng ?? null,
+      timezone: geocoded?.tz ?? 'UTC',
+    } as never);
+  }
 
   return NextResponse.json({ data }, { status: 201 });
 }
@@ -203,4 +221,72 @@ export async function PATCH(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ data });
+}
+
+export async function DELETE(request: Request) {
+  const auth = await requireAdmin();
+  if (!auth.admin) return auth.response;
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+
+  // Delete related data in order (respecting foreign keys)
+  // service_staff, service_locations, staff_locations -> services, staff, tenant_locations -> tenant
+  const { data: services } = await auth.supabase.from('services').select('id').eq('tenant_id', id);
+  const serviceIds = ((services ?? []) as { id: string }[]).map(s => s.id);
+  const { data: staffRows } = await auth.supabase.from('staff').select('id').eq('tenant_id', id);
+  const staffIds = ((staffRows ?? []) as { id: string }[]).map(s => s.id);
+
+  // Junction tables
+  if (serviceIds.length > 0) {
+    await auth.supabase.from('service_staff').delete().in('service_id', serviceIds);
+    await auth.supabase.from('service_locations').delete().in('service_id', serviceIds);
+    await auth.supabase.from('service_extras').delete().in('service_id', serviceIds);
+  }
+  if (staffIds.length > 0) {
+    await auth.supabase.from('staff_locations').delete().in('staff_id', staffIds);
+  }
+
+  // Main child tables
+  await auth.supabase.from('services').delete().eq('tenant_id', id);
+  await auth.supabase.from('staff').delete().eq('tenant_id', id);
+  await auth.supabase.from('tenant_locations').delete().eq('tenant_id', id);
+  await auth.supabase.from('appointments').delete().eq('tenant_id', id);
+  await auth.supabase.from('reviews').delete().eq('tenant_id', id);
+  await auth.supabase.from('coupons').delete().eq('tenant_id', id);
+
+  // Delete tenant
+  const { error } = await auth.supabase.from('tenants').delete().eq('id', id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ success: true });
+}
+
+// Geocode a city name to get lat/lng/timezone using Google Maps API
+async function geocodeCity(city: string, country?: string): Promise<{ lat: number; lng: number; tz: string } | null> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const query = country ? `${city}, ${country}` : city;
+    const geoRes = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}`
+    );
+    const geoJson = await geoRes.json() as { status: string; results?: { geometry?: { location?: { lat: number; lng: number } } }[] };
+    if (geoJson.status !== 'OK' || !geoJson.results?.[0]?.geometry?.location) return null;
+
+    const { lat, lng } = geoJson.results[0].geometry.location;
+
+    // Get timezone from coordinates
+    const tzRes = await fetch(
+      `https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lng}&timestamp=${Math.floor(Date.now() / 1000)}&key=${apiKey}`
+    );
+    const tzJson = await tzRes.json() as { status: string; timeZoneId?: string };
+    const tz = tzJson.status === 'OK' && tzJson.timeZoneId ? tzJson.timeZoneId : 'UTC';
+
+    return { lat, lng, tz };
+  } catch {
+    return null;
+  }
 }

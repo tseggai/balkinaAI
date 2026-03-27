@@ -32,6 +32,33 @@ interface LocationInput {
   country?: string;
 }
 
+// Geocode a city name to get lat/lng/timezone using Google Maps API
+async function geocodeCity(city: string, country?: string): Promise<{ lat: number; lng: number; tz: string } | null> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const query = country ? `${city}, ${country}` : city;
+    const geoRes = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}`
+    );
+    const geoJson = await geoRes.json() as { status: string; results?: { geometry?: { location?: { lat: number; lng: number } } }[] };
+    if (geoJson.status !== 'OK' || !geoJson.results?.[0]?.geometry?.location) return null;
+
+    const { lat, lng } = geoJson.results[0].geometry.location;
+
+    const tzRes = await fetch(
+      `https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lng}&timestamp=${Math.floor(Date.now() / 1000)}&key=${apiKey}`
+    );
+    const tzJson = await tzRes.json() as { status: string; timeZoneId?: string };
+    const tz = tzJson.status === 'OK' && tzJson.timeZoneId ? tzJson.timeZoneId : 'UTC';
+
+    return { lat, lng, tz };
+  } catch {
+    return null;
+  }
+}
+
 const STAFF_NAMES = [
   'Alex Rivera', 'Jordan Smith', 'Taylor Kim', 'Morgan Lee', 'Casey Brown',
   'Riley Johnson', 'Avery Davis', 'Quinn Wilson', 'Reese Martinez', 'Dakota Thomas',
@@ -87,13 +114,33 @@ export async function POST(request: Request) {
   const withStaff = body.with_staff !== false;
   const withServices = body.with_services !== false;
 
-  // Custom locations: array of { name, lat, lng, tz, address? }
-  // If provided, ALL tenants get exactly these locations (for geo-testing)
+  // Custom locations: array of { name, country? } (simplified) or { name, lat, lng, tz } (full)
+  // If provided, ALL tenants get exactly these locations
   // If not provided, each tenant gets 1-3 random cities from defaults
-  const customLocations: LocationInput[] | null =
-    Array.isArray(body.locations) && body.locations.length > 0
-      ? body.locations
-      : null;
+  let customLocations: LocationInput[] | null = null;
+  if (Array.isArray(body.locations) && body.locations.length > 0) {
+    // Resolve any locations missing lat/lng/tz via geocoding
+    const resolved: LocationInput[] = [];
+    for (const loc of body.locations as { name: string; country?: string; state?: string; lat?: number; lng?: number; tz?: string; address?: string }[]) {
+      if (!loc.name) continue;
+      if (loc.lat && loc.lng && loc.tz) {
+        resolved.push(loc as LocationInput);
+      } else {
+        // Geocode from city + country
+        const geo = await geocodeCity(loc.name, loc.country);
+        resolved.push({
+          name: loc.name,
+          lat: geo?.lat ?? 0,
+          lng: geo?.lng ?? 0,
+          tz: geo?.tz ?? 'UTC',
+          country: loc.country,
+          state: loc.state,
+          address: loc.address,
+        });
+      }
+    }
+    if (resolved.length > 0) customLocations = resolved;
+  }
 
   // Fetch categories for matching
   const { data: categories } = await auth.supabase
