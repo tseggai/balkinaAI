@@ -90,8 +90,8 @@ export default function TenantsPage() {
   const [bulking, setBulking] = useState(false);
   const [bulkResult, setBulkResult] = useState<string | null>(null);
   const [showBulkConfig, setShowBulkConfig] = useState(false);
-  type BulkLoc = { name: string; lat: string; lng: string; tz: string; address: string };
-  const [bulkLocations, setBulkLocations] = useState<BulkLoc[]>([{ name: '', lat: '', lng: '', tz: '', address: '' }]);
+  type BulkLoc = { name: string; lat: string; lng: string; tz: string; address: string; country: string; state: string };
+  const [bulkLocations, setBulkLocations] = useState<BulkLoc[]>([{ name: '', lat: '', lng: '', tz: '', address: '', country: '', state: '' }]);
   const updateBulkLoc = (idx: number, field: keyof BulkLoc, value: string) => {
     setBulkLocations(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
   };
@@ -209,7 +209,7 @@ export default function TenantsPage() {
   async function handleBulkCreate() {
     setBulking(true);
     setBulkResult(null);
-    const locations = bulkLocations.filter(l => l.name && l.lat && l.lng && l.tz).map(l => ({ name: l.name, lat: parseFloat(l.lat), lng: parseFloat(l.lng), tz: l.tz, address: l.address || undefined }));
+    const locations = bulkLocations.filter(l => l.name && l.lat && l.lng && l.tz).map(l => ({ name: l.name, lat: parseFloat(l.lat), lng: parseFloat(l.lng), tz: l.tz, address: l.address || undefined, country: l.country || undefined, state: l.state || undefined }));
     const res = await fetch('/api/admin/tenants/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ count: bulkCount, with_staff: true, with_services: true, locations: locations.length > 0 ? locations : undefined }) });
     const json = await res.json();
     setBulking(false);
@@ -522,7 +522,7 @@ export default function TenantsPage() {
             <div className="mt-4">
               <div className="flex items-center justify-between">
                 <label className="block text-sm font-medium text-gray-700">Locations <span className="text-gray-400 font-normal">(each tenant gets all locations listed below)</span></label>
-                <button type="button" onClick={() => setBulkLocations([...bulkLocations, { name: '', lat: '', lng: '', tz: '', address: '' }])} className="text-sm font-medium text-brand-600 hover:text-brand-700">+ Add location</button>
+                <button type="button" onClick={() => setBulkLocations([...bulkLocations, { name: '', lat: '', lng: '', tz: '', address: '', country: '', state: '' }])} className="text-sm font-medium text-brand-600 hover:text-brand-700">+ Add location</button>
               </div>
               <p className="mt-1 text-xs text-gray-400">Leave empty to use random default cities.</p>
               <div className="mt-2 space-y-3">
@@ -545,12 +545,12 @@ export default function TenantsPage() {
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className="text-xs text-gray-400 self-center">Quick add:</span>
                 {[
-                  { name: 'Valencia', lat: '39.4699', lng: '-0.3763', tz: 'Europe/Madrid', address: '' },
-                  { name: 'Berlin', lat: '52.5200', lng: '13.4050', tz: 'Europe/Berlin', address: '' },
-                  { name: 'Tivat', lat: '42.4357', lng: '18.6936', tz: 'Europe/Amsterdam', address: '' },
-                  { name: 'San Francisco', lat: '37.7749', lng: '-122.4194', tz: 'America/Los_Angeles', address: '' },
-                  { name: 'Dubai', lat: '25.2048', lng: '55.2708', tz: 'Asia/Dubai', address: '' },
-                  { name: 'London', lat: '51.5074', lng: '-0.1278', tz: 'Europe/London', address: '' },
+                  { name: 'Valencia', lat: '39.4699', lng: '-0.3763', tz: 'Europe/Madrid', address: '', country: 'Spain', state: '' },
+                  { name: 'Berlin', lat: '52.5200', lng: '13.4050', tz: 'Europe/Berlin', address: '', country: 'Germany', state: '' },
+                  { name: 'Tivat', lat: '42.4357', lng: '18.6936', tz: 'Europe/Amsterdam', address: '', country: 'Montenegro', state: '' },
+                  { name: 'San Francisco', lat: '37.7749', lng: '-122.4194', tz: 'America/Los_Angeles', address: '', country: 'United States', state: 'CA' },
+                  { name: 'Dubai', lat: '25.2048', lng: '55.2708', tz: 'Asia/Dubai', address: '', country: 'UAE', state: '' },
+                  { name: 'London', lat: '51.5074', lng: '-0.1278', tz: 'Europe/London', address: '', country: 'United Kingdom', state: '' },
                 ].map(preset => (
                   <button key={preset.name} type="button" onClick={() => { const idx = bulkLocations.findIndex(l => !l.name && !l.lat && !l.lng && !l.tz); if (idx >= 0) { setBulkLocations(prev => prev.map((l, i) => i === idx ? preset : l)); } else { setBulkLocations(prev => [...prev, preset]); } }} className="rounded-full border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-100 hover:border-gray-400">{preset.name}</button>
                 ))}
