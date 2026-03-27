@@ -316,6 +316,7 @@ function buildTenantSystemPrompt(
 
 ## Response Format
 Use [[CARD:...]] for structured UI. Use [[button:...]] ONLY for: dates, yes/no, Show More.
+NEVER wrap [[CARD:...]] or [[button:...]] in markdown code fences (\`\`\`). Output them as raw text directly in the message.
 Put intro text BEFORE [[CARD:...]], never after. Use REAL data from tool results only — never invent IDs, prices, or names. Populate image_url from DB if available.
 
 Card types and fields:
@@ -405,6 +406,7 @@ function buildDiscoverySystemPrompt(
 
 ## Response Format
 Use [[CARD:...]] for structured UI. Use [[button:...]] ONLY for: dates, yes/no, Show More.
+NEVER wrap [[CARD:...]] or [[button:...]] in markdown code fences (\`\`\`). Output them as raw text directly in the message.
 Put intro text BEFORE [[CARD:...]], never after. Use REAL data from tool results only — never invent IDs, prices, or names. Populate image_url from DB if available.
 
 Card types and fields:
