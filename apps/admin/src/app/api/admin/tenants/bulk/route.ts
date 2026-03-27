@@ -151,16 +151,21 @@ export async function POST(request: Request) {
       ? customLocations
       : [...DEFAULT_CITIES].sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 3) + 1);
 
-    for (const city of citiesToUse) {
+    for (const cityData of citiesToUse) {
+      const streetNum = Math.floor(100 + Math.random() * 9900);
+      const fullAddress = cityData.address ?? `${streetNum} Main St, ${cityData.name}`;
       const { data: loc } = await auth.supabase
         .from('tenant_locations')
         .insert({
           tenant_id: tenantId,
-          name: `${bizName} - ${city.name}`,
-          address: city.address ?? `${Math.floor(100 + Math.random() * 9900)} Main St, ${city.name}`,
-          latitude: city.lat + randomFloat(-0.005, 0.005),
-          longitude: city.lng + randomFloat(-0.005, 0.005),
-          timezone: city.tz,
+          name: `${bizName} - ${cityData.name}`,
+          address: fullAddress,
+          street_address: cityData.address ? null : `${streetNum} Main St`,
+          city: cityData.name,
+          country: null,
+          latitude: cityData.lat + randomFloat(-0.005, 0.005),
+          longitude: cityData.lng + randomFloat(-0.005, 0.005),
+          timezone: cityData.tz,
           phone: `+1${Math.floor(2000000000 + Math.random() * 8000000000)}`,
         } as never)
         .select('id')
