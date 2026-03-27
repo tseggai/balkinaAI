@@ -104,6 +104,48 @@ export default function TenantsPage() {
 
   const [deleting, setDeleting] = useState<string | null>(null);
 
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkActing, setBulkActing] = useState(false);
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function toggleSelectAll() {
+    if (selectedIds.size === tenants.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(tenants.map(t => t.id)));
+    }
+  }
+  async function handleBulkAction(action: string) {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    if (action === 'delete') {
+      if (!confirm(`Delete ${ids.length} tenant(s) and ALL their data? This cannot be undone.`)) return;
+      setBulkActing(true);
+      for (const id of ids) {
+        await fetch(`/api/admin/tenants?id=${id}`, { method: 'DELETE' });
+      }
+      setBulkActing(false);
+      setSelectedIds(new Set());
+      fetchTenants();
+    } else {
+      // Status change
+      setBulkActing(true);
+      for (const id of ids) {
+        await fetch('/api/admin/tenants', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: action }) });
+      }
+      setBulkActing(false);
+      setSelectedIds(new Set());
+      fetchTenants();
+    }
+  }
+
   // Bulk create
   const [bulkCount, setBulkCount] = useState(10);
   const [bulking, setBulking] = useState(false);
@@ -319,6 +361,20 @@ export default function TenantsPage() {
         </div>
       )}
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="mt-4 flex items-center gap-3 rounded-lg bg-brand-50 border border-brand-200 px-4 py-2.5">
+          <span className="text-sm font-medium text-brand-700">{selectedIds.size} selected</span>
+          <div className="h-4 w-px bg-brand-200" />
+          <button onClick={() => handleBulkAction('active')} disabled={bulkActing} className="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50">Set Active</button>
+          <button onClick={() => handleBulkAction('suspended')} disabled={bulkActing} className="rounded-md bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50">Suspend</button>
+          <button onClick={() => handleBulkAction('inactive')} disabled={bulkActing} className="rounded-md bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50">Deactivate</button>
+          <button onClick={() => handleBulkAction('delete')} disabled={bulkActing} className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50">Delete</button>
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs font-medium text-brand-600 hover:text-brand-700">Clear selection</button>
+          {bulkActing && <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />}
+        </div>
+      )}
+
       {/* Table */}
       {loading ? (
         <div className="mt-8 flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" /></div>
@@ -329,6 +385,9 @@ export default function TenantsPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="w-10 px-4 py-3">
+                      <input type="checkbox" checked={selectedIds.size === tenants.length && tenants.length > 0} onChange={toggleSelectAll} className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Business</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Owner</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Category</th>
@@ -345,10 +404,17 @@ export default function TenantsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {tenants.map(t => (
-                    <tr key={t.id} className="hover:bg-gray-50">
+                    <tr key={t.id} className={`hover:bg-gray-50 ${selectedIds.has(t.id) ? 'bg-brand-50' : ''}`}>
+                      <td className="w-10 px-4 py-3">
+                        <input type="checkbox" checked={selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                      </td>
                       <td className="px-4 py-3">
                         <button onClick={() => router.push(`/dashboard/tenants/${t.id}`)} className="flex items-center gap-2 text-left">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{t.name.charAt(0).toUpperCase()}</div>
+                          {t.logo_url ? (
+                            <img src={t.logo_url} alt={t.name} className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                          ) : (
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{t.name.charAt(0).toUpperCase()}</div>
+                          )}
                           <div>
                             <p className="text-sm font-medium text-gray-900 hover:text-brand-600">{t.name}</p>
                             <p className="text-xs text-gray-400">{t.email ?? '\u2014'}</p>

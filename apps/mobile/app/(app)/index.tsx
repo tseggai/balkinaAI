@@ -1394,6 +1394,25 @@ export default function ChatScreen() {
     return id;
   }, []);
 
+  // Remove stale interactive booking cards when the user changes their selection mid-flow.
+  // This prevents old staff_with_slots / booking_options / summary_card messages from
+  // appearing alongside new ones, which causes confusing duplicate staff entries.
+  const removeStaleBookingCards = useCallback(() => {
+    const staleCardTypes = ['staff_with_slots', 'booking_options', 'summary_card'];
+    setMessages((prev) =>
+      prev.filter((m) => {
+        if (m.role !== 'assistant') return true;
+        // Check if this message contains an interactive booking card
+        for (const cardType of staleCardTypes) {
+          if (m.content.includes(`"type":"${cardType}"`) || m.content.includes(`"type": "${cardType}"`)) {
+            return false; // Remove this message
+          }
+        }
+        return true;
+      }),
+    );
+  }, []);
+
   // Show date picker buttons locally
   const showDatePicker = useCallback(() => {
     const buttons = getDateButtons();
@@ -1583,6 +1602,8 @@ export default function ChatScreen() {
         });
 
         if (matchedService) {
+          // Remove stale cards from previous booking flow to prevent duplicate staff/options
+          removeStaleBookingCards();
           addUserMessage(userText);
           const newState: BookingState = {
             ...INITIAL_BOOKING_STATE,
@@ -1863,7 +1884,7 @@ export default function ChatScreen() {
 
       return false;
     },
-    [bookingState, addUserMessage, addAssistantMessage, fetchStaffAvailability, fetchBookingOptions, showSummaryCard, userId, customerName, customerPhone, customerEmail],
+    [bookingState, addUserMessage, addAssistantMessage, removeStaleBookingCards, fetchStaffAvailability, fetchBookingOptions, showSummaryCard, userId, customerName, customerPhone, customerEmail],
   );
 
   const sendMessage = useCallback(

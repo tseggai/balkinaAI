@@ -170,6 +170,8 @@ export function generateId(): string {
 
 export function cleanAIMessage(text: string): string {
   return text
+    // Strip markdown code fences that GPT sometimes wraps around [[CARD:...]] blocks
+    .replace(/```(?:json|JSON)?\s*\n?([\s\S]*?)\n?\s*```/g, '$1')
     .replace(/^\d+\.\s*$/gm, '')
     .replace(/^-\s*$/gm, '')
     .replace(/\n{3,}/g, '\n\n')

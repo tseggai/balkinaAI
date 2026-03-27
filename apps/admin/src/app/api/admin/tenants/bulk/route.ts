@@ -64,6 +64,90 @@ const STAFF_NAMES = [
   'Riley Johnson', 'Avery Davis', 'Quinn Wilson', 'Reese Martinez', 'Dakota Thomas',
 ];
 
+// Category-appropriate logo images (Unsplash, 400x400 crop)
+const LOGO_IMAGES: Record<string, string[]> = {
+  barbershop: [
+    'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1585747860830-63ab9dfd12f3?w=400&h=400&fit=crop',
+  ],
+  beauty: [
+    'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1562322140-8baeececf08b?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?w=400&h=400&fit=crop',
+  ],
+  wellness: [
+    'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=400&h=400&fit=crop',
+  ],
+  fitness: [
+    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=400&h=400&fit=crop',
+  ],
+  medical: [
+    'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1573497620053-ea5300f94f21?w=400&h=400&fit=crop',
+  ],
+};
+
+// Staff headshot images (Unsplash, 200x200 crop, face-focused)
+const STAFF_IMAGES = [
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&h=200&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=200&h=200&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&h=200&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&h=200&fit=crop&crop=face',
+];
+
+// Service images per category (Unsplash, 400x200 crop)
+const SERVICE_IMAGES: Record<string, string[]> = {
+  barbershop: [
+    'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400&h=200&fit=crop',
+  ],
+  beauty: [
+    'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1610992015732-2449b76344bc?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1519014816548-bf5fe059798b?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1632345031435-8727f6897d53?w=400&h=200&fit=crop',
+  ],
+  wellness: [
+    'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1600334129128-685c5582fd35?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1540555700478-4be289fbec6d?w=400&h=200&fit=crop',
+  ],
+  fitness: [
+    'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=400&h=200&fit=crop',
+  ],
+  medical: [
+    'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=400&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=400&h=200&fit=crop',
+  ],
+};
+
 const SERVICE_TEMPLATES: Record<string, { name: string; price: number; duration: number }[]> = {
   barbershop: [
     { name: 'Haircut', price: 35, duration: 30 },
@@ -195,6 +279,10 @@ export async function POST(request: Request) {
 
     const categoryLabel = category?.name ?? 'Uncategorized';
 
+    // Pick a category-appropriate logo
+    const logoPool = LOGO_IMAGES[bizType.category] ?? Object.values(LOGO_IMAGES).flat();
+    const logoUrl = randomItem(logoPool);
+
     // Create tenant
     const { data: tenant, error: tenantError } = await auth.supabase
       .from('tenants')
@@ -207,6 +295,7 @@ export async function POST(request: Request) {
         subscription_plan_id: defaultPlan?.id ?? null,
         status: 'active',
         payments_enabled: Math.random() > 0.5,
+        logo_url: logoUrl,
       } as never)
       .select('id')
       .single();
@@ -259,7 +348,18 @@ export async function POST(request: Request) {
       const numStaff = Math.floor(Math.random() * 4) + 2;
       const names = [...STAFF_NAMES].sort(() => Math.random() - 0.5).slice(0, numStaff);
 
-      for (const staffName of names) {
+      for (let si = 0; si < names.length; si++) {
+        const staffName = names[si] as string;
+        // Generate a realistic weekly schedule (Mon-Sat, ~9AM-5PM with slight variation)
+        const scheduleStart = 8 + Math.floor(Math.random() * 2); // 8 or 9
+        const scheduleEnd = 17 + Math.floor(Math.random() * 2);  // 17 or 18
+        const startTime = `${String(scheduleStart).padStart(2, '0')}:00`;
+        const endTime = `${String(scheduleEnd).padStart(2, '0')}:00`;
+        const availabilitySchedule: Record<string, { start: string; end: string }> = {};
+        for (const day of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']) {
+          availabilitySchedule[day] = { start: startTime, end: endTime };
+        }
+
         const { data: s } = await auth.supabase
           .from('staff')
           .insert({
@@ -267,6 +367,8 @@ export async function POST(request: Request) {
             name: staffName,
             email: `${staffName.toLowerCase().replace(' ', '.')}+${Date.now().toString(36).slice(-3)}@test.balkina.ai`,
             status: 'active',
+            availability_schedule: availabilitySchedule,
+            image_url: STAFF_IMAGES[si % STAFF_IMAGES.length],
           } as never)
           .select('id')
           .single();
@@ -290,7 +392,9 @@ export async function POST(request: Request) {
     // Create services
     if (withServices) {
       const templates = SERVICE_TEMPLATES[bizType.category] ?? [];
-      for (const tmpl of templates) {
+      const svcImagePool = SERVICE_IMAGES[bizType.category] ?? Object.values(SERVICE_IMAGES).flat();
+      for (let ti = 0; ti < templates.length; ti++) {
+        const tmpl = templates[ti] as { name: string; price: number; duration: number };
         const { data: svc } = await auth.supabase
           .from('services')
           .insert({
@@ -299,6 +403,7 @@ export async function POST(request: Request) {
             price: tmpl.price,
             duration_minutes: tmpl.duration,
             visibility: 'public',
+            image_url: svcImagePool[ti % svcImagePool.length],
           } as never)
           .select('id')
           .single();
