@@ -227,7 +227,7 @@ const findBusinessesTool: OpenAI.ChatCompletionTool = {
   type: 'function',
   function: {
     name: 'find_businesses',
-    description: 'Search for businesses by service type, category, or name. When query is empty, returns ALL nearby businesses. Results include distance_km, matched_services, total_count, has_more, offset, limit. Use offset to paginate. ALWAYS present results using [[CARD:{"type":"business_cards","items":[...]}]] format. When has_more is true, add [[button:Show more businesses]] at the end.',
+    description: 'Search for businesses by service type, category, or name. When query is empty, returns ALL nearby businesses. Results include distance_km, matched_services, total_count, has_more, offset, limit. Use offset to paginate. ALWAYS present results using ONE [[CARD:{"type":"business_with_services","items":[...]}]] card. Each item must include services array from all_services. When has_more is true, add [[button:Show more businesses]] at the end.',
     parameters: {
       type: 'object',
       properties: {
