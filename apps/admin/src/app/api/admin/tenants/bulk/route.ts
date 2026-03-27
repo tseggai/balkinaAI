@@ -142,13 +142,19 @@ export async function POST(request: Request) {
     if (resolved.length > 0) customLocations = resolved;
   }
 
-  // Fetch categories for matching
+  // Fetch categories — tenants will be distributed evenly across all categories
   const { data: categories } = await auth.supabase
     .from('categories')
     .select('id, name');
-  const categoryMap = new Map(
-    ((categories ?? []) as { id: string; name: string }[]).map(c => [c.name.toLowerCase(), c.id])
-  );
+  const categoryList = ((categories ?? []) as { id: string; name: string }[]);
+
+  // Build a lookup: lowercase category name -> best matching business type for names/services
+  const categoryToBizType = new Map<string, typeof BUSINESS_TYPES[number]>();
+  for (const cat of categoryList) {
+    const lower = cat.name.toLowerCase();
+    const match = BUSINESS_TYPES.find(bt => lower.includes(bt.category) || bt.category.includes(lower));
+    categoryToBizType.set(cat.id, match ?? randomItem(BUSINESS_TYPES));
+  }
 
   // Fetch a default plan
   const { data: defaultPlan } = await auth.supabase
@@ -158,17 +164,20 @@ export async function POST(request: Request) {
     .limit(1)
     .single();
 
-  const results: { tenant_id: string; name: string; locations: number; staff: number; services: number }[] = [];
+  const results: { tenant_id: string; name: string; category: string; locations: number; staff: number; services: number }[] = [];
 
   for (let i = 0; i < count; i++) {
-    const bizType = randomItem(BUSINESS_TYPES);
+    // Evenly distribute across categories: tenant 0 -> cat 0, tenant 1 -> cat 1, etc.
+    const category = categoryList.length > 0 ? categoryList[i % categoryList.length] : null;
+    const categoryId = category?.id ?? null;
+    const bizType = category ? (categoryToBizType.get(category.id) ?? randomItem(BUSINESS_TYPES)) : randomItem(BUSINESS_TYPES);
     const bizName = randomItem(bizType.names) + ` #${Date.now().toString(36).slice(-4)}`;
     const firstName = randomItem(FIRST_NAMES);
     const lastName = randomItem(LAST_NAMES);
     const ownerName = `${firstName} ${lastName}`;
     const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}+${Date.now().toString(36).slice(-3)}@test.balkina.ai`;
 
-    const categoryId = categoryMap.get(bizType.category) ?? null;
+    const categoryLabel = category?.name ?? 'Uncategorized';
 
     // Create tenant
     const { data: tenant, error: tenantError } = await auth.supabase
@@ -299,7 +308,7 @@ export async function POST(request: Request) {
       }
     }
 
-    results.push({ tenant_id: tenantId, name: bizName, locations: locCount, staff: staffCount, services: svcCount });
+    results.push({ tenant_id: tenantId, name: bizName, category: categoryLabel, locations: locCount, staff: staffCount, services: svcCount });
   }
 
   return NextResponse.json({
