@@ -128,15 +128,31 @@ export async function POST(request: Request) {
       } else {
         // Geocode from city + country
         const geo = await geocodeCity(loc.name, loc.country);
-        resolved.push({
-          name: loc.name,
-          lat: geo?.lat ?? 0,
-          lng: geo?.lng ?? 0,
-          tz: geo?.tz ?? 'UTC',
-          country: loc.country,
-          state: loc.state,
-          address: loc.address,
-        });
+        if (geo) {
+          resolved.push({
+            name: loc.name,
+            lat: geo.lat,
+            lng: geo.lng,
+            tz: geo.tz,
+            country: loc.country,
+            state: loc.state,
+            address: loc.address,
+          });
+        } else {
+          // Geocoding failed — still add but use default city coordinates
+          // Look up from DEFAULT_CITIES if name matches
+          const defaultCity = DEFAULT_CITIES.find(c => c.name.toLowerCase() === loc.name.toLowerCase());
+          resolved.push({
+            name: loc.name,
+            lat: defaultCity?.lat ?? 0,
+            lng: defaultCity?.lng ?? 0,
+            tz: defaultCity?.tz ?? 'UTC',
+            country: loc.country,
+            state: loc.state,
+            address: loc.address,
+          });
+          console.warn(`[bulk-create] Geocoding failed for "${loc.name}, ${loc.country}" — using ${defaultCity ? 'default' : 'zero'} coordinates`);
+        }
       }
     }
     if (resolved.length > 0) customLocations = resolved;
