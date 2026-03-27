@@ -35,6 +35,12 @@ interface Location {
   id: string;
   name: string;
   address: string;
+  street_address: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+  country: string | null;
   latitude: number | null;
   longitude: number | null;
   timezone: string;
@@ -73,6 +79,12 @@ export default function LocationsPage() {
   // Form state
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [streetAddress, setStreetAddress] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [country, setCountry] = useState('');
   const [timezone, setTimezone] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
@@ -135,6 +147,24 @@ export default function LocationsPage() {
         setLat(newLat);
         setLng(newLng);
       }
+      // Extract structured address components from Google Places
+      const components = (place as unknown as { address_components?: { long_name: string; short_name: string; types: string[] }[] }).address_components;
+      if (components) {
+        let streetNum = '';
+        let route = '';
+        for (const comp of components) {
+          const types = comp.types;
+          if (types.includes('street_number')) streetNum = comp.long_name;
+          else if (types.includes('route')) route = comp.long_name;
+          else if (types.includes('locality') || types.includes('postal_town')) setCity(comp.long_name);
+          else if (types.includes('administrative_area_level_1')) setState(comp.short_name);
+          else if (types.includes('country')) setCountry(comp.long_name);
+          else if (types.includes('postal_code')) setPostalCode(comp.long_name);
+          else if (types.includes('subpremise')) setAddressLine2(comp.long_name);
+        }
+        const street = streetNum ? `${streetNum} ${route}` : route;
+        if (street) setStreetAddress(street);
+      }
     });
   }, [mapsLoaded, showPanel]);
 
@@ -173,6 +203,12 @@ export default function LocationsPage() {
     setEditing(null);
     setName('');
     setAddress('');
+    setStreetAddress('');
+    setAddressLine2('');
+    setCity('');
+    setState('');
+    setPostalCode('');
+    setCountry('');
     setTimezone('');
     setLat(null);
     setLng(null);
@@ -191,6 +227,12 @@ export default function LocationsPage() {
     setEditing(loc);
     setName(loc.name);
     setAddress(loc.address);
+    setStreetAddress(loc.street_address ?? '');
+    setAddressLine2(loc.address_line2 ?? '');
+    setCity(loc.city ?? '');
+    setState(loc.state ?? '');
+    setPostalCode(loc.postal_code ?? '');
+    setCountry(loc.country ?? '');
     setTimezone(loc.timezone ?? '');
     setLat(loc.latitude);
     setLng(loc.longitude);
@@ -204,6 +246,12 @@ export default function LocationsPage() {
     initialFormValues.current = {
       name: loc.name,
       address: loc.address,
+      streetAddress: loc.street_address ?? '',
+      addressLine2: loc.address_line2 ?? '',
+      city: loc.city ?? '',
+      state: loc.state ?? '',
+      postalCode: loc.postal_code ?? '',
+      country: loc.country ?? '',
       timezone: loc.timezone ?? '',
       lat: loc.latitude,
       lng: loc.longitude,
@@ -247,10 +295,19 @@ export default function LocationsPage() {
     setError('');
     setSaving(true);
 
+    // Build full address from structured fields for backward compatibility
+    const fullAddress = [streetAddress, city, state, postalCode, country].filter(Boolean).join(', ') || address;
+
     const body: Record<string, unknown> = {
       id: editing?.id,
       name,
-      address,
+      address: fullAddress,
+      street_address: streetAddress || null,
+      address_line2: addressLine2 || null,
+      city: city || null,
+      state: state || null,
+      postal_code: postalCode || null,
+      country: country || null,
       timezone: timezone || 'UTC',
       latitude: lat ?? null,
       longitude: lng ?? null,
@@ -295,14 +352,16 @@ export default function LocationsPage() {
       }
     }
     initialFormValues.current = {
-      name, address, timezone, lat, lng, phone, description, imageUrl,
+      name, address, streetAddress, addressLine2, city, state, postalCode, country,
+      timezone, lat, lng, phone, description, imageUrl,
       bookingLimitEnabled, bookingLimitCapacity, bookingLimitInterval,
     };
   }
 
   // Dirty-state tracking
   const currentLocationValues = {
-    name, address, timezone, lat, lng, phone, description, imageUrl,
+    name, address, streetAddress, addressLine2, city, state, postalCode, country,
+    timezone, lat, lng, phone, description, imageUrl,
     bookingLimitEnabled, bookingLimitCapacity, bookingLimitInterval,
   };
   const isDirty = JSON.stringify(currentLocationValues) !== JSON.stringify(initialFormValues.current);
@@ -370,35 +429,170 @@ export default function LocationsPage() {
                 )}
               </div>
 
-              {/* Address — Google Places Autocomplete */}
-              <div>
-                {isEdit ? (
-                  <div>
-                    <span className="text-xs text-gray-400">Address</span>
+              {/* Address — Google Places Autocomplete + Structured Fields */}
+              <div className="space-y-3">
+                {/* Search field — Google Places Autocomplete fills structured fields below */}
+                <div>
+                  {isEdit ? (
+                    <div>
+                      <span className="text-xs text-gray-400">Search Address</span>
+                      <input
+                        ref={addressInputRef}
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="Start typing to search an address..."
+                        className={editInputClass}
+                        autoComplete="off"
+                      />
+                    </div>
+                  ) : (
                     <input
                       ref={addressInputRef}
-                      required
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
-                      placeholder="Start typing an address... *"
-                      className={editInputClass}
+                      placeholder="Search address (auto-fills fields below)..."
+                      className={addInputClass}
                       autoComplete="off"
                     />
+                  )}
+                  <p className="mt-1 text-[11px] text-gray-400">Type to search — fields below will auto-fill</p>
+                </div>
+
+                {/* Country */}
+                <div>
+                  {isEdit ? (
+                    <div>
+                      <span className="text-xs text-gray-400">Country</span>
+                      <input
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                        placeholder="Country"
+                        className={editInputClass}
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      placeholder="Country"
+                      className={addInputClass}
+                    />
+                  )}
+                </div>
+
+                {/* Street Address */}
+                <div>
+                  {isEdit ? (
+                    <div>
+                      <span className="text-xs text-gray-400">Street Address</span>
+                      <input
+                        value={streetAddress}
+                        onChange={(e) => setStreetAddress(e.target.value)}
+                        placeholder="Street Address"
+                        className={editInputClass}
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      value={streetAddress}
+                      onChange={(e) => setStreetAddress(e.target.value)}
+                      placeholder="Street Address"
+                      className={addInputClass}
+                    />
+                  )}
+                </div>
+
+                {/* Address Line 2 */}
+                <div>
+                  {isEdit ? (
+                    <div>
+                      <span className="text-xs text-gray-400">Address Line 2</span>
+                      <input
+                        value={addressLine2}
+                        onChange={(e) => setAddressLine2(e.target.value)}
+                        placeholder="Apt, Suite, Unit (Optional)"
+                        className={editInputClass}
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      value={addressLine2}
+                      onChange={(e) => setAddressLine2(e.target.value)}
+                      placeholder="Apt, Suite, Unit (Optional)"
+                      className={addInputClass}
+                    />
+                  )}
+                </div>
+
+                {/* City + State row */}
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    {isEdit ? (
+                      <div>
+                        <span className="text-xs text-gray-400">City</span>
+                        <input
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          placeholder="City"
+                          className={editInputClass}
+                        />
+                      </div>
+                    ) : (
+                      <input
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        placeholder="City"
+                        className={addInputClass}
+                      />
+                    )}
                   </div>
-                ) : (
-                  <input
-                    ref={addressInputRef}
-                    required
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Start typing an address... *"
-                    className={addInputClass}
-                    autoComplete="off"
-                  />
-                )}
+                  <div className="flex-1">
+                    {isEdit ? (
+                      <div>
+                        <span className="text-xs text-gray-400">State / Province</span>
+                        <input
+                          value={state}
+                          onChange={(e) => setState(e.target.value)}
+                          placeholder="State / Province"
+                          className={editInputClass}
+                        />
+                      </div>
+                    ) : (
+                      <input
+                        value={state}
+                        onChange={(e) => setState(e.target.value)}
+                        placeholder="State / Province"
+                        className={addInputClass}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Postal Code */}
+                <div className="w-1/2">
+                  {isEdit ? (
+                    <div>
+                      <span className="text-xs text-gray-400">ZIP / Postal Code</span>
+                      <input
+                        value={postalCode}
+                        onChange={(e) => setPostalCode(e.target.value)}
+                        placeholder="ZIP / Postal Code"
+                        className={editInputClass}
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      placeholder="ZIP / Postal Code"
+                      className={addInputClass}
+                    />
+                  )}
+                </div>
+
                 {/* Map display after entering address */}
                 {lat != null && lng != null && (
-                  <div className="mt-2">
+                  <div>
                     <p className="text-xs text-gray-500">
                       Lat: {lat.toFixed(6)}, Lng: {lng.toFixed(6)}
                     </p>
@@ -628,7 +822,7 @@ export default function LocationsPage() {
                     Name
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                    Address
+                    Address / City
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
                     Phone
@@ -694,7 +888,16 @@ export default function LocationsPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
                       {loc.name}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{loc.address}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {loc.city || loc.state ? (
+                        <div>
+                          <div className="font-medium text-gray-900">{[loc.city, loc.state].filter(Boolean).join(', ')}</div>
+                          {loc.country && <div className="text-xs text-gray-400">{loc.country}</div>}
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">{loc.address || '\u2014'}</span>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                       {loc.phone || '\u2014'}
                     </td>

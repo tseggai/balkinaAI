@@ -27,6 +27,12 @@ interface Location {
   id: string;
   name: string;
   address: string;
+  street_address: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+  country: string | null;
   latitude: number | null;
   longitude: number | null;
   timezone: string;
@@ -372,7 +378,9 @@ function LocationsTab({ locations, locationStaffCount }: { locations: Location[]
       {locations.map((loc) => (
         <div key={loc.id} className="rounded-xl border border-gray-200 bg-white p-5">
           <h3 className="font-semibold text-gray-900">{loc.name}</h3>
-          <p className="mt-1 text-sm text-gray-500">{loc.address}</p>
+          <p className="mt-1 text-sm text-gray-500">
+            {loc.city ? [loc.city, loc.state, loc.country].filter(Boolean).join(', ') : loc.address}
+          </p>
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-500">
             <span className="rounded bg-gray-100 px-2 py-0.5">{loc.timezone}</span>
             <span className="rounded bg-gray-100 px-2 py-0.5">{locationStaffCount.get(loc.id) ?? 0} staff</span>
