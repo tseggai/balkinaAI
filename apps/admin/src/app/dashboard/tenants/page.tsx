@@ -46,6 +46,31 @@ const SORT_OPTIONS = [
   { value: 'review_count', label: 'Most reviews' },
 ];
 
+const COUNTRIES = [
+  { code: 'us', name: 'United States' }, { code: 'gb', name: 'United Kingdom' }, { code: 'ca', name: 'Canada' },
+  { code: 'au', name: 'Australia' }, { code: 'de', name: 'Germany' }, { code: 'fr', name: 'France' },
+  { code: 'es', name: 'Spain' }, { code: 'it', name: 'Italy' }, { code: 'nl', name: 'Netherlands' },
+  { code: 'be', name: 'Belgium' }, { code: 'at', name: 'Austria' }, { code: 'ch', name: 'Switzerland' },
+  { code: 'se', name: 'Sweden' }, { code: 'no', name: 'Norway' }, { code: 'dk', name: 'Denmark' },
+  { code: 'fi', name: 'Finland' }, { code: 'pt', name: 'Portugal' }, { code: 'ie', name: 'Ireland' },
+  { code: 'pl', name: 'Poland' }, { code: 'cz', name: 'Czech Republic' }, { code: 'gr', name: 'Greece' },
+  { code: 'tr', name: 'Turkey' }, { code: 'ae', name: 'UAE' }, { code: 'sa', name: 'Saudi Arabia' },
+  { code: 'in', name: 'India' }, { code: 'jp', name: 'Japan' }, { code: 'kr', name: 'South Korea' },
+  { code: 'cn', name: 'China' }, { code: 'sg', name: 'Singapore' }, { code: 'my', name: 'Malaysia' },
+  { code: 'th', name: 'Thailand' }, { code: 'br', name: 'Brazil' }, { code: 'mx', name: 'Mexico' },
+  { code: 'ar', name: 'Argentina' }, { code: 'co', name: 'Colombia' }, { code: 'cl', name: 'Chile' },
+  { code: 'za', name: 'South Africa' }, { code: 'ng', name: 'Nigeria' }, { code: 'eg', name: 'Egypt' },
+  { code: 'ke', name: 'Kenya' }, { code: 'ma', name: 'Morocco' }, { code: 'il', name: 'Israel' },
+  { code: 'ro', name: 'Romania' }, { code: 'bg', name: 'Bulgaria' }, { code: 'hr', name: 'Croatia' },
+  { code: 'rs', name: 'Serbia' }, { code: 'me', name: 'Montenegro' }, { code: 'ba', name: 'Bosnia' },
+  { code: 'si', name: 'Slovenia' }, { code: 'hu', name: 'Hungary' }, { code: 'sk', name: 'Slovakia' },
+  { code: 'nz', name: 'New Zealand' }, { code: 'ph', name: 'Philippines' }, { code: 'id', name: 'Indonesia' },
+  { code: 'vn', name: 'Vietnam' }, { code: 'pk', name: 'Pakistan' }, { code: 'bd', name: 'Bangladesh' },
+  { code: 'lk', name: 'Sri Lanka' }, { code: 'qa', name: 'Qatar' }, { code: 'kw', name: 'Kuwait' },
+  { code: 'bh', name: 'Bahrain' }, { code: 'om', name: 'Oman' }, { code: 'jo', name: 'Jordan' },
+  { code: 'lb', name: 'Lebanon' }, { code: 'ge', name: 'Georgia' }, { code: 'am', name: 'Armenia' },
+].sort((a, b) => a.name.localeCompare(b.name));
+
 const selectCls = 'rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 const inputCls = 'mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
@@ -77,14 +102,6 @@ export default function TenantsPage() {
   const [editError, setEditError] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
-  // Create modal
-  const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState('');
-  const [newTenant, setNewTenant] = useState({
-    name: '', owner_name: '', email: '', phone: '', category_id: '', subscription_plan_id: '', status: 'active', payments_enabled: false,
-    location_city: '', location_country: '',
-  });
   const [deleting, setDeleting] = useState<string | null>(null);
 
   // Bulk create
@@ -92,11 +109,41 @@ export default function TenantsPage() {
   const [bulking, setBulking] = useState(false);
   const [bulkResult, setBulkResult] = useState<string | null>(null);
   const [showBulkConfig, setShowBulkConfig] = useState(false);
-  type BulkLoc = { name: string; country: string };
-  const [bulkLocations, setBulkLocations] = useState<BulkLoc[]>([{ name: '', country: '' }]);
-  const updateBulkLoc = (idx: number, field: keyof BulkLoc, value: string) => {
+  type BulkLoc = { name: string; country: string; countryCode: string };
+  const [bulkLocations, setBulkLocations] = useState<BulkLoc[]>([{ name: '', country: '', countryCode: '' }]);
+  const [citySuggestions, setCitySuggestions] = useState<Record<number, { name: string; full: string }[]>>({});
+  const [citySearchTimers, setCitySearchTimers] = useState<Record<number, ReturnType<typeof setTimeout>>>({});
+
+  function updateBulkLoc(idx: number, field: keyof BulkLoc, value: string) {
     setBulkLocations(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
-  };
+    // If changing country, clear city
+    if (field === 'countryCode') {
+      const entry = COUNTRIES.find(c => c.code === value);
+      setBulkLocations(prev => prev.map((l, i) => i === idx ? { ...l, countryCode: value, country: entry?.name ?? '', name: '' } : l));
+      setCitySuggestions(prev => ({ ...prev, [idx]: [] }));
+    }
+  }
+
+  function handleCityInput(idx: number, value: string) {
+    setBulkLocations(prev => prev.map((l, i) => i === idx ? { ...l, name: value } : l));
+    // Debounce city autocomplete
+    if (citySearchTimers[idx]) clearTimeout(citySearchTimers[idx]);
+    if (value.length < 2) { setCitySuggestions(prev => ({ ...prev, [idx]: [] })); return; }
+    const countryCode = bulkLocations[idx]?.countryCode ?? '';
+    const timer = setTimeout(async () => {
+      const params = new URLSearchParams({ q: value });
+      if (countryCode) params.set('country', countryCode);
+      const res = await fetch(`/api/admin/geocode/cities?${params}`);
+      const json = await res.json();
+      setCitySuggestions(prev => ({ ...prev, [idx]: json.cities ?? [] }));
+    }, 300);
+    setCitySearchTimers(prev => ({ ...prev, [idx]: timer }));
+  }
+
+  function selectCity(idx: number, cityName: string) {
+    setBulkLocations(prev => prev.map((l, i) => i === idx ? { ...l, name: cityName } : l));
+    setCitySuggestions(prev => ({ ...prev, [idx]: [] }));
+  }
 
   const perPage = 20;
 
@@ -190,23 +237,6 @@ export default function TenantsPage() {
     fetchTenants();
   }
 
-  // Create
-  async function handleCreate() {
-    if (!newTenant.name || !newTenant.owner_name || !newTenant.email) {
-      setCreateError('Name, owner name, and email are required.');
-      return;
-    }
-    setCreating(true);
-    setCreateError('');
-    const res = await fetch('/api/admin/tenants', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTenant) });
-    const json = await res.json();
-    if (!res.ok) { setCreateError(json.error ?? 'Failed to create tenant'); setCreating(false); return; }
-    setShowCreate(false);
-    setNewTenant({ name: '', owner_name: '', email: '', phone: '', category_id: '', subscription_plan_id: '', status: 'active', payments_enabled: false, location_city: '', location_country: '' });
-    setCreating(false);
-    fetchTenants();
-  }
-
   // Delete tenant
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Delete "${name}" and all its locations, staff, services, appointments, and reviews? This cannot be undone.`)) return;
@@ -249,10 +279,7 @@ export default function TenantsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Tenants</h1>
           <p className="mt-1 text-sm text-gray-500">{total} business{total !== 1 ? 'es' : ''} on the platform</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setShowBulkConfig(true)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Bulk Create</button>
-          <button onClick={() => setShowCreate(true)} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Add Tenant</button>
-        </div>
+        <button onClick={() => setShowBulkConfig(true)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Bulk Create Test Data</button>
       </div>
 
       {/* Filters — Row 1: search + dropdowns */}
@@ -468,79 +495,6 @@ export default function TenantsPage() {
         </div>
       )}
 
-      {/* Create Tenant Modal */}
-      {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="text-lg font-bold text-gray-900">Add Tenant</h2>
-            <p className="mt-1 text-sm text-gray-500">Create a new business on the platform.</p>
-            {createError && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</div>}
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Business Name *</label>
-                <input type="text" value={newTenant.name} onChange={e => setNewTenant({ ...newTenant, name: e.target.value })} className={inputCls} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Owner Name *</label>
-                  <input type="text" value={newTenant.owner_name} onChange={e => setNewTenant({ ...newTenant, owner_name: e.target.value })} className={inputCls} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Email *</label>
-                  <input type="email" value={newTenant.email} onChange={e => setNewTenant({ ...newTenant, email: e.target.value })} className={inputCls} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Phone</label>
-                <input type="tel" value={newTenant.phone} onChange={e => setNewTenant({ ...newTenant, phone: e.target.value })} className={inputCls} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Category</label>
-                  <select value={newTenant.category_id} onChange={e => setNewTenant({ ...newTenant, category_id: e.target.value })} className={inputCls}>
-                    <option value="">No Category</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Plan</label>
-                  <select value={newTenant.subscription_plan_id} onChange={e => setNewTenant({ ...newTenant, subscription_plan_id: e.target.value })} className={inputCls}>
-                    <option value="">No Plan</option>
-                    {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Location <span className="text-gray-400 font-normal">(optional)</span></label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <input type="text" placeholder="City" value={newTenant.location_city} onChange={e => setNewTenant({ ...newTenant, location_city: e.target.value })} className={inputCls} />
-                  </div>
-                  <div>
-                    <input type="text" placeholder="Country" value={newTenant.location_country} onChange={e => setNewTenant({ ...newTenant, location_country: e.target.value })} className={inputCls} />
-                  </div>
-                </div>
-                <p className="mt-1 text-[11px] text-gray-400">Coordinates and timezone auto-resolved from city + country</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Status</label>
-                <select value={newTenant.status} onChange={e => setNewTenant({ ...newTenant, status: e.target.value })} className={inputCls}>
-                  {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="create_payments" checked={newTenant.payments_enabled} onChange={e => setNewTenant({ ...newTenant, payments_enabled: e.target.checked })} className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                <label htmlFor="create_payments" className="text-sm text-gray-700">Enable payments</label>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => { setShowCreate(false); setCreateError(''); }} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button onClick={handleCreate} disabled={creating} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{creating ? 'Creating...' : 'Create Tenant'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Bulk Create Modal */}
       {showBulkConfig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -554,7 +508,7 @@ export default function TenantsPage() {
             <div className="mt-4">
               <div className="flex items-center justify-between">
                 <label className="block text-sm font-medium text-gray-700">Locations <span className="text-gray-400 font-normal">(each tenant gets all locations listed below)</span></label>
-                <button type="button" onClick={() => setBulkLocations([...bulkLocations, { name: '', country: '' }])} className="text-sm font-medium text-brand-600 hover:text-brand-700">+ Add location</button>
+                <button type="button" onClick={() => setBulkLocations([...bulkLocations, { name: '', country: '', countryCode: '' }])} className="text-sm font-medium text-brand-600 hover:text-brand-700">+ Add location</button>
               </div>
               <p className="mt-1 text-xs text-gray-400">Leave empty to use random default cities. Coordinates and timezone are auto-resolved.</p>
               <div className="mt-2 space-y-3">
@@ -562,11 +516,33 @@ export default function TenantsPage() {
                   <div key={idx} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-medium text-gray-500">Location {idx + 1}</span>
-                      {bulkLocations.length > 1 && <button type="button" onClick={() => setBulkLocations(bulkLocations.filter((_, i) => i !== idx))} className="text-xs text-red-500 hover:text-red-700">Remove</button>}
+                      {bulkLocations.length > 1 && <button type="button" onClick={() => { setBulkLocations(bulkLocations.filter((_, i) => i !== idx)); setCitySuggestions(prev => { const n = { ...prev }; delete n[idx]; return n; }); }} className="text-xs text-red-500 hover:text-red-700">Remove</button>}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <input type="text" placeholder="City" value={loc.name} onChange={e => updateBulkLoc(idx, 'name', e.target.value)} className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none" />
-                      <input type="text" placeholder="Country" value={loc.country} onChange={e => updateBulkLoc(idx, 'country', e.target.value)} className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none" />
+                      <select value={loc.countryCode} onChange={e => updateBulkLoc(idx, 'countryCode', e.target.value)} className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none">
+                        <option value="">Select country</option>
+                        {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                      </select>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder={loc.countryCode ? 'Search city...' : 'Select country first'}
+                          value={loc.name}
+                          onChange={e => handleCityInput(idx, e.target.value)}
+                          disabled={!loc.countryCode}
+                          className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
+                        />
+                        {(citySuggestions[idx]?.length ?? 0) > 0 && (
+                          <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-40 overflow-y-auto">
+                            {citySuggestions[idx]?.map((s, i) => (
+                              <button key={i} type="button" onClick={() => selectCity(idx, s.name)} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100">
+                                <span className="font-medium">{s.name}</span>
+                                <span className="ml-1 text-xs text-gray-400">{s.full}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -574,12 +550,12 @@ export default function TenantsPage() {
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className="text-xs text-gray-400 self-center">Quick add:</span>
                 {[
-                  { name: 'Valencia', country: 'Spain' },
-                  { name: 'Berlin', country: 'Germany' },
-                  { name: 'Tivat', country: 'Montenegro' },
-                  { name: 'San Francisco', country: 'United States' },
-                  { name: 'Dubai', country: 'UAE' },
-                  { name: 'London', country: 'United Kingdom' },
+                  { name: 'Valencia', country: 'Spain', countryCode: 'es' },
+                  { name: 'Berlin', country: 'Germany', countryCode: 'de' },
+                  { name: 'Tivat', country: 'Montenegro', countryCode: 'me' },
+                  { name: 'San Francisco', country: 'United States', countryCode: 'us' },
+                  { name: 'Dubai', country: 'UAE', countryCode: 'ae' },
+                  { name: 'London', country: 'United Kingdom', countryCode: 'gb' },
                 ].map(preset => (
                   <button key={preset.name} type="button" onClick={() => { const idx = bulkLocations.findIndex(l => !l.name); if (idx >= 0) { setBulkLocations(prev => prev.map((l, i) => i === idx ? preset : l)); } else { setBulkLocations(prev => [...prev, preset]); } }} className="rounded-full border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-100 hover:border-gray-400">{preset.name}</button>
                 ))}
