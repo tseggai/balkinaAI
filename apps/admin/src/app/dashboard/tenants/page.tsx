@@ -102,13 +102,6 @@ export default function TenantsPage() {
   const [editError, setEditError] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
-  // Create modal
-  const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState('');
-  const [newTenant, setNewTenant] = useState({
-    name: '', owner_name: '', email: '', phone: '', category_id: '', subscription_plan_id: '', status: 'active', payments_enabled: false,
-  });
   const [deleting, setDeleting] = useState<string | null>(null);
 
   // Bulk create
@@ -244,23 +237,6 @@ export default function TenantsPage() {
     fetchTenants();
   }
 
-  // Create
-  async function handleCreate() {
-    if (!newTenant.name || !newTenant.owner_name || !newTenant.email) {
-      setCreateError('Name, owner name, and email are required.');
-      return;
-    }
-    setCreating(true);
-    setCreateError('');
-    const res = await fetch('/api/admin/tenants', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTenant) });
-    const json = await res.json();
-    if (!res.ok) { setCreateError(json.error ?? 'Failed to create tenant'); setCreating(false); return; }
-    setShowCreate(false);
-    setNewTenant({ name: '', owner_name: '', email: '', phone: '', category_id: '', subscription_plan_id: '', status: 'active', payments_enabled: false });
-    setCreating(false);
-    fetchTenants();
-  }
-
   // Delete tenant
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Delete "${name}" and all its locations, staff, services, appointments, and reviews? This cannot be undone.`)) return;
@@ -303,10 +279,7 @@ export default function TenantsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Tenants</h1>
           <p className="mt-1 text-sm text-gray-500">{total} business{total !== 1 ? 'es' : ''} on the platform</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setShowBulkConfig(true)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Bulk Create</button>
-          <button onClick={() => setShowCreate(true)} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Add Tenant</button>
-        </div>
+        <button onClick={() => setShowBulkConfig(true)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Bulk Create Test Data</button>
       </div>
 
       {/* Filters — Row 1: search + dropdowns */}
@@ -517,67 +490,6 @@ export default function TenantsPage() {
                   {editSaving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Tenant Modal */}
-      {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="text-lg font-bold text-gray-900">Add Tenant</h2>
-            <p className="mt-1 text-sm text-gray-500">Create a new business on the platform.</p>
-            {createError && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</div>}
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Business Name *</label>
-                <input type="text" value={newTenant.name} onChange={e => setNewTenant({ ...newTenant, name: e.target.value })} className={inputCls} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Owner Name *</label>
-                  <input type="text" value={newTenant.owner_name} onChange={e => setNewTenant({ ...newTenant, owner_name: e.target.value })} className={inputCls} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Email *</label>
-                  <input type="email" value={newTenant.email} onChange={e => setNewTenant({ ...newTenant, email: e.target.value })} className={inputCls} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Phone</label>
-                <input type="tel" value={newTenant.phone} onChange={e => setNewTenant({ ...newTenant, phone: e.target.value })} className={inputCls} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Category</label>
-                  <select value={newTenant.category_id} onChange={e => setNewTenant({ ...newTenant, category_id: e.target.value })} className={inputCls}>
-                    <option value="">No Category</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Plan</label>
-                  <select value={newTenant.subscription_plan_id} onChange={e => setNewTenant({ ...newTenant, subscription_plan_id: e.target.value })} className={inputCls}>
-                    <option value="">No Plan</option>
-                    {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Status</label>
-                <select value={newTenant.status} onChange={e => setNewTenant({ ...newTenant, status: e.target.value })} className={inputCls}>
-                  {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="create_payments" checked={newTenant.payments_enabled} onChange={e => setNewTenant({ ...newTenant, payments_enabled: e.target.checked })} className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                <label htmlFor="create_payments" className="text-sm text-gray-700">Enable payments</label>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => { setShowCreate(false); setCreateError(''); }} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button onClick={handleCreate} disabled={creating} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{creating ? 'Creating...' : 'Create Tenant'}</button>
             </div>
           </div>
         </div>
