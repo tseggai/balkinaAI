@@ -22,56 +22,66 @@ function CustomerAvatar() {
   );
 }
 
-/* ─── Device Frames ────────────────────────────────────────────────────── */
+/* ─── Device Frames (devices.css) ──────────────────────────────────────── */
 
-function PhoneMockup({ children, label }: { children: React.ReactNode; label: string }) {
+/* Scale factors: phone 0.52x, iPad 0.88x → iPad is ~42px taller than phones */
+const PHONE_SCALE = 0.52;
+const PHONE_VIS_W = Math.round(428 * PHONE_SCALE); // 222px
+const PHONE_VIS_H = Math.round(868 * PHONE_SCALE); // 451px
+const PHONE_CONTENT_SCALE = 390 / 260; // screen is 390px, content designed at 260px
+
+const IPAD_SCALE = 0.88;
+const IPAD_VIS_W = Math.round(778 * IPAD_SCALE); // 685px
+const IPAD_VIS_H = Math.round(560 * IPAD_SCALE); // 493px (42px taller than phone)
+const IPAD_CONTENT_SCALE = 724 / 580; // screen is 724px, content designed at 580px
+
+function PhoneDevice({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center">
-      <p className="mb-3 text-sm font-semibold text-gray-600">{label}</p>
-      <div className="rounded-[2.8rem] bg-gray-900 p-[10px] shadow-2xl shadow-gray-400/50">
-        {/* Side buttons */}
-        <div className="absolute -left-[2px] top-[80px] h-8 w-[3px] rounded-l bg-gray-700" />
-        <div className="absolute -left-[2px] top-[120px] h-12 w-[3px] rounded-l bg-gray-700" />
-        <div className="absolute -left-[2px] top-[140px] h-12 w-[3px] rounded-l bg-gray-700" />
-        <div className="absolute -right-[2px] top-[100px] h-14 w-[3px] rounded-r bg-gray-700" />
-        <div className="relative w-[250px] rounded-[2rem] bg-white overflow-hidden">
-          {/* Dynamic Island */}
-          <div className="absolute top-[6px] left-1/2 -translate-x-1/2 z-10 h-[16px] w-[56px] rounded-full bg-gray-900" />
-          <div className="pt-7">{children}</div>
-          {/* Home Indicator */}
-          <div className="flex justify-center pb-2 pt-1">
-            <div className="h-[4px] w-24 rounded-full bg-gray-900/20" />
+    <div className="device device-iphone-14-pro">
+      <div className="device-frame">
+        <div className="device-screen">
+          <div style={{
+            transform: `scale(${PHONE_CONTENT_SCALE})`,
+            transformOrigin: 'top left',
+            width: 260,
+          }}>
+            {children}
           </div>
         </div>
       </div>
+      <div className="device-stripe" />
+      <div className="device-header" />
+      <div className="device-sensors" />
+      <div className="device-btns" />
+      <div className="device-power" />
+      <div className="device-home" />
     </div>
   );
 }
 
-function IPadMockup({ children, label }: { children: React.ReactNode; label: string }) {
+function IPadDevice({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center">
-      <p className="mb-3 text-sm font-semibold text-gray-600">{label}</p>
-      <div className="rounded-[1.8rem] bg-gray-900 p-[12px] shadow-2xl shadow-gray-400/50">
-        <div className="relative w-[580px] rounded-[0.8rem] bg-white overflow-hidden" style={{ minHeight: 400 }}>
-          {/* Camera dot — right edge for landscape */}
-          <div className="absolute top-1/2 right-[4px] -translate-y-1/2 z-10 h-[6px] w-[6px] rounded-full bg-gray-700" />
-          <div className="flex h-full flex-col">
-            <div className="flex-1">{children}</div>
-            {/* Home Indicator */}
-            <div className="flex justify-center pb-2">
-              <div className="h-[4px] w-24 rounded-full bg-gray-900/20" />
-            </div>
+    <div className="device device-ipad-landscape">
+      <div className="device-frame">
+        <div className="device-screen">
+          <div style={{
+            transform: `scale(${IPAD_CONTENT_SCALE})`,
+            transformOrigin: 'top left',
+            width: 580,
+          }}>
+            {children}
           </div>
         </div>
       </div>
+      <div className="device-sensors" />
+      <div className="device-btns" />
     </div>
   );
 }
 
 /* ─── Customer Booking Flow (5 animated screens) ──────────────────────── */
 
-function CustomerPhoneAnimation() {
+function CustomerPhoneContent() {
   const backArrow = (
     <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -79,8 +89,7 @@ function CustomerPhoneAnimation() {
   );
 
   return (
-    <PhoneMockup label="Your Customers">
-      <div className="relative overflow-hidden" style={{ height: 430 }}>
+      <div className="relative overflow-hidden" style={{ height: 530 }}>
 
         {/* ── Screen 1: Categories ──────────────────────────────────── */}
         <div className="bk-screen-1 absolute inset-0 px-3 pt-1">
@@ -296,16 +305,14 @@ function CustomerPhoneAnimation() {
         </div>
 
       </div>
-    </PhoneMockup>
   );
 }
 
-/* ─── Staff Notification Animation ──────────────────────────────────────── */
+/* ─── Staff Notification Content ───────────────────────────────────────── */
 
-function StaffPhoneAnimation() {
+function StaffPhoneContent() {
   return (
-    <PhoneMockup label="Your Staff">
-      <div className="px-3 pb-4 pt-3" style={{ minHeight: 420 }}>
+      <div className="px-3 pb-4 pt-3" style={{ minHeight: 530 }}>
         {/* Header */}
         <div className="flex items-center justify-between pb-3">
           <div>
@@ -392,15 +399,13 @@ function StaffPhoneAnimation() {
           </div>
         </div>
       </div>
-    </PhoneMockup>
   );
 }
 
-/* ─── Dashboard iPad (Landscape) ───────────────────────────────────────── */
+/* ─── Dashboard Content (iPad Landscape) ───────────────────────────────── */
 
-function DashboardIPadAnimation() {
+function DashboardContent() {
   return (
-    <IPadMockup label="Your Dashboard">
       <div className="flex h-full">
         {/* Sidebar nav */}
         <div className="w-[100px] shrink-0 border-r border-gray-100 bg-gray-50/50 px-2 pt-4 pb-2">
@@ -484,7 +489,6 @@ function DashboardIPadAnimation() {
           </div>
         </div>
       </div>
-    </IPadMockup>
   );
 }
 
@@ -519,28 +523,50 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Three-device showcase — iPad overlaps with staff phone */}
-          {/* Mobile: phones stacked */}
+          {/* Mobile: phones only, stacked */}
           <div className="mt-10 flex flex-1 flex-col items-center justify-center gap-8 pb-8 lg:hidden">
-            <CustomerPhoneAnimation />
-            <StaffPhoneAnimation />
+            <div style={{ width: PHONE_VIS_W, height: PHONE_VIS_H, position: 'relative' }}>
+              <div style={{ transform: `scale(${PHONE_SCALE})`, transformOrigin: 'bottom left', position: 'absolute', bottom: 0, left: 0 }}>
+                <PhoneDevice><CustomerPhoneContent /></PhoneDevice>
+              </div>
+            </div>
+            <div style={{ width: PHONE_VIS_W, height: PHONE_VIS_H, position: 'relative' }}>
+              <div style={{ transform: `scale(${PHONE_SCALE})`, transformOrigin: 'bottom left', position: 'absolute', bottom: 0, left: 0 }}>
+                <PhoneDevice><StaffPhoneContent /></PhoneDevice>
+              </div>
+            </div>
           </div>
 
-          {/* Desktop: iPad large + phones with overlap */}
+          {/* Desktop: 3 devices — phones aligned bottom, iPad 42px taller, staff overlaps iPad */}
           <div className="relative mt-10 hidden flex-1 items-end justify-center pb-8 lg:flex">
-            {/* Customer phone — left */}
-            <div className="relative z-10 shrink-0 -mr-6">
-              <CustomerPhoneAnimation />
+            {/* Customer phone — left, gap from iPad */}
+            <div className="flex flex-col items-center" style={{ zIndex: 10 }}>
+              <p className="mb-3 text-sm font-semibold text-gray-600">Your Customers</p>
+              <div style={{ width: PHONE_VIS_W, height: PHONE_VIS_H, position: 'relative' }}>
+                <div style={{ transform: `scale(${PHONE_SCALE})`, transformOrigin: 'bottom left', position: 'absolute', bottom: 0, left: 0 }}>
+                  <PhoneDevice><CustomerPhoneContent /></PhoneDevice>
+                </div>
+              </div>
             </div>
 
-            {/* Dashboard iPad — center, large */}
-            <div className="relative z-0 shrink-0">
-              <DashboardIPadAnimation />
+            {/* Dashboard iPad — center, 42px taller */}
+            <div className="flex flex-col items-center" style={{ zIndex: 0, marginLeft: 24 }}>
+              <p className="mb-3 text-sm font-semibold text-gray-600">Your Dashboard</p>
+              <div style={{ width: IPAD_VIS_W, height: IPAD_VIS_H, position: 'relative' }}>
+                <div style={{ transform: `scale(${IPAD_SCALE})`, transformOrigin: 'bottom left', position: 'absolute', bottom: 0, left: 0 }}>
+                  <IPadDevice><DashboardContent /></IPadDevice>
+                </div>
+              </div>
             </div>
 
             {/* Staff phone — right, overlapping iPad */}
-            <div className="relative z-10 shrink-0 -ml-16">
-              <StaffPhoneAnimation />
+            <div className="flex flex-col items-center" style={{ zIndex: 10, marginLeft: -70 }}>
+              <p className="mb-3 text-sm font-semibold text-gray-600">Your Staff</p>
+              <div style={{ width: PHONE_VIS_W, height: PHONE_VIS_H, position: 'relative' }}>
+                <div style={{ transform: `scale(${PHONE_SCALE})`, transformOrigin: 'bottom left', position: 'absolute', bottom: 0, left: 0 }}>
+                  <PhoneDevice><StaffPhoneContent /></PhoneDevice>
+                </div>
+              </div>
             </div>
           </div>
         </div>

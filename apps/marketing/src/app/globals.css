@@ -1,3 +1,5 @@
+@import 'devices.css/dist/devices.min.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,6 +12,75 @@
 
 html {
   scroll-behavior: smooth;
+}
+
+/* ─── Device screen override: allow div children (not just img) ──────── */
+
+div.device-screen {
+  overflow: hidden;
+  background: #fff;
+  display: block;
+  position: relative;
+}
+
+/* ─── Custom landscape iPad (matches devices.css iPad Pro styling) ──── */
+
+.device-ipad-landscape {
+  height: 560px;
+  width: 778px;
+  position: relative;
+}
+
+.device-ipad-landscape .device-frame {
+  background: #0d0d0d;
+  border-radius: 36px;
+  box-shadow: inset 0 0 0 1px #babdbf, inset 0 0 1px 3px #e2e3e4;
+  height: 560px;
+  width: 778px;
+  padding: 27px;
+  position: relative;
+}
+
+.device-ipad-landscape .device-screen {
+  border: 2px solid #121212;
+  border-radius: 11px;
+  height: 506px;
+  width: 724px;
+}
+
+.device-ipad-landscape .device-sensors::before {
+  background: radial-gradient(farthest-corner at 20% 20%, #6074bf 0, transparent 40%),
+    radial-gradient(farthest-corner at 80% 80%, #513785 0, #24555e 20%, transparent 50%);
+  border-radius: 50%;
+  box-shadow: 0 0 1px 1px rgba(255, 255, 255, 0.05);
+  content: "";
+  height: 6px;
+  left: 50%;
+  margin-left: -3px;
+  position: absolute;
+  top: 10px;
+  width: 6px;
+}
+
+.device-ipad-landscape .device-btns::before {
+  background: #babdbf;
+  content: "";
+  position: absolute;
+  height: 2px;
+  top: -2px;
+  right: 60px;
+  width: 36px;
+}
+
+.device-ipad-landscape .device-btns::after {
+  background: #babdbf;
+  content: "";
+  position: absolute;
+  width: 2px;
+  right: -2px;
+  top: 63px;
+  height: 32px;
+  box-shadow: 0 37px #babdbf;
 }
 
 /* ─── Staggered fade-in animations for mockup elements ───────────────── */
