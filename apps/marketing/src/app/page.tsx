@@ -52,14 +52,16 @@ function IPadMockup({ children, label }: { children: React.ReactNode; label: str
   return (
     <div className="flex flex-col items-center">
       <p className="mb-3 text-sm font-semibold text-gray-600">{label}</p>
-      <div className="rounded-[1.5rem] bg-gray-900 p-[10px] shadow-2xl shadow-gray-400/50">
-        <div className="relative w-[580px] rounded-[0.8rem] bg-white overflow-hidden">
-          {/* Camera dot */}
+      <div className="rounded-[1.8rem] bg-gray-900 p-[12px] shadow-2xl shadow-gray-400/50">
+        <div className="relative w-[580px] rounded-[0.8rem] bg-white overflow-hidden" style={{ minHeight: 400 }}>
+          {/* Camera dot — right edge for landscape */}
           <div className="absolute top-1/2 right-[4px] -translate-y-1/2 z-10 h-[6px] w-[6px] rounded-full bg-gray-700" />
-          {children}
-          {/* Home Indicator */}
-          <div className="flex justify-center pb-2">
-            <div className="h-[4px] w-24 rounded-full bg-gray-900/20" />
+          <div className="flex h-full flex-col">
+            <div className="flex-1">{children}</div>
+            {/* Home Indicator */}
+            <div className="flex justify-center pb-2">
+              <div className="h-[4px] w-24 rounded-full bg-gray-900/20" />
+            </div>
           </div>
         </div>
       </div>
@@ -399,52 +401,85 @@ function StaffPhoneAnimation() {
 function DashboardIPadAnimation() {
   return (
     <IPadMockup label="Your Dashboard">
-      <div className="p-4 pt-5">
-        {/* Stats row */}
-        <div className="grid grid-cols-4 gap-2">
+      <div className="flex h-full">
+        {/* Sidebar nav */}
+        <div className="w-[100px] shrink-0 border-r border-gray-100 bg-gray-50/50 px-2 pt-4 pb-2">
+          <div className="flex items-center gap-1.5 mb-4 px-1">
+            <div className="h-4 w-4 rounded-full bg-brand-600" />
+            <span className="text-[9px] font-bold text-gray-800">Balkina</span>
+          </div>
           {[
-            { label: 'Today', value: '8', sub: 'bookings', bg: 'bg-brand-50', fg: 'text-brand-700' },
-            { label: 'Pending', value: '2', sub: 'requests', bg: 'bg-amber-50', fg: 'text-amber-700' },
-            { label: 'Revenue', value: '$1,240', sub: 'this week', bg: 'bg-green-50', fg: 'text-green-700' },
-            { label: 'Rating', value: '4.9', sub: '89 reviews', bg: 'bg-purple-50', fg: 'text-purple-700' },
-          ].map((s, i) => (
-            <div key={i} className={`rounded-lg p-2 ${s.bg}`}>
-              <p className="text-[8px] text-gray-400">{s.label}</p>
-              <p className={`text-lg font-bold ${s.fg}`}>{s.value}</p>
-              <p className="text-[8px] text-gray-400">{s.sub}</p>
+            { name: 'Dashboard', active: true },
+            { name: 'Appointments' },
+            { name: 'Services' },
+            { name: 'Staff' },
+            { name: 'Customers' },
+            { name: 'Analytics' },
+            { name: 'Settings' },
+          ].map((item) => (
+            <div
+              key={item.name}
+              className={`mb-0.5 rounded-md px-2 py-1.5 text-[9px] ${
+                item.active
+                  ? 'bg-brand-100 font-semibold text-brand-700'
+                  : 'text-gray-500'
+              }`}
+            >
+              {item.name}
             </div>
           ))}
         </div>
 
-        {/* Appointments table */}
-        <div className="mt-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">Today&apos;s Appointments</p>
-            <div className="rounded bg-brand-600 px-2 py-0.5 text-[8px] font-semibold text-white">+ New</div>
-          </div>
-          <div className="mt-2 rounded-lg border border-gray-100">
-            <div className="grid grid-cols-5 gap-1 border-b border-gray-100 bg-gray-50 px-2 py-1 text-[8px] font-semibold text-gray-400">
-              <span>Time</span><span>Customer</span><span>Service</span><span>Staff</span><span>Status</span>
-            </div>
+        {/* Main content */}
+        <div className="flex-1 p-4 pt-4">
+          {/* Stats row */}
+          <div className="grid grid-cols-4 gap-2">
             {[
-              { time: '8:00 AM', name: 'Sarah M.', svc: 'Vinyasa Flow', staff: 'Priya S.', status: 'Completed', sc: 'bg-gray-100 text-gray-600' },
-              { time: '9:00 AM', name: 'James K.', svc: 'Hot Yoga', staff: 'Luna R.', status: 'In Progress', sc: 'bg-blue-100 text-blue-700' },
-              { time: '10:00 AM', name: 'Emma L.', svc: 'Vinyasa Flow', staff: 'Priya S.', status: 'Confirmed', sc: 'bg-green-100 text-green-700' },
-            ].map((apt, i) => (
-              <div key={i} className={`grid grid-cols-5 gap-1 px-2 py-1.5 text-[9px] ${i < 2 ? 'border-b border-gray-50' : ''} ${i === 2 ? 'animate-fade-in-6 bg-green-50/50' : ''}`}>
-                <span className="text-gray-500">{apt.time}</span>
-                <span className="font-medium text-gray-800">{apt.name}</span>
-                <span className="text-gray-600">{apt.svc}</span>
-                <span className="text-gray-500">{apt.staff}</span>
-                <span className={`inline-block w-fit rounded-full px-1.5 py-0.5 text-[7px] font-semibold ${apt.sc}`}>{apt.status}</span>
+              { label: 'Today', value: '8', sub: 'bookings', bg: 'bg-brand-50', fg: 'text-brand-700' },
+              { label: 'Pending', value: '2', sub: 'requests', bg: 'bg-amber-50', fg: 'text-amber-700' },
+              { label: 'Revenue', value: '$1,240', sub: 'this week', bg: 'bg-green-50', fg: 'text-green-700' },
+              { label: 'Rating', value: '4.9', sub: '89 reviews', bg: 'bg-purple-50', fg: 'text-purple-700' },
+            ].map((s, i) => (
+              <div key={i} className={`rounded-lg p-2 ${s.bg}`}>
+                <p className="text-[8px] text-gray-400">{s.label}</p>
+                <p className={`text-lg font-bold ${s.fg}`}>{s.value}</p>
+                <p className="text-[8px] text-gray-400">{s.sub}</p>
               </div>
             ))}
-            <div className="animate-fade-in-7 grid grid-cols-5 gap-1 border-t border-brand-100 bg-brand-50/50 px-2 py-1.5 text-[9px]">
-              <span className="text-gray-500">11:30 AM</span>
-              <span className="font-medium text-brand-700">New booking!</span>
-              <span className="text-gray-600">Gentle Yoga</span>
-              <span className="text-gray-500">Raj K.</span>
-              <span className="inline-block w-fit rounded-full bg-amber-100 px-1.5 py-0.5 text-[7px] font-semibold text-amber-700">Pending</span>
+          </div>
+
+          {/* Appointments table */}
+          <div className="mt-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">Today&apos;s Appointments</p>
+              <div className="rounded bg-brand-600 px-2 py-0.5 text-[8px] font-semibold text-white">+ New</div>
+            </div>
+            <div className="mt-2 rounded-lg border border-gray-100">
+              <div className="grid grid-cols-5 gap-1 border-b border-gray-100 bg-gray-50 px-2 py-1 text-[8px] font-semibold text-gray-400">
+                <span>Time</span><span>Customer</span><span>Service</span><span>Staff</span><span>Status</span>
+              </div>
+              {[
+                { time: '8:00 AM', name: 'Sarah M.', svc: 'Vinyasa Flow', staff: 'Priya S.', status: 'Completed', sc: 'bg-gray-100 text-gray-600' },
+                { time: '9:00 AM', name: 'James K.', svc: 'Hot Yoga', staff: 'Luna R.', status: 'In Progress', sc: 'bg-blue-100 text-blue-700' },
+                { time: '10:00 AM', name: 'Emma L.', svc: 'Vinyasa Flow', staff: 'Priya S.', status: 'Confirmed', sc: 'bg-green-100 text-green-700' },
+                { time: '11:00 AM', name: 'Alex R.', svc: 'Yin & Restore', staff: 'Priya S.', status: 'Confirmed', sc: 'bg-green-100 text-green-700' },
+                { time: '12:30 PM', name: 'Mia T.', svc: 'Power Yoga', staff: 'Luna R.', status: 'Confirmed', sc: 'bg-green-100 text-green-700' },
+              ].map((apt, i) => (
+                <div key={i} className={`grid grid-cols-5 gap-1 px-2 py-1.5 text-[9px] ${i < 4 ? 'border-b border-gray-50' : ''} ${i === 2 ? 'animate-fade-in-6 bg-green-50/50' : ''}`}>
+                  <span className="text-gray-500">{apt.time}</span>
+                  <span className="font-medium text-gray-800">{apt.name}</span>
+                  <span className="text-gray-600">{apt.svc}</span>
+                  <span className="text-gray-500">{apt.staff}</span>
+                  <span className={`inline-block w-fit rounded-full px-1.5 py-0.5 text-[7px] font-semibold ${apt.sc}`}>{apt.status}</span>
+                </div>
+              ))}
+              <div className="animate-fade-in-7 grid grid-cols-5 gap-1 border-t border-brand-100 bg-brand-50/50 px-2 py-1.5 text-[9px]">
+                <span className="text-gray-500">2:00 PM</span>
+                <span className="font-medium text-brand-700">New booking!</span>
+                <span className="text-gray-600">Gentle Yoga</span>
+                <span className="text-gray-500">Raj K.</span>
+                <span className="inline-block w-fit rounded-full bg-amber-100 px-1.5 py-0.5 text-[7px] font-semibold text-amber-700">Pending</span>
+              </div>
             </div>
           </div>
         </div>
