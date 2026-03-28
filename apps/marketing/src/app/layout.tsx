@@ -1,0 +1,28 @@
+import type { Metadata } from 'next';
+import './globals.css';
+import { Navbar } from '@/components/navbar';
+import { Footer } from '@/components/footer';
+
+export const metadata: Metadata = {
+  title: 'Balkina AI — Book Appointments with AI',
+  description: 'The AI-powered appointment booking platform. Customers chat, AI finds businesses, checks availability, and books — all in one conversation.',
+  keywords: ['appointment booking', 'AI booking', 'chatbot', 'scheduling', 'business management'],
+  openGraph: {
+    title: 'Balkina AI — Book Appointments with AI',
+    description: 'The AI-powered appointment booking platform.',
+    type: 'website',
+    url: 'https://balkina.ai',
+  },
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body className="min-h-screen bg-white">
+        <Navbar />
+        <main>{children}</main>
+        <Footer />
+      </body>
+    </html>
+  );
+}
