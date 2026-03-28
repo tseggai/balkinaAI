@@ -27,18 +27,23 @@ function CustomerAvatar() {
 function PhoneMockup({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="rounded-[2.5rem] border border-gray-200/80 bg-gray-50 p-[3px] shadow-2xl shadow-gray-300/40">
-        <div className="relative w-[250px] rounded-[2.3rem] bg-white overflow-hidden">
+      <p className="mb-3 text-sm font-semibold text-gray-600">{label}</p>
+      <div className="rounded-[2.8rem] bg-gray-900 p-[10px] shadow-2xl shadow-gray-400/50">
+        {/* Side buttons */}
+        <div className="absolute -left-[2px] top-[80px] h-8 w-[3px] rounded-l bg-gray-700" />
+        <div className="absolute -left-[2px] top-[120px] h-12 w-[3px] rounded-l bg-gray-700" />
+        <div className="absolute -left-[2px] top-[140px] h-12 w-[3px] rounded-l bg-gray-700" />
+        <div className="absolute -right-[2px] top-[100px] h-14 w-[3px] rounded-r bg-gray-700" />
+        <div className="relative w-[250px] rounded-[2rem] bg-white overflow-hidden">
           {/* Dynamic Island */}
-          <div className="absolute top-[6px] left-1/2 -translate-x-1/2 z-10 h-[14px] w-[50px] rounded-full bg-gray-900" />
-          <div className="pt-6">{children}</div>
+          <div className="absolute top-[6px] left-1/2 -translate-x-1/2 z-10 h-[16px] w-[56px] rounded-full bg-gray-900" />
+          <div className="pt-7">{children}</div>
           {/* Home Indicator */}
           <div className="flex justify-center pb-2 pt-1">
-            <div className="h-[3px] w-20 rounded-full bg-gray-200" />
+            <div className="h-[4px] w-24 rounded-full bg-gray-900/20" />
           </div>
         </div>
       </div>
-      <p className="mt-5 text-sm font-semibold text-gray-600">{label}</p>
     </div>
   );
 }
@@ -46,18 +51,18 @@ function PhoneMockup({ children, label }: { children: React.ReactNode; label: st
 function IPadMockup({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="rounded-[1.2rem] border border-gray-200/80 bg-gray-50 p-[3px] shadow-2xl shadow-gray-300/40">
-        <div className="relative w-[480px] rounded-[1rem] bg-white overflow-hidden">
+      <p className="mb-3 text-sm font-semibold text-gray-600">{label}</p>
+      <div className="rounded-[1.5rem] bg-gray-900 p-[10px] shadow-2xl shadow-gray-400/50">
+        <div className="relative w-[580px] rounded-[0.8rem] bg-white overflow-hidden">
           {/* Camera dot */}
-          <div className="absolute top-[8px] left-1/2 -translate-x-1/2 z-10 h-[6px] w-[6px] rounded-full bg-gray-300" />
+          <div className="absolute top-1/2 right-[4px] -translate-y-1/2 z-10 h-[6px] w-[6px] rounded-full bg-gray-700" />
           {children}
           {/* Home Indicator */}
-          <div className="flex justify-center pb-1.5">
-            <div className="h-[3px] w-20 rounded-full bg-gray-200" />
+          <div className="flex justify-center pb-2">
+            <div className="h-[4px] w-24 rounded-full bg-gray-900/20" />
           </div>
         </div>
       </div>
-      <p className="mt-5 text-sm font-semibold text-gray-600">{label}</p>
     </div>
   );
 }
@@ -479,20 +484,27 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Three-device showcase */}
-          <div className="mt-10 flex flex-1 flex-col items-center justify-center gap-8 pb-8 lg:flex-row lg:items-start lg:gap-6 xl:gap-10">
-            {/* Customer phone */}
-            <div className="shrink-0 lg:mt-8">
+          {/* Three-device showcase — iPad overlaps with staff phone */}
+          {/* Mobile: phones stacked */}
+          <div className="mt-10 flex flex-1 flex-col items-center justify-center gap-8 pb-8 lg:hidden">
+            <CustomerPhoneAnimation />
+            <StaffPhoneAnimation />
+          </div>
+
+          {/* Desktop: iPad large + phones with overlap */}
+          <div className="relative mt-10 hidden flex-1 items-end justify-center pb-8 lg:flex">
+            {/* Customer phone — left */}
+            <div className="relative z-10 shrink-0 -mr-6">
               <CustomerPhoneAnimation />
             </div>
 
-            {/* Dashboard iPad — center, hidden on mobile */}
-            <div className="hidden shrink-0 lg:flex lg:order-none lg:-mt-2">
+            {/* Dashboard iPad — center, large */}
+            <div className="relative z-0 shrink-0">
               <DashboardIPadAnimation />
             </div>
 
-            {/* Staff phone */}
-            <div className="shrink-0 lg:mt-8">
+            {/* Staff phone — right, overlapping iPad */}
+            <div className="relative z-10 shrink-0 -ml-16">
               <StaffPhoneAnimation />
             </div>
           </div>
