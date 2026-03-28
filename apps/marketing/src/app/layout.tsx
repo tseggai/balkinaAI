@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import 'devices.css/dist/devices.min.css';
 import './globals.css';
 import { Navbar } from '@/components/navbar';
 import { Footer } from '@/components/footer';
