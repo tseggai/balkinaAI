@@ -2,85 +2,292 @@
 
 import Link from 'next/link';
 
-/* ─── Animated Phone Mockup ─────────────────────────────────────────────── */
+/* ─── Chat Avatars ─────────────────────────────────────────────────────── */
 
-function PhoneMockup({ children, label }: { children: React.ReactNode; label: string }) {
+function BalkinaAvatar() {
   return (
-    <div className="flex flex-col items-center">
-      <div className="rounded-[2.2rem] border-[5px] border-gray-800 bg-gray-800 p-0.5 shadow-2xl shadow-gray-400/30">
-        <div className="w-[260px] rounded-[1.8rem] bg-white overflow-hidden">
-          {/* Notch */}
-          <div className="mx-auto mt-2 h-5 w-24 rounded-full bg-gray-800" />
-          {children}
-        </div>
-      </div>
-      <p className="mt-5 text-sm font-semibold text-gray-700">{label}</p>
+    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600">
+      <span className="text-[7px] font-bold text-white">B</span>
     </div>
   );
 }
 
-/* ─── Customer Booking Animation ────────────────────────────────────────── */
+function CustomerAvatar() {
+  return (
+    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-200">
+      <svg className="h-3 w-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+      </svg>
+    </div>
+  );
+}
+
+/* ─── Device Frames ────────────────────────────────────────────────────── */
+
+function PhoneMockup({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <div className="flex flex-col items-center">
+      <div className="rounded-[2.5rem] border border-gray-200/80 bg-gray-50 p-[3px] shadow-2xl shadow-gray-300/40">
+        <div className="relative w-[250px] rounded-[2.3rem] bg-white overflow-hidden">
+          {/* Dynamic Island */}
+          <div className="absolute top-[6px] left-1/2 -translate-x-1/2 z-10 h-[14px] w-[50px] rounded-full bg-gray-900" />
+          <div className="pt-6">{children}</div>
+          {/* Home Indicator */}
+          <div className="flex justify-center pb-2 pt-1">
+            <div className="h-[3px] w-20 rounded-full bg-gray-200" />
+          </div>
+        </div>
+      </div>
+      <p className="mt-5 text-sm font-semibold text-gray-600">{label}</p>
+    </div>
+  );
+}
+
+function IPadMockup({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <div className="flex flex-col items-center">
+      <div className="rounded-[1.2rem] border border-gray-200/80 bg-gray-50 p-[3px] shadow-2xl shadow-gray-300/40">
+        <div className="relative w-[480px] rounded-[1rem] bg-white overflow-hidden">
+          {/* Camera dot */}
+          <div className="absolute top-[8px] left-1/2 -translate-x-1/2 z-10 h-[6px] w-[6px] rounded-full bg-gray-300" />
+          {children}
+          {/* Home Indicator */}
+          <div className="flex justify-center pb-1.5">
+            <div className="h-[3px] w-20 rounded-full bg-gray-200" />
+          </div>
+        </div>
+      </div>
+      <p className="mt-5 text-sm font-semibold text-gray-600">{label}</p>
+    </div>
+  );
+}
+
+/* ─── Customer Booking Flow (5 animated screens) ──────────────────────── */
 
 function CustomerPhoneAnimation() {
+  const backArrow = (
+    <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+    </svg>
+  );
+
   return (
     <PhoneMockup label="Your Customers">
-      <div className="px-3 pb-4 pt-3" style={{ minHeight: 420 }}>
-        {/* App header */}
-        <div className="flex items-center justify-center gap-1.5 pb-2">
-          <div className="h-4 w-4 rounded-full bg-brand-600" />
-          <span className="text-[10px] font-bold tracking-wider text-gray-800">BALKINA</span>
+      <div className="relative overflow-hidden" style={{ height: 430 }}>
+
+        {/* ── Screen 1: Categories ──────────────────────────────────── */}
+        <div className="bk-screen-1 absolute inset-0 px-3 pt-1">
+          <div className="flex items-center gap-1.5 pb-3">
+            <BalkinaAvatar />
+            <span className="text-[10px] font-bold text-gray-800">Balkina</span>
+          </div>
+          <div className="mb-3 flex items-start gap-1.5">
+            <BalkinaAvatar />
+            <div className="rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[11px] text-gray-700">
+              Hi! What are you looking for?
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5 px-1">
+            {[
+              { name: 'Beauty', gradient: 'from-pink-400 to-rose-300' },
+              { name: 'Wellness', gradient: 'from-emerald-400 to-teal-300', selected: true },
+              { name: 'Fitness', gradient: 'from-orange-400 to-amber-300' },
+              { name: 'Medical', gradient: 'from-blue-400 to-cyan-300' },
+              { name: 'Pets', gradient: 'from-yellow-400 to-amber-200' },
+              { name: 'Home', gradient: 'from-violet-400 to-purple-300' },
+            ].map((cat, i) => (
+              <div
+                key={i}
+                className={`flex flex-col items-center rounded-xl border p-2.5 ${
+                  cat.selected
+                    ? 'border-brand-300 bg-brand-50 shadow-sm'
+                    : 'border-gray-100 bg-white'
+                }`}
+              >
+                <div className={`h-8 w-8 rounded-xl bg-gradient-to-br ${cat.gradient}`} />
+                <p className={`mt-1 text-[9px] font-medium ${
+                  cat.selected ? 'text-brand-700' : 'text-gray-600'
+                }`}>{cat.name}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Chat bubbles — staggered fade-in */}
-        <div className="space-y-2">
-          <div className="animate-fade-in-1 ml-auto max-w-[80%] rounded-2xl rounded-tr-md bg-brand-600 px-3 py-2 text-[11px] text-white">
-            I need a yoga session near me
+        {/* ── Screen 2: Businesses ─────────────────────────────────── */}
+        <div className="bk-screen-2 absolute inset-0 px-3 pt-1">
+          <div className="flex items-center gap-1.5 pb-3">
+            {backArrow}
+            <span className="text-[10px] font-semibold text-gray-800">Wellness</span>
           </div>
-
-          <div className="animate-fade-in-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-3 py-2 text-[11px] text-gray-700">
-            I found 2 yoga studios nearby!
-          </div>
-
-          {/* Business cards */}
-          <div className="animate-fade-in-3 flex gap-1.5">
-            <div className="flex-1 rounded-lg border border-gray-200 p-2">
-              <div className="h-10 rounded bg-gradient-to-br from-emerald-100 to-teal-50" />
-              <p className="mt-1 text-[10px] font-semibold text-gray-800">Sunrise Yoga</p>
-              <p className="text-[9px] text-gray-400">0.3 mi</p>
+          <div className="mb-2 flex items-start justify-end gap-1.5">
+            <div className="rounded-2xl rounded-tr-md bg-brand-600 px-2.5 py-2 text-[11px] text-white">
+              Wellness
             </div>
-            <div className="flex-1 rounded-lg border border-brand-300 bg-brand-50 p-2">
-              <div className="h-10 rounded bg-gradient-to-br from-brand-100 to-indigo-50" />
-              <p className="mt-1 text-[10px] font-semibold text-brand-800">Zen Wellness</p>
-              <p className="text-[9px] text-brand-500">0.5 mi</p>
+            <CustomerAvatar />
+          </div>
+          <div className="mb-2 flex items-start gap-1.5">
+            <BalkinaAvatar />
+            <div className="rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[11px] text-gray-700">
+              Here are spots near you:
             </div>
           </div>
+          <div className="flex gap-2 overflow-hidden px-1">
+            {[
+              { name: 'Sunrise Yoga', rating: '4.8', dist: '0.3 mi', gradient: 'from-emerald-300 via-teal-200 to-cyan-100' },
+              { name: 'Zen Wellness', rating: '4.9', dist: '0.5 mi', gradient: 'from-brand-300 via-indigo-200 to-purple-100', selected: true },
+              { name: 'Harmony Spa', rating: '4.7', dist: '1.2 mi', gradient: 'from-rose-300 via-pink-200 to-fuchsia-100' },
+            ].map((biz, i) => (
+              <div
+                key={i}
+                className={`w-[105px] shrink-0 rounded-xl border overflow-hidden ${
+                  biz.selected ? 'border-brand-300 shadow-md shadow-brand-100/50' : 'border-gray-100'
+                }`}
+              >
+                <div className={`h-14 bg-gradient-to-br ${biz.gradient}`} />
+                <div className="p-1.5">
+                  <p className={`text-[10px] font-semibold ${biz.selected ? 'text-brand-800' : 'text-gray-800'}`}>{biz.name}</p>
+                  <div className="mt-0.5 flex items-center gap-1">
+                    <span className="text-[9px] text-amber-500">&#9733;</span>
+                    <span className="text-[9px] text-gray-500">{biz.rating}</span>
+                    <span className="text-[9px] text-gray-300">&middot;</span>
+                    <span className="text-[9px] text-gray-400">{biz.dist}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-          {/* Service selection */}
-          <div className="animate-fade-in-4 flex gap-1.5">
-            <div className="rounded-md border border-brand-300 bg-brand-50 px-2 py-1">
-              <p className="text-[10px] font-medium text-brand-800">Vinyasa Flow</p>
-              <p className="text-[9px] text-brand-600">$30 &middot; 60 min</p>
-            </div>
-            <div className="rounded-md border border-gray-200 px-2 py-1">
-              <p className="text-[10px] font-medium text-gray-700">Hot Yoga</p>
-              <p className="text-[9px] text-gray-400">$35 &middot; 60 min</p>
+        {/* ── Screen 3: Services ───────────────────────────────────── */}
+        <div className="bk-screen-3 absolute inset-0 px-3 pt-1">
+          <div className="flex items-center gap-1.5 pb-3">
+            {backArrow}
+            <span className="text-[10px] font-semibold text-gray-800">Zen Wellness</span>
+          </div>
+          <div className="mb-2 flex items-start gap-1.5">
+            <BalkinaAvatar />
+            <div className="rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[11px] text-gray-700">
+              Here are their services:
             </div>
           </div>
-
-          <div className="animate-fade-in-5 ml-auto max-w-[80%] rounded-2xl rounded-tr-md bg-brand-600 px-3 py-2 text-[11px] text-white">
-            Book Vinyasa at Zen for 10am
+          <div className="space-y-1.5 px-1">
+            {[
+              { name: 'Vinyasa Flow', price: '$30', dur: '60 min', selected: true },
+              { name: 'Hot Yoga', price: '$35', dur: '60 min' },
+              { name: 'Yin & Restore', price: '$28', dur: '45 min' },
+              { name: 'Power Yoga', price: '$32', dur: '75 min' },
+            ].map((svc, i) => (
+              <div
+                key={i}
+                className={`flex items-center justify-between rounded-xl border p-2.5 ${
+                  svc.selected ? 'border-brand-300 bg-brand-50' : 'border-gray-100 bg-white'
+                }`}
+              >
+                <div>
+                  <p className={`text-[11px] font-semibold ${svc.selected ? 'text-brand-800' : 'text-gray-800'}`}>{svc.name}</p>
+                  <p className={`text-[9px] ${svc.selected ? 'text-brand-500' : 'text-gray-400'}`}>{svc.dur}</p>
+                </div>
+                <p className={`text-[11px] font-bold ${svc.selected ? 'text-brand-700' : 'text-gray-600'}`}>{svc.price}</p>
+              </div>
+            ))}
           </div>
+        </div>
 
-          {/* Confirmed */}
-          <div className="animate-fade-in-6 rounded-xl border border-green-200 bg-green-50 p-2.5">
+        {/* ── Screen 4: Staff + Time Slots ─────────────────────────── */}
+        <div className="bk-screen-4 absolute inset-0 px-3 pt-1">
+          <div className="flex items-center gap-1.5 pb-3">
+            {backArrow}
+            <span className="text-[10px] font-semibold text-gray-800">Vinyasa Flow</span>
+          </div>
+          <div className="mb-2 flex items-start gap-1.5">
+            <BalkinaAvatar />
+            <div className="rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[11px] text-gray-700">
+              Pick your instructor &amp; time:
+            </div>
+          </div>
+          <div className="mb-3 flex gap-2 px-1">
+            {[
+              { name: 'Priya S.', initials: 'PS', gradient: 'from-amber-200 to-orange-100', color: 'text-amber-800', selected: true },
+              { name: 'Luna R.', initials: 'LR', gradient: 'from-sky-200 to-blue-100', color: 'text-blue-800' },
+              { name: 'Raj K.', initials: 'RK', gradient: 'from-emerald-200 to-green-100', color: 'text-green-800' },
+            ].map((staff, i) => (
+              <div
+                key={i}
+                className={`flex flex-1 flex-col items-center rounded-xl border p-2 ${
+                  staff.selected ? 'border-brand-300 bg-brand-50' : 'border-gray-100'
+                }`}
+              >
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${staff.gradient}`}>
+                  <span className={`text-[10px] font-bold ${staff.color}`}>{staff.initials}</span>
+                </div>
+                <p className={`mt-1 text-[9px] font-medium ${staff.selected ? 'text-brand-700' : 'text-gray-600'}`}>{staff.name}</p>
+                <div className="mt-0.5 flex items-center gap-0.5">
+                  <span className="text-[8px] text-amber-500">&#9733;</span>
+                  <span className="text-[8px] text-gray-400">{staff.selected ? '4.9' : i === 1 ? '4.7' : '4.8'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mb-1.5 px-1 text-[9px] font-semibold uppercase tracking-wider text-gray-400">Tomorrow</p>
+          <div className="grid grid-cols-4 gap-1 px-1">
+            {['9:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00', '18:00'].map((time) => (
+              <div
+                key={time}
+                className={`rounded-lg border py-1.5 text-center text-[10px] font-medium ${
+                  time === '10:00'
+                    ? 'border-brand-400 bg-brand-600 text-white'
+                    : 'border-gray-100 text-gray-600'
+                }`}
+              >
+                {time}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Screen 5: Summary + Confirmation ─────────────────────── */}
+        <div className="bk-screen-5 absolute inset-0 px-3 pt-1">
+          <div className="flex items-center gap-1.5 pb-3">
+            <BalkinaAvatar />
+            <span className="text-[10px] font-bold text-gray-800">Balkina</span>
+          </div>
+          <div className="mb-2 flex items-start gap-1.5">
+            <BalkinaAvatar />
+            <div className="rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[11px] text-gray-700">
+              Here&apos;s your booking summary:
+            </div>
+          </div>
+          <div className="mx-1 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+            <div className="space-y-2">
+              {[
+                { l: 'Business', v: 'Zen Wellness' },
+                { l: 'Service', v: 'Vinyasa Flow' },
+                { l: 'Instructor', v: 'Priya S.' },
+                { l: 'Date & Time', v: 'Tomorrow, 10:00 AM' },
+                { l: 'Duration', v: '60 min' },
+              ].map((row) => (
+                <div key={row.l} className="flex justify-between text-[10px]">
+                  <span className="text-gray-400">{row.l}</span>
+                  <span className="font-semibold text-gray-800">{row.v}</span>
+                </div>
+              ))}
+              <div className="flex justify-between border-t border-gray-100 pt-2 text-[10px]">
+                <span className="text-gray-400">Total</span>
+                <span className="font-bold text-gray-900">$30.00</span>
+              </div>
+            </div>
+          </div>
+          <div className="mx-1 mt-3 rounded-xl border border-green-200 bg-green-50 p-2.5">
             <div className="flex items-center gap-1.5">
-              <svg className="h-3.5 w-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-              <p className="text-[10px] font-semibold text-green-800">Booked!</p>
+              <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <p className="text-[11px] font-semibold text-green-800">Booking Confirmed!</p>
             </div>
-            <p className="mt-1 text-[9px] text-green-700">Vinyasa Flow at Zen Wellness</p>
-            <p className="text-[9px] text-green-600">Tomorrow, 10:00 AM &middot; Priya S.</p>
+            <p className="mt-1 text-[9px] text-green-600">You&apos;ll receive a confirmation shortly.</p>
           </div>
         </div>
+
       </div>
     </PhoneMockup>
   );
@@ -182,85 +389,62 @@ function StaffPhoneAnimation() {
   );
 }
 
-/* ─── Dashboard Laptop Mockup ───────────────────────────────────────────── */
+/* ─── Dashboard iPad (Landscape) ───────────────────────────────────────── */
 
-function DashboardLaptopAnimation() {
+function DashboardIPadAnimation() {
   return (
-    <div className="flex flex-col items-center">
-      <div className="w-full max-w-[500px]">
-        {/* Laptop screen */}
-        <div className="rounded-t-xl border-[3px] border-b-0 border-gray-700 bg-gray-700 px-1 pt-1">
-          <div className="rounded-t-lg bg-white overflow-hidden">
-            {/* Browser chrome */}
-            <div className="flex items-center gap-1.5 border-b border-gray-100 bg-gray-50 px-3 py-1.5">
-              <div className="h-2 w-2 rounded-full bg-red-300" />
-              <div className="h-2 w-2 rounded-full bg-amber-300" />
-              <div className="h-2 w-2 rounded-full bg-green-300" />
-              <div className="ml-2 flex-1 rounded bg-gray-200 px-2 py-0.5 text-[8px] text-gray-400">app.balkina.ai/dashboard</div>
+    <IPadMockup label="Your Dashboard">
+      <div className="p-4 pt-5">
+        {/* Stats row */}
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { label: 'Today', value: '8', sub: 'bookings', bg: 'bg-brand-50', fg: 'text-brand-700' },
+            { label: 'Pending', value: '2', sub: 'requests', bg: 'bg-amber-50', fg: 'text-amber-700' },
+            { label: 'Revenue', value: '$1,240', sub: 'this week', bg: 'bg-green-50', fg: 'text-green-700' },
+            { label: 'Rating', value: '4.9', sub: '89 reviews', bg: 'bg-purple-50', fg: 'text-purple-700' },
+          ].map((s, i) => (
+            <div key={i} className={`rounded-lg p-2 ${s.bg}`}>
+              <p className="text-[8px] text-gray-400">{s.label}</p>
+              <p className={`text-lg font-bold ${s.fg}`}>{s.value}</p>
+              <p className="text-[8px] text-gray-400">{s.sub}</p>
             </div>
+          ))}
+        </div>
 
-            {/* Dashboard content */}
-            <div className="p-4">
-              {/* Stats row */}
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { label: 'Today', value: '8', sub: 'bookings', color: 'bg-brand-50 text-brand-700' },
-                  { label: 'Pending', value: '2', sub: 'requests', color: 'bg-amber-50 text-amber-700' },
-                  { label: 'Revenue', value: '$1,240', sub: 'this week', color: 'bg-green-50 text-green-700' },
-                  { label: 'Rating', value: '4.9', sub: '89 reviews', color: 'bg-purple-50 text-purple-700' },
-                ].map((s, i) => (
-                  <div key={i} className={`rounded-lg p-2 ${s.color.split(' ')[0]}`}>
-                    <p className="text-[8px] text-gray-400">{s.label}</p>
-                    <p className={`text-lg font-bold ${s.color.split(' ')[1]}`}>{s.value}</p>
-                    <p className="text-[8px] text-gray-400">{s.sub}</p>
-                  </div>
-                ))}
+        {/* Appointments table */}
+        <div className="mt-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">Today&apos;s Appointments</p>
+            <div className="rounded bg-brand-600 px-2 py-0.5 text-[8px] font-semibold text-white">+ New</div>
+          </div>
+          <div className="mt-2 rounded-lg border border-gray-100">
+            <div className="grid grid-cols-5 gap-1 border-b border-gray-100 bg-gray-50 px-2 py-1 text-[8px] font-semibold text-gray-400">
+              <span>Time</span><span>Customer</span><span>Service</span><span>Staff</span><span>Status</span>
+            </div>
+            {[
+              { time: '8:00 AM', name: 'Sarah M.', svc: 'Vinyasa Flow', staff: 'Priya S.', status: 'Completed', sc: 'bg-gray-100 text-gray-600' },
+              { time: '9:00 AM', name: 'James K.', svc: 'Hot Yoga', staff: 'Luna R.', status: 'In Progress', sc: 'bg-blue-100 text-blue-700' },
+              { time: '10:00 AM', name: 'Emma L.', svc: 'Vinyasa Flow', staff: 'Priya S.', status: 'Confirmed', sc: 'bg-green-100 text-green-700' },
+            ].map((apt, i) => (
+              <div key={i} className={`grid grid-cols-5 gap-1 px-2 py-1.5 text-[9px] ${i < 2 ? 'border-b border-gray-50' : ''} ${i === 2 ? 'animate-fade-in-6 bg-green-50/50' : ''}`}>
+                <span className="text-gray-500">{apt.time}</span>
+                <span className="font-medium text-gray-800">{apt.name}</span>
+                <span className="text-gray-600">{apt.svc}</span>
+                <span className="text-gray-500">{apt.staff}</span>
+                <span className={`inline-block w-fit rounded-full px-1.5 py-0.5 text-[7px] font-semibold ${apt.sc}`}>{apt.status}</span>
               </div>
-
-              {/* Appointments table */}
-              <div className="mt-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">Today&apos;s Appointments</p>
-                  <div className="rounded bg-brand-600 px-2 py-0.5 text-[8px] font-semibold text-white">+ New</div>
-                </div>
-                <div className="mt-2 rounded-lg border border-gray-100">
-                  {/* Header */}
-                  <div className="grid grid-cols-5 gap-1 border-b border-gray-100 bg-gray-50 px-2 py-1 text-[8px] font-semibold text-gray-400">
-                    <span>Time</span><span>Customer</span><span>Service</span><span>Staff</span><span>Status</span>
-                  </div>
-                  {/* Rows */}
-                  {[
-                    { time: '8:00 AM', name: 'Sarah M.', svc: 'Vinyasa Flow', staff: 'Priya S.', status: 'Completed', statusColor: 'bg-gray-100 text-gray-600' },
-                    { time: '9:00 AM', name: 'James K.', svc: 'Hot Yoga', staff: 'Luna R.', status: 'In Progress', statusColor: 'bg-blue-100 text-blue-700' },
-                    { time: '10:00 AM', name: 'Emma L.', svc: 'Vinyasa Flow', staff: 'Priya S.', status: 'Confirmed', statusColor: 'bg-green-100 text-green-700' },
-                  ].map((apt, i) => (
-                    <div key={i} className={`grid grid-cols-5 gap-1 px-2 py-1.5 text-[9px] ${i < 2 ? 'border-b border-gray-50' : ''} ${i === 2 ? 'animate-fade-in-6 bg-green-50/50' : ''}`}>
-                      <span className="text-gray-500">{apt.time}</span>
-                      <span className="font-medium text-gray-800">{apt.name}</span>
-                      <span className="text-gray-600">{apt.svc}</span>
-                      <span className="text-gray-500">{apt.staff}</span>
-                      <span className={`inline-block w-fit rounded-full px-1.5 py-0.5 text-[7px] font-semibold ${apt.statusColor}`}>{apt.status}</span>
-                    </div>
-                  ))}
-                  {/* New row appearing */}
-                  <div className="animate-fade-in-7 grid grid-cols-5 gap-1 border-t border-brand-100 bg-brand-50/50 px-2 py-1.5 text-[9px]">
-                    <span className="text-gray-500">11:30 AM</span>
-                    <span className="font-medium text-brand-700">New booking!</span>
-                    <span className="text-gray-600">Gentle Yoga</span>
-                    <span className="text-gray-500">Raj K.</span>
-                    <span className="inline-block w-fit rounded-full bg-amber-100 px-1.5 py-0.5 text-[7px] font-semibold text-amber-700">Pending</span>
-                  </div>
-                </div>
-              </div>
+            ))}
+            <div className="animate-fade-in-7 grid grid-cols-5 gap-1 border-t border-brand-100 bg-brand-50/50 px-2 py-1.5 text-[9px]">
+              <span className="text-gray-500">11:30 AM</span>
+              <span className="font-medium text-brand-700">New booking!</span>
+              <span className="text-gray-600">Gentle Yoga</span>
+              <span className="text-gray-500">Raj K.</span>
+              <span className="inline-block w-fit rounded-full bg-amber-100 px-1.5 py-0.5 text-[7px] font-semibold text-amber-700">Pending</span>
             </div>
           </div>
         </div>
-        {/* Laptop base */}
-        <div className="mx-auto h-3 w-[110%] -translate-x-[5%] rounded-b-xl bg-gray-600 shadow-lg" />
-        <div className="mx-auto h-1 w-[70%] rounded-b bg-gray-500" />
       </div>
-      <p className="mt-5 text-sm font-semibold text-gray-700">Your Dashboard</p>
-    </div>
+    </IPadMockup>
   );
 }
 
@@ -302,9 +486,9 @@ export default function HomePage() {
               <CustomerPhoneAnimation />
             </div>
 
-            {/* Dashboard laptop — center, slightly elevated */}
-            <div className="order-first shrink-0 lg:order-none lg:-mt-2">
-              <DashboardLaptopAnimation />
+            {/* Dashboard iPad — center, hidden on mobile */}
+            <div className="hidden shrink-0 lg:flex lg:order-none lg:-mt-2">
+              <DashboardIPadAnimation />
             </div>
 
             {/* Staff phone */}

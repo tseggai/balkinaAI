@@ -44,3 +44,35 @@ html {
 .animate-fade-in-6 { opacity: 0; animation: fadeInUp 0.5s ease-out 2.8s forwards; }
 .animate-fade-in-7 { opacity: 0; animation: fadeInUp 0.5s ease-out 3.3s forwards; }
 .animate-slide-down { animation: slideDown 0.4s ease-out; }
+
+/* ─── Booking flow screen transitions (15s cycle) ────────────────────── */
+
+@keyframes bkScreen1 {
+  0%, 16% { opacity: 1; }
+  19%, 100% { opacity: 0; }
+}
+@keyframes bkScreen2 {
+  0%, 16% { opacity: 0; }
+  19%, 36% { opacity: 1; }
+  39%, 100% { opacity: 0; }
+}
+@keyframes bkScreen3 {
+  0%, 36% { opacity: 0; }
+  39%, 56% { opacity: 1; }
+  59%, 100% { opacity: 0; }
+}
+@keyframes bkScreen4 {
+  0%, 56% { opacity: 0; }
+  59%, 76% { opacity: 1; }
+  79%, 100% { opacity: 0; }
+}
+@keyframes bkScreen5 {
+  0%, 76% { opacity: 0; }
+  79%, 100% { opacity: 1; }
+}
+
+.bk-screen-1 { animation: bkScreen1 15s ease-in-out forwards; }
+.bk-screen-2 { opacity: 0; animation: bkScreen2 15s ease-in-out forwards; }
+.bk-screen-3 { opacity: 0; animation: bkScreen3 15s ease-in-out forwards; }
+.bk-screen-4 { opacity: 0; animation: bkScreen4 15s ease-in-out forwards; }
+.bk-screen-5 { opacity: 0; animation: bkScreen5 15s ease-in-out forwards; }
