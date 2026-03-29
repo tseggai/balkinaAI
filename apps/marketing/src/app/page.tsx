@@ -2,26 +2,6 @@
 
 import Link from 'next/link';
 
-/* ─── Chat Avatars ─────────────────────────────────────────────────────── */
-
-function BalkinaAvatar() {
-  return (
-    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600">
-      <span className="text-[7px] font-bold text-white">B</span>
-    </div>
-  );
-}
-
-function CustomerAvatar() {
-  return (
-    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-200">
-      <svg className="h-3 w-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-      </svg>
-    </div>
-  );
-}
-
 /* ─── Device Frames (devices.css) ──────────────────────────────────────── */
 
 /* Scale factors: phone 0.52x, iPad 0.88x → iPad is ~42px taller than phones */
@@ -81,226 +61,269 @@ function IPadDevice({ children }: { children: React.ReactNode }) {
 
 /* ─── Customer Booking Flow (5 animated screens) ──────────────────────── */
 
-function CustomerPhoneContent() {
-  const backArrow = (
-    <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-    </svg>
-  );
-
+function BottomBar() {
   return (
-      <div className="relative overflow-hidden" style={{ height: 530 }}>
+    <div className="absolute inset-x-0 bottom-0 bg-white">
+      <div className="flex items-center gap-1.5 border-t border-gray-100 px-3 py-1.5">
+        <div className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[9px] text-gray-300">Ask me anything...</div>
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500">
+          <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+        </div>
+      </div>
+      <div className="flex items-center justify-around border-t border-gray-100 px-2 pb-1 pt-1.5">
+        <div className="flex flex-col items-center">
+          <svg className="h-4 w-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>
+          <span className="text-[7px] font-medium text-brand-600">Chat</span>
+        </div>
+        <div className="flex flex-col items-center">
+          <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
+          <span className="text-[7px] text-gray-400">Bookings</span>
+        </div>
+        <div className="flex flex-col items-center">
+          <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+          <span className="text-[7px] text-gray-400">Profile</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatHeader() {
+  return (
+    <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2">
+      <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+      <span className="text-[8px] text-gray-400">Start over</span>
+      <div className="ml-2 flex items-center gap-1">
+        <div className="h-4 w-4 rounded-full bg-brand-600" />
+        <span className="text-[9px] font-bold tracking-widest text-gray-800">BALKINA</span>
+      </div>
+    </div>
+  );
+}
+
+function CustomerPhoneContent() {
+  return (
+      <div className="relative overflow-hidden bg-white" style={{ height: 530 }}>
 
         {/* ── Screen 1: Categories ──────────────────────────────────── */}
-        <div className="bk-screen-1 absolute inset-0 px-3 pt-1">
-          <div className="flex items-center gap-1.5 pb-3">
-            <BalkinaAvatar />
-            <span className="text-[10px] font-bold text-gray-800">Balkina</span>
-          </div>
-          <div className="mb-3 flex items-start gap-1.5">
-            <BalkinaAvatar />
-            <div className="rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[11px] text-gray-700">
-              Hi! What are you looking for?
+        <div className="bk-screen-1 absolute inset-0 flex flex-col">
+          <div className="flex flex-1 flex-col items-center justify-center px-6">
+            <div className="mb-1 h-10 w-10 rounded-full bg-brand-600" />
+            <p className="mb-1 text-[10px] font-bold tracking-[0.2em] text-brand-600">BALKINA</p>
+            <p className="mb-4 text-[10px] text-gray-400">What would you like to book today?</p>
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {[
+                'Health & Wellness', 'Beauty & Personal Care',
+                'Fitness & Sports', 'Home Services',
+                'Professional Services', 'Education & Tutoring',
+                'Pet Services', 'Automotive',
+              ].map((cat, i) => (
+                <div
+                  key={i}
+                  className={`rounded-full border px-3 py-1.5 text-[8px] ${
+                    cat === 'Beauty & Personal Care'
+                      ? 'border-brand-300 bg-brand-50 font-medium text-brand-700'
+                      : 'border-gray-200 text-gray-600'
+                  }`}
+                >
+                  {cat}
+                </div>
+              ))}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-1.5 px-1">
-            {[
-              { name: 'Beauty', gradient: 'from-pink-400 to-rose-300' },
-              { name: 'Wellness', gradient: 'from-emerald-400 to-teal-300', selected: true },
-              { name: 'Fitness', gradient: 'from-orange-400 to-amber-300' },
-              { name: 'Medical', gradient: 'from-blue-400 to-cyan-300' },
-              { name: 'Pets', gradient: 'from-yellow-400 to-amber-200' },
-              { name: 'Home', gradient: 'from-violet-400 to-purple-300' },
-            ].map((cat, i) => (
-              <div
-                key={i}
-                className={`flex flex-col items-center rounded-xl border p-2.5 ${
-                  cat.selected
-                    ? 'border-brand-300 bg-brand-50 shadow-sm'
-                    : 'border-gray-100 bg-white'
-                }`}
-              >
-                <div className={`h-8 w-8 rounded-xl bg-gradient-to-br ${cat.gradient}`} />
-                <p className={`mt-1 text-[9px] font-medium ${
-                  cat.selected ? 'text-brand-700' : 'text-gray-600'
-                }`}>{cat.name}</p>
-              </div>
-            ))}
-          </div>
+          <BottomBar />
         </div>
 
-        {/* ── Screen 2: Businesses ─────────────────────────────────── */}
-        <div className="bk-screen-2 absolute inset-0 px-3 pt-1">
-          <div className="flex items-center gap-1.5 pb-3">
-            {backArrow}
-            <span className="text-[10px] font-semibold text-gray-800">Wellness</span>
-          </div>
-          <div className="mb-2 flex items-start justify-end gap-1.5">
-            <div className="rounded-2xl rounded-tr-md bg-brand-600 px-2.5 py-2 text-[11px] text-white">
-              Wellness
+        {/* ── Screen 2: Businesses + Services ──────────────────────── */}
+        <div className="bk-screen-2 absolute inset-0 flex flex-col">
+          <ChatHeader />
+          <div className="flex-1 overflow-hidden px-3 pt-2">
+            {/* User bubble */}
+            <div className="mb-2 flex justify-end">
+              <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
+                Find Beauty &amp; Personal Care businesses near me
+              </div>
             </div>
-            <CustomerAvatar />
-          </div>
-          <div className="mb-2 flex items-start gap-1.5">
-            <BalkinaAvatar />
-            <div className="rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[11px] text-gray-700">
-              Here are spots near you:
+            {/* AI response */}
+            <div className="mb-2 rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700" style={{ maxWidth: '85%' }}>
+              Here are some Beauty &amp; Personal Care businesses near you:
             </div>
-          </div>
-          <div className="flex gap-2 overflow-hidden px-1">
-            {[
-              { name: 'Sunrise Yoga', rating: '4.8', dist: '0.3 mi', gradient: 'from-emerald-300 via-teal-200 to-cyan-100' },
-              { name: 'Zen Wellness', rating: '4.9', dist: '0.5 mi', gradient: 'from-brand-300 via-indigo-200 to-purple-100', selected: true },
-              { name: 'Harmony Spa', rating: '4.7', dist: '1.2 mi', gradient: 'from-rose-300 via-pink-200 to-fuchsia-100' },
-            ].map((biz, i) => (
-              <div
-                key={i}
-                className={`w-[105px] shrink-0 rounded-xl border overflow-hidden ${
-                  biz.selected ? 'border-brand-300 shadow-md shadow-brand-100/50' : 'border-gray-100'
-                }`}
-              >
-                <div className={`h-14 bg-gradient-to-br ${biz.gradient}`} />
-                <div className="p-1.5">
-                  <p className={`text-[10px] font-semibold ${biz.selected ? 'text-brand-800' : 'text-gray-800'}`}>{biz.name}</p>
-                  <div className="mt-0.5 flex items-center gap-1">
-                    <span className="text-[9px] text-amber-500">&#9733;</span>
-                    <span className="text-[9px] text-gray-500">{biz.rating}</span>
-                    <span className="text-[9px] text-gray-300">&middot;</span>
-                    <span className="text-[9px] text-gray-400">{biz.dist}</span>
+            {/* Business cards — horizontal */}
+            <div className="mb-2 flex gap-1.5 overflow-hidden">
+              {[
+                { name: 'Dan the Barber', rating: '5', reviews: '9', dist: '0.3 mi', drive: '1 min drive', gradient: 'from-amber-200 via-orange-100 to-yellow-50', selected: true },
+                { name: 'Radiant Spa', rating: '4.9', reviews: '15', dist: '1.9 mi', drive: '5 min drive', gradient: 'from-emerald-200 via-teal-100 to-cyan-50' },
+              ].map((biz, i) => (
+                <div
+                  key={i}
+                  className={`w-[140px] shrink-0 overflow-hidden rounded-xl border ${
+                    biz.selected ? 'border-brand-300' : 'border-gray-100'
+                  }`}
+                >
+                  <div className={`h-16 bg-gradient-to-br ${biz.gradient}`} />
+                  <div className="p-1.5">
+                    <p className="text-[9px] font-bold text-gray-900">{biz.name}</p>
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-[8px] text-amber-500">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+                      <span className="text-[8px] text-gray-400">{biz.rating} ({biz.reviews})</span>
+                    </div>
+                    <p className="text-[8px] text-gray-400">{biz.dist} &middot; {biz.drive}</p>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Screen 3: Services ───────────────────────────────────── */}
-        <div className="bk-screen-3 absolute inset-0 px-3 pt-1">
-          <div className="flex items-center gap-1.5 pb-3">
-            {backArrow}
-            <span className="text-[10px] font-semibold text-gray-800">Zen Wellness</span>
-          </div>
-          <div className="mb-2 flex items-start gap-1.5">
-            <BalkinaAvatar />
-            <div className="rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[11px] text-gray-700">
-              Here are their services:
+              ))}
+            </div>
+            {/* Service cards */}
+            <div className="flex gap-1.5">
+              {[
+                { name: 'Beard trimming', price: '$25', dur: '20 min' },
+                { name: 'Hair Color', price: '$30', dep: '50% deposit', selected: true },
+              ].map((svc, i) => (
+                <div
+                  key={i}
+                  className={`flex-1 rounded-xl border p-2 ${
+                    svc.selected ? 'border-brand-300 bg-brand-50' : 'border-gray-200'
+                  }`}
+                >
+                  <p className={`text-[9px] font-semibold ${svc.selected ? 'text-brand-700' : 'text-gray-800'}`}>{svc.name}</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-[9px] font-bold ${svc.selected ? 'text-brand-600' : 'text-gray-600'}`}>{svc.price}</span>
+                    <span className="text-[7px] text-gray-400">{svc.dep || svc.dur}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="space-y-1.5 px-1">
-            {[
-              { name: 'Vinyasa Flow', price: '$30', dur: '60 min', selected: true },
-              { name: 'Hot Yoga', price: '$35', dur: '60 min' },
-              { name: 'Yin & Restore', price: '$28', dur: '45 min' },
-              { name: 'Power Yoga', price: '$32', dur: '75 min' },
-            ].map((svc, i) => (
-              <div
-                key={i}
-                className={`flex items-center justify-between rounded-xl border p-2.5 ${
-                  svc.selected ? 'border-brand-300 bg-brand-50' : 'border-gray-100 bg-white'
-                }`}
-              >
-                <div>
-                  <p className={`text-[11px] font-semibold ${svc.selected ? 'text-brand-800' : 'text-gray-800'}`}>{svc.name}</p>
-                  <p className={`text-[9px] ${svc.selected ? 'text-brand-500' : 'text-gray-400'}`}>{svc.dur}</p>
-                </div>
-                <p className={`text-[11px] font-bold ${svc.selected ? 'text-brand-700' : 'text-gray-600'}`}>{svc.price}</p>
+          <BottomBar />
+        </div>
+
+        {/* ── Screen 3: Date Selection ─────────────────────────────── */}
+        <div className="bk-screen-3 absolute inset-0 flex flex-col">
+          <ChatHeader />
+          <div className="flex-1 overflow-hidden px-3 pt-2">
+            {/* User bubble */}
+            <div className="mb-2 flex justify-end">
+              <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
+                Hair Color at Dan the Barber
               </div>
-            ))}
+            </div>
+            {/* AI response */}
+            <div className="mb-2 rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700" style={{ maxWidth: '85%' }}>
+              When would you like your appointment?
+            </div>
+            {/* Date options */}
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {['Today', 'Tomorrow', 'Next Week', 'Pick a date'].map((d) => (
+                <div
+                  key={d}
+                  className={`rounded-full border px-3 py-1.5 text-[9px] ${
+                    d === 'Tomorrow' ? 'border-brand-400 bg-brand-50 font-medium text-brand-700' : 'border-gray-200 text-gray-600'
+                  }`}
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+            {/* User chose Tomorrow */}
+            <div className="mb-2 flex justify-end">
+              <div className="rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
+                Tomorrow
+              </div>
+            </div>
+            {/* AI response */}
+            <div className="mb-2 rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700" style={{ maxWidth: '85%' }}>
+              Here are the available staff and time slots:
+            </div>
+            {/* Staff preview */}
+            <div className="flex items-center gap-2">
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-sky-300 via-blue-200 to-indigo-100" />
+              <div>
+                <p className="text-[9px] font-bold text-gray-900">Dragana D.</p>
+                <p className="text-[8px] text-gray-400">15 slots</p>
+              </div>
+            </div>
           </div>
+          <BottomBar />
         </div>
 
         {/* ── Screen 4: Staff + Time Slots ─────────────────────────── */}
-        <div className="bk-screen-4 absolute inset-0 px-3 pt-1">
-          <div className="flex items-center gap-1.5 pb-3">
-            {backArrow}
-            <span className="text-[10px] font-semibold text-gray-800">Vinyasa Flow</span>
-          </div>
-          <div className="mb-2 flex items-start gap-1.5">
-            <BalkinaAvatar />
-            <div className="rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[11px] text-gray-700">
-              Pick your instructor &amp; time:
+        <div className="bk-screen-4 absolute inset-0 flex flex-col">
+          <ChatHeader />
+          <div className="flex-1 overflow-hidden px-3 pt-2">
+            {/* AI response */}
+            <div className="mb-2 rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700" style={{ maxWidth: '85%' }}>
+              Here are the available staff and time slots:
             </div>
-          </div>
-          <div className="mb-3 flex gap-2 px-1">
-            {[
-              { name: 'Priya S.', initials: 'PS', gradient: 'from-amber-200 to-orange-100', color: 'text-amber-800', selected: true },
-              { name: 'Luna R.', initials: 'LR', gradient: 'from-sky-200 to-blue-100', color: 'text-blue-800' },
-              { name: 'Raj K.', initials: 'RK', gradient: 'from-emerald-200 to-green-100', color: 'text-green-800' },
-            ].map((staff, i) => (
-              <div
-                key={i}
-                className={`flex flex-1 flex-col items-center rounded-xl border p-2 ${
-                  staff.selected ? 'border-brand-300 bg-brand-50' : 'border-gray-100'
-                }`}
-              >
-                <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${staff.gradient}`}>
-                  <span className={`text-[10px] font-bold ${staff.color}`}>{staff.initials}</span>
-                </div>
-                <p className={`mt-1 text-[9px] font-medium ${staff.selected ? 'text-brand-700' : 'text-gray-600'}`}>{staff.name}</p>
-                <div className="mt-0.5 flex items-center gap-0.5">
-                  <span className="text-[8px] text-amber-500">&#9733;</span>
-                  <span className="text-[8px] text-gray-400">{staff.selected ? '4.9' : i === 1 ? '4.7' : '4.8'}</span>
-                </div>
+            {/* Staff */}
+            <div className="mb-2 flex items-center gap-2">
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-sky-300 via-blue-200 to-indigo-100" />
+              <div>
+                <p className="text-[9px] font-bold text-gray-900">Dragana Djurica</p>
+                <p className="text-[8px] text-gray-400">15 slots</p>
               </div>
-            ))}
-          </div>
-          <p className="mb-1.5 px-1 text-[9px] font-semibold uppercase tracking-wider text-gray-400">Tomorrow</p>
-          <div className="grid grid-cols-4 gap-1 px-1">
-            {['9:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00', '18:00'].map((time) => (
-              <div
-                key={time}
-                className={`rounded-lg border py-1.5 text-center text-[10px] font-medium ${
-                  time === '10:00'
-                    ? 'border-brand-400 bg-brand-600 text-white'
-                    : 'border-gray-100 text-gray-600'
-                }`}
-              >
-                {time}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Screen 5: Summary + Confirmation ─────────────────────── */}
-        <div className="bk-screen-5 absolute inset-0 px-3 pt-1">
-          <div className="flex items-center gap-1.5 pb-3">
-            <BalkinaAvatar />
-            <span className="text-[10px] font-bold text-gray-800">Balkina</span>
-          </div>
-          <div className="mb-2 flex items-start gap-1.5">
-            <BalkinaAvatar />
-            <div className="rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[11px] text-gray-700">
-              Here&apos;s your booking summary:
             </div>
-          </div>
-          <div className="mx-1 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-            <div className="space-y-2">
-              {[
-                { l: 'Business', v: 'Zen Wellness' },
-                { l: 'Service', v: 'Vinyasa Flow' },
-                { l: 'Instructor', v: 'Priya S.' },
-                { l: 'Date & Time', v: 'Tomorrow, 10:00 AM' },
-                { l: 'Duration', v: '60 min' },
-              ].map((row) => (
-                <div key={row.l} className="flex justify-between text-[10px]">
-                  <span className="text-gray-400">{row.l}</span>
-                  <span className="font-semibold text-gray-800">{row.v}</span>
+            {/* Time slots grid */}
+            <div className="grid grid-cols-3 gap-1">
+              {['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM'].map((time) => (
+                <div
+                  key={time}
+                  className={`rounded-lg border py-1.5 text-center text-[8px] font-medium ${
+                    time === '9:00 AM'
+                      ? 'border-brand-400 bg-brand-600 text-white'
+                      : 'border-gray-200 text-gray-600'
+                  }`}
+                >
+                  {time}
                 </div>
               ))}
-              <div className="flex justify-between border-t border-gray-100 pt-2 text-[10px]">
-                <span className="text-gray-400">Total</span>
-                <span className="font-bold text-gray-900">$30.00</span>
-              </div>
             </div>
           </div>
-          <div className="mx-1 mt-3 rounded-xl border border-green-200 bg-green-50 p-2.5">
-            <div className="flex items-center gap-1.5">
-              <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              <p className="text-[11px] font-semibold text-green-800">Booking Confirmed!</p>
+          <BottomBar />
+        </div>
+
+        {/* ── Screen 5: Confirmation ───────────────────────────────── */}
+        <div className="bk-screen-5 absolute inset-0 flex flex-col bg-gray-50">
+          <div className="flex flex-1 flex-col items-center px-4 pt-6">
+            {/* Clock icon */}
+            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-amber-400">
+              <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
-            <p className="mt-1 text-[9px] text-green-600">You&apos;ll receive a confirmation shortly.</p>
+            <p className="mb-1 text-[11px] font-bold text-gray-900">Appointment Request Sent</p>
+            <p className="mb-3 text-center text-[8px] text-brand-500">
+              Waiting for confirmation from Dragana Djurica.
+              <br />You&apos;ll be notified once approved.
+            </p>
+            {/* Summary card */}
+            <div className="w-full rounded-xl border border-gray-200 bg-white p-3">
+              <div className="space-y-1.5">
+                {[
+                  { l: 'Service', v: 'Hair Color' },
+                  { l: 'Business', v: 'Dan the Barber' },
+                  { l: 'Staff', v: 'Dragana Djurica' },
+                  { l: 'Date', v: 'Sunday, March 29, 2026' },
+                  { l: 'Time', v: '9:00 AM' },
+                ].map((row) => (
+                  <div key={row.l} className="flex justify-between text-[8px]">
+                    <span className="text-gray-400">{row.l}</span>
+                    <span className="font-semibold text-gray-800">{row.v}</span>
+                  </div>
+                ))}
+                <div className="border-t border-gray-100 pt-1.5">
+                  <div className="flex justify-between text-[8px]">
+                    <span className="text-gray-400">Total</span>
+                    <span className="font-bold text-gray-900">$30.00</span>
+                  </div>
+                  <div className="flex justify-between text-[8px]">
+                    <span className="text-gray-400">Deposit</span>
+                    <span className="font-bold text-red-500">$15.00 (Due)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Buttons */}
+            <div className="mt-3 w-full space-y-1.5">
+              <div className="w-full rounded-xl bg-brand-600 py-2 text-center text-[9px] font-semibold text-white">Done</div>
+              <div className="w-full rounded-xl border border-brand-300 py-2 text-center text-[9px] font-semibold text-brand-600">Get Directions</div>
+            </div>
           </div>
         </div>
 
