@@ -63,7 +63,7 @@ function IPadDevice({ children }: { children: React.ReactNode }) {
 
 function BottomBar() {
   return (
-    <div className="absolute inset-x-0 bottom-0 bg-white">
+    <div className="shrink-0 bg-white">
       <div className="flex items-center gap-1.5 border-t border-gray-100 px-3 py-1.5">
         <div className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[9px] text-gray-300">Ask me anything...</div>
         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500">
@@ -105,8 +105,8 @@ function CustomerPhoneContent() {
   return (
       <div className="relative overflow-hidden bg-white" style={{ height: 530 }}>
 
-        {/* ── Screen 1: Categories ──────────────────────────────────── */}
-        <div className="bk-screen-1 absolute inset-0 flex flex-col">
+        {/* ── Intro: Categories ──────────────────────────────────── */}
+        <div className="bk-intro absolute inset-0 z-20 flex flex-col bg-white">
           <div className="flex flex-1 flex-col items-center justify-center px-6">
             <div className="mb-1 h-10 w-10 rounded-full bg-brand-600" />
             <p className="mb-1 text-[10px] font-bold tracking-[0.2em] text-brand-600">BALKINA</p>
@@ -134,196 +134,158 @@ function CustomerPhoneContent() {
           <BottomBar />
         </div>
 
-        {/* ── Screen 2: Businesses + Services ──────────────────────── */}
-        <div className="bk-screen-2 absolute inset-0 flex flex-col">
+        {/* ── Chat: Continuous scrolling conversation ─────────────── */}
+        <div className="bk-chat absolute inset-0 z-10 flex flex-col">
           <ChatHeader />
-          <div className="flex-1 overflow-hidden px-3 pt-2">
-            {/* User bubble */}
-            <div className="mb-2 flex justify-end">
-              <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
-                Find Beauty &amp; Personal Care businesses near me
+          <div className="relative flex-1 overflow-hidden">
+            <div className="bk-chat-scroll px-3 pt-2" style={{ paddingBottom: 80 }}>
+              {/* 1. User selects category */}
+              <div className="chat-msg-1 mb-3 flex justify-end">
+                <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
+                  Find Beauty &amp; Personal Care businesses near me
+                </div>
               </div>
-            </div>
-            {/* AI response */}
-            <div className="mb-2 rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700" style={{ maxWidth: '85%' }}>
-              Here are some Beauty &amp; Personal Care businesses near you:
-            </div>
-            {/* Business cards — horizontal */}
-            <div className="mb-2 flex gap-1.5 overflow-hidden">
-              {[
-                { name: 'Dan the Barber', rating: '5', reviews: '9', dist: '0.3 mi', drive: '1 min drive', gradient: 'from-amber-200 via-orange-100 to-yellow-50', selected: true },
-                { name: 'Radiant Spa', rating: '4.9', reviews: '15', dist: '1.9 mi', drive: '5 min drive', gradient: 'from-emerald-200 via-teal-100 to-cyan-50' },
-              ].map((biz, i) => (
-                <div
-                  key={i}
-                  className={`w-[140px] shrink-0 overflow-hidden rounded-xl border ${
-                    biz.selected ? 'border-brand-300' : 'border-gray-100'
-                  }`}
-                >
-                  <div className={`h-16 bg-gradient-to-br ${biz.gradient}`} />
-                  <div className="p-1.5">
-                    <p className="text-[9px] font-bold text-gray-900">{biz.name}</p>
-                    <div className="flex items-center gap-0.5">
-                      <span className="text-[8px] text-amber-500">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
-                      <span className="text-[8px] text-gray-400">{biz.rating} ({biz.reviews})</span>
-                    </div>
-                    <p className="text-[8px] text-gray-400">{biz.dist} &middot; {biz.drive}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {/* Service cards */}
-            <div className="flex gap-1.5">
-              {[
-                { name: 'Beard trimming', price: '$25', dur: '20 min' },
-                { name: 'Hair Color', price: '$30', dep: '50% deposit', selected: true },
-              ].map((svc, i) => (
-                <div
-                  key={i}
-                  className={`flex-1 rounded-xl border p-2 ${
-                    svc.selected ? 'border-brand-300 bg-brand-50' : 'border-gray-200'
-                  }`}
-                >
-                  <p className={`text-[9px] font-semibold ${svc.selected ? 'text-brand-700' : 'text-gray-800'}`}>{svc.name}</p>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-[9px] font-bold ${svc.selected ? 'text-brand-600' : 'text-gray-600'}`}>{svc.price}</span>
-                    <span className="text-[7px] text-gray-400">{svc.dep || svc.dur}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <BottomBar />
-        </div>
 
-        {/* ── Screen 3: Date Selection ─────────────────────────────── */}
-        <div className="bk-screen-3 absolute inset-0 flex flex-col">
-          <ChatHeader />
-          <div className="flex-1 overflow-hidden px-3 pt-2">
-            {/* User bubble */}
-            <div className="mb-2 flex justify-end">
-              <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
-                Hair Color at Dan the Barber
+              {/* 2. AI responds with businesses */}
+              <div className="chat-msg-2 mb-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">
+                Here are some Beauty &amp; Personal Care businesses near you:
               </div>
-            </div>
-            {/* AI response */}
-            <div className="mb-2 rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700" style={{ maxWidth: '85%' }}>
-              When would you like your appointment?
-            </div>
-            {/* Date options */}
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {['Today', 'Tomorrow', 'Next Week', 'Pick a date'].map((d) => (
-                <div
-                  key={d}
-                  className={`rounded-full border px-3 py-1.5 text-[9px] ${
-                    d === 'Tomorrow' ? 'border-brand-400 bg-brand-50 font-medium text-brand-700' : 'border-gray-200 text-gray-600'
-                  }`}
-                >
-                  {d}
-                </div>
-              ))}
-            </div>
-            {/* User chose Tomorrow */}
-            <div className="mb-2 flex justify-end">
-              <div className="rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
-                Tomorrow
-              </div>
-            </div>
-            {/* AI response */}
-            <div className="mb-2 rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700" style={{ maxWidth: '85%' }}>
-              Here are the available staff and time slots:
-            </div>
-            {/* Staff preview */}
-            <div className="flex items-center gap-2">
-              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-sky-300 via-blue-200 to-indigo-100" />
-              <div>
-                <p className="text-[9px] font-bold text-gray-900">Dragana D.</p>
-                <p className="text-[8px] text-gray-400">15 slots</p>
-              </div>
-            </div>
-          </div>
-          <BottomBar />
-        </div>
 
-        {/* ── Screen 4: Staff + Time Slots ─────────────────────────── */}
-        <div className="bk-screen-4 absolute inset-0 flex flex-col">
-          <ChatHeader />
-          <div className="flex-1 overflow-hidden px-3 pt-2">
-            {/* AI response */}
-            <div className="mb-2 rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700" style={{ maxWidth: '85%' }}>
-              Here are the available staff and time slots:
-            </div>
-            {/* Staff */}
-            <div className="mb-2 flex items-center gap-2">
-              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-sky-300 via-blue-200 to-indigo-100" />
-              <div>
-                <p className="text-[9px] font-bold text-gray-900">Dragana Djurica</p>
-                <p className="text-[8px] text-gray-400">15 slots</p>
-              </div>
-            </div>
-            {/* Time slots grid */}
-            <div className="grid grid-cols-3 gap-1">
-              {['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM'].map((time) => (
-                <div
-                  key={time}
-                  className={`rounded-lg border py-1.5 text-center text-[8px] font-medium ${
-                    time === '9:00 AM'
-                      ? 'border-brand-400 bg-brand-600 text-white'
-                      : 'border-gray-200 text-gray-600'
-                  }`}
-                >
-                  {time}
-                </div>
-              ))}
-            </div>
-          </div>
-          <BottomBar />
-        </div>
-
-        {/* ── Screen 5: Confirmation ───────────────────────────────── */}
-        <div className="bk-screen-5 absolute inset-0 flex flex-col bg-gray-50">
-          <div className="flex flex-1 flex-col items-center px-4 pt-6">
-            {/* Clock icon */}
-            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-amber-400">
-              <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </div>
-            <p className="mb-1 text-[11px] font-bold text-gray-900">Appointment Request Sent</p>
-            <p className="mb-3 text-center text-[8px] text-brand-500">
-              Waiting for confirmation from Dragana Djurica.
-              <br />You&apos;ll be notified once approved.
-            </p>
-            {/* Summary card */}
-            <div className="w-full rounded-xl border border-gray-200 bg-white p-3">
-              <div className="space-y-1.5">
+              {/* 3. Business cards */}
+              <div className="chat-msg-3 mb-3 flex gap-1.5 overflow-hidden">
                 {[
-                  { l: 'Service', v: 'Hair Color' },
-                  { l: 'Business', v: 'Dan the Barber' },
-                  { l: 'Staff', v: 'Dragana Djurica' },
-                  { l: 'Date', v: 'Sunday, March 29, 2026' },
-                  { l: 'Time', v: '9:00 AM' },
-                ].map((row) => (
-                  <div key={row.l} className="flex justify-between text-[8px]">
-                    <span className="text-gray-400">{row.l}</span>
-                    <span className="font-semibold text-gray-800">{row.v}</span>
+                  { name: 'Dan the Barber', rating: '5', reviews: '9', dist: '0.3 mi', drive: '1 min drive', gradient: 'from-amber-200 via-orange-100 to-yellow-50', selected: true },
+                  { name: 'Radiant Spa', rating: '4.9', reviews: '15', dist: '1.9 mi', drive: '5 min drive', gradient: 'from-emerald-200 via-teal-100 to-cyan-50' },
+                ].map((biz, i) => (
+                  <div key={i} className={`w-[130px] shrink-0 overflow-hidden rounded-xl border ${biz.selected ? 'border-brand-300' : 'border-gray-100'}`}>
+                    <div className={`h-16 bg-gradient-to-br ${biz.gradient}`} />
+                    <div className="p-1.5">
+                      <p className="text-[9px] font-bold text-gray-900">{biz.name}</p>
+                      <div className="flex items-center gap-0.5">
+                        <span className="text-[8px] text-amber-500">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+                        <span className="text-[8px] text-gray-400">{biz.rating} ({biz.reviews})</span>
+                      </div>
+                      <p className="text-[8px] text-gray-400">{biz.dist} &middot; {biz.drive}</p>
+                    </div>
                   </div>
                 ))}
-                <div className="border-t border-gray-100 pt-1.5">
-                  <div className="flex justify-between text-[8px]">
-                    <span className="text-gray-400">Total</span>
-                    <span className="font-bold text-gray-900">$30.00</span>
+              </div>
+
+              {/* 4. Service cards */}
+              <div className="chat-msg-4 mb-3 flex gap-1.5">
+                {[
+                  { name: 'Beard trimming', price: '$25', sub: '20 min' },
+                  { name: 'Hair Color', price: '$30', sub: '50% deposit', selected: true },
+                ].map((svc, i) => (
+                  <div key={i} className={`flex-1 rounded-xl border p-2 ${svc.selected ? 'border-brand-300 bg-brand-50' : 'border-gray-200'}`}>
+                    <p className={`text-[9px] font-semibold ${svc.selected ? 'text-brand-700' : 'text-gray-800'}`}>{svc.name}</p>
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-[9px] font-bold ${svc.selected ? 'text-brand-600' : 'text-gray-600'}`}>{svc.price}</span>
+                      <span className="text-[7px] text-gray-400">{svc.sub}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-[8px]">
-                    <span className="text-gray-400">Deposit</span>
-                    <span className="font-bold text-red-500">$15.00 (Due)</span>
+                ))}
+              </div>
+
+              {/* 5. User selects service */}
+              <div className="chat-msg-5 mb-3 flex justify-end">
+                <div className="rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
+                  Hair Color at Dan the Barber
+                </div>
+              </div>
+
+              {/* 6. AI asks when + date options */}
+              <div className="chat-msg-6 mb-3">
+                <div className="mb-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">
+                  When would you like your appointment?
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Today', 'Tomorrow', 'Next Week', 'Pick a date'].map((d) => (
+                    <div key={d} className={`rounded-full border px-3 py-1.5 text-[8px] ${d === 'Tomorrow' ? 'border-brand-400 bg-brand-50 font-medium text-brand-700' : 'border-gray-200 text-gray-600'}`}>
+                      {d}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 7. User picks Tomorrow */}
+              <div className="chat-msg-7 mb-3 flex justify-end">
+                <div className="rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
+                  Tomorrow
+                </div>
+              </div>
+
+              {/* 8. AI shows staff */}
+              <div className="chat-msg-8 mb-2">
+                <div className="mb-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">
+                  Here are the available staff and time slots:
+                </div>
+                <div className="mb-2 flex items-center gap-2">
+                  <div className="h-9 w-9 shrink-0 rounded-full bg-gradient-to-br from-sky-300 via-blue-200 to-indigo-100" />
+                  <div>
+                    <p className="text-[9px] font-bold text-gray-900">Dragana Djurica</p>
+                    <p className="text-[8px] text-gray-400">15 slots</p>
                   </div>
                 </div>
               </div>
+
+              {/* 9. Time slots */}
+              <div className="chat-msg-9 grid grid-cols-3 gap-1">
+                {['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '1:00 PM'].map((time) => (
+                  <div key={time} className={`rounded-lg border py-1.5 text-center text-[8px] font-medium ${time === '9:00 AM' ? 'border-brand-400 bg-brand-600 text-white' : 'border-gray-200 text-gray-600'}`}>
+                    {time}
+                  </div>
+                ))}
+              </div>
             </div>
-            {/* Buttons */}
-            <div className="mt-3 w-full space-y-1.5">
-              <div className="w-full rounded-xl bg-brand-600 py-2 text-center text-[9px] font-semibold text-white">Done</div>
-              <div className="w-full rounded-xl border border-brand-300 py-2 text-center text-[9px] font-semibold text-brand-600">Get Directions</div>
+          </div>
+          <BottomBar />
+        </div>
+
+        {/* ── Confirmation: Full screen ───────────────────────────── */}
+        <div className="bk-confirm absolute inset-0 z-30 flex flex-col items-center justify-center bg-gray-50 px-4">
+          {/* Green check */}
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-green-500">
+            <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <p className="mb-1 text-[11px] font-bold text-gray-900">Appointment Confirmed</p>
+          <p className="mb-4 text-center text-[8px] text-gray-500">
+            Your booking with Dragana Djurica is confirmed.
+            <br />You&apos;ll receive a notification shortly.
+          </p>
+          {/* Summary card */}
+          <div className="w-full rounded-xl border border-gray-200 bg-white p-3">
+            <div className="space-y-1.5">
+              {[
+                { l: 'Service', v: 'Hair Color' },
+                { l: 'Business', v: 'Dan the Barber' },
+                { l: 'Staff', v: 'Dragana Djurica' },
+                { l: 'Date', v: 'Sunday, March 29, 2026' },
+                { l: 'Time', v: '9:00 AM' },
+              ].map((row) => (
+                <div key={row.l} className="flex justify-between text-[8px]">
+                  <span className="text-gray-400">{row.l}</span>
+                  <span className="font-semibold text-gray-800">{row.v}</span>
+                </div>
+              ))}
+              <div className="border-t border-gray-100 pt-1.5">
+                <div className="flex justify-between text-[8px]">
+                  <span className="text-gray-400">Total</span>
+                  <span className="font-bold text-gray-900">$30.00</span>
+                </div>
+                <div className="flex justify-between text-[8px]">
+                  <span className="text-gray-400">Deposit</span>
+                  <span className="font-bold text-red-500">$15.00 (Due)</span>
+                </div>
+              </div>
             </div>
+          </div>
+          {/* Buttons */}
+          <div className="mt-3 w-full space-y-1.5">
+            <div className="w-full rounded-xl bg-brand-600 py-2 text-center text-[9px] font-semibold text-white">Done</div>
+            <div className="w-full rounded-xl border border-brand-300 py-2 text-center text-[9px] font-semibold text-brand-600">Get Directions</div>
           </div>
         </div>
 
