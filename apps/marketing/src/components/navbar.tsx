@@ -20,15 +20,16 @@ export function Navbar() {
           <span className="text-xl font-bold tracking-wide text-gray-900">BALKINA</span>
         </Link>
 
-        {/* Desktop nav */}
-        <div className="hidden items-center gap-6 md:flex">
+        {/* Desktop nav — center links */}
+        <div className="hidden items-center gap-8 md:flex">
           <Link href="/" className="text-sm font-medium text-gray-600 hover:text-brand-600 transition-colors">For Businesses</Link>
           <Link href="/app" className="text-sm font-medium text-gray-600 hover:text-brand-600 transition-colors">For Customers</Link>
-          <Link href="/pricing" className="text-sm font-medium text-gray-600 hover:text-brand-600 transition-colors">Pricing</Link>
-          <div className="h-5 w-px bg-gray-200" />
-          <a href="https://app.balkina.ai" className="text-sm font-medium text-gray-700 hover:text-brand-600 transition-colors">Sign In</a>
-          <a href="https://app.balkina.ai/register" className="rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors">Get Started Free</a>
-          <Link href="/app" className="rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">Download App</Link>
+        </div>
+
+        {/* Desktop nav — right actions */}
+        <div className="hidden items-center gap-3 md:flex">
+          <a href="https://app.balkina.ai" className="rounded-full px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-brand-600 transition-colors">Sign In</a>
+          <a href="https://app.balkina.ai/register" className="rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors">Start Free Trial</a>
         </div>
 
         {/* Mobile hamburger */}
@@ -47,11 +48,9 @@ export function Navbar() {
           <div className="flex flex-col gap-4">
             <Link href="/" onClick={() => setMobileOpen(false)} className="text-base font-medium text-gray-700">For Businesses</Link>
             <Link href="/app" onClick={() => setMobileOpen(false)} className="text-base font-medium text-gray-700">For Customers</Link>
-            <Link href="/pricing" onClick={() => setMobileOpen(false)} className="text-base font-medium text-gray-700">Pricing</Link>
             <hr className="border-gray-100" />
             <a href="https://app.balkina.ai" className="text-base font-medium text-gray-700">Sign In</a>
-            <a href="https://app.balkina.ai/register" className="rounded-full bg-brand-600 px-5 py-3 text-center text-base font-semibold text-white">Get Started Free</a>
-            <Link href="/app" className="rounded-full border border-gray-300 px-5 py-3 text-center text-base font-semibold text-gray-700">Download App</Link>
+            <a href="https://app.balkina.ai/register" className="rounded-full bg-brand-600 px-5 py-3 text-center text-base font-semibold text-white">Start Free Trial</a>
           </div>
         </div>
       )}
