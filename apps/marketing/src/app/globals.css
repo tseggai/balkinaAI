@@ -102,6 +102,23 @@ div.device-screen {
   box-shadow: 0 37px #babdbf;
 }
 
+/* ─── Scroll-triggered section animations ────────────────────────────── */
+
+@keyframes sectionFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.section-animate {
+  animation: sectionFadeIn 0.7s ease-out both;
+}
+
 /* ─── Staggered fade-in animations for mockup elements ───────────────── */
 
 @keyframes fadeInUp {
