@@ -513,10 +513,10 @@ export default function HomePage() {
           {/* Minimal headline */}
           <div className="text-center">
             <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl lg:text-5xl">
-              Your business, booked by AI
+              Let AI book you while you work
             </h1>
             <p className="mx-auto mt-3 max-w-2xl text-base text-gray-500 md:text-lg">
-              Customers find you, book you, and pay you — all through a single chat. You just do what you do best.
+              Automated front desk for salons, clinics, studios, and beyond.
             </p>
           </div>
 
