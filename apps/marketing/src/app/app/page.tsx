@@ -53,15 +53,15 @@ function CustomerPhonePreview() {
         <span className="text-[9px] font-bold tracking-widest text-gray-800">BALKINA</span>
       </div>
       <div className="space-y-2 px-3 pt-3">
-        <div className="flex justify-end">
+        <div className="animate-fade-in-1 flex justify-end">
           <div className="max-w-[80%] rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
             Find a barber nearby
           </div>
         </div>
-        <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">
+        <div className="animate-fade-in-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">
           Here are top-rated barbers near you:
         </div>
-        <div className="flex gap-1.5">
+        <div className="animate-fade-in-3 flex gap-1.5">
           {[
             { name: 'Dan the Barber', rating: '5.0', dist: '0.3 mi', gradient: 'from-amber-200 via-orange-100 to-yellow-50' },
             { name: 'Fresh Cuts', rating: '4.8', dist: '0.7 mi', gradient: 'from-sky-200 via-blue-100 to-indigo-50' },
@@ -75,12 +75,12 @@ function CustomerPhonePreview() {
             </div>
           ))}
         </div>
-        <div className="flex justify-end">
+        <div className="animate-fade-in-4 flex justify-end">
           <div className="rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
             Hair Color at Dan the Barber
           </div>
         </div>
-        <div className="rounded-xl border border-green-200 bg-green-50 p-2.5">
+        <div className="animate-fade-in-5 rounded-xl border border-green-200 bg-green-50 p-2.5">
           <div className="flex items-center gap-1.5">
             <svg className="h-3.5 w-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
             <span className="text-[9px] font-semibold text-green-800">Confirmed!</span>
@@ -124,7 +124,7 @@ function StaffPhonePreview() {
             </div>
           </div>
         </div>
-        <div className="animate-slide-down rounded-xl border border-brand-200 bg-brand-50 p-2.5 shadow-md shadow-brand-100/50">
+        <div className="animate-fade-in-3 animate-slide-down rounded-xl border border-brand-200 bg-brand-50 p-2.5 shadow-md shadow-brand-100/50">
           <div className="flex items-center gap-2">
             <div className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-600">
               <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
@@ -135,7 +135,7 @@ function StaffPhonePreview() {
             </div>
           </div>
         </div>
-        <div className="mt-2 rounded-xl border border-gray-200 bg-white p-2.5">
+        <div className="animate-fade-in-4 mt-2 rounded-xl border border-gray-200 bg-white p-2.5">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-[9px] font-bold text-gray-600">EL</div>
             <div>
@@ -144,11 +144,11 @@ function StaffPhonePreview() {
             </div>
           </div>
           <div className="mt-2 flex gap-2">
-            <div className="flex-1 rounded-lg bg-green-600 py-1.5 text-center text-[9px] font-semibold text-white">Approve</div>
-            <div className="flex-1 rounded-lg border border-gray-200 py-1.5 text-center text-[9px] font-semibold text-gray-600">Reschedule</div>
+            <div className="animate-fade-in-5 flex-1 rounded-lg bg-green-600 py-1.5 text-center text-[9px] font-semibold text-white">Approve</div>
+            <div className="animate-fade-in-5 flex-1 rounded-lg border border-gray-200 py-1.5 text-center text-[9px] font-semibold text-gray-600">Reschedule</div>
           </div>
         </div>
-        <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-green-50 px-2.5 py-1.5">
+        <div className="animate-fade-in-6 mt-2 flex items-center gap-1.5 rounded-lg bg-green-50 px-2.5 py-1.5">
           <svg className="h-3 w-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
           <p className="text-[8px] font-medium text-green-700">Confirmed &middot; Customer notified</p>
         </div>
@@ -193,36 +193,39 @@ export default function AppPage() {
       {/* ─── Hero ────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-gradient-to-b from-gray-50 to-white">
         <div className="mx-auto max-w-7xl px-6 pb-20 pt-16 md:pt-24">
-          <div className="text-center">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-medium text-brand-700">
-              Free on iOS &amp; Android
+          <div className="flex flex-col items-center gap-12 lg:flex-row lg:gap-16">
+            {/* Left — text */}
+            <div className="flex-1 text-center lg:text-left">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-medium text-brand-700">
+                Free on iOS &amp; Android
+              </div>
+              <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl lg:text-5xl">
+                Book anything by chatting
+              </h1>
+              <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-gray-500 md:text-lg lg:mx-0">
+                Tell the AI what you need. It finds the best businesses near you, shows live availability, and books your appointment — in seconds.
+              </p>
+              <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:justify-start sm:justify-center">
+                <a href="#" className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-7 py-3.5 text-base font-semibold text-white shadow-lg hover:bg-gray-800 transition-colors">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" /></svg>
+                  App Store
+                </a>
+                <a href="#" className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-7 py-3.5 text-base font-semibold text-white shadow-lg hover:bg-gray-800 transition-colors">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-1.292l2.545 1.473c.68.394.68 1.03 0 1.424l-2.545 1.473-2.534-2.534 2.534-2.536zM5.864 2.658L16.8 8.99l-2.302 2.302-8.634-8.634z" /></svg>
+                  Google Play
+                </a>
+              </div>
             </div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl lg:text-5xl">
-              Book anything by chatting
-            </h1>
-            <p className="mx-auto mt-4 max-w-2xl text-base text-gray-500 md:text-lg">
-              Tell the AI what you need. It finds the best businesses near you, shows live availability, and books your appointment — in seconds.
-            </p>
-            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <a href="#" className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-7 py-3.5 text-base font-semibold text-white shadow-lg hover:bg-gray-800 transition-colors">
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" /></svg>
-                App Store
-              </a>
-              <a href="#" className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-7 py-3.5 text-base font-semibold text-white shadow-lg hover:bg-gray-800 transition-colors">
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-1.292l2.545 1.473c.68.394.68 1.03 0 1.424l-2.545 1.473-2.534-2.534 2.534-2.536zM5.864 2.658L16.8 8.99l-2.302 2.302-8.634-8.634z" /></svg>
-                Google Play
-              </a>
-            </div>
-          </div>
 
-          {/* Two phones side by side */}
-          <div className="mt-14 flex items-end justify-center gap-6 md:gap-10">
-            <ScaledPhone label="Customer Experience">
-              <CustomerPhonePreview />
-            </ScaledPhone>
-            <ScaledPhone label="Staff Experience">
-              <StaffPhonePreview />
-            </ScaledPhone>
+            {/* Right — two phones */}
+            <div className="flex shrink-0 items-end gap-4">
+              <ScaledPhone label="Customer">
+                <CustomerPhonePreview />
+              </ScaledPhone>
+              <ScaledPhone label="Staff">
+                <StaffPhonePreview />
+              </ScaledPhone>
+            </div>
           </div>
         </div>
       </section>
