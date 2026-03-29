@@ -24,9 +24,10 @@ export const APPOINTMENT_STATUS = {
 } as const;
 
 export const SUBSCRIPTION_PLANS = {
-  STARTER: 'starter',
-  PRO: 'pro',
-  ENTERPRISE: 'enterprise',
+  SOLO: 'solo',
+  SOLO_PRO: 'solo_pro',
+  TEAM: 'team',
+  SCALE: 'scale',
 } as const;
 
 export const DEPOSIT_TYPE = {
