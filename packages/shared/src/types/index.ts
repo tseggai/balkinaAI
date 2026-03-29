@@ -26,6 +26,8 @@ export interface SubscriptionPlan {
   max_staff: number;
   max_locations: number;
   features: Json;
+  extra_staff_price: number | null;
+  extra_staff_stripe_price_id: string | null;
   created_at: Timestamp;
 }
 
@@ -42,6 +44,9 @@ export interface Tenant {
   stripe_subscription_id: string | null;
   subscription_plan_id: UUID | null;
   payments_enabled: boolean;
+  online_payments_stripe_item_id: string | null;
+  stripe_extra_staff_item_id: string | null;
+  extra_staff_count: number;
   status: TenantStatus;
   created_at: Timestamp;
 }
