@@ -634,38 +634,63 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">Simple pricing, no surprises</h2>
-            <p className="mt-4 text-lg text-gray-500">Start with a free trial. Upgrade when you&apos;re ready.</p>
+            <p className="mt-4 text-lg text-gray-500">Start free. Upgrade as you grow. All paid plans include a 7-day free trial.</p>
           </div>
-          <div className="mt-16 grid gap-8 md:grid-cols-3">
+          <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {[
-              { name: 'Starter', price: '49', desc: 'For solo professionals', features: ['1 staff member', '1 location', 'AI booking chatbot', 'Email notifications', 'Basic analytics'] },
-              { name: 'Pro', price: '99', desc: 'For growing teams', popular: true, features: ['Up to 10 staff', '3 locations', 'Everything in Starter', 'SMS notifications', 'Deposit payments', 'Coupons & promotions', 'Priority support'] },
-              { name: 'Enterprise', price: '199', desc: 'For multi-location businesses', features: ['Unlimited staff', 'Unlimited locations', 'Everything in Pro', 'Custom branding', 'API access', 'Dedicated account manager'] },
+              { name: 'Free', price: '0', desc: 'Try it out', staff: '1 staff', locations: '1 location', bookings: '20/month', trial: false, features: ['AI chatbot', 'Staff app', 'Smart reminders', 'SMS notifications', 'Reviews & ratings', 'Basic analytics'] },
+              { name: 'Growth', price: '19', desc: 'Solo professionals', staff: '1 staff', locations: '1 location', bookings: 'Unlimited', trial: true, features: ['Everything in Free', 'Unlimited bookings', 'Full service management', 'Service add-ons', 'Coupons'] },
+              { name: 'Business', price: '49', desc: 'Small teams', staff: 'Up to 5 staff', locations: '2 locations', bookings: 'Unlimited', popular: true, trial: true, extra: '+$8/additional staff', features: ['Everything in Growth', 'Service packages', 'Staff management', 'Advanced analytics'] },
+              { name: 'Scale', price: '99', desc: 'Growing businesses', staff: 'Up to 15 staff', locations: '5 locations', bookings: 'Unlimited', trial: true, extra: '+$6/additional staff', features: ['Everything in Business', 'Role management', 'Loyalty programs', 'Inventory management', 'Dedicated support'] },
             ].map((plan, i) => (
-              <div key={i} className={`relative rounded-2xl border p-8 ${plan.popular ? 'border-brand-600 bg-white shadow-xl shadow-brand-100/50' : 'border-gray-200 bg-white'}`}>
+              <div key={i} className={`relative flex flex-col rounded-2xl border p-6 ${plan.popular ? 'border-brand-600 bg-white shadow-xl shadow-brand-100/50' : 'border-gray-200 bg-white'}`}>
                 {plan.popular && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-brand-600 px-4 py-1 text-xs font-semibold text-white">Most Popular</div>
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-600 px-4 py-1 text-[10px] font-semibold text-white">Most Popular</div>
                 )}
                 <h3 className="text-lg font-semibold text-gray-900">{plan.name}</h3>
-                <p className="mt-1 text-sm text-gray-500">{plan.desc}</p>
-                <div className="mt-6">
-                  <span className="text-4xl font-extrabold text-gray-900">&euro;{plan.price}</span>
-                  <span className="text-sm text-gray-500">/month</span>
+                <p className="mt-0.5 text-sm text-gray-500">{plan.desc}</p>
+                <div className="mt-4">
+                  <span className="text-3xl font-extrabold text-gray-900">${plan.price}</span>
+                  <span className="text-sm text-gray-500">/mo</span>
                 </div>
-                <ul className="mt-8 space-y-3">
+                {plan.trial && <p className="mt-1 text-[11px] text-brand-600">7-day free trial</p>}
+                <div className="mt-4 space-y-1 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
+                  <p>{plan.staff} &middot; {plan.locations}</p>
+                  <p>{plan.bookings} bookings</p>
+                  {plan.extra && <p className="text-brand-600">{plan.extra}</p>}
+                </div>
+                <ul className="mt-4 flex-1 space-y-2">
                   {plan.features.map((f, fi) => (
-                    <li key={fi} className="flex items-start gap-2.5 text-sm text-gray-600">
-                      <svg className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    <li key={fi} className="flex items-start gap-2 text-sm text-gray-600">
+                      <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                       {f}
                     </li>
                   ))}
                 </ul>
-                <a href="https://app.balkina.ai/register" className={`mt-8 block rounded-full py-3 text-center text-sm font-semibold transition-colors ${plan.popular ? 'bg-brand-600 text-white hover:bg-brand-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
-                  Start Free Trial
+                <a href="https://app.balkina.ai/register" className={`mt-6 block rounded-full py-2.5 text-center text-sm font-semibold transition-colors ${plan.popular ? 'bg-brand-600 text-white hover:bg-brand-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
+                  {plan.price === '0' ? 'Get Started' : 'Start Free Trial'}
                 </a>
               </div>
             ))}
           </div>
+
+          {/* Online Payments add-on */}
+          <div className="mx-auto mt-8 max-w-2xl rounded-2xl border border-gray-200 bg-white p-5">
+            <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" /></svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Online Payments</p>
+                  <p className="text-xs text-gray-500">Accept deposits and payments via Stripe. Available where Stripe is supported.</p>
+                </div>
+              </div>
+              <p className="shrink-0 text-lg font-bold text-gray-900">+$9<span className="text-sm font-normal text-gray-500">/mo</span></p>
+            </div>
+          </div>
+
+          {/* View all features toggle */}
           <div className="mt-8 text-center">
             <button onClick={() => setShowAllFeatures(!showAllFeatures)} className="text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors">
               {showAllFeatures ? 'Show less' : 'View all features'} {showAllFeatures ? '\u2191' : '\u2193'}
@@ -680,29 +705,36 @@ export default function HomePage() {
                   <thead>
                     <tr className="border-b border-gray-100">
                       <th className="pb-3 font-medium text-gray-500">Feature</th>
-                      <th className="pb-3 text-center font-medium text-gray-500">Starter</th>
-                      <th className="pb-3 text-center font-medium text-brand-600">Pro</th>
-                      <th className="pb-3 text-center font-medium text-gray-500">Enterprise</th>
+                      <th className="pb-3 text-center font-medium text-gray-500">Free</th>
+                      <th className="pb-3 text-center font-medium text-gray-500">Growth</th>
+                      <th className="pb-3 text-center font-medium text-brand-600">Business</th>
+                      <th className="pb-3 text-center font-medium text-gray-500">Scale</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {[
-                      { f: 'AI Booking Chatbot', s: true, p: true, e: true },
-                      { f: 'Staff Members', s: '1', p: '10', e: 'Unlimited' },
-                      { f: 'Locations', s: '1', p: '3', e: 'Unlimited' },
-                      { f: 'Email Notifications', s: true, p: true, e: true },
-                      { f: 'SMS Notifications', s: false, p: true, e: true },
-                      { f: 'Deposit Payments', s: false, p: true, e: true },
-                      { f: 'Coupons & Promotions', s: false, p: true, e: true },
-                      { f: 'Analytics & CRM', s: 'Basic', p: 'Advanced', e: 'Advanced' },
-                      { f: 'Custom Branding', s: false, p: false, e: true },
-                      { f: 'API Access', s: false, p: false, e: true },
-                      { f: 'Priority Support', s: false, p: true, e: true },
-                      { f: 'Dedicated Account Manager', s: false, p: false, e: true },
+                      { f: 'AI Chatbot', fr: true, g: true, b: true, s: true },
+                      { f: 'Staff App', fr: true, g: true, b: true, s: true },
+                      { f: 'Smart Reminders (Email + SMS + Push)', fr: true, g: true, b: true, s: true },
+                      { f: 'SMS Notifications', fr: true, g: true, b: true, s: true },
+                      { f: 'Reviews & Ratings', fr: true, g: true, b: true, s: true },
+                      { f: 'Analytics', fr: 'Basic', g: 'Basic', b: 'Advanced', s: 'Advanced' },
+                      { f: 'Bookings', fr: '20/mo', g: 'Unlimited', b: 'Unlimited', s: 'Unlimited' },
+                      { f: 'Staff Members', fr: '1', g: '1', b: '5 (+$8)', s: '15 (+$6)' },
+                      { f: 'Locations', fr: '1', g: '1', b: '2', s: '5' },
+                      { f: 'Full Service Management', fr: false, g: true, b: true, s: true },
+                      { f: 'Service Add-ons', fr: false, g: true, b: true, s: true },
+                      { f: 'Coupons', fr: false, g: true, b: true, s: true },
+                      { f: 'Service Packages', fr: false, g: false, b: true, s: true },
+                      { f: 'Staff Management', fr: false, g: false, b: true, s: true },
+                      { f: 'Role Management', fr: false, g: false, b: false, s: true },
+                      { f: 'Loyalty Programs', fr: false, g: false, b: false, s: true },
+                      { f: 'Inventory Management', fr: false, g: false, b: false, s: true },
+                      { f: 'Online Payments (add-on)', fr: '+$9', g: '+$9', b: '+$9', s: '+$9' },
                     ].map((row) => (
                       <tr key={row.f}>
                         <td className="py-2.5 text-gray-700">{row.f}</td>
-                        {[row.s, row.p, row.e].map((v, vi) => (
+                        {[row.fr, row.g, row.b, row.s].map((v, vi) => (
                           <td key={vi} className="py-2.5 text-center">
                             {v === true ? (
                               <svg className="mx-auto h-4 w-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
