@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 
 /* ─── Device Frames (devices.css) ──────────────────────────────────────── */
@@ -477,20 +478,33 @@ function DashboardContent() {
 
 /* ─── Feature Grid ──────────────────────────────────────────────────────── */
 
+const FEATURE_ICONS = [
+  <svg key="svc" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>,
+  <svg key="staff" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>,
+  <svg key="loc" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>,
+  <svg key="pay" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" /></svg>,
+  <svg key="coupon" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z" /></svg>,
+  <svg key="chart" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>,
+  <svg key="bell" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>,
+  <svg key="star" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>,
+];
+
 const FEATURES = [
-  { icon: '📅', title: 'Service Management', desc: 'Set prices, durations, deposits, extras, buffer times, and booking limits for every service.' },
-  { icon: '👥', title: 'Staff Scheduling', desc: 'Individual schedules, day-offs, service assignments, and multi-location support for your team.' },
-  { icon: '📍', title: 'Multi-Location', desc: 'Manage multiple branches with separate staff, services, and schedules from one dashboard.' },
-  { icon: '💳', title: 'Deposit Payments', desc: 'Collect deposits at booking via Stripe. Apple Pay, Google Pay, and cards supported.' },
-  { icon: '🎟️', title: 'Coupons & Promotions', desc: 'Create discount codes with usage limits, expiration dates, and percentage or fixed amounts.' },
-  { icon: '📊', title: 'Analytics & CRM', desc: 'Track revenue, bookings, reviews, and customer history. Know your business inside out.' },
-  { icon: '🔔', title: 'Smart Reminders', desc: 'Automated email and push confirmations, reminders, and AI-powered rebooking nudges.' },
-  { icon: '⭐', title: 'Reviews & Ratings', desc: 'Collect customer reviews automatically. Your rating helps you rank higher in AI search.' },
+  { title: 'Service Management', desc: 'Set prices, durations, deposits, extras, buffer times, and booking limits for every service.' },
+  { title: 'Staff Scheduling', desc: 'Individual schedules, day-offs, service assignments, and multi-location support for your team.' },
+  { title: 'Multi-Location', desc: 'Manage multiple branches with separate staff, services, and schedules from one dashboard.' },
+  { title: 'Deposit Payments', desc: 'Collect deposits at booking via Stripe. Apple Pay, Google Pay, and cards supported.' },
+  { title: 'Coupons & Promotions', desc: 'Create discount codes with usage limits, expiration dates, and percentage or fixed amounts.' },
+  { title: 'Analytics & CRM', desc: 'Track revenue, bookings, reviews, and customer history. Know your business inside out.' },
+  { title: 'Smart Reminders', desc: 'Automated email and push confirmations, reminders, and AI-powered rebooking nudges.' },
+  { title: 'Reviews & Ratings', desc: 'Collect customer reviews automatically. Your rating helps you rank higher in AI search.' },
 ];
 
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
+  const [showAllFeatures, setShowAllFeatures] = useState(false);
+
   return (
     <>
       {/* ─── Hero (full viewport, visual-first) ──────────────────────────── */}
@@ -524,32 +538,32 @@ export default function HomePage() {
           <div className="relative mt-10 hidden flex-1 items-end justify-center pb-8 lg:flex">
             {/* Customer phone — left, gap from iPad */}
             <div className="flex flex-col items-center" style={{ zIndex: 10 }}>
-              <p className="mb-3 text-sm font-semibold text-gray-600">Your Customers</p>
               <div style={{ width: PHONE_VIS_W, height: PHONE_VIS_H, position: 'relative' }}>
                 <div style={{ transform: `scale(${PHONE_SCALE})`, transformOrigin: 'bottom left', position: 'absolute', bottom: 0, left: 0 }}>
                   <PhoneDevice><CustomerPhoneContent /></PhoneDevice>
                 </div>
               </div>
+              <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">Your Customers</p>
             </div>
 
             {/* Dashboard iPad — center, 42px taller */}
             <div className="flex flex-col items-center" style={{ zIndex: 0, marginLeft: 24 }}>
-              <p className="mb-3 text-sm font-semibold text-gray-600">Your Dashboard</p>
               <div style={{ width: IPAD_VIS_W, height: IPAD_VIS_H, position: 'relative' }}>
                 <div style={{ transform: `scale(${IPAD_SCALE})`, transformOrigin: 'bottom left', position: 'absolute', bottom: 0, left: 0 }}>
                   <IPadDevice><DashboardContent /></IPadDevice>
                 </div>
               </div>
+              <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">Your Dashboard</p>
             </div>
 
             {/* Staff phone — right, overlapping iPad */}
             <div className="flex flex-col items-center" style={{ zIndex: 10, marginLeft: -70 }}>
-              <p className="mb-3 text-sm font-semibold text-gray-600">Your Staff</p>
               <div style={{ width: PHONE_VIS_W, height: PHONE_VIS_H, position: 'relative' }}>
                 <div style={{ transform: `scale(${PHONE_SCALE})`, transformOrigin: 'bottom left', position: 'absolute', bottom: 0, left: 0 }}>
                   <PhoneDevice><StaffPhoneContent /></PhoneDevice>
                 </div>
               </div>
+              <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">Your Staff</p>
             </div>
           </div>
         </div>
@@ -564,7 +578,7 @@ export default function HomePage() {
       </section>
 
       {/* ─── Features ─────────────────────────────────────────────────────── */}
-      <section id="features" className="py-24 md:py-32">
+      <section id="features" className="section-animate py-24 md:py-32">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">Everything you need, nothing you don&apos;t</h2>
@@ -573,7 +587,9 @@ export default function HomePage() {
           <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {FEATURES.map((f, i) => (
               <div key={i} className="group rounded-2xl border border-gray-100 bg-white p-6 transition-all hover:border-brand-200 hover:shadow-lg hover:shadow-brand-100/40">
-                <span className="text-2xl">{f.icon}</span>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                  {FEATURE_ICONS[i]}
+                </div>
                 <h3 className="mt-3 text-base font-semibold text-gray-900">{f.title}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-gray-500">{f.desc}</p>
               </div>
@@ -583,7 +599,7 @@ export default function HomePage() {
       </section>
 
       {/* ─── Social Proof / Numbers ───────────────────────────────────────── */}
-      <section className="border-y border-gray-100 bg-gray-50 py-16">
+      <section className="section-animate border-y border-gray-100 bg-gray-50 py-16">
         <div className="mx-auto max-w-5xl px-6">
           <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
             {[
@@ -602,7 +618,7 @@ export default function HomePage() {
       </section>
 
       {/* ─── Pricing ──────────────────────────────────────────────────────── */}
-      <section id="pricing" className="py-24 md:py-32">
+      <section id="pricing" className="section-animate py-24 md:py-32">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">Simple pricing, no surprises</h2>
@@ -639,13 +655,64 @@ export default function HomePage() {
             ))}
           </div>
           <div className="mt-8 text-center">
-            <Link href="/pricing" className="text-sm font-medium text-brand-600 hover:text-brand-700">View full pricing details &rarr;</Link>
+            <button onClick={() => setShowAllFeatures(!showAllFeatures)} className="text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors">
+              {showAllFeatures ? 'Show less' : 'View all features'} {showAllFeatures ? '\u2191' : '\u2193'}
+            </button>
           </div>
+
+          {showAllFeatures && (
+            <div className="mt-10 mx-auto max-w-4xl rounded-2xl border border-gray-100 bg-white p-8">
+              <h3 className="mb-6 text-center text-lg font-semibold text-gray-900">Full Feature Comparison</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="pb-3 font-medium text-gray-500">Feature</th>
+                      <th className="pb-3 text-center font-medium text-gray-500">Starter</th>
+                      <th className="pb-3 text-center font-medium text-brand-600">Pro</th>
+                      <th className="pb-3 text-center font-medium text-gray-500">Enterprise</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {[
+                      { f: 'AI Booking Chatbot', s: true, p: true, e: true },
+                      { f: 'Staff Members', s: '1', p: '10', e: 'Unlimited' },
+                      { f: 'Locations', s: '1', p: '3', e: 'Unlimited' },
+                      { f: 'Email Notifications', s: true, p: true, e: true },
+                      { f: 'SMS Notifications', s: false, p: true, e: true },
+                      { f: 'Deposit Payments', s: false, p: true, e: true },
+                      { f: 'Coupons & Promotions', s: false, p: true, e: true },
+                      { f: 'Analytics & CRM', s: 'Basic', p: 'Advanced', e: 'Advanced' },
+                      { f: 'Custom Branding', s: false, p: false, e: true },
+                      { f: 'API Access', s: false, p: false, e: true },
+                      { f: 'Priority Support', s: false, p: true, e: true },
+                      { f: 'Dedicated Account Manager', s: false, p: false, e: true },
+                    ].map((row) => (
+                      <tr key={row.f}>
+                        <td className="py-2.5 text-gray-700">{row.f}</td>
+                        {[row.s, row.p, row.e].map((v, vi) => (
+                          <td key={vi} className="py-2.5 text-center">
+                            {v === true ? (
+                              <svg className="mx-auto h-4 w-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                            ) : v === false ? (
+                              <span className="text-gray-300">&mdash;</span>
+                            ) : (
+                              <span className="text-gray-600">{v}</span>
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
       {/* ─── CTA ──────────────────────────────────────────────────────────── */}
-      <section className="bg-brand-600 py-20 md:py-24">
+      <section className="section-animate bg-brand-600 py-20 md:py-24">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl">Let AI fill your calendar</h2>
           <p className="mt-4 text-lg text-brand-100">Join barbershops, yoga studios, salons, and clinics already using Balkina AI.</p>
@@ -653,13 +720,25 @@ export default function HomePage() {
             <a href="https://app.balkina.ai/register" className="rounded-full bg-white px-8 py-3.5 text-base font-semibold text-brand-600 shadow-lg hover:bg-gray-50 transition-colors">
               Get Started Free
             </a>
-            <Link href="/pricing" className="rounded-full border border-white/30 px-8 py-3.5 text-base font-semibold text-white hover:bg-white/10 transition-colors">
-              View Pricing
-            </Link>
           </div>
           <p className="mt-4 text-sm text-brand-200">Free 14-day trial. No credit card required.</p>
         </div>
       </section>
+
+      {/* ─── Minimal Footer ───────────────────────────────────────────────── */}
+      <footer className="border-t border-gray-100 bg-white py-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-6 sm:flex-row sm:justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-5 w-5 rounded-full bg-brand-600" />
+            <span className="text-sm font-semibold text-gray-800">Balkina AI</span>
+          </div>
+          <div className="flex items-center gap-6 text-sm text-gray-400">
+            <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</Link>
+          </div>
+          <p className="text-sm text-gray-400">&copy; {new Date().getFullYear()} Balkina AI</p>
+        </div>
+      </footer>
     </>
   );
 }

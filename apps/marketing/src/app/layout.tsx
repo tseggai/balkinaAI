@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import 'devices.css/dist/devices.min.css';
 import './globals.css';
 import { Navbar } from '@/components/navbar';
-import { Footer } from '@/components/footer';
 
 export const metadata: Metadata = {
   title: 'Balkina AI — Book Appointments with AI',
@@ -22,7 +21,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-white">
         <Navbar />
         <main>{children}</main>
-        <Footer />
       </body>
     </html>
   );
