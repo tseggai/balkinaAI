@@ -27,7 +27,6 @@ export interface SubscriptionPlan {
   max_locations: number;
   features: Json;
   extra_staff_price: number | null;
-  extra_staff_stripe_price_id: string | null;
   created_at: Timestamp;
 }
 

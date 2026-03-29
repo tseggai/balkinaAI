@@ -16,8 +16,7 @@ export const PLAN_PRICE_IDS = {
 } as const;
 
 export const ADDON_PRICE_IDS = {
-  extra_staff_team: process.env.STRIPE_PRICE_ID_EXTRA_STAFF_TEAM ?? '',
-  extra_staff_scale: process.env.STRIPE_PRICE_ID_EXTRA_STAFF_SCALE ?? '',
+  extra_staff: process.env.STRIPE_PRICE_ID_EXTRA_STAFF ?? '',
   online_payments: process.env.STRIPE_PRICE_ID_ONLINE_PAYMENTS ?? '',
 } as const;
 
