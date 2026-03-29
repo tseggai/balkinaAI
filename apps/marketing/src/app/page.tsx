@@ -638,10 +638,10 @@ export default function HomePage() {
           </div>
           <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {[
-              { name: 'Free', price: '0', desc: 'Try it out', staff: '1 staff', locations: '1 location', bookings: '20/month', trial: false, features: ['AI chatbot', 'Staff app', 'Smart reminders', 'SMS notifications', 'Reviews & ratings', 'Basic analytics'] },
-              { name: 'Growth', price: '19', desc: 'Solo professionals', staff: '1 staff', locations: '1 location', bookings: 'Unlimited', trial: true, features: ['Everything in Free', 'Unlimited bookings', 'Full service management', 'Service add-ons', 'Coupons'] },
-              { name: 'Business', price: '49', desc: 'Small teams', staff: 'Up to 5 staff', locations: '2 locations', bookings: 'Unlimited', popular: true, trial: true, extra: '+$8/additional staff', features: ['Everything in Growth', 'Service packages', 'Staff management', 'Advanced analytics'] },
-              { name: 'Scale', price: '99', desc: 'Growing businesses', staff: 'Up to 15 staff', locations: '5 locations', bookings: 'Unlimited', trial: true, extra: '+$6/additional staff', features: ['Everything in Business', 'Role management', 'Loyalty programs', 'Inventory management', 'Dedicated support'] },
+              { name: 'Solo', price: '0', desc: 'For individuals getting started', staff: '1 staff', locations: '1 location', bookings: '20/month', trial: false, features: ['AI chatbot', 'Staff app', 'Smart reminders', 'SMS notifications', 'Reviews & ratings', 'Basic analytics'] },
+              { name: 'Solo Pro', price: '19', desc: 'For serious solo professionals', staff: '1 staff', locations: '1 location', bookings: 'Unlimited', trial: true, features: ['Everything in Solo', 'Unlimited bookings', 'Full service management', 'Service add-ons', 'Coupons'] },
+              { name: 'Team', price: '49', desc: 'For small teams', staff: 'Up to 5 staff', locations: '2 locations', bookings: 'Unlimited', popular: true, trial: true, extra: '+$8/additional staff', features: ['Everything in Solo Pro', 'Service packages', 'Staff management', 'Advanced analytics'] },
+              { name: 'Scale', price: '99', desc: 'For growing businesses', staff: 'Up to 15 staff', locations: '5 locations', bookings: 'Unlimited', trial: true, extra: '+$6/additional staff', features: ['Everything in Team', 'Role management', 'Loyalty programs', 'Inventory management', 'Dedicated support'] },
             ].map((plan, i) => (
               <div key={i} className={`relative flex flex-col rounded-2xl border p-6 ${plan.popular ? 'border-brand-600 bg-white shadow-xl shadow-brand-100/50' : 'border-gray-200 bg-white'}`}>
                 {plan.popular && (
@@ -668,7 +668,7 @@ export default function HomePage() {
                   ))}
                 </ul>
                 <a href="https://app.balkina.ai/register" className={`mt-6 block rounded-full py-2.5 text-center text-sm font-semibold transition-colors ${plan.popular ? 'bg-brand-600 text-white hover:bg-brand-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
-                  {plan.price === '0' ? 'Get Started' : 'Start Free Trial'}
+                  {plan.price === '0' ? 'Start for Free' : 'Start Free Trial'}
                 </a>
               </div>
             ))}
@@ -705,10 +705,10 @@ export default function HomePage() {
                   <thead>
                     <tr className="border-b border-gray-100">
                       <th className="pb-3 font-medium text-gray-500">Feature</th>
-                      <th className="pb-3 text-center font-medium text-gray-500">Free</th>
-                      <th className="pb-3 text-center font-medium text-gray-500">Growth</th>
-                      <th className="pb-3 text-center font-medium text-brand-600">Business</th>
-                      <th className="pb-3 text-center font-medium text-gray-500">Scale</th>
+                      <th className="pb-3 text-center font-medium text-gray-500"><div>Solo</div><div className="text-xs font-normal text-gray-400">$0/mo</div></th>
+                      <th className="pb-3 text-center font-medium text-gray-500"><div>Solo Pro</div><div className="text-xs font-normal text-gray-400">$19/mo</div></th>
+                      <th className="pb-3 text-center font-medium text-brand-600"><div>Team</div><div className="text-xs font-normal text-brand-400">$49/mo</div></th>
+                      <th className="pb-3 text-center font-medium text-gray-500"><div>Scale</div><div className="text-xs font-normal text-gray-400">$99/mo</div></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -722,7 +722,7 @@ export default function HomePage() {
                       { f: 'Bookings', fr: '20/mo', g: 'Unlimited', b: 'Unlimited', s: 'Unlimited' },
                       { f: 'Staff Members', fr: '1', g: '1', b: '5 (+$8)', s: '15 (+$6)' },
                       { f: 'Locations', fr: '1', g: '1', b: '2', s: '5' },
-                      { f: 'Full Service Management', fr: false, g: true, b: true, s: true },
+                      { f: 'Service Management', fr: 'Basic', g: 'Full', b: 'Full', s: 'Full' },
                       { f: 'Service Add-ons', fr: false, g: true, b: true, s: true },
                       { f: 'Coupons', fr: false, g: true, b: true, s: true },
                       { f: 'Service Packages', fr: false, g: false, b: true, s: true },
