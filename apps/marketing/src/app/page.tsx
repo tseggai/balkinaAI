@@ -640,8 +640,8 @@ export default function HomePage() {
             {[
               { name: 'Solo', price: '0', desc: 'For individuals getting started', staff: '1 staff', locations: '1 location', bookings: '20/month', trial: false, features: ['AI chatbot', 'Staff app', 'Smart reminders', 'SMS notifications', 'Reviews & ratings', 'Basic analytics'] },
               { name: 'Solo Pro', price: '19', desc: 'For serious solo professionals', staff: '1 staff', locations: '1 location', bookings: 'Unlimited', trial: true, features: ['Everything in Solo', 'Unlimited bookings', 'Full service management', 'Service add-ons', 'Coupons'] },
-              { name: 'Team', price: '49', desc: 'For small teams', staff: 'Up to 5 staff', locations: '2 locations', bookings: 'Unlimited', popular: true, trial: true, extra: '+$8/additional staff', features: ['Everything in Solo Pro', 'Service packages', 'Staff management', 'Advanced analytics'] },
-              { name: 'Scale', price: '99', desc: 'For growing businesses', staff: 'Up to 15 staff', locations: '5 locations', bookings: 'Unlimited', trial: true, extra: '+$6/additional staff', features: ['Everything in Team', 'Role management', 'Loyalty programs', 'Inventory management', 'Dedicated support'] },
+              { name: 'Team', price: '49', desc: 'For small teams', staff: 'Up to 5 staff', locations: '2 locations', bookings: 'Unlimited', popular: true, trial: true, extra: '+\u20AC6/additional staff', features: ['Everything in Solo Pro', 'Service packages', 'Staff management', 'Advanced analytics'] },
+              { name: 'Scale', price: '99', desc: 'For growing businesses', staff: 'Up to 15 staff', locations: '5 locations', bookings: 'Unlimited', trial: true, extra: '+\u20AC6/additional staff', features: ['Everything in Team', 'Role management', 'Loyalty programs', 'Inventory management', 'Dedicated support'] },
             ].map((plan, i) => (
               <div key={i} className={`relative flex flex-col rounded-2xl border p-6 ${plan.popular ? 'border-brand-600 bg-white shadow-xl shadow-brand-100/50' : 'border-gray-200 bg-white'}`}>
                 {plan.popular && (
@@ -650,7 +650,7 @@ export default function HomePage() {
                 <h3 className="text-lg font-semibold text-gray-900">{plan.name}</h3>
                 <p className="mt-0.5 text-sm text-gray-500">{plan.desc}</p>
                 <div className="mt-4">
-                  <span className="text-3xl font-extrabold text-gray-900">${plan.price}</span>
+                  <span className="text-3xl font-extrabold text-gray-900">&euro;{plan.price}</span>
                   <span className="text-sm text-gray-500">/mo</span>
                 </div>
                 {plan.trial && <p className="mt-1 text-[11px] text-brand-600">7-day free trial</p>}
@@ -686,7 +686,7 @@ export default function HomePage() {
                   <p className="text-xs text-gray-500">Accept deposits and payments via Stripe. Available where Stripe is supported.</p>
                 </div>
               </div>
-              <p className="shrink-0 text-lg font-bold text-gray-900">+$9<span className="text-sm font-normal text-gray-500">/mo</span></p>
+              <p className="shrink-0 text-lg font-bold text-gray-900">+&euro;14<span className="text-sm font-normal text-gray-500">/mo</span></p>
             </div>
           </div>
 
@@ -705,10 +705,10 @@ export default function HomePage() {
                   <thead>
                     <tr className="border-b border-gray-200">
                       <th className="pb-4 pr-4 font-medium text-gray-500" style={{ minWidth: 200 }}>Feature</th>
-                      <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Solo</div><div className="text-xs font-normal text-gray-400">$0/mo</div></th>
-                      <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Solo Pro</div><div className="text-xs font-normal text-gray-400">$19/mo</div></th>
-                      <th className="pb-4 text-center font-semibold text-brand-700" style={{ minWidth: 90 }}><div className="rounded-t-lg bg-brand-50 px-2 py-1.5 -mx-2">Team<div className="text-xs font-normal text-brand-500">$49/mo</div></div></th>
-                      <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Scale</div><div className="text-xs font-normal text-gray-400">$99/mo</div></th>
+                      <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Solo</div><div className="text-xs font-normal text-gray-400">&euro;0/mo</div></th>
+                      <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Solo Pro</div><div className="text-xs font-normal text-gray-400">&euro;19/mo</div></th>
+                      <th className="pb-4 text-center font-semibold text-brand-700" style={{ minWidth: 90 }}><div className="rounded-t-lg bg-brand-50 px-2 py-1.5 -mx-2">Team<div className="text-xs font-normal text-brand-500">&euro;49/mo</div></div></th>
+                      <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Scale</div><div className="text-xs font-normal text-gray-400">&euro;99/mo</div></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -720,7 +720,7 @@ export default function HomePage() {
                       { f: 'Reviews & Ratings', d: 'Collect feedback automatically after each appointment', fr: true, g: true, b: true, s: true },
                       { f: 'Analytics', d: 'Track bookings, revenue, and customer trends', fr: 'Basic', g: 'Basic', b: 'Advanced', s: 'Advanced' },
                       { f: 'Bookings', d: 'Number of appointments per month', fr: '20/mo', g: 'Unlimited', b: 'Unlimited', s: 'Unlimited' },
-                      { f: 'Staff Members', d: 'Team members who can receive bookings', fr: '1', g: '1', b: '5 (+$8)', s: '15 (+$6)' },
+                      { f: 'Staff Members', d: 'Team members who can receive bookings', fr: '1', g: '1', b: '5 (+\u20AC6)', s: '15 (+\u20AC6)' },
                       { f: 'Locations', d: 'Physical branches or addresses', fr: '1', g: '1', b: '2', s: '5' },
                       { f: 'Service Management', d: 'Configure pricing, duration, buffer times, and booking rules', fr: 'Basic', g: 'Full', b: 'Full', s: 'Full' },
                       { f: 'Service Add-ons', d: 'Optional extras customers can add to any booking', fr: false, g: true, b: true, s: true },
@@ -730,7 +730,7 @@ export default function HomePage() {
                       { f: 'Role Management', d: 'Admin, manager, and staff roles with granular permissions', fr: false, g: false, b: false, s: true },
                       { f: 'Loyalty Programs', d: 'Reward repeat customers with points and automated perks', fr: false, g: false, b: false, s: true },
                       { f: 'Inventory Management', d: 'Track product stock and link items to services', fr: false, g: false, b: false, s: true },
-                      { f: 'Online Payments', d: 'Accept deposits and payments via Stripe (where supported)', fr: '+$9', g: '+$9', b: '+$9', s: '+$9' },
+                      { f: 'Online Payments', d: 'Accept deposits and payments via Stripe (where supported)', fr: '+\u20AC14', g: '+\u20AC14', b: '+\u20AC14', s: '+\u20AC14' },
                     ].map((row) => (
                       <tr key={row.f} className="border-b border-gray-50">
                         <td className="py-3 pr-4">
