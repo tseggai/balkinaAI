@@ -698,50 +698,53 @@ export default function HomePage() {
           </div>
 
           {showAllFeatures && (
-            <div className="mt-10 mx-auto max-w-4xl rounded-2xl border border-gray-100 bg-white p-8">
+            <div className="mt-10 mx-auto max-w-5xl rounded-2xl border border-gray-100 bg-white p-6 md:p-8">
               <h3 className="mb-6 text-center text-lg font-semibold text-gray-900">Full Feature Comparison</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100">
-                      <th className="pb-3 font-medium text-gray-500">Feature</th>
-                      <th className="pb-3 text-center font-medium text-gray-500"><div>Solo</div><div className="text-xs font-normal text-gray-400">$0/mo</div></th>
-                      <th className="pb-3 text-center font-medium text-gray-500"><div>Solo Pro</div><div className="text-xs font-normal text-gray-400">$19/mo</div></th>
-                      <th className="pb-3 text-center font-medium text-brand-600"><div>Team</div><div className="text-xs font-normal text-brand-400">$49/mo</div></th>
-                      <th className="pb-3 text-center font-medium text-gray-500"><div>Scale</div><div className="text-xs font-normal text-gray-400">$99/mo</div></th>
+                    <tr className="border-b border-gray-200">
+                      <th className="pb-4 pr-4 font-medium text-gray-500" style={{ minWidth: 200 }}>Feature</th>
+                      <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Solo</div><div className="text-xs font-normal text-gray-400">$0/mo</div></th>
+                      <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Solo Pro</div><div className="text-xs font-normal text-gray-400">$19/mo</div></th>
+                      <th className="pb-4 text-center font-semibold text-brand-700" style={{ minWidth: 90 }}><div className="rounded-t-lg bg-brand-50 px-2 py-1.5 -mx-2">Team<div className="text-xs font-normal text-brand-500">$49/mo</div></div></th>
+                      <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Scale</div><div className="text-xs font-normal text-gray-400">$99/mo</div></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody>
                     {[
-                      { f: 'AI Chatbot', fr: true, g: true, b: true, s: true },
-                      { f: 'Staff App', fr: true, g: true, b: true, s: true },
-                      { f: 'Smart Reminders (Email + SMS + Push)', fr: true, g: true, b: true, s: true },
-                      { f: 'SMS Notifications', fr: true, g: true, b: true, s: true },
-                      { f: 'Reviews & Ratings', fr: true, g: true, b: true, s: true },
-                      { f: 'Analytics', fr: 'Basic', g: 'Basic', b: 'Advanced', s: 'Advanced' },
-                      { f: 'Bookings', fr: '20/mo', g: 'Unlimited', b: 'Unlimited', s: 'Unlimited' },
-                      { f: 'Staff Members', fr: '1', g: '1', b: '5 (+$8)', s: '15 (+$6)' },
-                      { f: 'Locations', fr: '1', g: '1', b: '2', s: '5' },
-                      { f: 'Service Management', fr: 'Basic', g: 'Full', b: 'Full', s: 'Full' },
-                      { f: 'Service Add-ons', fr: false, g: true, b: true, s: true },
-                      { f: 'Coupons', fr: false, g: true, b: true, s: true },
-                      { f: 'Service Packages', fr: false, g: false, b: true, s: true },
-                      { f: 'Staff Management', fr: false, g: false, b: true, s: true },
-                      { f: 'Role Management', fr: false, g: false, b: false, s: true },
-                      { f: 'Loyalty Programs', fr: false, g: false, b: false, s: true },
-                      { f: 'Inventory Management', fr: false, g: false, b: false, s: true },
-                      { f: 'Online Payments (add-on)', fr: '+$9', g: '+$9', b: '+$9', s: '+$9' },
+                      { f: 'AI Chatbot', d: 'Customers discover and book you through conversational AI', fr: true, g: true, b: true, s: true },
+                      { f: 'Staff App', d: 'Your team manages bookings and notifications on mobile', fr: true, g: true, b: true, s: true },
+                      { f: 'Smart Reminders', d: 'Automated email, SMS, and push for confirmations and follow-ups', fr: true, g: true, b: true, s: true },
+                      { f: 'SMS Notifications', d: 'Text message alerts for bookings, cancellations, and updates', fr: true, g: true, b: true, s: true },
+                      { f: 'Reviews & Ratings', d: 'Collect feedback automatically after each appointment', fr: true, g: true, b: true, s: true },
+                      { f: 'Analytics', d: 'Track bookings, revenue, and customer trends', fr: 'Basic', g: 'Basic', b: 'Advanced', s: 'Advanced' },
+                      { f: 'Bookings', d: 'Number of appointments per month', fr: '20/mo', g: 'Unlimited', b: 'Unlimited', s: 'Unlimited' },
+                      { f: 'Staff Members', d: 'Team members who can receive bookings', fr: '1', g: '1', b: '5 (+$8)', s: '15 (+$6)' },
+                      { f: 'Locations', d: 'Physical branches or addresses', fr: '1', g: '1', b: '2', s: '5' },
+                      { f: 'Service Management', d: 'Configure pricing, duration, buffer times, and booking rules', fr: 'Basic', g: 'Full', b: 'Full', s: 'Full' },
+                      { f: 'Service Add-ons', d: 'Optional extras customers can add to any booking', fr: false, g: true, b: true, s: true },
+                      { f: 'Coupons', d: 'Discount codes with usage limits and expiration dates', fr: false, g: true, b: true, s: true },
+                      { f: 'Service Packages', d: 'Bundle multiple services with combined pricing', fr: false, g: false, b: true, s: true },
+                      { f: 'Staff Management', d: 'Schedules, day-offs, and service assignments per staff', fr: false, g: false, b: true, s: true },
+                      { f: 'Role Management', d: 'Admin, manager, and staff roles with granular permissions', fr: false, g: false, b: false, s: true },
+                      { f: 'Loyalty Programs', d: 'Reward repeat customers with points and automated perks', fr: false, g: false, b: false, s: true },
+                      { f: 'Inventory Management', d: 'Track product stock and link items to services', fr: false, g: false, b: false, s: true },
+                      { f: 'Online Payments', d: 'Accept deposits and payments via Stripe (where supported)', fr: '+$9', g: '+$9', b: '+$9', s: '+$9' },
                     ].map((row) => (
-                      <tr key={row.f}>
-                        <td className="py-2.5 text-gray-700">{row.f}</td>
+                      <tr key={row.f} className="border-b border-gray-50">
+                        <td className="py-3 pr-4">
+                          <p className="font-medium text-gray-700">{row.f}</p>
+                          <p className="mt-0.5 text-xs text-gray-400">{row.d}</p>
+                        </td>
                         {[row.fr, row.g, row.b, row.s].map((v, vi) => (
-                          <td key={vi} className="py-2.5 text-center">
+                          <td key={vi} className={`py-3 text-center ${vi === 2 ? 'bg-brand-50/50' : ''}`}>
                             {v === true ? (
                               <svg className="mx-auto h-4 w-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                             ) : v === false ? (
                               <span className="text-gray-300">&mdash;</span>
                             ) : (
-                              <span className="text-gray-600">{v}</span>
+                              <span className="text-xs font-medium text-gray-600">{v}</span>
                             )}
                           </td>
                         ))}
