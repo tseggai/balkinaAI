@@ -30,8 +30,7 @@ const serverEnvSchema = z.object({
   STRIPE_PRICE_ID_SOLO_PRO: z.string().min(1, 'STRIPE_PRICE_ID_SOLO_PRO is required'),
   STRIPE_PRICE_ID_TEAM: z.string().min(1, 'STRIPE_PRICE_ID_TEAM is required'),
   STRIPE_PRICE_ID_SCALE: z.string().min(1, 'STRIPE_PRICE_ID_SCALE is required'),
-  STRIPE_PRICE_ID_EXTRA_STAFF_TEAM: z.string().min(1, 'STRIPE_PRICE_ID_EXTRA_STAFF_TEAM is required'),
-  STRIPE_PRICE_ID_EXTRA_STAFF_SCALE: z.string().min(1, 'STRIPE_PRICE_ID_EXTRA_STAFF_SCALE is required'),
+  STRIPE_PRICE_ID_EXTRA_STAFF: z.string().min(1, 'STRIPE_PRICE_ID_EXTRA_STAFF is required'),
   STRIPE_PRICE_ID_ONLINE_PAYMENTS: z.string().min(1, 'STRIPE_PRICE_ID_ONLINE_PAYMENTS is required'),
   STRIPE_CONNECT_CLIENT_ID: z.string().min(1, 'STRIPE_CONNECT_CLIENT_ID is required'),
 

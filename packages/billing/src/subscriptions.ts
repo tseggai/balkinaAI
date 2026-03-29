@@ -14,9 +14,12 @@ export const stripe = new Stripe(serverEnv.STRIPE_SECRET_KEY, {
 export interface CreateSubscriptionParams {
   tenantId: string;
   stripeCustomerId: string;
+  /** Base plan Stripe Price ID */
   stripePriceId: string;
+  /** Single extra staff Stripe Price ID (€6/mo, same for all plans) */
   extraStaffPriceId?: string;
   extraStaffQuantity?: number;
+  /** Online payments add-on Stripe Price ID (€14/mo) */
   onlinePaymentsPriceId?: string;
 }
 
