@@ -16,9 +16,30 @@ html {
 
 div.device-screen {
   overflow: hidden;
-  background: #fff;
+  background: #fff !important;
+  background-color: #fff !important;
   display: block;
   position: relative;
+}
+
+/* ─── iPhone 14 Pro brand color overrides ─────────────────────────────── */
+
+.device-iphone-14-pro .device-frame {
+  background: #eef2ff;
+  border: 1px solid #eef2ff;
+  box-shadow: inset 0 0 4px 2px #c0b7cd, inset 0 0 0 6px #6b7fc4;
+}
+
+.device-iphone-14-pro .device-btns {
+  background: #6b7fc4;
+}
+
+.device-iphone-14-pro .device-btns::before {
+  background: #6b7fc4;
+}
+
+.device-iphone-14-pro .device-power {
+  background: #6b7fc4;
 }
 
 /* ─── Custom landscape iPad (matches devices.css iPad Pro styling) ──── */
@@ -30,9 +51,9 @@ div.device-screen {
 }
 
 .device-ipad-landscape .device-frame {
-  background: #0d0d0d;
+  background: #eef2ff;
   border-radius: 36px;
-  box-shadow: inset 0 0 0 1px #babdbf, inset 0 0 1px 3px #e2e3e4;
+  box-shadow: inset 0 0 0 1px #babdbf, inset 0 0 1px 3px #6b7fc4;
   height: 560px;
   width: 778px;
   padding: 27px;
@@ -40,7 +61,7 @@ div.device-screen {
 }
 
 .device-ipad-landscape .device-screen {
-  border: 2px solid #121212;
+  border: 1px solid #d7ddf2;
   border-radius: 11px;
   height: 506px;
   width: 724px;
@@ -61,7 +82,7 @@ div.device-screen {
 }
 
 .device-ipad-landscape .device-btns::before {
-  background: #babdbf;
+  background: #6b7fc4;
   content: "";
   position: absolute;
   height: 2px;
