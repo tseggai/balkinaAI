@@ -2,13 +2,16 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+  const isCustomers = pathname === '/app';
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600">
@@ -20,10 +23,30 @@ export function Navbar() {
           <span className="text-xl font-bold tracking-wide text-gray-900">BALKINA</span>
         </Link>
 
-        {/* Desktop nav — center links */}
-        <div className="hidden items-center gap-8 md:flex">
-          <Link href="/" className="text-sm font-medium text-gray-600 hover:text-brand-600 transition-colors">For Businesses</Link>
-          <Link href="/app" className="text-sm font-medium text-gray-600 hover:text-brand-600 transition-colors">For Customers</Link>
+        {/* Desktop nav — center pill toggle */}
+        <div className="hidden md:flex">
+          <div className="flex rounded-full bg-gray-100 p-1">
+            <Link
+              href="/"
+              className={`rounded-full px-5 py-2 text-sm font-medium transition-all ${
+                !isCustomers
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              For Businesses
+            </Link>
+            <Link
+              href="/app"
+              className={`rounded-full px-5 py-2 text-sm font-medium transition-all ${
+                isCustomers
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              For Customers
+            </Link>
+          </div>
         </div>
 
         {/* Desktop nav — right actions */}
@@ -46,8 +69,11 @@ export function Navbar() {
       {mobileOpen && (
         <div className="border-t border-gray-100 bg-white px-6 pb-6 pt-4 md:hidden">
           <div className="flex flex-col gap-4">
-            <Link href="/" onClick={() => setMobileOpen(false)} className="text-base font-medium text-gray-700">For Businesses</Link>
-            <Link href="/app" onClick={() => setMobileOpen(false)} className="text-base font-medium text-gray-700">For Customers</Link>
+            {/* Mobile pill toggle */}
+            <div className="flex rounded-full bg-gray-100 p-1">
+              <Link href="/" onClick={() => setMobileOpen(false)} className={`flex-1 rounded-full py-2.5 text-center text-sm font-medium ${!isCustomers ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>For Businesses</Link>
+              <Link href="/app" onClick={() => setMobileOpen(false)} className={`flex-1 rounded-full py-2.5 text-center text-sm font-medium ${isCustomers ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>For Customers</Link>
+            </div>
             <hr className="border-gray-100" />
             <a href="https://app.balkina.ai" className="text-base font-medium text-gray-700">Sign In</a>
             <a href="https://app.balkina.ai/register" className="rounded-full bg-brand-600 px-5 py-3 text-center text-base font-semibold text-white">Start Free Trial</a>
