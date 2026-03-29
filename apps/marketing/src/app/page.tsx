@@ -137,22 +137,21 @@ function CustomerPhoneContent() {
         {/* ── Chat: Continuous scrolling conversation ─────────────── */}
         <div className="bk-chat absolute inset-0 z-10 flex flex-col">
           <ChatHeader />
-          <div className="relative flex-1 overflow-hidden">
-            <div className="bk-chat-scroll px-3 pt-2" style={{ paddingBottom: 80 }}>
+          <div className="flex flex-1 flex-col justify-end overflow-hidden px-3">
               {/* 1. User selects category */}
-              <div className="chat-msg-1 mb-3 flex justify-end">
+              <div className="chat-msg-1 flex justify-end">
                 <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
                   Find Beauty &amp; Personal Care businesses near me
                 </div>
               </div>
 
               {/* 2. AI responds with businesses */}
-              <div className="chat-msg-2 mb-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">
+              <div className="chat-msg-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">
                 Here are some Beauty &amp; Personal Care businesses near you:
               </div>
 
               {/* 3. Business cards */}
-              <div className="chat-msg-3 mb-3 flex gap-1.5 overflow-hidden">
+              <div className="chat-msg-3 flex gap-1.5">
                 {[
                   { name: 'Dan the Barber', rating: '5', reviews: '9', dist: '0.3 mi', drive: '1 min drive', gradient: 'from-amber-200 via-orange-100 to-yellow-50', selected: true },
                   { name: 'Radiant Spa', rating: '4.9', reviews: '15', dist: '1.9 mi', drive: '5 min drive', gradient: 'from-emerald-200 via-teal-100 to-cyan-50' },
@@ -172,7 +171,7 @@ function CustomerPhoneContent() {
               </div>
 
               {/* 4. Service cards */}
-              <div className="chat-msg-4 mb-3 flex gap-1.5">
+              <div className="chat-msg-4 flex gap-1.5">
                 {[
                   { name: 'Beard trimming', price: '$25', sub: '20 min' },
                   { name: 'Hair Color', price: '$30', sub: '50% deposit', selected: true },
@@ -188,14 +187,14 @@ function CustomerPhoneContent() {
               </div>
 
               {/* 5. User selects service */}
-              <div className="chat-msg-5 mb-3 flex justify-end">
+              <div className="chat-msg-5 flex justify-end">
                 <div className="rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
                   Hair Color at Dan the Barber
                 </div>
               </div>
 
               {/* 6. AI asks when + date options */}
-              <div className="chat-msg-6 mb-3">
+              <div className="chat-msg-6">
                 <div className="mb-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">
                   When would you like your appointment?
                 </div>
@@ -209,14 +208,14 @@ function CustomerPhoneContent() {
               </div>
 
               {/* 7. User picks Tomorrow */}
-              <div className="chat-msg-7 mb-3 flex justify-end">
+              <div className="chat-msg-7 flex justify-end">
                 <div className="rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
                   Tomorrow
                 </div>
               </div>
 
               {/* 8. AI shows staff */}
-              <div className="chat-msg-8 mb-2">
+              <div className="chat-msg-8">
                 <div className="mb-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">
                   Here are the available staff and time slots:
                 </div>
@@ -237,7 +236,6 @@ function CustomerPhoneContent() {
                   </div>
                 ))}
               </div>
-            </div>
           </div>
           <BottomBar />
         </div>

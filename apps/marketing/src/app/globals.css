@@ -152,17 +152,6 @@ div.device-screen {
 }
 .bk-chat { opacity: 0; animation: chatFade 16s ease-in-out forwards; }
 
-/* Chat messages scroll upward as conversation grows */
-@keyframes chatScroll {
-  0%, 22% { transform: translateY(0); }
-  30% { transform: translateY(-50px); }
-  40% { transform: translateY(-140px); }
-  52% { transform: translateY(-220px); }
-  64% { transform: translateY(-300px); }
-  75%, 100% { transform: translateY(-300px); }
-}
-.bk-chat-scroll { animation: chatScroll 16s ease-in-out forwards; }
-
 /* Confirmation screen → fades in at ~12s */
 @keyframes confirmFade {
   0%, 72% { opacity: 0; pointer-events: none; }
@@ -170,13 +159,34 @@ div.device-screen {
 }
 .bk-confirm { opacity: 0; animation: confirmFade 16s ease-in-out forwards; }
 
-/* Chat message staggered appearances */
-.chat-msg-1 { opacity: 0; animation: fadeInUp 0.4s ease-out 2.5s forwards; }
-.chat-msg-2 { opacity: 0; animation: fadeInUp 0.4s ease-out 3.5s forwards; }
-.chat-msg-3 { opacity: 0; animation: fadeInUp 0.4s ease-out 4.3s forwards; }
-.chat-msg-4 { opacity: 0; animation: fadeInUp 0.4s ease-out 5.2s forwards; }
-.chat-msg-5 { opacity: 0; animation: fadeInUp 0.4s ease-out 6.2s forwards; }
-.chat-msg-6 { opacity: 0; animation: fadeInUp 0.4s ease-out 7.2s forwards; }
-.chat-msg-7 { opacity: 0; animation: fadeInUp 0.4s ease-out 8.2s forwards; }
-.chat-msg-8 { opacity: 0; animation: fadeInUp 0.4s ease-out 9.2s forwards; }
-.chat-msg-9 { opacity: 0; animation: fadeInUp 0.4s ease-out 10.0s forwards; }
+/* Chat messages: start collapsed, expand from bottom like real texting */
+@keyframes chatMsgAppear {
+  from {
+    max-height: 0;
+    opacity: 0;
+    margin-bottom: 0;
+  }
+  to {
+    max-height: 400px;
+    opacity: 1;
+    margin-bottom: 10px;
+  }
+}
+
+.chat-msg-1, .chat-msg-2, .chat-msg-3, .chat-msg-4, .chat-msg-5,
+.chat-msg-6, .chat-msg-7, .chat-msg-8, .chat-msg-9 {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.chat-msg-1 { animation: chatMsgAppear 0.5s ease-out 2.5s forwards; }
+.chat-msg-2 { animation: chatMsgAppear 0.5s ease-out 3.5s forwards; }
+.chat-msg-3 { animation: chatMsgAppear 0.5s ease-out 4.3s forwards; }
+.chat-msg-4 { animation: chatMsgAppear 0.5s ease-out 5.2s forwards; }
+.chat-msg-5 { animation: chatMsgAppear 0.5s ease-out 6.2s forwards; }
+.chat-msg-6 { animation: chatMsgAppear 0.5s ease-out 7.2s forwards; }
+.chat-msg-7 { animation: chatMsgAppear 0.5s ease-out 8.2s forwards; }
+.chat-msg-8 { animation: chatMsgAppear 0.5s ease-out 9.2s forwards; }
+.chat-msg-9 { animation: chatMsgAppear 0.5s ease-out 10.0s forwards; }
