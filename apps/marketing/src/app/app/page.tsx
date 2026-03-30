@@ -281,9 +281,9 @@ export default function AppPage() {
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-medium text-brand-700">
                 Free on iOS &amp; Android
               </div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl lg:text-5xl">
+              <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 md:text-5xl lg:text-6xl">
                 Book anything<br />
-                under <span className="bg-gradient-to-r from-brand-600 to-indigo-500 bg-clip-text text-transparent">1 minute</span>
+                under <span className="text-brand-600">1 minute</span>
               </h1>
               <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-gray-500 md:text-lg lg:mx-0">
                 Tell Balkina AI what you need. It finds top-rated services near you, checks real-time availability, and books them — in seconds.
