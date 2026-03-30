@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 /* ─── Reuse devices.css phone frame ────────────────────────────────────── */
 
-const PHONE_SCALE = 0.48;
+const PHONE_SCALE = 0.58;
 const PHONE_VIS_W = Math.round(428 * PHONE_SCALE);
 const PHONE_VIS_H = Math.round(868 * PHONE_SCALE);
 const PHONE_CONTENT_SCALE = 390 / 260;
@@ -32,69 +32,148 @@ function PhoneDevice({ children }: { children: React.ReactNode }) {
 function ScaledPhone({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <div className="flex flex-col items-center">
+      <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">{label}</p>
       <div style={{ width: PHONE_VIS_W, height: PHONE_VIS_H, position: 'relative' }}>
         <div style={{ transform: `scale(${PHONE_SCALE})`, transformOrigin: 'bottom left', position: 'absolute', bottom: 0, left: 0 }}>
           <PhoneDevice>{children}</PhoneDevice>
         </div>
       </div>
-      <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">{label}</p>
     </div>
   );
 }
 
-/* ─── Customer phone content ───────────────────────────────────────────── */
+/* ─── Shared components for phone content ──────────────────────────────── */
 
-function CustomerPhonePreview() {
+function BottomBar() {
   return (
-    <div className="bg-white" style={{ height: 530 }}>
-      {/* Header */}
-      <div className="flex items-center justify-center gap-1.5 border-b border-gray-100 py-2">
+    <div className="shrink-0 bg-white">
+      <div className="flex items-center gap-1.5 border-t border-gray-100 px-3 py-1.5">
+        <div className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[9px] text-gray-300">Ask me anything...</div>
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500">
+          <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+        </div>
+      </div>
+      <div className="flex items-center justify-around border-t border-gray-100 px-2 pb-1 pt-1.5">
+        <div className="flex flex-col items-center">
+          <svg className="h-4 w-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>
+          <span className="text-[7px] font-medium text-brand-600">Chat</span>
+        </div>
+        <div className="flex flex-col items-center">
+          <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
+          <span className="text-[7px] text-gray-400">Bookings</span>
+        </div>
+        <div className="flex flex-col items-center">
+          <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+          <span className="text-[7px] text-gray-400">Profile</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatHeader() {
+  return (
+    <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2">
+      <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+      <span className="text-[8px] text-gray-400">Start over</span>
+      <div className="ml-2 flex items-center gap-1">
         <div className="h-4 w-4 rounded-full bg-brand-600" />
         <span className="text-[9px] font-bold tracking-widest text-gray-800">BALKINA</span>
       </div>
-      <div className="space-y-2 px-3 pt-3">
-        <div className="animate-fade-in-1 flex justify-end">
-          <div className="max-w-[80%] rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
-            Find a barber nearby
+    </div>
+  );
+}
+
+/* ─── Customer phone: same scrolling chat as business page ─────────────── */
+
+function CustomerPhoneContent() {
+  return (
+    <div className="relative overflow-hidden bg-white" style={{ height: 530 }}>
+      {/* Intro: Categories */}
+      <div className="bk-intro absolute inset-0 z-20 flex flex-col bg-white">
+        <div className="flex flex-1 flex-col items-center justify-center px-6">
+          <div className="mb-1 h-10 w-10 rounded-full bg-brand-600" />
+          <p className="mb-1 text-[10px] font-bold tracking-[0.2em] text-brand-600">BALKINA</p>
+          <p className="mb-4 text-[10px] text-gray-400">What would you like to book today?</p>
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {['Health & Wellness', 'Beauty & Personal Care', 'Fitness & Sports', 'Home Services', 'Professional Services', 'Pet Services'].map((cat, i) => (
+              <div key={i} className={`rounded-full border px-3 py-1.5 text-[8px] ${cat === 'Beauty & Personal Care' ? 'border-brand-300 bg-brand-50 font-medium text-brand-700' : 'border-gray-200 text-gray-600'}`}>{cat}</div>
+            ))}
           </div>
         </div>
-        <div className="animate-fade-in-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">
-          Here are top-rated barbers near you:
-        </div>
-        <div className="animate-fade-in-3 flex gap-1.5">
-          {[
-            { name: 'Dan the Barber', rating: '5.0', dist: '0.3 mi', gradient: 'from-amber-200 via-orange-100 to-yellow-50' },
-            { name: 'Fresh Cuts', rating: '4.8', dist: '0.7 mi', gradient: 'from-sky-200 via-blue-100 to-indigo-50' },
-          ].map((b, i) => (
-            <div key={i} className={`w-[110px] shrink-0 overflow-hidden rounded-xl border ${i === 0 ? 'border-brand-300' : 'border-gray-100'}`}>
-              <div className={`h-12 bg-gradient-to-br ${b.gradient}`} />
-              <div className="p-1.5">
-                <p className="text-[8px] font-bold text-gray-900">{b.name}</p>
-                <p className="text-[7px] text-gray-400">{b.rating} &#9733; &middot; {b.dist}</p>
+        <BottomBar />
+      </div>
+
+      {/* Chat: Continuous scroll */}
+      <div className="bk-chat absolute inset-0 z-10 flex flex-col">
+        <ChatHeader />
+        <div className="flex flex-1 flex-col justify-end overflow-hidden px-3">
+          <div className="chat-msg-1 flex justify-end">
+            <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">Find Beauty &amp; Personal Care businesses near me</div>
+          </div>
+          <div className="chat-msg-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">Here are some businesses near you:</div>
+          <div className="chat-msg-3 flex gap-1.5">
+            {[{ name: 'Dan the Barber', r: '5 (9)', d: '0.3 mi', g: 'from-amber-200 via-orange-100 to-yellow-50', s: true }, { name: 'Radiant Spa', r: '4.9 (15)', d: '1.9 mi', g: 'from-emerald-200 via-teal-100 to-cyan-50' }].map((b, i) => (
+              <div key={i} className={`w-[120px] shrink-0 overflow-hidden rounded-xl border ${b.s ? 'border-brand-300' : 'border-gray-100'}`}>
+                <div className={`h-14 bg-gradient-to-br ${b.g}`} />
+                <div className="p-1.5"><p className="text-[8px] font-bold text-gray-900">{b.name}</p><p className="text-[7px] text-gray-400">&#9733; {b.r} &middot; {b.d}</p></div>
               </div>
+            ))}
+          </div>
+          <div className="chat-msg-4 flex gap-1.5">
+            {[{ n: 'Beard trimming', p: '$25', s: '20 min' }, { n: 'Hair Color', p: '$30', s: '50% deposit', sel: true }].map((v, i) => (
+              <div key={i} className={`flex-1 rounded-xl border p-2 ${v.sel ? 'border-brand-300 bg-brand-50' : 'border-gray-200'}`}>
+                <p className={`text-[9px] font-semibold ${v.sel ? 'text-brand-700' : 'text-gray-800'}`}>{v.n}</p>
+                <p className={`text-[8px] ${v.sel ? 'text-brand-500' : 'text-gray-400'}`}>{v.p} &middot; {v.s}</p>
+              </div>
+            ))}
+          </div>
+          <div className="chat-msg-5 flex justify-end">
+            <div className="rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">Hair Color at Dan the Barber</div>
+          </div>
+          <div className="chat-msg-6">
+            <div className="mb-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">When would you like your appointment?</div>
+            <div className="flex flex-wrap gap-1.5">
+              {['Today', 'Tomorrow', 'Next Week'].map((d) => (
+                <div key={d} className={`rounded-full border px-3 py-1.5 text-[8px] ${d === 'Tomorrow' ? 'border-brand-400 bg-brand-50 font-medium text-brand-700' : 'border-gray-200 text-gray-600'}`}>{d}</div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="animate-fade-in-4 flex justify-end">
-          <div className="rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">
-            Hair Color at Dan the Barber
+          </div>
+          <div className="chat-msg-7 flex justify-end">
+            <div className="rounded-2xl rounded-tr-md bg-brand-500 px-2.5 py-2 text-[9px] text-white">Tomorrow</div>
+          </div>
+          <div className="chat-msg-8">
+            <div className="mb-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">Here are the available staff and time slots:</div>
+            <div className="mb-2 flex items-center gap-2">
+              <div className="h-8 w-8 shrink-0 rounded-full bg-gradient-to-br from-sky-300 via-blue-200 to-indigo-100" />
+              <div><p className="text-[9px] font-bold text-gray-900">Dragana Djurica</p><p className="text-[7px] text-gray-400">15 slots</p></div>
+            </div>
+          </div>
+          <div className="chat-msg-9 grid grid-cols-3 gap-1">
+            {['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM'].map((t) => (
+              <div key={t} className={`rounded-lg border py-1.5 text-center text-[7px] font-medium ${t === '9:00 AM' ? 'border-brand-400 bg-brand-600 text-white' : 'border-gray-200 text-gray-600'}`}>{t}</div>
+            ))}
           </div>
         </div>
-        <div className="animate-fade-in-5 rounded-xl border border-green-200 bg-green-50 p-2.5">
-          <div className="flex items-center gap-1.5">
-            <svg className="h-3.5 w-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-            <span className="text-[9px] font-semibold text-green-800">Confirmed!</span>
-          </div>
-          <p className="mt-0.5 text-[8px] text-green-700">Hair Color at Dan the Barber &middot; Tomorrow 9 AM</p>
+        <BottomBar />
+      </div>
+
+      {/* Confirmation */}
+      <div className="bk-confirm absolute inset-0 z-30 flex flex-col items-center justify-center bg-gray-50 px-4">
+        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-500">
+          <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
         </div>
+        <p className="mb-1 text-[11px] font-bold text-gray-900">Appointment Confirmed</p>
+        <p className="mb-3 text-center text-[8px] text-gray-500">Hair Color at Dan the Barber<br />Tomorrow, 9:00 AM</p>
+        <div className="w-full rounded-xl bg-brand-600 py-2 text-center text-[9px] font-semibold text-white">Done</div>
       </div>
     </div>
   );
 }
 
-/* ─── Staff phone content ──────────────────────────────────────────────── */
+/* ─── Staff phone: animations start at 12s (after customer confirm) ──── */
 
-function StaffPhonePreview() {
+function StaffPhoneContent() {
   return (
     <div className="bg-white" style={{ height: 530 }}>
       <div className="px-3 pt-3">
@@ -108,23 +187,24 @@ function StaffPhonePreview() {
           </div>
         </div>
         <div className="mb-3 rounded-lg bg-gray-50 p-2">
-          <p className="text-[8px] font-semibold uppercase tracking-wider text-gray-400">Today</p>
+          <p className="text-[8px] font-semibold uppercase tracking-wider text-gray-400">Tomorrow</p>
           <div className="mt-1 space-y-1">
             <div className="flex items-center gap-2 text-[9px]">
               <span className="w-12 text-gray-400">9:00 AM</span>
-              <div className="h-1.5 flex-1 rounded-full bg-brand-400" />
+              <div className="h-1.5 flex-1 rounded-full bg-gray-200" />
             </div>
             <div className="flex items-center gap-2 text-[9px]">
               <span className="w-12 text-gray-400">10:00 AM</span>
               <div className="h-1.5 flex-1 rounded-full bg-brand-200" />
             </div>
             <div className="flex items-center gap-2 text-[9px]">
-              <span className="w-12 font-medium text-gray-600">11:00 AM</span>
-              <div className="h-1.5 flex-1 rounded-full bg-gray-200" />
+              <span className="w-12 text-gray-400">11:00 AM</span>
+              <div className="h-1.5 flex-1 rounded-full bg-brand-400" />
             </div>
           </div>
         </div>
-        <div className="animate-fade-in-3 animate-slide-down rounded-xl border border-brand-200 bg-brand-50 p-2.5 shadow-md shadow-brand-100/50">
+        {/* Notification appears at 12.5s */}
+        <div className="staff-msg-1 rounded-xl border border-brand-200 bg-brand-50 p-2.5 shadow-md shadow-brand-100/50">
           <div className="flex items-center gap-2">
             <div className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-600">
               <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
@@ -135,7 +215,8 @@ function StaffPhonePreview() {
             </div>
           </div>
         </div>
-        <div className="animate-fade-in-4 mt-2 rounded-xl border border-gray-200 bg-white p-2.5">
+        {/* Detail card at 13.5s */}
+        <div className="staff-msg-2 mt-2 rounded-xl border border-gray-200 bg-white p-2.5">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-[9px] font-bold text-gray-600">EL</div>
             <div>
@@ -144,11 +225,12 @@ function StaffPhonePreview() {
             </div>
           </div>
           <div className="mt-2 flex gap-2">
-            <div className="animate-fade-in-5 flex-1 rounded-lg bg-green-600 py-1.5 text-center text-[9px] font-semibold text-white">Approve</div>
-            <div className="animate-fade-in-5 flex-1 rounded-lg border border-gray-200 py-1.5 text-center text-[9px] font-semibold text-gray-600">Reschedule</div>
+            <div className="flex-1 rounded-lg bg-green-600 py-1.5 text-center text-[9px] font-semibold text-white">Approve</div>
+            <div className="flex-1 rounded-lg border border-gray-200 py-1.5 text-center text-[9px] font-semibold text-gray-600">Reschedule</div>
           </div>
         </div>
-        <div className="animate-fade-in-6 mt-2 flex items-center gap-1.5 rounded-lg bg-green-50 px-2.5 py-1.5">
+        {/* Confirmed at 14.5s */}
+        <div className="staff-msg-3 mt-2 flex items-center gap-1.5 rounded-lg bg-green-50 px-2.5 py-1.5">
           <svg className="h-3 w-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
           <p className="text-[8px] font-medium text-green-700">Confirmed &middot; Customer notified</p>
         </div>
@@ -190,40 +272,50 @@ const PERKS = [
 export default function AppPage() {
   return (
     <>
-      {/* ─── Hero ────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-gray-50 to-white">
-        <div className="mx-auto max-w-7xl px-6 pb-20 pt-16 md:pt-24">
-          <div className="flex flex-col items-center gap-12 lg:flex-row lg:gap-16">
-            {/* Left — text */}
-            <div className="flex-1 text-center lg:text-left">
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-medium text-brand-700">
-                Free on iOS &amp; Android
-              </div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl lg:text-5xl">
-                Book anything by chatting
-              </h1>
-              <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-gray-500 md:text-lg lg:mx-0">
-                Tell the AI what you need. It finds the best businesses near you, shows live availability, and books your appointment — in seconds.
-              </p>
-              <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:justify-start sm:justify-center">
-                <a href="#" className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-7 py-3.5 text-base font-semibold text-white shadow-lg hover:bg-gray-800 transition-colors">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" /></svg>
-                  App Store
-                </a>
-                <a href="#" className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-7 py-3.5 text-base font-semibold text-white shadow-lg hover:bg-gray-800 transition-colors">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-1.292l2.545 1.473c.68.394.68 1.03 0 1.424l-2.545 1.473-2.534-2.534 2.534-2.536zM5.864 2.658L16.8 8.99l-2.302 2.302-8.634-8.634z" /></svg>
-                  Google Play
-                </a>
-              </div>
+      {/* ─── Hero (full viewport) ──────────────────────────────────────── */}
+      <section className="relative flex min-h-[calc(100vh-65px)] flex-col bg-gradient-to-b from-gray-50 to-white">
+        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-6 pt-10 md:pt-16">
+          {/* Headline + sub */}
+          <div className="text-center">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-medium text-brand-700">
+              Free on iOS &amp; Android
             </div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl lg:text-5xl">
+              Book anything<br />
+              under <span className="bg-gradient-to-r from-brand-600 to-indigo-500 bg-clip-text text-transparent">1 minute</span>
+            </h1>
+            <p className="mx-auto mt-4 max-w-2xl text-base text-gray-500 md:text-lg">
+              Tell Balkina AI what you need. It finds top-rated services near you, checks real-time availability, and books them — in seconds.
+            </p>
+            <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <a href="#" className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-7 py-3 text-sm font-semibold text-white shadow-lg hover:bg-gray-800 transition-colors">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" /></svg>
+                App Store
+              </a>
+              <a href="#" className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-7 py-3 text-sm font-semibold text-white shadow-lg hover:bg-gray-800 transition-colors">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-1.292l2.545 1.473c.68.394.68 1.03 0 1.424l-2.545 1.473-2.534-2.534 2.534-2.536zM5.864 2.658L16.8 8.99l-2.302 2.302-8.634-8.634z" /></svg>
+                Google Play
+              </a>
+            </div>
+          </div>
 
-            {/* Right — two phones */}
-            <div className="flex shrink-0 items-end gap-4">
-              <ScaledPhone label="Customer">
-                <CustomerPhonePreview />
+          {/* Two phones with arrow between them */}
+          <div className="mt-8 flex flex-1 items-end justify-center pb-6">
+            <div className="flex items-end gap-3 md:gap-6">
+              <ScaledPhone label="You">
+                <CustomerPhoneContent />
               </ScaledPhone>
-              <ScaledPhone label="Staff">
-                <StaffPhonePreview />
+
+              {/* Arrow between phones — appears after customer confirms */}
+              <div className="connect-arrow mb-[240px] flex flex-col items-center gap-1">
+                <svg className="h-5 w-5 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+                <span className="text-[8px] font-medium text-brand-400">Booked!</span>
+              </div>
+
+              <ScaledPhone label="Your Pro">
+                <StaffPhoneContent />
               </ScaledPhone>
             </div>
           </div>
