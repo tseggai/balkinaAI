@@ -5,6 +5,10 @@ import { SupabaseProvider } from '@/components/supabase-provider';
 export const metadata: Metadata = {
   title: 'Balkina AI — Tenant Panel',
   description: 'Manage your appointments, services, and staff',
+  icons: {
+    icon: '/assets/Balkina_icon_color.png',
+    apple: '/assets/Balkina_icon_color.png',
+  },
 };
 
 // Force dynamic rendering so env vars are read at request time, not build time.

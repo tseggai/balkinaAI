@@ -5,6 +5,10 @@ import { SupabaseProvider } from '@/components/supabase-provider';
 export const metadata: Metadata = {
   title: 'Balkina AI — Admin Panel',
   description: 'Platform administration for Balkina AI',
+  icons: {
+    icon: '/assets/Balkina_icon_color.png',
+    apple: '/assets/Balkina_icon_color.png',
+  },
 };
 
 export const dynamic = 'force-dynamic';
