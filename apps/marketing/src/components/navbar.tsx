@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 export function Navbar() {
@@ -13,14 +14,8 @@ export function Navbar() {
     <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600">
-            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-white" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2v4m0 12v4m10-10h-4M6 12H2m15.07-7.07-2.83 2.83M9.76 14.24l-2.83 2.83m11.14 0-2.83-2.83M9.76 9.76 6.93 6.93" />
-            </svg>
-          </div>
-          <span className="text-xl font-bold tracking-wide text-gray-900">BALKINA</span>
+        <Link href="/" className="flex items-center">
+          <Image src="/assets/Balkina_logo_color.png" alt="Balkina" width={130} height={36} className="h-8 w-auto" priority />
         </Link>
 
         {/* Desktop nav — center pill toggle */}
