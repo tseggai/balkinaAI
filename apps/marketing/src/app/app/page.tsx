@@ -385,8 +385,7 @@ export default function AppPage() {
       <footer className="border-t border-gray-100 bg-white py-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-6 sm:flex-row sm:justify-between">
           <div className="flex items-center gap-2">
-            <img src="/assets/Balkina_icon_color.png" alt="" className="h-5 w-5" />
-            <span className="text-sm font-semibold text-gray-800">Balkina AI</span>
+            <img src="/assets/Balkina_logo_color.png" alt="Balkina AI" className="h-6 w-auto" />
           </div>
           <div className="flex items-center gap-6 text-sm text-gray-400">
             <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
