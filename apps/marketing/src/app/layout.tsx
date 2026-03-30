@@ -7,6 +7,10 @@ export const metadata: Metadata = {
   title: 'Balkina AI — Book Appointments with AI',
   description: 'The AI-powered appointment booking platform. Customers chat, AI finds businesses, checks availability, and books — all in one conversation.',
   keywords: ['appointment booking', 'AI booking', 'chatbot', 'scheduling', 'business management'],
+  icons: {
+    icon: '/assets/Balkina_icon_color.png',
+    apple: '/assets/Balkina_icon_color.png',
+  },
   openGraph: {
     title: 'Balkina AI — Book Appointments with AI',
     description: 'The AI-powered appointment booking platform.',

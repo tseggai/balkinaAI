@@ -77,7 +77,7 @@ function ChatHeader() {
       <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
       <span className="text-[8px] text-gray-400">Start over</span>
       <div className="ml-2 flex items-center gap-1">
-        <div className="h-4 w-4 rounded-full bg-brand-600" />
+        <img src="/assets/Balkina_icon_color.png" alt="" className="h-4 w-4" />
         <span className="text-[9px] font-bold tracking-widest text-gray-800">BALKINA</span>
       </div>
     </div>
@@ -92,7 +92,7 @@ function CustomerPhoneContent() {
       {/* Intro: Categories */}
       <div className="bk-intro absolute inset-0 z-20 flex flex-col bg-white">
         <div className="flex flex-1 flex-col items-center justify-center px-6">
-          <div className="mb-1 h-10 w-10 rounded-full bg-brand-600" />
+          <img src="/assets/Balkina_icon_color.png" alt="" className="mb-1 h-10 w-10" />
           <p className="mb-1 text-[10px] font-bold tracking-[0.2em] text-brand-600">BALKINA</p>
           <p className="mb-4 text-[10px] text-gray-400">What would you like to book today?</p>
           <div className="flex flex-wrap justify-center gap-1.5">
@@ -385,7 +385,7 @@ export default function AppPage() {
       <footer className="border-t border-gray-100 bg-white py-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-6 sm:flex-row sm:justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-5 w-5 rounded-full bg-brand-600" />
+            <img src="/assets/Balkina_icon_color.png" alt="" className="h-5 w-5" />
             <span className="text-sm font-semibold text-gray-800">Balkina AI</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-gray-400">
