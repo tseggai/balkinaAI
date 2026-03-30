@@ -25,13 +25,8 @@ export function Sidebar() {
     <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
-          B
-        </div>
-        <div>
-          <span className="text-lg font-bold text-gray-900">Balkina AI</span>
-          <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">ADMIN</span>
-        </div>
+        <img src="/assets/Balkina_logo_color.png" alt="Balkina AI" className="h-7 w-auto" />
+        <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">ADMIN</span>
       </div>
 
       {/* Navigation */}
