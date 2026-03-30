@@ -146,13 +146,13 @@ function CustomerPhoneContent() {
             <div className="mb-2 max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 px-2.5 py-2 text-[9px] text-gray-700">Here are the available staff and time slots:</div>
             <div className="mb-2 flex items-center gap-2">
               <div className="h-8 w-8 shrink-0 rounded-full bg-gradient-to-br from-sky-300 via-blue-200 to-indigo-100" />
-              <div><p className="text-[9px] font-bold text-gray-900">Dragana Djurica</p><p className="text-[7px] text-gray-400">15 slots</p></div>
+              <div><p className="text-[9px] font-bold text-gray-900">Helen Jones</p><p className="text-[7px] text-gray-400">15 slots</p></div>
             </div>
-          </div>
-          <div className="chat-msg-9 grid grid-cols-3 gap-1">
-            {['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM'].map((t) => (
-              <div key={t} className={`rounded-lg border py-1.5 text-center text-[7px] font-medium ${t === '9:00 AM' ? 'border-brand-400 bg-brand-600 text-white' : 'border-gray-200 text-gray-600'}`}>{t}</div>
-            ))}
+            <div className="grid grid-cols-3 gap-1">
+              {['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM'].map((t) => (
+                <div key={t} className={`rounded-lg border py-1.5 text-center text-[7px] font-medium ${t === '9:00 AM' ? 'border-brand-400 bg-brand-600 text-white' : 'border-gray-200 text-gray-600'}`}>{t}</div>
+              ))}
+            </div>
           </div>
         </div>
         <BottomBar />
@@ -176,14 +176,14 @@ function CustomerPhoneContent() {
 function StaffPhoneContent() {
   return (
     <div className="bg-white" style={{ height: 530 }}>
-      <div className="px-3 pt-3">
+      <div className="px-3 pt-10">
         <div className="flex items-center justify-between pb-3">
           <div>
-            <p className="text-[10px] font-bold text-gray-900">Dragana Djurica</p>
+            <p className="text-[10px] font-bold text-gray-900">Helen Jones</p>
             <p className="text-[8px] text-gray-400">Hair Stylist</p>
           </div>
           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100">
-            <span className="text-[8px] font-bold text-brand-700">DD</span>
+            <span className="text-[8px] font-bold text-brand-700">HJ</span>
           </div>
         </div>
         <div className="mb-3 rounded-lg bg-gray-50 p-2">
@@ -281,9 +281,9 @@ export default function AppPage() {
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-medium text-brand-700">
                 Free on iOS &amp; Android
               </div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl lg:text-5xl">
+              <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 md:text-5xl lg:text-6xl">
                 Book anything<br />
-                under <span className="bg-gradient-to-r from-brand-600 to-indigo-500 bg-clip-text text-transparent">1 minute</span>
+                under <span className="text-brand-600">1 minute</span>
               </h1>
               <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-gray-500 md:text-lg lg:mx-0">
                 Tell Balkina AI what you need. It finds top-rated services near you, checks real-time availability, and books them — in seconds.
