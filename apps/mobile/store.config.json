@@ -1,0 +1,18 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "info": {
+      "en-US": {
+        "title": "Balkina AI",
+        "subtitle": "Book anything by chatting",
+        "description": "Balkina AI is the easiest way to book appointments. Just tell the AI what you need — a haircut, a yoga session, a dental checkup — and it finds top-rated businesses near you, shows real-time availability, and books your appointment in seconds.\n\nNo browsing. No phone calls. No waiting. Just chat.\n\nHOW IT WORKS\n• Open the app and tell the AI what you're looking for\n• Browse matching businesses with ratings, distance, and live availability\n• Pick a time, confirm, and pay the deposit if needed\n• Get instant confirmation and reminders\n\nFEATURES\n• AI-powered booking — describe what you need in plain language\n• Discover nearby services — barbers, salons, spas, clinics, studios, and more\n• Real-time availability — see actual open slots, not estimates\n• In-app payments — Apple Pay, Google Pay, and card supported\n• Smart reminders — push notifications so you never miss an appointment\n• Easy rebooking — AI remembers your preferences\n• Reviews & ratings — see what others think before you book\n\nFOR BUSINESS OWNERS\nBalkina AI also powers your booking operations. Get an AI front desk that works 24/7, manage staff schedules, accept deposits, send reminders, and grow your business — all from one dashboard. Visit balkina.ai to learn more.\n\nPRIVACY\nYour data is encrypted and never sold. We only collect what's needed to book your appointments. Read our full privacy policy at balkina.ai/privacy.",
+        "keywords": "appointment booking, AI booking, book appointments, barber, salon, spa, dental, yoga, scheduling, chatbot, nearby services, online booking",
+        "privacyPolicyUrl": "https://balkina.ai/privacy",
+        "supportUrl": "https://balkina.ai",
+        "marketingUrl": "https://balkina.ai/app"
+      }
+    },
+    "categories": ["LIFESTYLE", "PRODUCTIVITY"],
+    "copyright": "2026 Balkina AI"
+  }
+}
