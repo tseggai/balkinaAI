@@ -46,8 +46,8 @@ export function Navbar() {
 
         {/* Desktop nav — right actions */}
         <div className="hidden items-center gap-3 md:flex">
-          <a href="https://app.balkina.ai" className="rounded-full px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-brand-600 transition-colors">Sign In</a>
-          <a href="https://app.balkina.ai/register" className="rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors">Start Free Trial</a>
+          <a href="https://app.balkina.ai/auth/login" className="rounded-full px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-brand-600 transition-colors">Sign In</a>
+          <a href="https://app.balkina.ai/auth/register" className="rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors">Start Free Trial</a>
         </div>
 
         {/* Mobile hamburger */}
@@ -70,8 +70,8 @@ export function Navbar() {
               <Link href="/app" onClick={() => setMobileOpen(false)} className={`flex-1 rounded-full py-2.5 text-center text-sm font-medium ${isCustomers ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>For Customers</Link>
             </div>
             <hr className="border-gray-100" />
-            <a href="https://app.balkina.ai" className="text-base font-medium text-gray-700">Sign In</a>
-            <a href="https://app.balkina.ai/register" className="rounded-full bg-brand-600 px-5 py-3 text-center text-base font-semibold text-white">Start Free Trial</a>
+            <a href="https://app.balkina.ai/auth/login" className="text-base font-medium text-gray-700">Sign In</a>
+            <a href="https://app.balkina.ai/auth/register" className="rounded-full bg-brand-600 px-5 py-3 text-center text-base font-semibold text-white">Start Free Trial</a>
           </div>
         </div>
       )}
