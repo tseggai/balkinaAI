@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { AudienceToggle } from '@/components/audience-toggle';
 
 /* ─── Device Frames (devices.css) ──────────────────────────────────────── */
 
@@ -521,14 +522,15 @@ export default function HomePage() {
     <>
       {/* ─── Hero (full viewport, visual-first) ──────────────────────────── */}
       <section className="relative flex min-h-[calc(100vh-73px)] flex-col bg-gradient-to-b from-gray-50 to-white">
-        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-6 pt-10 md:pt-14">
+        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-6 pt-6 md:pt-10">
+          <AudienceToggle />
           {/* Minimal headline */}
-          <div className="text-center">
+          <div className="mt-6 text-center md:mt-8">
             <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl lg:text-5xl">
-              Let AI book you while you work
+              Booked by Balkina
             </h1>
             <p className="mx-auto mt-3 max-w-2xl text-base text-gray-500 md:text-lg">
-              Automated front desk for salons, clinics, studios, and beyond.
+              AI-powered front desk for salons, clinics, studios, and every business in between.
             </p>
           </div>
 

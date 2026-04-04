@@ -60,17 +60,19 @@ export async function updateSession(request: NextRequest) {
     return redirectTo('/auth/login');
   }
 
-  if (user && !isPublicPath) {
-    // Check tenant status and redirect accordingly
-    const { data: tenant } = await supabase
+  // For authenticated users, check tenant status
+  let tenant: { status: string } | null = null;
+  if (user) {
+    const { data } = await supabase
       .from('tenants')
       .select('status')
       .eq('user_id', user.id)
       .single();
+    tenant = data;
+  }
 
+  if (user && !isPublicPath) {
     if (!tenant) {
-      // User exists but has no tenant record (incomplete registration).
-      // Send them to register instead of letting pages redirect to login.
       return redirectTo('/auth/register');
     }
 
@@ -89,9 +91,9 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Redirect authenticated users away from auth pages — except reset-password
-  // and register (needed when user exists but has no tenant yet).
-  if (user && pathname.startsWith('/auth/') && pathname !== '/auth/reset-password' && pathname !== '/auth/register') {
+  // Redirect authenticated users away from auth pages — but only if they
+  // have a valid tenant. Users without a tenant need access to auth pages.
+  if (user && tenant && pathname.startsWith('/auth/') && pathname !== '/auth/reset-password') {
     return redirectTo('/dashboard');
   }
 
