@@ -44,7 +44,6 @@
     "production": {
       "ios": {
         "appleId": "tseggai@debreeze.com",
-        "ascAppId": "",
         "appleTeamId": "XYN3V2543N"
       },
       "android": {
