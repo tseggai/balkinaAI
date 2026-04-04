@@ -33,8 +33,8 @@ export function Footer() {
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-900">For Businesses</h3>
             <ul className="mt-4 space-y-3">
-              <li><a href="https://app.balkina.ai/register" className="text-sm text-gray-500 hover:text-brand-600">Sign Up</a></li>
-              <li><a href="https://app.balkina.ai" className="text-sm text-gray-500 hover:text-brand-600">Tenant Dashboard</a></li>
+              <li><a href="https://app.balkina.ai/auth/register" className="text-sm text-gray-500 hover:text-brand-600">Sign Up</a></li>
+              <li><a href="https://app.balkina.ai/auth/login" className="text-sm text-gray-500 hover:text-brand-600">Tenant Dashboard</a></li>
             </ul>
           </div>
 

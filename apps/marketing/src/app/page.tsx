@@ -667,7 +667,7 @@ export default function HomePage() {
                     </li>
                   ))}
                 </ul>
-                <a href="https://app.balkina.ai/register" className={`mt-6 block rounded-full py-2.5 text-center text-sm font-semibold transition-colors ${plan.popular ? 'bg-brand-600 text-white hover:bg-brand-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
+                <a href="https://app.balkina.ai/auth/register" className={`mt-6 block rounded-full py-2.5 text-center text-sm font-semibold transition-colors ${plan.popular ? 'bg-brand-600 text-white hover:bg-brand-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
                   {plan.price === '0' ? 'Start for Free' : 'Start Free Trial'}
                 </a>
               </div>
@@ -764,7 +764,7 @@ export default function HomePage() {
           <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl">Let AI fill your calendar</h2>
           <p className="mt-4 text-lg text-brand-100">Join barbershops, yoga studios, salons, and clinics already using Balkina AI.</p>
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <a href="https://app.balkina.ai/register" className="rounded-full bg-white px-8 py-3.5 text-base font-semibold text-brand-600 shadow-lg hover:bg-gray-50 transition-colors">
+            <a href="https://app.balkina.ai/auth/register" className="rounded-full bg-white px-8 py-3.5 text-base font-semibold text-brand-600 shadow-lg hover:bg-gray-50 transition-colors">
               Get Started Free
             </a>
           </div>

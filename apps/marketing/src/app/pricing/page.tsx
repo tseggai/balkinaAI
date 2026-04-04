@@ -99,7 +99,7 @@ export default function PricingPage() {
                   <span className="text-5xl font-extrabold text-gray-900">&euro;{plan.price}</span>
                   <span className="text-base text-gray-500">/month</span>
                 </div>
-                <a href="https://app.balkina.ai/register" className={`mt-8 block rounded-full py-3.5 text-center text-sm font-semibold transition-colors ${plan.popular ? 'bg-brand-600 text-white hover:bg-brand-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
+                <a href="https://app.balkina.ai/auth/register" className={`mt-8 block rounded-full py-3.5 text-center text-sm font-semibold transition-colors ${plan.popular ? 'bg-brand-600 text-white hover:bg-brand-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
                   Start Free Trial
                 </a>
 
@@ -153,7 +153,7 @@ export default function PricingPage() {
         <div className="mx-auto max-w-2xl px-6 text-center">
           <h2 className="text-2xl font-bold text-white md:text-3xl">Start your 14-day free trial today</h2>
           <p className="mt-3 text-base text-brand-100">No credit card required. Set up in minutes.</p>
-          <a href="https://app.balkina.ai/register" className="mt-8 inline-block rounded-full bg-white px-8 py-3.5 text-base font-semibold text-brand-600 shadow-lg hover:bg-gray-50 transition-colors">
+          <a href="https://app.balkina.ai/auth/register" className="mt-8 inline-block rounded-full bg-white px-8 py-3.5 text-base font-semibold text-brand-600 shadow-lg hover:bg-gray-50 transition-colors">
             Get Started Free
           </a>
         </div>
