@@ -285,10 +285,17 @@ async function handleFindBusinessesInner(
     }
     businesses = businesses.map((b) => ({ ...b, all_services: catSvcMap.get(b.id) ?? [], locations: catLocMap.get(b.id) ?? [] }));
 
-    // Sort by proximity if location available
+    // Always set closest_location_id — use proximity when location available, first location as fallback
+    const locMap = new Map<string, { locationId: string; latitude: number; longitude: number; distance: number }>();
+    // Build a fallback map using first location per tenant (no user coords needed)
+    for (const loc of (catLocs ?? []) as { id: string; tenant_id: string; latitude: number | null; longitude: number | null }[]) {
+      if (!locMap.has(loc.tenant_id)) {
+        locMap.set(loc.tenant_id, { locationId: loc.id, latitude: loc.latitude ?? 0, longitude: loc.longitude ?? 0, distance: 9999 });
+      }
+    }
+
+    // Sort by proximity if location available — overwrite fallback with actual closest
     if (userLat && userLng) {
-      // Pick the CLOSEST location per tenant (not just the first one)
-      const locMap = new Map<string, { locationId: string; latitude: number; longitude: number; distance: number }>();
       for (const loc of (catLocs ?? []) as { id: string; tenant_id: string; latitude: number | null; longitude: number | null }[]) {
         if (loc.latitude && loc.longitude) {
           const dist = haversineKm(userLat, userLng, loc.latitude, loc.longitude);
@@ -298,15 +305,19 @@ async function handleFindBusinessesInner(
           }
         }
       }
-      // Filter services to only those available at the closest location and attach closest_location_id
-      businesses = businesses.map((b) => {
-        const closest = locMap.get(b.id);
-        return { ...b, all_services: filterServicesForLocation(b.all_services ?? [], closest?.locationId, svcLocMap), closest_location_id: closest?.locationId };
-      });
+    }
+
+    // Filter services to only those available at the closest/fallback location and attach closest_location_id
+    businesses = businesses.map((b) => {
+      const closest = locMap.get(b.id);
+      return { ...b, all_services: filterServicesForLocation(b.all_services ?? [], closest?.locationId, svcLocMap), closest_location_id: closest?.locationId };
+    });
+
+    if (userLat && userLng) {
       businesses = businesses
         .map((b) => {
           const loc = locMap.get(b.id);
-          if (!loc) return b;
+          if (!loc || loc.distance === 9999) return b;
           const distKm = Math.round(loc.distance * 10) / 10;
           const distMi = Math.round(distKm * 0.621371 * 10) / 10;
           return { ...b, distance_km: distKm, distance_mi: distMi, estimated_drive_minutes: estimateDriveMinutes(distKm) };

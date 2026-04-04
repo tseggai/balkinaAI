@@ -38,7 +38,7 @@ import {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const API_BASE = 'https://balkina-ai.vercel.app';
+const API_BASE = 'https://app.balkina.ai';
 
 import {
   generateId,
