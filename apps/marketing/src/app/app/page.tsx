@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { AudienceToggle } from '@/components/audience-toggle';
 
 /* ─── Reuse devices.css phone frame ────────────────────────────────────── */
 
@@ -274,8 +275,9 @@ export default function AppPage() {
     <>
       {/* ─── Hero (full viewport, left text / right phones) ────────────── */}
       <section className="relative flex min-h-[calc(100vh-65px)] flex-col bg-gradient-to-b from-gray-50 to-white">
-        <div className="mx-auto flex w-full max-w-7xl flex-1 items-center px-6 py-10 md:py-16">
-          <div className="flex w-full flex-col gap-10 lg:flex-row lg:items-center lg:gap-12">
+        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-6 pt-6 md:pt-10">
+          <AudienceToggle />
+          <div className="mt-6 flex w-full flex-1 flex-col gap-10 md:mt-8 lg:flex-row lg:items-center lg:gap-12">
             {/* Left — text */}
             <div className="flex-1 text-center lg:text-left">
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-medium text-brand-700">
@@ -288,27 +290,27 @@ export default function AppPage() {
               <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-gray-500 md:text-lg lg:mx-0">
                 Tell Balkina AI what you need. It finds top-rated services near you, checks real-time availability, and books them — in seconds.
               </p>
-              <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:justify-start sm:justify-center">
-                <a href="#" className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-7 py-3.5 text-base font-semibold text-white shadow-lg hover:bg-gray-800 transition-colors">
+              <div className="mt-8 flex flex-row items-center justify-center gap-3 lg:justify-start">
+                <a href="#" className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-lg hover:bg-gray-800 transition-colors sm:px-7 sm:py-3.5 sm:text-base">
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" /></svg>
                   App Store
                 </a>
-                <a href="#" className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-7 py-3.5 text-base font-semibold text-white shadow-lg hover:bg-gray-800 transition-colors">
+                <a href="#" className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-lg hover:bg-gray-800 transition-colors sm:px-7 sm:py-3.5 sm:text-base">
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-1.292l2.545 1.473c.68.394.68 1.03 0 1.424l-2.545 1.473-2.534-2.534 2.534-2.536zM5.864 2.658L16.8 8.99l-2.302 2.302-8.634-8.634z" /></svg>
                   Google Play
                 </a>
               </div>
             </div>
 
-            {/* Right — two phones with arrow */}
-            <div className="flex shrink-0 items-end gap-3 md:gap-5">
+            {/* Right — two phones with arrow (column on mobile, row on md+) */}
+            <div className="flex shrink-0 flex-col items-center gap-4 md:flex-row md:items-end md:gap-5">
               <ScaledPhone label="You">
                 <CustomerPhoneContent />
               </ScaledPhone>
 
-              {/* Arrow — appears after customer confirms */}
-              <div className="connect-arrow mb-[220px] flex flex-col items-center gap-1">
-                <svg className="h-5 w-5 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              {/* Arrow — appears after customer confirms (rotated down on mobile) */}
+              <div className="connect-arrow flex flex-col items-center gap-1 md:mb-[220px]">
+                <svg className="h-5 w-5 rotate-90 text-brand-500 md:rotate-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
                 <span className="text-[8px] font-medium text-brand-400">Booked!</span>
