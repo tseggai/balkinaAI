@@ -38,7 +38,7 @@ import {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const API_BASE = 'https://balkina-ai.vercel.app';
+const API_BASE = 'https://app.balkina.ai';
 
 import {
   generateId,
@@ -2543,9 +2543,9 @@ const fullScreenConfirmStyles = StyleSheet.create({
 // ── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   chatScreenWrapper: { flex: 1, backgroundColor: '#fff' },
-  chatScreenSafe: { flex: 1, backgroundColor: '#f9fafb' },
+  chatScreenSafe: { flex: 1, backgroundColor: '#ffffff' },
   flex: { flex: 1 },
   welcomeContainer: { flex: 1, justifyContent: 'flex-start', alignItems: 'center', paddingHorizontal: 24, paddingTop: 60 },
   greeting: { fontSize: 34, fontWeight: '700', color: '#111827', marginBottom: 8 },

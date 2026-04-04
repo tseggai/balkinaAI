@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, StatusBar } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { SafeStripeProvider } from '@/lib/stripe';
 import type { Session } from '@supabase/supabase-js';
@@ -72,12 +72,15 @@ function RootLayoutContent() {
   }
 
   return (
-    <Stack screenOptions={{ headerBackTitle: 'Back' }}>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="(app)" options={{ headerShown: false }} />
-      <Stack.Screen name="(staff)" options={{ headerShown: false }} />
-    </Stack>
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <Stack screenOptions={{ headerBackTitle: 'Back' }}>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(app)" options={{ headerShown: false }} />
+        <Stack.Screen name="(staff)" options={{ headerShown: false }} />
+      </Stack>
+    </>
   );
 }
 
