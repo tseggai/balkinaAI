@@ -36,18 +36,29 @@ function LocationInput({ value, onChange }: { value: string; onChange: (v: strin
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    // Load Google Maps script if not already loaded
-    if (typeof window !== 'undefined' && !(window as { google?: unknown }).google) {
-      const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-      if (!key) return;
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places`;
-      script.async = true;
-      script.onload = () => setLoaded(true);
-      document.head.appendChild(script);
-    } else {
+    const win = window as { google?: { maps?: unknown } };
+    if (win.google?.maps) {
       setLoaded(true);
+      return;
     }
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!key) return;
+    // Check if script is already being loaded
+    if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+      const check = setInterval(() => {
+        if ((window as { google?: { maps?: unknown } }).google?.maps) {
+          setLoaded(true);
+          clearInterval(check);
+        }
+      }, 100);
+      return () => clearInterval(check);
+    }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&loading=async`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setLoaded(true);
+    document.head.appendChild(script);
   }, []);
 
   useEffect(() => {
@@ -184,8 +195,8 @@ export default function JoinPage() {
           </p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-10 space-y-4">
+        {/* Form Card */}
+        <form onSubmit={handleSubmit} className="mt-10 space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-lg shadow-gray-100/50 md:p-8">
           <div className="grid gap-4 sm:grid-cols-2">
             <input type="text" required value={form.business_name} onChange={(e) => setForm({ ...form, business_name: e.target.value })} placeholder="Business name *" className={INPUT} />
             <input type="text" required value={form.owner_name} onChange={(e) => setForm({ ...form, owner_name: e.target.value })} placeholder="Your name *" className={INPUT} />
