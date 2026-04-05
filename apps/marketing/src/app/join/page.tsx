@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
 const CATEGORIES = [
@@ -18,6 +18,69 @@ const CATEGORIES = [
   'Other',
 ];
 
+const INPUT = 'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors';
+
+interface ServiceRow {
+  name: string;
+  duration: string;
+  price: string;
+}
+
+const EMPTY_SERVICE: ServiceRow = { name: '', duration: '', price: '' };
+
+/* ─── Google Places Autocomplete ───────────────────────────────────────── */
+
+function LocationInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    // Load Google Maps script if not already loaded
+    if (typeof window !== 'undefined' && !(window as { google?: unknown }).google) {
+      const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+      if (!key) return;
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places`;
+      script.async = true;
+      script.onload = () => setLoaded(true);
+      document.head.appendChild(script);
+    } else {
+      setLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loaded || !inputRef.current || autocompleteRef.current) return;
+    try {
+      autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
+        types: ['address'],
+      });
+      autocompleteRef.current.addListener('place_changed', () => {
+        const place = autocompleteRef.current?.getPlace();
+        if (place?.formatted_address) {
+          onChange(place.formatted_address);
+        }
+      });
+    } catch {
+      // Google Maps not available — graceful fallback to plain text
+    }
+  }, [loaded, onChange]);
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="Business address"
+      className={INPUT}
+    />
+  );
+}
+
+/* ─── Page ─────────────────────────────────────────────────────────────── */
+
 export default function JoinPage() {
   const [form, setForm] = useState({
     business_name: '',
@@ -27,16 +90,36 @@ export default function JoinPage() {
     category: '',
     location: '',
     staff_count: '1',
-    services_description: '',
   });
+  const [services, setServices] = useState<ServiceRow[]>([{ ...EMPTY_SERVICE }]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+
+  const handleLocationChange = useCallback((v: string) => setForm((f) => ({ ...f, location: v })), []);
+
+  const updateService = (i: number, field: keyof ServiceRow, value: string) => {
+    setServices((prev) => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s));
+  };
+
+  const addService = () => {
+    if (services.length < 3) setServices((prev) => [...prev, { ...EMPTY_SERVICE }]);
+  };
+
+  const removeService = (i: number) => {
+    if (services.length > 1) setServices((prev) => prev.filter((_, idx) => idx !== i));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSubmitting(true);
+
+    // Build services description from structured rows
+    const servicesDescription = services
+      .filter((s) => s.name.trim())
+      .map((s) => `${s.name}${s.duration ? ` (${s.duration} min)` : ''}${s.price ? ` - $${s.price}` : ''}`)
+      .join(', ');
 
     try {
       const res = await fetch('/api/waitlist', {
@@ -45,6 +128,7 @@ export default function JoinPage() {
         body: JSON.stringify({
           ...form,
           staff_count: parseInt(form.staff_count) || 1,
+          services_description: servicesDescription || null,
         }),
       });
 
@@ -101,107 +185,57 @@ export default function JoinPage() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-10 space-y-5">
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Business Name *</label>
-              <input
-                type="text"
-                required
-                value={form.business_name}
-                onChange={(e) => setForm({ ...form, business_name: e.target.value })}
-                placeholder="e.g., Sunrise Yoga Studio"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Your Name *</label>
-              <input
-                type="text"
-                required
-                value={form.owner_name}
-                onChange={(e) => setForm({ ...form, owner_name: e.target.value })}
-                placeholder="e.g., Sarah Johnson"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors"
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="mt-10 space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <input type="text" required value={form.business_name} onChange={(e) => setForm({ ...form, business_name: e.target.value })} placeholder="Business name *" className={INPUT} />
+            <input type="text" required value={form.owner_name} onChange={(e) => setForm({ ...form, owner_name: e.target.value })} placeholder="Your name *" className={INPUT} />
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Email *</label>
-              <input
-                type="email"
-                required
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="you@business.com"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Phone</label>
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="+1 (555) 123-4567"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors"
-              />
-            </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Email *" className={INPUT} />
+            <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Phone" className={INPUT} />
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Category</label>
-              <select
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors"
-              >
-                <option value="">Select a category</option>
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Team Size</label>
-              <select
-                value={form.staff_count}
-                onChange={(e) => setForm({ ...form, staff_count: e.target.value })}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors"
-              >
-                <option value="1">Just me</option>
-                <option value="2">2-3 staff</option>
-                <option value="5">4-5 staff</option>
-                <option value="10">6-10 staff</option>
-                <option value="15">11-15 staff</option>
-                <option value="20">15+ staff</option>
-              </select>
-            </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={`${INPUT} ${!form.category ? 'text-gray-400' : ''}`}>
+              <option value="" disabled>Category</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            <select value={form.staff_count} onChange={(e) => setForm({ ...form, staff_count: e.target.value })} className={INPUT}>
+              <option value="1">Just me</option>
+              <option value="2">2-3 staff</option>
+              <option value="5">4-5 staff</option>
+              <option value="10">6-10 staff</option>
+              <option value="15">11-15 staff</option>
+              <option value="20">15+ staff</option>
+            </select>
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Location</label>
-            <input
-              type="text"
-              value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
-              placeholder="City, State or full address"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors"
-            />
-          </div>
+          <LocationInput value={form.location} onChange={handleLocationChange} />
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">What services do you offer?</label>
-            <textarea
-              value={form.services_description}
-              onChange={(e) => setForm({ ...form, services_description: e.target.value })}
-              rows={3}
-              placeholder="e.g., Haircuts ($25, 30 min), Hair Color ($60, 90 min), Beard Trim ($15, 15 min)"
-              className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors"
-            />
+          {/* Services — structured rows */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-gray-500">Services you offer</p>
+            {services.map((svc, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input type="text" value={svc.name} onChange={(e) => updateService(i, 'name', e.target.value)} placeholder="Service name" className={`${INPUT} flex-[3]`} />
+                <input type="text" value={svc.duration} onChange={(e) => updateService(i, 'duration', e.target.value)} placeholder="Min" className={`${INPUT} flex-1 text-center`} />
+                <input type="text" value={svc.price} onChange={(e) => updateService(i, 'price', e.target.value)} placeholder="Price" className={`${INPUT} flex-1 text-center`} />
+                {services.length > 1 && (
+                  <button type="button" onClick={() => removeService(i)} className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                )}
+              </div>
+            ))}
+            {services.length < 3 && (
+              <button type="button" onClick={addService} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50 transition-colors">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                Add service
+              </button>
+            )}
           </div>
 
           {error && (
