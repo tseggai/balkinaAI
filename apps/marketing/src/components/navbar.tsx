@@ -9,7 +9,7 @@ export function Navbar() {
   const isCustomers = pathname === '/app';
 
   return (
-    <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
+    <header className="sticky top-0 z-50 border-b border-gray-100/50 bg-gray-50/80 backdrop-blur-lg">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
         {/* Logo + Beta badge — logo 30% smaller on mobile */}
         <Link href="/" className="flex items-center gap-2">
