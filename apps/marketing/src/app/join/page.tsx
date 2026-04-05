@@ -177,10 +177,10 @@ export default function JoinPage() {
             Early Access
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">
-            Join the Balkina AI Beta
+            Join the Balkina AI Beta — FREE
           </h1>
           <p className="mt-3 text-base text-gray-500 md:text-lg">
-            Tell us about your business and we&apos;ll set you up — free during beta. Limited spots available.
+            Tell us about your service, and we&apos;ll handle the setup. Limited spots available.
           </p>
         </div>
 
@@ -221,7 +221,17 @@ export default function JoinPage() {
             {services.map((svc, i) => (
               <div key={i} className="flex items-center gap-2">
                 <input type="text" value={svc.name} onChange={(e) => updateService(i, 'name', e.target.value)} placeholder="Service name" className={`${INPUT} flex-[3]`} />
-                <input type="text" value={svc.duration} onChange={(e) => updateService(i, 'duration', e.target.value)} placeholder="Min" className={`${INPUT} flex-1 text-center`} />
+                <select value={svc.duration} onChange={(e) => updateService(i, 'duration', e.target.value)} className={`${INPUT} flex-[1.2] ${!svc.duration ? 'text-gray-400' : ''}`}>
+                  <option value="" disabled>Duration</option>
+                  <option value="15">15 min</option>
+                  <option value="30">30 min</option>
+                  <option value="45">45 min</option>
+                  <option value="60">1 hour</option>
+                  <option value="75">1h 15 min</option>
+                  <option value="90">1h 30 min</option>
+                  <option value="105">1h 45 min</option>
+                  <option value="120">2 hours</option>
+                </select>
                 <input type="text" value={svc.price} onChange={(e) => updateService(i, 'price', e.target.value)} placeholder="Price" className={`${INPUT} flex-1 text-center`} />
                 {services.length > 1 && (
                   <button type="button" onClick={() => removeService(i)} className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
