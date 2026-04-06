@@ -3,7 +3,7 @@ import { requireAdmin } from '@/lib/admin-auth';
 
 /**
  * POST /api/admin/waitlist/invite
- * Sends a password reset (magic link) email to the tenant owner
+ * Sends a password reset email to the tenant owner
  * so they can set their password and log in.
  */
 export async function POST(request: Request) {
@@ -21,23 +21,16 @@ export async function POST(request: Request) {
     ? `${process.env.NEXTAUTH_URL}/auth/reset-password`
     : 'https://app.balkina.ai/auth/reset-password';
 
-  const { error } = await auth.supabase.auth.admin.generateLink({
-    type: 'recovery',
-    email,
-    options: { redirectTo },
-  });
-
-  if (error) {
-    return NextResponse.json({ error: `Failed to send invite: ${error.message}` }, { status: 500 });
-  }
-
-  // Also send via Supabase's built-in email (which actually sends the email)
-  const { error: resetErr } = await auth.supabase.auth.resetPasswordForEmail(email, {
+  const { error } = await auth.supabase.auth.resetPasswordForEmail(email, {
     redirectTo,
   });
 
-  if (resetErr) {
-    return NextResponse.json({ error: `Failed to send email: ${resetErr.message}` }, { status: 500 });
+  if (error) {
+    // Handle Supabase rate limit gracefully
+    if (error.message?.includes('security purposes') || error.message?.includes('after')) {
+      return NextResponse.json({ error: 'Please wait 60 seconds before sending another invite.' }, { status: 429 });
+    }
+    return NextResponse.json({ error: `Failed to send email: ${error.message}` }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, message: `Login invite sent to ${email}` });

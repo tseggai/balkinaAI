@@ -93,6 +93,7 @@ async function createTenantFromWaitlist(supabase: any, entry: any, userId: strin
       email: entry.email,
       phone: entry.phone || null,
       category_id: categoryId,
+      currency: entry.currency || 'EUR',
       status: 'active',
     })
     .select('id')
@@ -125,7 +126,7 @@ async function createTenantFromWaitlist(supabase: any, entry: any, userId: strin
       // Parse "Service Name (60 min) - $30" format
       const nameMatch = svcStr.match(/^([^(–-]+)/);
       const durationMatch = svcStr.match(/\((\d+)\s*min\)/);
-      const priceMatch = svcStr.match(/\$(\d+(?:\.\d+)?)/);
+      const priceMatch = svcStr.match(/[\$€£](\d+(?:\.\d+)?)/);
 
       const name = nameMatch ? nameMatch[1].trim() : svcStr;
       const duration = durationMatch ? parseInt(durationMatch[1]) : 60;

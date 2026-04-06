@@ -18,6 +18,12 @@ const CATEGORIES = [
   'Other',
 ];
 
+const CURRENCIES = [
+  { code: 'EUR', symbol: '\u20AC' },
+  { code: 'USD', symbol: '$' },
+  { code: 'GBP', symbol: '\u00A3' },
+];
+
 const INPUT = 'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors';
 
 interface ServiceRow {
@@ -123,6 +129,7 @@ export default function JoinPage() {
     country: '',
     postal_code: '',
     staff_count: '1',
+    currency: 'EUR',
   });
   const [services, setServices] = useState<ServiceRow[]>([{ ...EMPTY_SERVICE }]);
   const [submitting, setSubmitting] = useState(false);
@@ -159,9 +166,10 @@ export default function JoinPage() {
     setSubmitting(true);
 
     // Build services description from structured rows
+    const currSymbol = CURRENCIES.find((c) => c.code === form.currency)?.symbol ?? '€';
     const servicesDescription = services
       .filter((s) => s.name.trim())
-      .map((s) => `${s.name}${s.duration ? ` (${s.duration} min)` : ''}${s.price ? ` - $${s.price}` : ''}`)
+      .map((s) => `${s.name}${s.duration ? ` (${s.duration} min)` : ''}${s.price ? ` - ${currSymbol}${s.price}` : ''}`)
       .join(', ');
 
     try {
@@ -261,9 +269,16 @@ export default function JoinPage() {
 
           <LocationInput onSelect={handleLocationSelect} />
 
-          {/* Services — structured rows */}
+          {/* Currency + Services */}
           <div className="space-y-2">
-            <p className="text-sm font-medium text-gray-500">Services you offer</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-gray-500">Services you offer</p>
+              <select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 outline-none focus:border-brand-400">
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>{c.symbol} {c.code}</option>
+                ))}
+              </select>
+            </div>
             {services.map((svc, i) => (
               <div key={i} className="flex items-center gap-2">
                 <input type="text" value={svc.name} onChange={(e) => updateService(i, 'name', e.target.value)} placeholder="Service name" className={`${INPUT} flex-[3]`} />
@@ -278,7 +293,7 @@ export default function JoinPage() {
                   <option value="105">1h 45 min</option>
                   <option value="120">2 hours</option>
                 </select>
-                <input type="text" value={svc.price} onChange={(e) => updateService(i, 'price', e.target.value)} placeholder="Price" className={`${INPUT} flex-1 text-center`} />
+                <input type="text" value={svc.price} onChange={(e) => updateService(i, 'price', e.target.value)} placeholder={`${CURRENCIES.find((c) => c.code === form.currency)?.symbol ?? '€'} Price`} className={`${INPUT} flex-1 text-center`} />
                 {services.length > 1 && (
                   <button type="button" onClick={() => removeService(i)} className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
