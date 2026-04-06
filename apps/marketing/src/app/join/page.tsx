@@ -220,10 +220,10 @@ export default function JoinPage() {
             Limited Early Access
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">
-            Booked by Balkina
+            Booked by Balkina <span className="relative top-[-2px] rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700">BETA</span>
           </h1>
           <p className="mt-2 text-base text-gray-500 md:text-lg">
-            AI-powered appointment assistant for spas, salons, clinics, studios, and beyond.
+            AI-powered appointment assistant for spas, clinics, studios, and beyond.
           </p>
           <p className="mt-2 text-sm text-gray-400">
             Tell us about your service to join the early access, and we&apos;ll handle the setup.
