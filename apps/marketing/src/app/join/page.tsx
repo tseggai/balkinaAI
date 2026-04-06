@@ -28,94 +28,82 @@ interface ServiceRow {
 
 const EMPTY_SERVICE: ServiceRow = { name: '', duration: '', price: '' };
 
-/* ─── Google Places Autocomplete (New API — required after March 2025) ── */
+/* ─── Google Places Autocomplete (same as tenant locations page) ────── */
 
-function LocationInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const fallbackRef = useRef<HTMLInputElement>(null);
-  const [useFallback, setUseFallback] = useState(false);
+interface ParsedAddress {
+  formatted: string;
+  street: string;
+  city: string;
+  state: string;
+  country: string;
+  postal_code: string;
+}
+
+function LocationInput({ onSelect }: { onSelect: (addr: ParsedAddress) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (!key || !containerRef.current) {
-      setUseFallback(true);
-      return;
+    if (!key) return;
+    const win = window as { google?: { maps?: unknown } };
+    if (win.google?.maps) { setMapsLoaded(true); return; }
+    if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+      const check = setInterval(() => {
+        if ((window as { google?: { maps?: unknown } }).google?.maps) { setMapsLoaded(true); clearInterval(check); }
+      }, 100);
+      return () => clearInterval(check);
     }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places`;
+    script.async = true;
+    script.onload = () => setMapsLoaded(true);
+    document.head.appendChild(script);
+  }, []);
 
-    let mounted = true;
+  useEffect(() => {
+    if (!mapsLoaded || !inputRef.current || autocompleteRef.current) return;
+    try {
+      const ac = new google.maps.places.Autocomplete(inputRef.current, {
+        types: ['establishment', 'geocode'],
+      });
+      autocompleteRef.current = ac;
 
-    async function init() {
-      // Load Google Maps script if needed
-      const win = window as { google?: { maps?: { importLibrary?: (lib: string) => Promise<unknown> } } };
-      if (!win.google?.maps?.importLibrary) {
-        if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
-          const script = document.createElement('script');
-          script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&loading=async`;
-          script.async = true;
-          script.defer = true;
-          document.head.appendChild(script);
+      ac.addListener('place_changed', () => {
+        const place = ac.getPlace();
+        if (!place) return;
+
+        const parsed: ParsedAddress = { formatted: place.formatted_address || '', street: '', city: '', state: '', country: '', postal_code: '' };
+        const components = (place as unknown as { address_components?: { long_name: string; short_name: string; types: string[] }[] }).address_components;
+        if (components) {
+          let streetNum = '';
+          let route = '';
+          for (const comp of components) {
+            const t = comp.types;
+            if (t.includes('street_number')) streetNum = comp.long_name;
+            else if (t.includes('route')) route = comp.long_name;
+            else if (t.includes('locality') || t.includes('postal_town')) parsed.city = comp.long_name;
+            else if (t.includes('administrative_area_level_1')) parsed.state = comp.short_name;
+            else if (t.includes('country')) parsed.country = comp.long_name;
+            else if (t.includes('postal_code')) parsed.postal_code = comp.long_name;
+          }
+          parsed.street = streetNum ? `${streetNum} ${route}` : route;
         }
-        // Wait for Google Maps to load
-        await new Promise<void>((resolve) => {
-          const check = setInterval(() => {
-            if ((window as { google?: { maps?: unknown } }).google?.maps) {
-              clearInterval(check);
-              resolve();
-            }
-          }, 100);
-          // Timeout after 10s
-          setTimeout(() => { clearInterval(check); resolve(); }, 10000);
-        });
-      }
-
-      if (!mounted || !containerRef.current) return;
-
-      try {
-        // Use the new PlaceAutocompleteElement API
-        const gmp = window.google?.maps?.places;
-        if (!gmp) { setUseFallback(true); return; }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const PlaceAuto = (gmp as any).PlaceAutocompleteElement;
-        if (!PlaceAuto) { setUseFallback(true); return; }
-
-        const el = new PlaceAuto({ types: ['address'] });
-        el.style.width = '100%';
-        el.style.height = '100%';
-
-        el.addEventListener('gmp-placeselect', (e: { place?: { displayName?: string; formattedAddress?: string } }) => {
-          const addr = e.place?.formattedAddress || e.place?.displayName || '';
-          if (addr) onChange(addr);
-        });
-
-        if (containerRef.current) {
-          containerRef.current.innerHTML = '';
-          containerRef.current.appendChild(el);
-        }
-      } catch {
-        if (mounted) setUseFallback(true);
-      }
+        onSelect(parsed);
+      });
+    } catch {
+      // Fallback — plain text input still works
     }
-
-    init();
-    return () => { mounted = false; };
-  }, [onChange]);
-
-  if (useFallback) {
-    return (
-      <input
-        ref={fallbackRef}
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Business address"
-        className={INPUT}
-      />
-    );
-  }
+  }, [mapsLoaded, onSelect]);
 
   return (
-    <div ref={containerRef} className={`${INPUT} flex items-center overflow-hidden p-0 [&_input]:w-full [&_input]:border-none [&_input]:bg-transparent [&_input]:px-4 [&_input]:py-3 [&_input]:text-sm [&_input]:outline-none`} />
+    <input
+      ref={inputRef}
+      type="text"
+      placeholder="Business address"
+      className={INPUT}
+    />
   );
 }
 
@@ -129,6 +117,11 @@ export default function JoinPage() {
     phone: '',
     category: '',
     location: '',
+    street: '',
+    city: '',
+    state: '',
+    country: '',
+    postal_code: '',
     staff_count: '1',
   });
   const [services, setServices] = useState<ServiceRow[]>([{ ...EMPTY_SERVICE }]);
@@ -136,7 +129,17 @@ export default function JoinPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLocationChange = useCallback((v: string) => setForm((f) => ({ ...f, location: v })), []);
+  const handleLocationSelect = useCallback((addr: ParsedAddress) => {
+    setForm((f) => ({
+      ...f,
+      location: addr.formatted,
+      street: addr.street,
+      city: addr.city,
+      state: addr.state,
+      country: addr.country,
+      postal_code: addr.postal_code,
+    }));
+  }, []);
 
   const updateService = (i: number, field: keyof ServiceRow, value: string) => {
     setServices((prev) => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s));
@@ -253,7 +256,7 @@ export default function JoinPage() {
             </select>
           </div>
 
-          <LocationInput value={form.location} onChange={handleLocationChange} />
+          <LocationInput onSelect={handleLocationSelect} />
 
           {/* Services — structured rows */}
           <div className="space-y-2">
