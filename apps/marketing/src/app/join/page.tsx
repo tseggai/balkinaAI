@@ -28,65 +28,94 @@ interface ServiceRow {
 
 const EMPTY_SERVICE: ServiceRow = { name: '', duration: '', price: '' };
 
-/* ─── Google Places Autocomplete ───────────────────────────────────────── */
+/* ─── Google Places Autocomplete (New API — required after March 2025) ── */
 
 function LocationInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const fallbackRef = useRef<HTMLInputElement>(null);
+  const [useFallback, setUseFallback] = useState(false);
 
   useEffect(() => {
-    const win = window as { google?: { maps?: unknown } };
-    if (win.google?.maps) {
-      setLoaded(true);
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!key || !containerRef.current) {
+      setUseFallback(true);
       return;
     }
-    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (!key) return;
-    // Check if script is already being loaded
-    if (document.querySelector('script[src*="maps.googleapis.com"]')) {
-      const check = setInterval(() => {
-        if ((window as { google?: { maps?: unknown } }).google?.maps) {
-          setLoaded(true);
-          clearInterval(check);
-        }
-      }, 100);
-      return () => clearInterval(check);
-    }
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&loading=async`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => setLoaded(true);
-    document.head.appendChild(script);
-  }, []);
 
-  useEffect(() => {
-    if (!loaded || !inputRef.current || autocompleteRef.current) return;
-    try {
-      autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
-        types: ['address'],
-      });
-      autocompleteRef.current.addListener('place_changed', () => {
-        const place = autocompleteRef.current?.getPlace();
-        if (place?.formatted_address) {
-          onChange(place.formatted_address);
+    let mounted = true;
+
+    async function init() {
+      // Load Google Maps script if needed
+      const win = window as { google?: { maps?: { importLibrary?: (lib: string) => Promise<unknown> } } };
+      if (!win.google?.maps?.importLibrary) {
+        if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
+          const script = document.createElement('script');
+          script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&loading=async`;
+          script.async = true;
+          script.defer = true;
+          document.head.appendChild(script);
         }
-      });
-    } catch {
-      // Google Maps not available — graceful fallback to plain text
+        // Wait for Google Maps to load
+        await new Promise<void>((resolve) => {
+          const check = setInterval(() => {
+            if ((window as { google?: { maps?: unknown } }).google?.maps) {
+              clearInterval(check);
+              resolve();
+            }
+          }, 100);
+          // Timeout after 10s
+          setTimeout(() => { clearInterval(check); resolve(); }, 10000);
+        });
+      }
+
+      if (!mounted || !containerRef.current) return;
+
+      try {
+        // Use the new PlaceAutocompleteElement API
+        const gmp = window.google?.maps?.places;
+        if (!gmp) { setUseFallback(true); return; }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const PlaceAuto = (gmp as any).PlaceAutocompleteElement;
+        if (!PlaceAuto) { setUseFallback(true); return; }
+
+        const el = new PlaceAuto({ types: ['address'] });
+        el.style.width = '100%';
+        el.style.height = '100%';
+
+        el.addEventListener('gmp-placeselect', (e: { place?: { displayName?: string; formattedAddress?: string } }) => {
+          const addr = e.place?.formattedAddress || e.place?.displayName || '';
+          if (addr) onChange(addr);
+        });
+
+        if (containerRef.current) {
+          containerRef.current.innerHTML = '';
+          containerRef.current.appendChild(el);
+        }
+      } catch {
+        if (mounted) setUseFallback(true);
+      }
     }
-  }, [loaded, onChange]);
+
+    init();
+    return () => { mounted = false; };
+  }, [onChange]);
+
+  if (useFallback) {
+    return (
+      <input
+        ref={fallbackRef}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Business address"
+        className={INPUT}
+      />
+    );
+  }
 
   return (
-    <input
-      ref={inputRef}
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder="Business address"
-      className={INPUT}
-    />
+    <div ref={containerRef} className={`${INPUT} flex items-center overflow-hidden p-0 [&_input]:w-full [&_input]:border-none [&_input]:bg-transparent [&_input]:px-4 [&_input]:py-3 [&_input]:text-sm [&_input]:outline-none`} />
   );
 }
 
