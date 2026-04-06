@@ -51,6 +51,19 @@ export default function WaitlistPage() {
     fetchEntries();
   };
 
+  const deleteEntry = async (id: string, businessName: string) => {
+    if (!confirm(`Delete "${businessName}" from the waitlist? This cannot be undone.`)) return;
+    setMessage('');
+    const res = await fetch(`/api/admin/waitlist?id=${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setMessage(`Deleted "${businessName}" from waitlist.`);
+      fetchEntries();
+    } else {
+      const data = await res.json();
+      setMessage(`Error: ${data.error}`);
+    }
+  };
+
   const setupTenant = async (id: string) => {
     setSettingUp(id);
     setMessage('');
@@ -225,6 +238,15 @@ export default function WaitlistPage() {
                         className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
                       >
                         {inviting === entry.id ? 'Sending...' : 'Send Login Invite'}
+                      </button>
+                    )}
+                    {/* Delete — available for pending, onboarded, and declined */}
+                    {(entry.status === 'pending' || entry.status === 'onboarded' || entry.status === 'declined') && (
+                      <button
+                        onClick={() => deleteEntry(entry.id, entry.business_name)}
+                        className="ml-auto rounded-lg px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        Delete
                       </button>
                     )}
                   </div>

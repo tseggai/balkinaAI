@@ -54,3 +54,27 @@ export async function PATCH(request: Request) {
 
   return NextResponse.json({ success: true });
 }
+
+// DELETE /api/admin/waitlist — delete a waitlist entry
+export async function DELETE(request: Request) {
+  const auth = await requireAdmin();
+  if (!auth.admin) return auth.response;
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
+
+  if (!id) {
+    return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  }
+
+  const { error } = await auth.supabase
+    .from('waitlist')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}
