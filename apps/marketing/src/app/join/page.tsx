@@ -45,7 +45,7 @@ interface ParsedAddress {
   postal_code: string;
 }
 
-function LocationInput({ onSelect }: { onSelect: (addr: ParsedAddress) => void }) {
+function LocationInput({ onSelect, onManualEdit }: { onSelect: (addr: ParsedAddress) => void; onManualEdit: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [mapsLoaded, setMapsLoaded] = useState(false);
@@ -107,7 +107,9 @@ function LocationInput({ onSelect }: { onSelect: (addr: ParsedAddress) => void }
     <input
       ref={inputRef}
       type="text"
-      placeholder="Business address"
+      required
+      placeholder="Business address * (select from dropdown)"
+      onChange={() => onManualEdit()}
       className={INPUT}
     />
   );
@@ -135,6 +137,7 @@ export default function JoinPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [addressVerified, setAddressVerified] = useState(false);
 
   const handleLocationSelect = useCallback((addr: ParsedAddress) => {
     setForm((f) => ({
@@ -146,6 +149,7 @@ export default function JoinPage() {
       country: addr.country,
       postal_code: addr.postal_code,
     }));
+    setAddressVerified(true);
   }, []);
 
   const updateService = (i: number, field: keyof ServiceRow, value: string) => {
@@ -163,6 +167,25 @@ export default function JoinPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Validate all required fields
+    if (!form.business_name || !form.owner_name || !form.email || !form.phone) {
+      setError('Please fill in all required fields.');
+      return;
+    }
+    if (!form.category) {
+      setError('Please select a business category.');
+      return;
+    }
+    if (!addressVerified || !form.location) {
+      setError('Please select an address from the dropdown suggestions.');
+      return;
+    }
+    if (!services[0]?.name?.trim()) {
+      setError('Please add at least one service.');
+      return;
+    }
+
     setSubmitting(true);
 
     // Build services description from structured rows
@@ -247,12 +270,12 @@ export default function JoinPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Email *" className={INPUT} />
-            <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Phone" className={INPUT} />
+            <input type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Phone *" className={INPUT} />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={`${INPUT} ${!form.category ? 'text-gray-400' : ''}`}>
-              <option value="" disabled>Category</option>
+            <select required value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={`${INPUT} ${!form.category ? 'text-gray-400' : ''}`}>
+              <option value="" disabled>Category *</option>
               {CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
@@ -267,7 +290,7 @@ export default function JoinPage() {
             </select>
           </div>
 
-          <LocationInput onSelect={handleLocationSelect} />
+          <LocationInput onSelect={handleLocationSelect} onManualEdit={() => setAddressVerified(false)} />
 
           {/* Currency + Services */}
           <div className="space-y-2">
@@ -281,7 +304,7 @@ export default function JoinPage() {
             </div>
             {services.map((svc, i) => (
               <div key={i} className="flex items-center gap-2">
-                <input type="text" value={svc.name} onChange={(e) => updateService(i, 'name', e.target.value)} placeholder="Service name" className={`${INPUT} flex-[3]`} />
+                <input type="text" required={i === 0} value={svc.name} onChange={(e) => updateService(i, 'name', e.target.value)} placeholder={i === 0 ? 'Service name *' : 'Service name'} className={`${INPUT} flex-[3]`} />
                 <select value={svc.duration} onChange={(e) => updateService(i, 'duration', e.target.value)} className={`${INPUT} flex-[1.2] ${!svc.duration ? 'text-gray-400' : ''}`}>
                   <option value="" disabled>Duration</option>
                   <option value="15">15 min</option>
