@@ -217,13 +217,16 @@ export default function JoinPage() {
         {/* Header */}
         <div className="text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-1.5 text-sm font-medium text-brand-700">
-            Early Access
+            Limited Early Access
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">
-            Join the Balkina AI Beta — FREE
+            Booked by Balkina
           </h1>
-          <p className="mt-3 text-base text-gray-500 md:text-lg">
-            Tell us about your service, and we&apos;ll handle the setup. Limited spots available.
+          <p className="mt-2 text-base text-gray-500 md:text-lg">
+            AI-powered appointment assistant for spas, salons, clinics, studios, and beyond.
+          </p>
+          <p className="mt-2 text-sm text-gray-400">
+            Tell us about your service to join the early access, and we&apos;ll handle the setup.
           </p>
         </div>
 
