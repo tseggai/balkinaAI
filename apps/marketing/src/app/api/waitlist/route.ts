@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const supabase = getSupabase();
     const body = await request.json();
 
-    const { business_name, owner_name, email, phone, category, location, street, city, state, country, postal_code, staff_count, services_description } = body;
+    const { business_name, owner_name, email, phone, category, location, street, city, state, country, postal_code, staff_count, currency, services_description } = body;
 
     if (!business_name || !owner_name || !email) {
       return Response.json({ error: 'Business name, owner name, and email are required.' }, { status: 400 });
@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       country: country || null,
       postal_code: postal_code || null,
       staff_count: staff_count || 1,
+      currency: currency || 'EUR',
       services_description: services_description || null,
     });
 

@@ -18,6 +18,12 @@ const CATEGORIES = [
   'Other',
 ];
 
+const CURRENCIES = [
+  { code: 'EUR', symbol: '\u20AC' },
+  { code: 'USD', symbol: '$' },
+  { code: 'GBP', symbol: '\u00A3' },
+];
+
 const INPUT = 'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors';
 
 interface ServiceRow {
@@ -39,7 +45,7 @@ interface ParsedAddress {
   postal_code: string;
 }
 
-function LocationInput({ onSelect }: { onSelect: (addr: ParsedAddress) => void }) {
+function LocationInput({ onSelect, onManualEdit }: { onSelect: (addr: ParsedAddress) => void; onManualEdit: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [mapsLoaded, setMapsLoaded] = useState(false);
@@ -101,7 +107,9 @@ function LocationInput({ onSelect }: { onSelect: (addr: ParsedAddress) => void }
     <input
       ref={inputRef}
       type="text"
-      placeholder="Business address"
+      required
+      placeholder="Business address * (select from dropdown)"
+      onChange={() => onManualEdit()}
       className={INPUT}
     />
   );
@@ -123,11 +131,13 @@ export default function JoinPage() {
     country: '',
     postal_code: '',
     staff_count: '1',
+    currency: 'EUR',
   });
   const [services, setServices] = useState<ServiceRow[]>([{ ...EMPTY_SERVICE }]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [addressVerified, setAddressVerified] = useState(false);
 
   const handleLocationSelect = useCallback((addr: ParsedAddress) => {
     setForm((f) => ({
@@ -139,6 +149,7 @@ export default function JoinPage() {
       country: addr.country,
       postal_code: addr.postal_code,
     }));
+    setAddressVerified(true);
   }, []);
 
   const updateService = (i: number, field: keyof ServiceRow, value: string) => {
@@ -156,12 +167,32 @@ export default function JoinPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Validate all required fields
+    if (!form.business_name || !form.owner_name || !form.email || !form.phone) {
+      setError('Please fill in all required fields.');
+      return;
+    }
+    if (!form.category) {
+      setError('Please select a business category.');
+      return;
+    }
+    if (!addressVerified || !form.location) {
+      setError('Please select an address from the dropdown suggestions.');
+      return;
+    }
+    if (!services[0]?.name?.trim()) {
+      setError('Please add at least one service.');
+      return;
+    }
+
     setSubmitting(true);
 
     // Build services description from structured rows
+    const currSymbol = CURRENCIES.find((c) => c.code === form.currency)?.symbol ?? '€';
     const servicesDescription = services
       .filter((s) => s.name.trim())
-      .map((s) => `${s.name}${s.duration ? ` (${s.duration} min)` : ''}${s.price ? ` - $${s.price}` : ''}`)
+      .map((s) => `${s.name}${s.duration ? ` (${s.duration} min)` : ''}${s.price ? ` - ${currSymbol}${s.price}` : ''}`)
       .join(', ');
 
     try {
@@ -239,12 +270,12 @@ export default function JoinPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Email *" className={INPUT} />
-            <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Phone" className={INPUT} />
+            <input type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Phone *" className={INPUT} />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={`${INPUT} ${!form.category ? 'text-gray-400' : ''}`}>
-              <option value="" disabled>Category</option>
+            <select required value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={`${INPUT} ${!form.category ? 'text-gray-400' : ''}`}>
+              <option value="" disabled>Category *</option>
               {CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
@@ -259,14 +290,21 @@ export default function JoinPage() {
             </select>
           </div>
 
-          <LocationInput onSelect={handleLocationSelect} />
+          <LocationInput onSelect={handleLocationSelect} onManualEdit={() => setAddressVerified(false)} />
 
-          {/* Services — structured rows */}
+          {/* Currency + Services */}
           <div className="space-y-2">
-            <p className="text-sm font-medium text-gray-500">Services you offer</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-gray-500">Services you offer</p>
+              <select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 outline-none focus:border-brand-400">
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>{c.symbol} {c.code}</option>
+                ))}
+              </select>
+            </div>
             {services.map((svc, i) => (
               <div key={i} className="flex items-center gap-2">
-                <input type="text" value={svc.name} onChange={(e) => updateService(i, 'name', e.target.value)} placeholder="Service name" className={`${INPUT} flex-[3]`} />
+                <input type="text" required={i === 0} value={svc.name} onChange={(e) => updateService(i, 'name', e.target.value)} placeholder={i === 0 ? 'Service name *' : 'Service name'} className={`${INPUT} flex-[3]`} />
                 <select value={svc.duration} onChange={(e) => updateService(i, 'duration', e.target.value)} className={`${INPUT} flex-[1.2] ${!svc.duration ? 'text-gray-400' : ''}`}>
                   <option value="" disabled>Duration</option>
                   <option value="15">15 min</option>
@@ -278,7 +316,7 @@ export default function JoinPage() {
                   <option value="105">1h 45 min</option>
                   <option value="120">2 hours</option>
                 </select>
-                <input type="text" value={svc.price} onChange={(e) => updateService(i, 'price', e.target.value)} placeholder="Price" className={`${INPUT} flex-1 text-center`} />
+                <input type="text" value={svc.price} onChange={(e) => updateService(i, 'price', e.target.value)} placeholder={`${CURRENCIES.find((c) => c.code === form.currency)?.symbol ?? '€'} Price`} className={`${INPUT} flex-1 text-center`} />
                 {services.length > 1 && (
                   <button type="button" onClick={() => removeService(i)} className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
