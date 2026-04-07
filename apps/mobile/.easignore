@@ -1,0 +1,12 @@
+# Exclude non-mobile apps and assets from EAS builds
+assets/appstore/
+apps/web/
+apps/admin/
+apps/marketing/
+packages/ai/
+packages/api/
+packages/billing/
+packages/notifications/
+packages/email-templates/
+docs/
+.turbo/
