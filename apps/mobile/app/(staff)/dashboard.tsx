@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase, getAuthenticatedRole } from '@/lib/supabase';
 import type { StaffInfo } from '@/lib/supabase';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
 interface StaffAppointment {
   id: string;

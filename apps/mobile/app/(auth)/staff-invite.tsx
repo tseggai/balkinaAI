@@ -14,7 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
 export default function StaffInviteScreen() {
   const router = useRouter();

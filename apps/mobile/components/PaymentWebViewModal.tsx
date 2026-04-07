@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 
 const API_BASE =
-  process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
+  process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
 interface Props {
   visible: boolean;

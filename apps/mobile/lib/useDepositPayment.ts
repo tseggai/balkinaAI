@@ -9,7 +9,7 @@ import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { useStripe } from '@/lib/stripe';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
 interface PayResult {
   success: boolean;

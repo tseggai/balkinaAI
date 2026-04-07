@@ -24,7 +24,7 @@ import { supabase } from '@/lib/supabase';
 import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 
 const API_BASE =
-  process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
+  process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
