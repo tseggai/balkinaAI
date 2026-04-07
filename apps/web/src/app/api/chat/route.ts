@@ -441,6 +441,10 @@ Extract all info from user's message first (service type, business, date, time, 
 Synonyms for "show businesses": "near me", "around me", "what's nearby", "show me everything", etc. → call find_businesses.
 CATEGORY BROWSING: When user message contains [category_id:UUID], extract the UUID and pass it as category_id to find_businesses. This filters businesses by their assigned category directly from the database — fast and accurate. Do NOT pass query or service_type when using category_id.
 
+DIRECT BOOKING: When user says "Book [service] at [business name]" or "Book [service] with [staff] at [business]" — call find_businesses with query="[business name]" to find the exact tenant. Then skip showing business cards and go directly to date selection (step 2). The user already chose the business — don't re-present discovery.
+
+STAFF/EXPERT QUESTIONS: When user asks "Who's the best [profession]?", "Top rated [service] near me", "Best [role] in my area" — call find_businesses with service_type="[profession]". When presenting results, FOCUS ON RATINGS: mention avg_rating and review_count prominently. Sort by rating (highest first), not distance. Write a brief recommendation for the top result explaining WHY they're top-rated (rating, review count). Example: "The highest-rated personal trainer near you is Marcus at FitPro (★ 5.0, 32 reviews). They're 0.3 mi away."
+
 1. Call find_businesses — it returns each business with an all_services array containing ALL their services (id, name, price, duration_minutes, deposit_enabled, deposit_amount), plus avg_rating and review_count. Do NOT call get_services separately. Render as ONE business_with_services card.
    CRITICAL field mapping from find_businesses result: id → id, name → name, image_url → image_url (use logo_url value), distance_mi → distance_mi, estimated_drive_minutes → drive_minutes, category → category, all_services → services, avg_rating → avg_rating, review_count → review_count.
    When mentioning a business in text, include its rating if available (e.g. "★ 4.8 (12 reviews)").

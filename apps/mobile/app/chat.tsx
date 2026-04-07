@@ -15,7 +15,7 @@ import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 
-const API_BASE = 'https://balkina-ai.vercel.app';
+const API_BASE = 'https://app.balkina.ai';
 
 interface ChatMessage {
   id: string;

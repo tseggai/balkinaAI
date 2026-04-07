@@ -110,7 +110,7 @@ export default function EmailLoginScreen() {
     // hash fragments (#access_token=...&type=recovery). A server-side callback
     // can't read hash fragments, so we skip it and let the client-side page
     // handle the tokens via @supabase/ssr's automatic hash detection.
-    const webUrl = process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
+    const webUrl = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${webUrl}/auth/reset-password`,
     });

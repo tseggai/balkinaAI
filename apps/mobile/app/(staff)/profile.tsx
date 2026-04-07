@@ -19,7 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabase, getAuthenticatedRole } from '@/lib/supabase';
 import type { StaffInfo } from '@/lib/supabase';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://balkina-ai.vercel.app';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
 interface StaffProfileData {
   id: string;

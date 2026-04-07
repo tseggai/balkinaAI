@@ -532,13 +532,18 @@ async function handleFindBusinessesInner(
 
       // Fetch locations, services, and service_locations in parallel
       const bizIds = businesses.map((b) => b.id);
-      const [{ data: bizLocations }, { data: allBizServices }, { data: bizSvcLocs }] = bizIds.length > 0
+      const [{ data: bizLocations }, { data: allBizServices }] = bizIds.length > 0
         ? await Promise.all([
             supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', bizIds),
             supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility').in('tenant_id', bizIds).eq('visibility', 'public'),
-            supabase.from('service_locations').select('service_id, location_id'),
           ])
-        : [{ data: [] }, { data: [] }, { data: [] }];
+        : [{ data: [] }, { data: [] }];
+
+      // Fetch service_locations only for services we found (not the entire table)
+      const svcIds = (allBizServices ?? []).map((s: { id: string }) => s.id);
+      const { data: bizSvcLocs } = svcIds.length > 0
+        ? await supabase.from('service_locations').select('service_id, location_id').in('service_id', svcIds)
+        : { data: [] };
 
       console.log('[find_businesses] bizLocations count:', bizLocations?.length);
 
@@ -606,7 +611,7 @@ async function handleFindBusinessesInner(
       // Check availability
       const bizIdsForAvail = businesses.map((b) => b.id);
       const { data: staffForAvail } = bizIdsForAvail.length > 0
-        ? await supabase.from('staff').select('tenant_id, availability_schedule').in('tenant_id', bizIdsForAvail)
+        ? await supabase.from('staff').select('tenant_id, availability_schedule').in('tenant_id', bizIdsForAvail).not('availability_schedule', 'is', null)
         : { data: [] };
       const tenantsWithStaffSet = new Set<string>();
       for (const s of (staffForAvail ?? []) as { tenant_id: string; availability_schedule: Record<string, unknown> | null }[]) {
