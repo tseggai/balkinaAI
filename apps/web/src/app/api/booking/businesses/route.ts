@@ -110,16 +110,8 @@ export async function POST(request: Request) {
       }
 
       // Enrich businesses with services, distance, closest_location_id
-      type EnrichedBusiness = typeof businesses[number] & {
-        all_services?: typeof svcs;
-        closest_location_id?: string;
-        distance_km?: number;
-        distance_mi?: number;
-        estimated_drive_minutes?: number;
-        has_availability?: boolean;
-      };
-
-      let enriched: EnrichedBusiness[] = businesses.map((b) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let enriched: any[] = businesses.map((b) => {
         const closest = locMap.get(b.id);
         const distKm = closest && closest.dist < 9999 ? Math.round(closest.dist * 10) / 10 : undefined;
         return {
