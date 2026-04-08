@@ -108,6 +108,42 @@ export default function ProfileScreen() {
     }
   }, [getToken]);
 
+  const handleDeleteAccount = useCallback(() => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all your data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete My Account',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await getToken();
+              if (!token) {
+                Alert.alert('Error', 'Please sign in again to delete your account.');
+                return;
+              }
+              const res = await fetch(`${API_BASE}/api/customers/profile`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                Alert.alert('Error', (data as { error?: string }).error || 'Failed to delete account. Please try again.');
+                return;
+              }
+              await supabase.auth.signOut();
+              Alert.alert('Account Deleted', 'Your account and data have been permanently deleted.');
+            } catch {
+              Alert.alert('Error', 'Network error. Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  }, [getToken]);
+
   const handleSignOut = useCallback(() => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -198,8 +234,17 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Sign out */}
+        {/* Account actions */}
         <View style={[styles.card, { marginTop: 24 }]}>
+          <TouchableOpacity style={styles.cardRow} onPress={handleDeleteAccount} activeOpacity={0.6}>
+            <View style={styles.cardRowLeft}>
+              <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2' }]}>
+                <Ionicons name="trash-outline" size={18} color="#dc2626" />
+              </View>
+              <Text style={[styles.cardRowLabel, { color: '#dc2626' }]}>Delete Account</Text>
+            </View>
+          </TouchableOpacity>
+          <View style={styles.separator} />
           <TouchableOpacity style={styles.cardRow} onPress={handleSignOut} activeOpacity={0.6}>
             <View style={styles.cardRowLeft}>
               <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2' }]}>
