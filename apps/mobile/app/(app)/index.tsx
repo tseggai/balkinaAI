@@ -424,14 +424,14 @@ const StaffWithSlotsRow = React.memo(function StaffWithSlotsRow({ data, onTap }:
             onPress={() => setSelectedIdx(idx)}
             activeOpacity={0.7}
           >
-            <View style={[richCardStyles.staffAvatar, { backgroundColor: nameToColor(staff.name) }]}>
+            <View style={[richCardStyles.staffAvatar, { backgroundColor: nameToColor(staff.name ?? 'Staff') }]}>
               {staff.image_url ? (
                 <Image source={{ uri: staff.image_url }} style={richCardStyles.staffAvatarImg} />
               ) : (
-                <Text style={richCardStyles.staffInitials}>{getInitials(staff.name)}</Text>
+                <Text style={richCardStyles.staffInitials}>{getInitials(staff.name ?? 'S')}</Text>
               )}
             </View>
-            <Text style={richCardStyles.staffName} numberOfLines={1}>{staff.name}</Text>
+            <Text style={richCardStyles.staffName} numberOfLines={1}>{staff.name ?? 'Staff'}</Text>
             <Text style={richCardStyles.staffSlots}>{staffAvailCount} slots</Text>
           </TouchableOpacity>
           );

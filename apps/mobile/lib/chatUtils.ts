@@ -261,7 +261,8 @@ export function tryParseConfirmedText(text: string): ConfirmedCardData | null {
 
 export function parseCardBlocks(content: string): ParsedSegment[] {
   const segments: ParsedSegment[] = [];
-  const regex = /\[\[CARD:([\s\S]*?)\]\]/g;
+  // Match [[CARD:{...}]] — use } followed by ]] to avoid cutting at ]] inside JSON arrays
+  const regex = /\[\[CARD:(\{[\s\S]*?\})\]\]/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -332,6 +333,7 @@ export function parseMessageContent(content: string): { text: string; buttons: s
 const AVATAR_COLORS = ['#6B7FC4', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6'];
 
 export function nameToColor(name: string): string {
+  if (!name) return AVATAR_COLORS[0]!;
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
