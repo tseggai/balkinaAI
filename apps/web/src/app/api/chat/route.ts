@@ -841,8 +841,39 @@ export async function POST(request: Request) {
         behaviorContext,
       );
 
-  // 6. Stream response from OpenAI with tool loop
+  // 6. Pre-detect search intent and prefetch businesses in parallel with OpenAI
   const openai = new OpenAI({ apiKey });
+  const lastUserMsg = (messages[messages.length - 1]?.content as string) ?? '';
+
+  // Prefetch: if message looks like a business search, start the query NOW
+  // so it's ready by the time OpenAI asks for find_businesses
+  let prefetchedBusinesses: { success: boolean; data?: unknown; error?: string } | null = null;
+  const searchPatterns = /\b(find|show|list|best|top|nearest|near me|nearby|barber|salon|spa|yoga|dentist|trainer|clinic|studio|massage|groomer|tutor)\b/i;
+  if (!tenantId && searchPatterns.test(lastUserMsg)) {
+    const { executeTool: execTool } = await import('./tool-handlers');
+    const prefetchInput: Record<string, unknown> = { query: lastUserMsg };
+    if (userLatitude && userLongitude) {
+      prefetchInput.latitude = userLatitude;
+      prefetchInput.longitude = userLongitude;
+    }
+    // Run in background — don't await yet
+    const prefetchPromise = execTool(
+      'find_businesses',
+      prefetchInput,
+      supabase,
+      '',
+      { customerId: chatSession!.customer_id, customerName: null, customerPhone: null, customerEmail: null, chatSessionId: chatSession!.id, userId: userId ?? null },
+      userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
+    );
+    console.log('[chat] ⏱ Prefetch: started find_businesses in parallel with OpenAI');
+    // We'll use this later if OpenAI calls find_businesses
+    prefetchPromise.then((result) => {
+      prefetchedBusinesses = result;
+      console.log(`[chat] ⏱ Prefetch: find_businesses completed (success: ${result.success})`);
+    }).catch(() => { /* ignore prefetch errors */ });
+  }
+
+  // 7. Stream response from OpenAI with tool loop
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -947,7 +978,12 @@ export async function POST(request: Request) {
             let result: { success: boolean; data?: unknown; error?: string };
             const tTool = Date.now();
             try {
-              result = await executeTool(
+              // Use prefetched result if available for find_businesses
+              if (toolCall.name === 'find_businesses' && prefetchedBusinesses) {
+                result = prefetchedBusinesses;
+                console.log(`[chat] ⏱ Tool "find_businesses" used PREFETCHED result (saved ~1-2s)`);
+              } else {
+                result = await executeTool(
                 toolCall.name,
                 parsedInput,
                 supabase,
@@ -964,6 +1000,7 @@ export async function POST(request: Request) {
                 },
                 userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
               );
+              }
             } catch (toolErr) {
               console.error(`[chat] Tool "${toolCall.name}" execution failed:`, toolErr instanceof Error ? toolErr.stack : toolErr);
               result = { success: false, error: `Tool ${toolCall.name} failed: ${toolErr instanceof Error ? toolErr.message : 'Unknown error'}` };
