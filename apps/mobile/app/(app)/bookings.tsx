@@ -315,6 +315,8 @@ export default function BookingsScreen() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
+      console.warn('[bookings] No authenticated user — cannot fetch bookings');
+      setErrorMsg('Please sign in to view your bookings.');
       setLoading(false);
       setRefreshing(false);
       setErrorMsg('Please sign in to view your bookings.');
@@ -328,11 +330,15 @@ export default function BookingsScreen() {
       if (user.email) params.set('email', user.email);
       if (user.phone) params.set('phone', user.phone);
 
+      console.log('[bookings] fetching:', `${API_BASE}/api/customer/bookings?${params.toString()}`);
       const res = await fetch(
         `${API_BASE}/api/customer/bookings?${params.toString()}`,
       );
+      console.log('[bookings] response status:', res.status);
 
       if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        console.error('[bookings] error response:', errText);
         setErrorMsg('Failed to load bookings. Please try again.');
         setAppointments([]);
       } else {
@@ -347,7 +353,8 @@ export default function BookingsScreen() {
           setAppointments(result.data ?? []);
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('[bookings] fetch error:', err);
       setErrorMsg('Connection error. Please check your network.');
       setAppointments([]);
     }
