@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         return Response.json({ error: error.message }, { status: 500, headers: CORS_HEADERS });
       }
 
-      let businesses = (tenants ?? []).map((t: { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; categories: { name: string } | { name: string }[] | null }) => {
+      const businesses = (tenants ?? []).map((t: { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; categories: { name: string } | { name: string }[] | null }) => {
         const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
         return { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: cat, avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0 };
       });
