@@ -1084,9 +1084,9 @@ export async function handleGetServiceDetails(
   if (service) {
     const { data: serviceStaffData } = await supabase
       .from('service_staff')
-      .select('staff:staff_id(id, name, image_url)')
+      .select('staff:staff_id(id, name, image_url, avg_rating, review_count)')
       .eq('service_id', serviceId);
-    const assignedStaff = ((serviceStaffData ?? []) as unknown as { staff: { id: string; name: string; image_url: string | null } | null }[])
+    const assignedStaff = ((serviceStaffData ?? []) as unknown as { staff: { id: string; name: string; image_url: string | null; avg_rating: number | null; review_count: number | null } | null }[])
       .map((ss) => ss.staff)
       .filter(Boolean);
     return { success: true, data: { ...service, available_staff: assignedStaff } };
@@ -1118,14 +1118,14 @@ export async function handleGetStaff(
     // Return only staff assigned to this specific service
     const { data, error } = await supabase
       .from('service_staff')
-      .select('staff:staff_id(id, name, image_url, availability_schedule)')
+      .select('staff:staff_id(id, name, image_url, availability_schedule, avg_rating, review_count)')
       .eq('service_id', serviceId);
 
     if (error) return { success: false, error: error.message };
 
-    let staffList = ((data ?? []) as unknown as { staff: { id: string; name: string; image_url: string | null; availability_schedule: unknown } | null }[])
+    let staffList = ((data ?? []) as unknown as { staff: { id: string; name: string; image_url: string | null; availability_schedule: unknown; avg_rating: number | null; review_count: number | null } | null }[])
       .map((ss) => ss.staff)
-      .filter(Boolean) as { id: string; name: string; image_url: string | null; availability_schedule: unknown }[];
+      .filter(Boolean) as { id: string; name: string; image_url: string | null; availability_schedule: unknown; avg_rating: number | null; review_count: number | null }[];
 
     console.log('[get_staff] all staff for service:', staffList.map(s => s.name), 'locationId:', locationId);
 
@@ -1164,7 +1164,7 @@ export async function handleGetStaff(
   // Fallback: all active staff for tenant
   const { data, error } = await supabase
     .from('staff')
-    .select('id, name, image_url, availability_schedule')
+    .select('id, name, image_url, availability_schedule, avg_rating, review_count')
     .eq('tenant_id', tenantId)
     .order('name');
 
