@@ -443,7 +443,7 @@ CATEGORY BROWSING: When user message contains [category_id:UUID], extract the UU
 
 DIRECT BOOKING: When user says "Book [service] at [business name]" or "Book [service] with [staff] at [business]" — call find_businesses with query="[business name]" to find the exact tenant. Then skip showing business cards and go directly to date selection (step 2). The user already chose the business — don't re-present discovery.
 
-STAFF/EXPERT QUESTIONS: When user asks "Who's the best [profession]?", "Top rated [service] near me", "Best [role] in my area" — call find_businesses with service_type="[profession]". When presenting results, FOCUS ON RATINGS: mention avg_rating and review_count prominently. Sort by rating (highest first), not distance. Write a brief recommendation for the top result explaining WHY they're top-rated (rating, review count). Example: "The highest-rated personal trainer near you is Marcus at FitPro (★ 5.0, 32 reviews). They're 0.3 mi away."
+STAFF/EXPERT QUESTIONS: When user asks "Who's the best [profession]?", "Top rated [service] near me", "Best [role] in my area" — call find_businesses with service_type set to the SPECIFIC service keyword (e.g. service_type="barbershop" for barbers, service_type="personal training" for trainers). ONLY show businesses that have matching services in the results. When presenting, use ONLY real avg_rating and review_count from the data. If a business has no rating (null/0), say "No reviews yet" — NEVER invent ratings. Sort by rating (highest first), skip businesses with no rating unless no rated ones exist.
 
 1. Call find_businesses — it returns each business with an all_services array containing ALL their services (id, name, price, duration_minutes, deposit_enabled, deposit_amount), plus avg_rating and review_count. Do NOT call get_services separately. Render as ONE business_with_services card.
    CRITICAL field mapping from find_businesses result: id → id, name → name, image_url → image_url (use logo_url value), distance_mi → distance_mi, estimated_drive_minutes → drive_minutes, category → category, all_services → services, avg_rating → avg_rating, review_count → review_count.
@@ -468,7 +468,8 @@ STAFF/EXPERT QUESTIONS: When user asks "Who's the best [profession]?", "Top rate
 GATES: Steps 4 and 5 are mandatory checks — never skip. Always WAIT for user response at steps 4 and 5. Never call create_booking without showing summary_card and receiving explicit confirmation.
 
 ${behaviorContext}## Key Rules
-- Never invent data. Only present what tool calls return. Copy names, IDs, distances EXACTLY from results.
+- ACCURACY IS CRITICAL. Never invent data. Only present what tool calls return. Copy names, IDs, distances, ratings, review counts EXACTLY from results. If avg_rating is null or 0, do NOT mention a rating — say "No reviews yet" instead. Never fabricate star ratings or review counts.
+- SERVICE TYPE MATCHING: When user asks for a specific service (e.g. "barber", "haircut"), pass it as service_type to find_businesses. Only show businesses that ACTUALLY offer that service. If find_businesses returns businesses without matching services, tell the user honestly "I didn't find that specific service nearby" rather than showing unrelated businesses.
 - find_businesses: call fresh for each new booking intent or service type change. Empty query = all nearby businesses.
 - tenant_id from find_businesses must be passed in ALL subsequent tool calls. Never mix data between tenants. Never reuse tenantId from a previous booking.
 - Always pass serviceId AND location_id (closest_location_id from find_businesses) to get_staff and check_availability. This ensures only staff at the selected location appear and the correct timezone is used. Never show extras from a different service.
@@ -843,35 +844,6 @@ export async function POST(request: Request) {
 
   // 6. Pre-detect search intent and prefetch businesses in parallel with OpenAI
   const openai = new OpenAI({ apiKey });
-  const lastUserMsg = (messages[messages.length - 1]?.content as string) ?? '';
-
-  // Prefetch: if message looks like a business search, start the query NOW
-  // so it's ready by the time OpenAI asks for find_businesses
-  let prefetchedBusinesses: { success: boolean; data?: unknown; error?: string } | null = null;
-  const searchPatterns = /\b(find|show|list|best|top|nearest|near me|nearby|barber|salon|spa|yoga|dentist|trainer|clinic|studio|massage|groomer|tutor)\b/i;
-  if (!tenantId && searchPatterns.test(lastUserMsg)) {
-    const { executeTool: execTool } = await import('./tool-handlers');
-    const prefetchInput: Record<string, unknown> = { query: lastUserMsg };
-    if (userLatitude && userLongitude) {
-      prefetchInput.latitude = userLatitude;
-      prefetchInput.longitude = userLongitude;
-    }
-    // Run in background — don't await yet
-    const prefetchPromise = execTool(
-      'find_businesses',
-      prefetchInput,
-      supabase,
-      '',
-      { customerId: chatSession!.customer_id, customerName: null, customerPhone: null, customerEmail: null, chatSessionId: chatSession!.id, userId: userId ?? null },
-      userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
-    );
-    console.log('[chat] ⏱ Prefetch: started find_businesses in parallel with OpenAI');
-    // We'll use this later if OpenAI calls find_businesses
-    prefetchPromise.then((result) => {
-      prefetchedBusinesses = result;
-      console.log(`[chat] ⏱ Prefetch: find_businesses completed (success: ${result.success})`);
-    }).catch(() => { /* ignore prefetch errors */ });
-  }
 
   // 7. Stream response from OpenAI with tool loop
 
@@ -978,12 +950,7 @@ export async function POST(request: Request) {
             let result: { success: boolean; data?: unknown; error?: string };
             const tTool = Date.now();
             try {
-              // Use prefetched result if available for find_businesses
-              if (toolCall.name === 'find_businesses' && prefetchedBusinesses) {
-                result = prefetchedBusinesses;
-                console.log(`[chat] ⏱ Tool "find_businesses" used PREFETCHED result (saved ~1-2s)`);
-              } else {
-                result = await executeTool(
+              result = await executeTool(
                 toolCall.name,
                 parsedInput,
                 supabase,
@@ -1000,7 +967,6 @@ export async function POST(request: Request) {
                 },
                 userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
               );
-              }
             } catch (toolErr) {
               console.error(`[chat] Tool "${toolCall.name}" execution failed:`, toolErr instanceof Error ? toolErr.stack : toolErr);
               result = { success: false, error: `Tool ${toolCall.name} failed: ${toolErr instanceof Error ? toolErr.message : 'Unknown error'}` };
