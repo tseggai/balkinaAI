@@ -209,6 +209,7 @@ async function handleFindBusinessesInner(
   supabase: AdminClient,
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
+  const t0 = Date.now();
   const query = ((input.query as string) || '').trim();
   let userLat = input.latitude as number | undefined;
   let userLng = input.longitude as number | undefined;
@@ -240,6 +241,7 @@ async function handleFindBusinessesInner(
   }
 
   console.log('[find_businesses] START params:', JSON.stringify({ query, serviceType, categoryId, locationQuery, userLat, userLng, radiusKm, offset, limit }));
+  console.log(`[find_businesses] ⏱ init: ${Date.now() - t0}ms`);
 
   // ── Fast path: filter by category_id directly from DB ─────────────────────
   if (categoryId) {
@@ -257,8 +259,10 @@ async function handleFindBusinessesInner(
       return { id: row.id, name: row.name, image_url: row.logo_url ?? undefined, category: cat, business_category: cat, avg_rating: row.avg_rating ?? undefined, review_count: row.review_count ?? 0 };
     }) as { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[] }[];
 
+    console.log(`[find_businesses] ⏱ category tenant query: ${Date.now() - t0}ms (${businesses.length} tenants)`);
     // Fetch locations and services in parallel (both depend on catBizIds only)
     const catBizIds = businesses.map((b) => b.id);
+    const tCatParallel = Date.now();
     const [{ data: catLocs }, { data: catSvcs }, { data: catSvcLocs }] = catBizIds.length > 0
       ? await Promise.all([
           supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', catBizIds),
@@ -283,6 +287,7 @@ async function handleFindBusinessesInner(
       existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url });
       catSvcMap.set(svc.tenant_id, existing);
     }
+    console.log(`[find_businesses] ⏱ category parallel queries: ${Date.now() - tCatParallel}ms (locs:${catLocs?.length ?? 0}, svcs:${catSvcs?.length ?? 0}, svcLocs:${catSvcLocs?.length ?? 0})`);
     businesses = businesses.map((b) => ({ ...b, all_services: catSvcMap.get(b.id) ?? [], locations: catLocMap.get(b.id) ?? [] }));
 
     // Always set closest_location_id — use proximity when location available, first location as fallback
@@ -330,7 +335,7 @@ async function handleFindBusinessesInner(
     const paged = businesses.slice(offset, offset + limit);
     const hasMore = offset + limit < totalCount;
 
-    console.log('[find_businesses] category_id path returning:', paged.length, 'businesses (total:', totalCount, ')');
+    console.log(`[find_businesses] ⏱ category_id TOTAL: ${Date.now() - t0}ms — returning ${paged.length} businesses (total: ${totalCount})`);
     return { success: true, data: { businesses: paged, total_count: totalCount, offset, limit, has_more: hasMore, matching_services: [], location_note: userLat && userLng ? undefined : 'Showing all locations — enable location access for nearby results' } };
   }
 
@@ -381,13 +386,14 @@ async function handleFindBusinessesInner(
     const uniqueSvcPatterns = [...new Set(svcPatterns)];
     console.log('[find_businesses] service_type patterns:', uniqueSvcPatterns.length);
 
+    const tSvcQuery = Date.now();
     const { data: matchingServices, error: svcError } = await supabase
       .from('services')
       .select('tenant_id, name, price, duration_minutes')
       .or(uniqueSvcPatterns.join(','))
       .limit(200);
 
-    console.log('[find_businesses] matching services for type:', serviceType, 'count:', matchingServices?.length, 'error:', svcError?.message);
+    console.log(`[find_businesses] ⏱ service query: ${Date.now() - tSvcQuery}ms — matching services for type: ${serviceType}, count: ${matchingServices?.length}, error: ${svcError?.message}`);
 
     // Also find tenants whose assigned category matches the search term
     // This catches businesses like "Dan the Barber" in "Beauty & Personal Care"
@@ -532,18 +538,22 @@ async function handleFindBusinessesInner(
 
       // Fetch locations, services, and service_locations in parallel
       const bizIds = businesses.map((b) => b.id);
+      const tBizParallel = Date.now();
       const [{ data: bizLocations }, { data: allBizServices }] = bizIds.length > 0
         ? await Promise.all([
             supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', bizIds),
             supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility').in('tenant_id', bizIds).eq('visibility', 'public'),
           ])
         : [{ data: [] }, { data: [] }];
+      console.log(`[find_businesses] ⏱ biz locs+svcs parallel: ${Date.now() - tBizParallel}ms (locs:${bizLocations?.length ?? 0}, svcs:${allBizServices?.length ?? 0})`);
 
       // Fetch service_locations only for services we found (not the entire table)
+      const tSvcLocs = Date.now();
       const svcIds = (allBizServices ?? []).map((s: { id: string }) => s.id);
       const { data: bizSvcLocs } = svcIds.length > 0
         ? await supabase.from('service_locations').select('service_id, location_id').in('service_id', svcIds)
         : { data: [] };
+      console.log(`[find_businesses] ⏱ svc_locations: ${Date.now() - tSvcLocs}ms (${bizSvcLocs?.length ?? 0} rows)`);
 
       console.log('[find_businesses] bizLocations count:', bizLocations?.length);
 
@@ -609,10 +619,12 @@ async function handleFindBusinessesInner(
       }
 
       // Check availability
+      const tStaff = Date.now();
       const bizIdsForAvail = businesses.map((b) => b.id);
       const { data: staffForAvail } = bizIdsForAvail.length > 0
         ? await supabase.from('staff').select('tenant_id, availability_schedule').in('tenant_id', bizIdsForAvail).not('availability_schedule', 'is', null)
         : { data: [] };
+      console.log(`[find_businesses] ⏱ staff availability: ${Date.now() - tStaff}ms (${staffForAvail?.length ?? 0} staff with schedules)`);
       const tenantsWithStaffSet = new Set<string>();
       for (const s of (staffForAvail ?? []) as { tenant_id: string; availability_schedule: Record<string, unknown> | null }[]) {
         if (s.availability_schedule && Object.keys(s.availability_schedule).length > 0) {
@@ -625,7 +637,7 @@ async function handleFindBusinessesInner(
       const paged = businesses.slice(offset, offset + limit);
       const hasMore = offset + limit < totalCount;
 
-      console.log('[find_businesses] returning:', paged.length, 'businesses (total:', totalCount, ')');
+      console.log(`[find_businesses] ⏱ TOTAL: ${Date.now() - t0}ms — returning ${paged.length} businesses (total: ${totalCount})`);
 
       return {
         success: true,

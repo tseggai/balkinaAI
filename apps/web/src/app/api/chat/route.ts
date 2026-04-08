@@ -853,8 +853,11 @@ export async function POST(request: Request) {
       ];
       let toolRound = 0;
 
+      const chatStartTime = Date.now();
       try {
         while (toolRound < MAX_TOOL_ROUNDS) {
+          const tRound = Date.now();
+          console.log(`[chat] ⏱ Starting OpenAI round ${toolRound + 1}`);
           const streamResponse = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             max_tokens: 4096,
@@ -942,6 +945,7 @@ export async function POST(request: Request) {
             const effectiveTenantId = (parsedInput.tenant_id as string) || resolvedTenantId;
 
             let result: { success: boolean; data?: unknown; error?: string };
+            const tTool = Date.now();
             try {
               result = await executeTool(
                 toolCall.name,
@@ -964,6 +968,8 @@ export async function POST(request: Request) {
               console.error(`[chat] Tool "${toolCall.name}" execution failed:`, toolErr instanceof Error ? toolErr.stack : toolErr);
               result = { success: false, error: `Tool ${toolCall.name} failed: ${toolErr instanceof Error ? toolErr.message : 'Unknown error'}` };
             }
+
+            console.log(`[chat] ⏱ Tool "${toolCall.name}" executed in ${Date.now() - tTool}ms (success: ${result.success})`);
 
             toolResults.push({
               tool_use_id: toolCall.id,
@@ -1040,9 +1046,11 @@ export async function POST(request: Request) {
             ...toolResultMessages,
           ];
 
+          console.log(`[chat] ⏱ Round ${toolRound + 1} complete: ${Date.now() - tRound}ms`);
           toolRound++;
         }
 
+        console.log(`[chat] ⏱ TOTAL chat processing: ${Date.now() - chatStartTime}ms (${toolRound} rounds)`);
         // Max tool rounds reached
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`),
