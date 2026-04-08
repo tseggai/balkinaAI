@@ -1589,6 +1589,77 @@ export default function ChatScreen() {
     async (userText: string): Promise<boolean> => {
       // Phase 2: intercept deterministic steps and handle locally
 
+      // ── REST-based category browsing (bypasses OpenAI) ──────────────
+      const categoryMatch = userText.match(/\[category_id:([^\]]+)\]/);
+      if (categoryMatch) {
+        const catId = categoryMatch[1];
+        const displayText = userText.replace(/\s*\[category_id:[^\]]*\]/g, '').trim();
+        addUserMessage(displayText);
+        setIsLoading(true);
+        try {
+          const res = await fetch(`${API_BASE}/api/booking/businesses`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              categoryId: catId,
+              latitude: userCoords?.latitude,
+              longitude: userCoords?.longitude,
+            }),
+          });
+          if (!res.ok) {
+            addAssistantMessage('Sorry, I could not find businesses in this category. Please try again.');
+            setIsLoading(false);
+            return true;
+          }
+          const data = (await res.json()) as {
+            businesses: { id: string; name: string; image_url?: string; category?: string; avg_rating?: number; review_count?: number; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; deposit_type?: string | null; image_url?: string | null }[]; closest_location_id?: string; distance_mi?: number; estimated_drive_minutes?: number }[];
+            total_count: number;
+            has_more: boolean;
+          };
+          if (!data.businesses || data.businesses.length === 0) {
+            addAssistantMessage('I didn\'t find any businesses in this category near you. Try a different category or search by city.');
+            setIsLoading(false);
+            return true;
+          }
+          // Store services for client-side matching
+          const allSvcs: typeof lastDisplayedServices.current = [];
+          for (const biz of data.businesses) {
+            for (const svc of biz.all_services ?? []) {
+              allSvcs.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled ?? false, deposit_amount: svc.deposit_amount ?? null, tenantId: biz.id, tenantName: biz.name });
+            }
+          }
+          lastDisplayedServices.current = allSvcs;
+
+          // Build business_with_services card
+          const card = {
+            type: 'business_with_services',
+            items: data.businesses.map((b) => ({
+              id: b.id,
+              name: b.name,
+              image_url: b.image_url,
+              distance_mi: b.distance_mi,
+              drive_minutes: b.estimated_drive_minutes,
+              category: b.category,
+              avg_rating: b.avg_rating,
+              review_count: b.review_count,
+              closest_location_id: b.closest_location_id,
+              services: (b.all_services ?? []).map((s) => ({
+                id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
+                deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount,
+              })),
+            })),
+          };
+          const intro = data.total_count > data.businesses.length
+            ? `Here are ${data.businesses.length} of ${data.total_count} businesses near you:`
+            : `Here are ${data.businesses.length} businesses near you:`;
+          addAssistantMessage(`${intro}\n\n[[CARD:${JSON.stringify(card)}]]${data.has_more ? '\n\n[[button:Show more businesses]]' : ''}`);
+        } catch {
+          addAssistantMessage('Connection error while finding businesses. Please try again.');
+        }
+        setIsLoading(false);
+        return true;
+      }
+
       // Check if user selected a service (match against recently displayed cards)
       const serviceAtBusinessMatch = userText.match(/^(.+) at (.+)$/);
 
