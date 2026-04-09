@@ -308,42 +308,6 @@ export default function BookingsScreen() {
     }
   }, [params.action, params.appointmentId, params.suggestedTime, params.suggestedDate, params.suggestedTimeIso]);
 
-  const fetchViaSupabase = useCallback(async (currentTab: Tab = 'upcoming'): Promise<Appointment[]> => {
-    // Query appointments directly — RLS policy handles filtering:
-    // "customer_id = auth.uid() OR customer_id IN (SELECT id FROM customers WHERE user_id = auth.uid())"
-    // This works regardless of whether customer.id = auth.uid() or customer.user_id = auth.uid()
-    const now = new Date().toISOString();
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayISO = todayStart.toISOString();
-    const isUpcoming = currentTab === 'upcoming';
-
-    let query = supabase
-      .from('appointments')
-      .select(
-        'id, start_time, end_time, status, total_price, notes, deposit_paid, deposit_amount_paid, stripe_payment_intent_id, services(name), staff(name), tenant_locations(name, address, latitude, longitude), tenants(name)',
-      )
-      .order('start_time', { ascending: isUpcoming });
-
-    if (isUpcoming) {
-      query = query
-        .gte('start_time', todayISO)
-        .in('status', ['pending', 'approved', 'confirmed']);
-    } else {
-      query = query.or(
-        `start_time.lt.${now},status.eq.completed,status.eq.cancelled`,
-      );
-    }
-
-    const { data, error } = await query.limit(50);
-    if (error) {
-      console.error('[bookings] supabase query error:', error.message);
-      throw new Error(error.message);
-    }
-    console.log('[bookings] supabase fallback returned', data?.length ?? 0, 'appointments');
-    return (data ?? []) as unknown as Appointment[];
-  }, []);
-
   const fetchAppointments = useCallback(async () => {
     setErrorMsg(null);
 
@@ -359,19 +323,6 @@ export default function BookingsScreen() {
     }
     setUserId(user.id);
 
-    // Helper: fetch directly from Supabase as fallback
-    const fallbackToSupabase = async () => {
-      console.log('[bookings] falling back to direct Supabase query');
-      try {
-        const data = await fetchViaSupabase(tab);
-        setAppointments(data);
-      } catch (sbErr) {
-        console.error('[bookings] supabase fallback error:', sbErr);
-        setErrorMsg('Failed to load bookings. Please try again.');
-        setAppointments([]);
-      }
-    };
-
     try {
       const params = new URLSearchParams({ tab });
       if (user.id) params.set('userId', user.id);
@@ -386,8 +337,9 @@ export default function BookingsScreen() {
 
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
-        console.error('[bookings] API error, trying Supabase fallback:', errText);
-        await fallbackToSupabase();
+        console.error('[bookings] error response:', errText);
+        setErrorMsg('Failed to load bookings. Please try again.');
+        setAppointments([]);
       } else {
         const result = (await res.json()) as {
           data: Appointment[];
@@ -401,13 +353,14 @@ export default function BookingsScreen() {
         }
       }
     } catch (err) {
-      console.error('[bookings] fetch error, trying Supabase fallback:', err);
-      await fallbackToSupabase();
+      console.error('[bookings] fetch error:', err);
+      setErrorMsg('Connection error. Please check your network.');
+      setAppointments([]);
     }
 
     setLoading(false);
     setRefreshing(false);
-  }, [tab, fetchViaSupabase]);
+  }, [tab]);
 
   useEffect(() => {
     setLoading(true);

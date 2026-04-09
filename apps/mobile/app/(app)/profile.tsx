@@ -56,66 +56,36 @@ export default function ProfileScreen() {
     return session?.access_token ?? null;
   }, []);
 
-  const fetchProfileFromSupabase = useCallback(async (): Promise<CustomerProfile | null> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-
-    // RLS: "id = auth.uid() OR user_id = auth.uid()"
-    const { data } = await supabase
-      .from('customers')
-      .select('id, display_name, first_name, last_name, phone, email, date_of_birth, gender, profile_image_url, notify_sms, notify_push, notify_email')
-      .or(`id.eq.${user.id},user_id.eq.${user.id}`)
-      .limit(1)
-      .maybeSingle();
-
-    if (data) return data as unknown as CustomerProfile;
-
-    // Last resort: auth metadata only
-    const meta = user.user_metadata as { display_name?: string } | undefined;
-    return {
-      id: user.id,
-      display_name: meta?.display_name ?? null,
-      first_name: null, last_name: null,
-      phone: user.phone ?? null,
-      email: user.email ?? null,
-      date_of_birth: null, gender: null, profile_image_url: null,
-    };
-  }, []);
-
   const fetchProfile = useCallback(async () => {
     const token = await getToken();
     if (!token) { setLoading(false); return; }
 
-    let loaded = false;
     try {
       const res = await fetch(`${API_BASE}/api/customers/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data) {
-          setProfile(json.data);
-          setNotifySms(json.data.notify_sms ?? true);
-          setNotifyPush(json.data.notify_push ?? true);
-          loaded = true;
-        }
+      const json = await res.json();
+      if (json.data) {
+        setProfile(json.data);
+        setNotifySms(json.data.notify_sms ?? true);
+        setNotifyPush(json.data.notify_push ?? true);
       }
     } catch {
-      // Network error — will fall through to Supabase fallback
-    }
-
-    if (!loaded) {
-      console.log('[profile] API unavailable, falling back to Supabase');
-      const profileData = await fetchProfileFromSupabase();
-      if (profileData) {
-        setProfile(profileData);
-        const p = profileData as unknown as { notify_sms?: boolean; notify_push?: boolean };
-        setNotifySms(p.notify_sms ?? true);
-        setNotifyPush(p.notify_push ?? true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const meta = user.user_metadata as { display_name?: string } | undefined;
+        setProfile({
+          id: user.id,
+          display_name: meta?.display_name ?? null,
+          first_name: null, last_name: null,
+          phone: user.phone ?? null,
+          email: user.email ?? null,
+          date_of_birth: null, gender: null, profile_image_url: null,
+        });
       }
     }
     setLoading(false);
-  }, [getToken, fetchProfileFromSupabase]);
+  }, [getToken]);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
 
