@@ -87,6 +87,7 @@ export default function EmailLoginScreen() {
       const cur = existing as { phone: string | null; email: string | null } | null;
       await supabase.from('customers').upsert({
         id: data.user.id,
+        user_id: data.user.id,
         display_name: name.trim(),
         email: email.trim() || cur?.email || null,
         phone: phone.trim() || cur?.phone || null,
