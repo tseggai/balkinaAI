@@ -364,7 +364,7 @@ export async function POST(request: Request) {
         paymentClientSecret = paymentIntent.client_secret;
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}`
-          : 'https://balkina-ai.vercel.app');
+          : 'https://app.balkina.ai');
         paymentUrl = `${baseUrl}/pay/${apptId}`;
         console.log('[booking/create] PaymentIntent created:', paymentIntent.id, requiresApproval ? '(manual capture)' : '(auto capture)');
       } catch (stripeErr) {

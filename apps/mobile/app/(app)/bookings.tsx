@@ -308,6 +308,79 @@ export default function BookingsScreen() {
     }
   }, [params.action, params.appointmentId, params.suggestedTime, params.suggestedDate, params.suggestedTimeIso]);
 
+  const fetchViaSupabase = useCallback(async (uid: string, email?: string, phone?: string, currentTab: Tab = 'upcoming'): Promise<Appointment[]> => {
+    // Find customer record by user_id, id, email, or phone
+    let customerId: string | null = null;
+
+    const { data: byUserId } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('user_id', uid)
+      .limit(1)
+      .maybeSingle();
+    if (byUserId) customerId = (byUserId as { id: string }).id;
+
+    if (!customerId) {
+      const { data: byId } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('id', uid)
+        .limit(1)
+        .maybeSingle();
+      if (byId) customerId = (byId as { id: string }).id;
+    }
+
+    if (!customerId && email) {
+      const { data: byEmail } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('email', email)
+        .limit(1)
+        .maybeSingle();
+      if (byEmail) customerId = (byEmail as { id: string }).id;
+    }
+
+    if (!customerId && phone) {
+      const { data: byPhone } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('phone', phone)
+        .limit(1)
+        .maybeSingle();
+      if (byPhone) customerId = (byPhone as { id: string }).id;
+    }
+
+    if (!customerId) return [];
+
+    const now = new Date().toISOString();
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayISO = todayStart.toISOString();
+    const isUpcoming = currentTab === 'upcoming';
+
+    let query = supabase
+      .from('appointments')
+      .select(
+        'id, start_time, end_time, status, total_price, notes, deposit_paid, deposit_amount_paid, stripe_payment_intent_id, services(name), staff(name), tenant_locations(name, address, latitude, longitude), tenants(name)',
+      )
+      .eq('customer_id', customerId)
+      .order('start_time', { ascending: isUpcoming });
+
+    if (isUpcoming) {
+      query = query
+        .gte('start_time', todayISO)
+        .in('status', ['pending', 'approved', 'confirmed']);
+    } else {
+      query = query.or(
+        `start_time.lt.${now},status.eq.completed,status.eq.cancelled`,
+      );
+    }
+
+    const { data, error } = await query.limit(50);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as unknown as Appointment[];
+  }, []);
+
   const fetchAppointments = useCallback(async () => {
     setErrorMsg(null);
 
@@ -316,13 +389,25 @@ export default function BookingsScreen() {
     } = await supabase.auth.getUser();
     if (!user) {
       console.warn('[bookings] No authenticated user — cannot fetch bookings');
-      setErrorMsg('Please sign in to view your bookings.');
       setLoading(false);
       setRefreshing(false);
       setErrorMsg('Please sign in to view your bookings.');
       return;
     }
     setUserId(user.id);
+
+    // Helper: fetch directly from Supabase as fallback
+    const fallbackToSupabase = async () => {
+      console.log('[bookings] falling back to direct Supabase query');
+      try {
+        const data = await fetchViaSupabase(user.id, user.email ?? undefined, user.phone ?? undefined, tab);
+        setAppointments(data);
+      } catch (sbErr) {
+        console.error('[bookings] supabase fallback error:', sbErr);
+        setErrorMsg('Failed to load bookings. Please try again.');
+        setAppointments([]);
+      }
+    };
 
     try {
       const params = new URLSearchParams({ tab });
@@ -338,9 +423,8 @@ export default function BookingsScreen() {
 
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
-        console.error('[bookings] error response:', errText);
-        setErrorMsg('Failed to load bookings. Please try again.');
-        setAppointments([]);
+        console.error('[bookings] API error, trying Supabase fallback:', errText);
+        await fallbackToSupabase();
       } else {
         const result = (await res.json()) as {
           data: Appointment[];
@@ -354,14 +438,13 @@ export default function BookingsScreen() {
         }
       }
     } catch (err) {
-      console.error('[bookings] fetch error:', err);
-      setErrorMsg('Connection error. Please check your network.');
-      setAppointments([]);
+      console.error('[bookings] fetch error, trying Supabase fallback:', err);
+      await fallbackToSupabase();
     }
 
     setLoading(false);
     setRefreshing(false);
-  }, [tab]);
+  }, [tab, fetchViaSupabase]);
 
   useEffect(() => {
     setLoading(true);
