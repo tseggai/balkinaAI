@@ -1694,9 +1694,9 @@ export async function handleBookAppointment(
         .eq('id', appointmentId);
 
       paymentClientSecret = paymentIntent.client_secret;
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
-        : 'https://balkina-ai.vercel.app';
+        : 'https://app.balkina.ai');
       paymentUrl = `${baseUrl}/pay/${appointmentId}`;
       console.log('[chat/book] PaymentIntent created:', paymentIntent.id, 'for deposit:', depositAmount, requiresApproval ? '(manual capture)' : '(auto capture)');
     } catch (stripeErr) {
