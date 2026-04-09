@@ -239,14 +239,11 @@ CREATE POLICY "Customers can update their own profile"
   );
 
 -- Tenant users need to read customer data for their appointments
+-- Uses SECURITY DEFINER function to avoid infinite recursion with appointments RLS
 CREATE POLICY "Tenant users can read customers they have appointments with"
   ON customers FOR SELECT
   USING (
-    EXISTS (
-      SELECT 1 FROM appointments a
-      WHERE a.customer_id = customers.id
-        AND a.tenant_id = get_my_tenant_id()
-    )
+    customer_has_appointment_with_tenant(id, get_my_tenant_id())
   );
 
 
