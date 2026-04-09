@@ -123,18 +123,13 @@ export default function ProfileSetupScreen() {
       display_name: displayName.trim(),
       email: (existing as { email: string | null } | null)?.email ?? user.email ?? null,
       phone: (existing as { phone: string | null } | null)?.phone ?? user.phone ?? null,
+      ...(avatarUrl ? { profile_image_url: avatarUrl } : {}),
     });
 
     if (error) {
       Alert.alert('Error', error.message);
       setLoading(false);
       return;
-    }
-
-    // Update avatar URL if uploaded (separate field isn't in schema,
-    // but display_name is stored above which is the key field)
-    if (avatarUrl) {
-      // Avatar stored in Supabase Storage, URL can be derived from user ID
     }
 
     // Register push token
