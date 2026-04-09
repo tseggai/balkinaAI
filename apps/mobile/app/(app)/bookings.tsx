@@ -308,50 +308,10 @@ export default function BookingsScreen() {
     }
   }, [params.action, params.appointmentId, params.suggestedTime, params.suggestedDate, params.suggestedTimeIso]);
 
-  const fetchViaSupabase = useCallback(async (uid: string, email?: string, phone?: string, currentTab: Tab = 'upcoming'): Promise<Appointment[]> => {
-    // Find customer record by user_id, id, email, or phone
-    let customerId: string | null = null;
-
-    const { data: byUserId } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('user_id', uid)
-      .limit(1)
-      .maybeSingle();
-    if (byUserId) customerId = (byUserId as { id: string }).id;
-
-    if (!customerId) {
-      const { data: byId } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('id', uid)
-        .limit(1)
-        .maybeSingle();
-      if (byId) customerId = (byId as { id: string }).id;
-    }
-
-    if (!customerId && email) {
-      const { data: byEmail } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('email', email)
-        .limit(1)
-        .maybeSingle();
-      if (byEmail) customerId = (byEmail as { id: string }).id;
-    }
-
-    if (!customerId && phone) {
-      const { data: byPhone } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('phone', phone)
-        .limit(1)
-        .maybeSingle();
-      if (byPhone) customerId = (byPhone as { id: string }).id;
-    }
-
-    if (!customerId) return [];
-
+  const fetchViaSupabase = useCallback(async (currentTab: Tab = 'upcoming'): Promise<Appointment[]> => {
+    // Query appointments directly — RLS policy handles filtering:
+    // "customer_id = auth.uid() OR customer_id IN (SELECT id FROM customers WHERE user_id = auth.uid())"
+    // This works regardless of whether customer.id = auth.uid() or customer.user_id = auth.uid()
     const now = new Date().toISOString();
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -363,7 +323,6 @@ export default function BookingsScreen() {
       .select(
         'id, start_time, end_time, status, total_price, notes, deposit_paid, deposit_amount_paid, stripe_payment_intent_id, services(name), staff(name), tenant_locations(name, address, latitude, longitude), tenants(name)',
       )
-      .eq('customer_id', customerId)
       .order('start_time', { ascending: isUpcoming });
 
     if (isUpcoming) {
@@ -377,7 +336,11 @@ export default function BookingsScreen() {
     }
 
     const { data, error } = await query.limit(50);
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error('[bookings] supabase query error:', error.message);
+      throw new Error(error.message);
+    }
+    console.log('[bookings] supabase fallback returned', data?.length ?? 0, 'appointments');
     return (data ?? []) as unknown as Appointment[];
   }, []);
 
@@ -400,7 +363,7 @@ export default function BookingsScreen() {
     const fallbackToSupabase = async () => {
       console.log('[bookings] falling back to direct Supabase query');
       try {
-        const data = await fetchViaSupabase(user.id, user.email ?? undefined, user.phone ?? undefined, tab);
+        const data = await fetchViaSupabase(tab);
         setAppointments(data);
       } catch (sbErr) {
         console.error('[bookings] supabase fallback error:', sbErr);
