@@ -85,13 +85,16 @@ export default function EmailLoginScreen() {
         .eq('id', data.user.id)
         .single();
       const cur = existing as { phone: string | null; email: string | null } | null;
-      await supabase.from('customers').upsert({
+      const { error: upsertErr } = await supabase.from('customers').upsert({
         id: data.user.id,
         user_id: data.user.id,
         display_name: name.trim(),
         email: email.trim() || cur?.email || null,
         phone: phone.trim() || cur?.phone || null,
       });
+      if (upsertErr) {
+        console.warn('[email-login] customer upsert failed (will auto-create on profile load):', upsertErr.message);
+      }
     }
 
     setLoading(false);

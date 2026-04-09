@@ -20,14 +20,33 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: customer, error } = await admin
+  const { data: existing } = await admin
     .from('customers')
     .select('id, user_id, display_name, first_name, last_name, phone, email, date_of_birth, gender, profile_image_url, notify_sms, notify_push, notify_email')
     .or(`id.eq.${user.id},user_id.eq.${user.id}`)
     .single();
 
-  if (error || !customer) {
-    return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+  let customer = existing;
+
+  // Auto-create customer record if it doesn't exist (handles failed signup upserts)
+  if (!customer) {
+    const meta = user.user_metadata as { display_name?: string } | undefined;
+    const { data: created, error: createErr } = await admin
+      .from('customers')
+      .upsert({
+        id: user.id,
+        user_id: user.id,
+        display_name: meta?.display_name ?? null,
+        email: user.email ?? null,
+        phone: user.phone ?? null,
+      })
+      .select('id, user_id, display_name, first_name, last_name, phone, email, date_of_birth, gender, profile_image_url, notify_sms, notify_push, notify_email')
+      .single();
+
+    if (createErr || !created) {
+      return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+    }
+    customer = created;
   }
 
   return NextResponse.json({ data: customer });
@@ -130,48 +149,43 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
   }
 
-  // Find customer record
+  // Find customer record (check both user_id and id)
   const { data: customer } = await admin
     .from('customers')
     .select('id')
-    .eq('user_id', user.id)
+    .or(`id.eq.${user.id},user_id.eq.${user.id}`)
     .single();
 
-  if (!customer) {
-    return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+  if (customer) {
+    const custId = (customer as { id: string }).id;
+
+    // Delete related data in order (respecting foreign keys)
+    await admin.from('reviews').delete().eq('customer_id', custId);
+    await admin.from('appointments').delete().eq('customer_id', custId);
+
+    const { data: sessions } = await admin
+      .from('chat_sessions')
+      .select('id')
+      .eq('customer_id', custId);
+    if (sessions && sessions.length > 0) {
+      const sessionIds = sessions.map((s: { id: string }) => s.id);
+      await admin.from('chat_messages').delete().in('session_id', sessionIds);
+      await admin.from('chat_sessions').delete().eq('customer_id', custId);
+    }
+
+    await admin.from('customer_behavior_profiles').delete().eq('customer_id', custId);
+    await admin.from('customers').delete().eq('id', custId);
+
+    console.log(`[delete-account] Deleted customer record ${custId}`);
   }
 
-  // Delete related data in order (respecting foreign keys)
-  // 1. Reviews
-  await admin.from('reviews').delete().eq('customer_id', customer.id);
-
-  // 2. Appointments
-  await admin.from('appointments').delete().eq('customer_id', customer.id);
-
-  // 3. Chat messages and sessions
-  const { data: sessions } = await admin
-    .from('chat_sessions')
-    .select('id')
-    .eq('customer_id', customer.id);
-  if (sessions && sessions.length > 0) {
-    const sessionIds = sessions.map((s: { id: string }) => s.id);
-    await admin.from('chat_messages').delete().in('session_id', sessionIds);
-    await admin.from('chat_sessions').delete().eq('customer_id', customer.id);
-  }
-
-  // 4. Behavior profiles
-  await admin.from('customer_behavior_profiles').delete().eq('customer_id', customer.id);
-
-  // 5. Customer record
-  await admin.from('customers').delete().eq('id', customer.id);
-
-  // 6. Delete auth user (this is permanent)
+  // Delete auth user (this is permanent) — works even if no customer record existed
   const { error: deleteErr } = await admin.auth.admin.deleteUser(user.id);
   if (deleteErr) {
     console.error('[delete-account] Failed to delete auth user:', deleteErr.message);
     return NextResponse.json({ error: 'Account data deleted but auth removal failed. Contact support.' }, { status: 500 });
   }
 
-  console.log(`[delete-account] Permanently deleted customer ${customer.id} and auth user ${user.id}`);
+  console.log(`[delete-account] Permanently deleted auth user ${user.id}`);
   return NextResponse.json({ success: true });
 }
