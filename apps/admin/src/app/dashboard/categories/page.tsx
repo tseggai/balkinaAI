@@ -21,9 +21,9 @@ export default function CategoriesPage() {
   const [formSlug, setFormSlug] = useState('');
   const [formParentId, setFormParentId] = useState('');
   const [formIconUrl, setFormIconUrl] = useState('');
-  const [formOrder, setFormOrder] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   const fetchCategories = useCallback(async () => {
     setLoading(true);
@@ -42,7 +42,6 @@ export default function CategoriesPage() {
     setFormSlug('');
     setFormParentId('');
     setFormIconUrl('');
-    setFormOrder(0);
     setEditingId(null);
     setShowForm(false);
     setError('');
@@ -54,7 +53,6 @@ export default function CategoriesPage() {
     setFormSlug(cat.slug);
     setFormParentId(cat.parent_id ?? '');
     setFormIconUrl(cat.icon_url ?? '');
-    setFormOrder(cat.display_order);
     setShowForm(true);
   }
 
@@ -69,13 +67,20 @@ export default function CategoriesPage() {
     setSaving(true);
     setError('');
 
+    // For new categories, set display_order to end of list
+    const maxOrder = categories.length > 0
+      ? Math.max(...categories.filter(c => !c.parent_id).map(c => c.display_order))
+      : -1;
+
     const payload = {
       ...(editingId ? { id: editingId } : {}),
       name: formName.trim(),
       slug,
       parent_id: formParentId || null,
       icon_url: formIconUrl || null,
-      display_order: formOrder,
+      display_order: editingId
+        ? categories.find(c => c.id === editingId)?.display_order ?? 0
+        : maxOrder + 1,
     };
 
     const res = await fetch('/api/admin/categories', {
@@ -98,8 +103,43 @@ export default function CategoriesPage() {
     fetchCategories();
   }
 
+  // Save reordered display_order values to the API
+  async function saveOrder(reordered: Category[]) {
+    const topLevelOrdered = reordered.filter(c => !c.parent_id);
+    await Promise.all(
+      topLevelOrdered.map((cat, idx) =>
+        fetch('/api/admin/categories', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: cat.id, display_order: idx }),
+        })
+      )
+    );
+  }
+
+  function handleDragStart(idx: number) {
+    setDragIdx(idx);
+  }
+
+  async function handleDrop(targetIdx: number) {
+    if (dragIdx === null || dragIdx === targetIdx) { setDragIdx(null); return; }
+    const topLevel = categories.filter(c => !c.parent_id);
+    const reordered = [...topLevel];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(targetIdx, 0, moved!);
+    const updated = reordered.map((c, i) => ({ ...c, display_order: i }));
+
+    // Update local state immediately (optimistic)
+    const children = categories.filter(c => c.parent_id);
+    setCategories([...updated, ...children]);
+    setDragIdx(null);
+
+    // Persist to backend
+    await saveOrder(updated);
+  }
+
   // Build tree structure for display
-  const topLevel = categories.filter((c) => !c.parent_id);
+  const topLevel = categories.filter((c) => !c.parent_id).sort((a, b) => a.display_order - b.display_order);
   const childMap = new Map<string, Category[]>();
   for (const c of categories) {
     if (c.parent_id) {
@@ -114,7 +154,7 @@ export default function CategoriesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Categories</h1>
-          <p className="mt-1 text-sm text-gray-500">Global service taxonomy. Tenants assign their services to these categories.</p>
+          <p className="mt-1 text-sm text-gray-500">Global service taxonomy. Drag to reorder. Tenants assign their services to these categories.</p>
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
@@ -161,15 +201,6 @@ export default function CategoriesPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Display Order</label>
-              <input
-                type="number"
-                value={formOrder}
-                onChange={(e) => setFormOrder(parseInt(e.target.value, 10) || 0)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
-            </div>
-            <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium text-gray-700">Icon URL (optional)</label>
               <input
                 value={formIconUrl}
@@ -198,7 +229,7 @@ export default function CategoriesPage() {
         </div>
       )}
 
-      {/* Categories Tree */}
+      {/* Categories Tree — draggable */}
       {loading ? (
         <div className="mt-8 flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
@@ -206,12 +237,25 @@ export default function CategoriesPage() {
       ) : (
         <div className="mt-6 space-y-2">
           {topLevel.length > 0 ? (
-            topLevel.map((cat) => {
+            topLevel.map((cat, idx) => {
               const children = childMap.get(cat.id) ?? [];
               return (
-                <div key={cat.id} className="rounded-xl border border-gray-200 bg-white">
+                <div
+                  key={cat.id}
+                  draggable
+                  onDragStart={() => handleDragStart(idx)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleDrop(idx)}
+                  className={`rounded-xl border bg-white transition-opacity ${dragIdx === idx ? 'border-brand-400 opacity-50' : 'border-gray-200'}`}
+                >
                   <div className="flex items-center justify-between px-5 py-4">
                     <div className="flex items-center gap-3">
+                      {/* Drag handle */}
+                      <div className="cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing">
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 8h16M4 16h16" />
+                        </svg>
+                      </div>
                       <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50">
                         {cat.icon_url ? (
                           <img src={cat.icon_url} alt="" className="h-5 w-5" />
@@ -223,7 +267,7 @@ export default function CategoriesPage() {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-gray-900">{cat.name}</p>
-                        <p className="text-xs text-gray-400">/{cat.slug} &middot; Order: {cat.display_order}</p>
+                        <p className="text-xs text-gray-400">/{cat.slug}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

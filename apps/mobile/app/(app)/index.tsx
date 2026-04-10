@@ -2311,7 +2311,7 @@ export default function ChatScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          <View style={styles.welcomeContainer}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
             <View style={{ alignItems: 'center', marginBottom: 24 }}>
               <BalkinaLogo size="large" />
               <Text style={styles.subtitle}>What would you like to book today?</Text>
@@ -2332,7 +2332,7 @@ export default function ChatScreen() {
                 ))}
               </View>
             )}
-          </View>
+          </ScrollView>
           <View style={styles.inputBar}>
             <TextInput
               style={styles.textInput}
