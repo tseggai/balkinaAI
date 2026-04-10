@@ -468,21 +468,24 @@ export async function POST(request: Request) {
       }
     }
 
-    // Create gallery photos (3-5 per tenant)
+    // Create gallery photos (3-5 per location)
     const galleryPool = GALLERY_IMAGES[bizType.category] ?? Object.values(GALLERY_IMAGES).flat();
-    const numPhotos = Math.floor(Math.random() * 3) + 3; // 3-5
-    const shuffledPhotos = [...galleryPool].sort(() => Math.random() - 0.5).slice(0, numPhotos);
     let galleryCount = 0;
-    for (let gi = 0; gi < shuffledPhotos.length; gi++) {
-      const { error: gErr } = await auth.supabase
-        .from('tenant_gallery')
-        .insert({
-          tenant_id: tenantId,
-          image_url: shuffledPhotos[gi],
-          caption: null,
-          sort_order: gi,
-        } as never);
-      if (!gErr) galleryCount++;
+    for (const lid of locationIds) {
+      const numPhotos = Math.floor(Math.random() * 3) + 3; // 3-5
+      const shuffledPhotos = [...galleryPool].sort(() => Math.random() - 0.5).slice(0, numPhotos);
+      for (let gi = 0; gi < shuffledPhotos.length; gi++) {
+        const { error: gErr } = await auth.supabase
+          .from('location_gallery')
+          .insert({
+            location_id: lid,
+            tenant_id: tenantId,
+            image_url: shuffledPhotos[gi],
+            caption: null,
+            sort_order: gi,
+          } as never);
+        if (!gErr) galleryCount++;
+      }
     }
 
     // Set random ratings (3.5-5.0 avg_rating, 5-120 review_count)

@@ -19,21 +19,21 @@ async function getTenantId() {
   return (tenant as { id: string } | null)?.id ?? null;
 }
 
-/** GET /api/gallery?tenantId=<uuid> — public, returns gallery photos sorted by sort_order */
+/** GET /api/gallery?locationId=<uuid> — public, returns gallery photos for a location */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const tenantId = searchParams.get('tenantId');
-  if (!tenantId) {
-    return NextResponse.json({ error: 'tenantId required' }, { status: 400, headers: CORS_HEADERS });
+  const locationId = searchParams.get('locationId');
+  if (!locationId) {
+    return NextResponse.json({ error: 'locationId required' }, { status: 400, headers: CORS_HEADERS });
   }
 
   const supabase = createAdminClient();
   const { data, error } = await supabase
-    .from('tenant_gallery')
+    .from('location_gallery')
     .select('id, image_url, caption, sort_order')
-    .eq('tenant_id', tenantId)
+    .eq('location_id', locationId)
     .order('sort_order', { ascending: true })
-    .limit(30);
+    .limit(15);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500, headers: CORS_HEADERS });
@@ -42,16 +42,18 @@ export async function GET(request: Request) {
   return NextResponse.json({ photos: data ?? [] }, { headers: CORS_HEADERS });
 }
 
-/** POST /api/gallery — authenticated tenant upload. Accepts multipart/form-data with file + optional caption */
+/** POST /api/gallery — authenticated tenant upload. Accepts multipart/form-data with file, locationId, optional caption */
 export async function POST(request: Request) {
   const tenantId = await getTenantId();
   if (!tenantId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const formData = await request.formData();
   const file = formData.get('file') as File | null;
+  const locationId = formData.get('locationId') as string | null;
   const caption = (formData.get('caption') as string | null) ?? null;
 
   if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+  if (!locationId) return NextResponse.json({ error: 'locationId required' }, { status: 400 });
 
   const allowed = ['image/jpeg', 'image/png', 'image/webp'];
   if (!allowed.includes(file.type)) {
@@ -63,11 +65,29 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
+  // Verify location belongs to tenant
+  const { data: loc } = await supabase
+    .from('tenant_locations')
+    .select('id')
+    .eq('id', locationId)
+    .eq('tenant_id', tenantId)
+    .single();
+  if (!loc) return NextResponse.json({ error: 'Location not found' }, { status: 404 });
+
+  // Check limit: max 15 photos per location
+  const { count } = await supabase
+    .from('location_gallery')
+    .select('id', { count: 'exact', head: true })
+    .eq('location_id', locationId);
+  if ((count ?? 0) >= 15) {
+    return NextResponse.json({ error: 'Maximum 15 photos per location' }, { status: 400 });
+  }
+
   // Get current max sort_order
   const { data: maxRow } = await supabase
-    .from('tenant_gallery')
+    .from('location_gallery')
     .select('sort_order')
-    .eq('tenant_id', tenantId)
+    .eq('location_id', locationId)
     .order('sort_order', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -75,7 +95,7 @@ export async function POST(request: Request) {
 
   // Upload to storage
   const ext = file.name.split('.').pop() ?? 'jpg';
-  const filename = `${tenantId}/gallery/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const filename = `${tenantId}/gallery/${locationId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { error: uploadError } = await supabase.storage
@@ -90,8 +110,9 @@ export async function POST(request: Request) {
 
   // Insert gallery record
   const { data: photo, error: insertError } = await supabase
-    .from('tenant_gallery')
+    .from('location_gallery')
     .insert({
+      location_id: locationId,
       tenant_id: tenantId,
       image_url: publicUrl.publicUrl,
       caption,
@@ -121,7 +142,7 @@ export async function PATCH(request: Request) {
 
   for (const p of body.photos) {
     await supabase
-      .from('tenant_gallery')
+      .from('location_gallery')
       .update({ sort_order: p.sort_order })
       .eq('id', p.id)
       .eq('tenant_id', tenantId);
@@ -143,7 +164,7 @@ export async function DELETE(request: Request) {
 
   // Get the photo to find the storage path
   const { data: photo } = await supabase
-    .from('tenant_gallery')
+    .from('location_gallery')
     .select('image_url')
     .eq('id', photoId)
     .eq('tenant_id', tenantId)
@@ -161,7 +182,7 @@ export async function DELETE(request: Request) {
   }
 
   // Delete DB record
-  await supabase.from('tenant_gallery').delete().eq('id', photoId).eq('tenant_id', tenantId);
+  await supabase.from('location_gallery').delete().eq('id', photoId).eq('tenant_id', tenantId);
 
   return NextResponse.json({ success: true });
 }

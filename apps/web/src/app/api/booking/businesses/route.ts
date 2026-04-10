@@ -83,7 +83,7 @@ export async function POST(request: Request) {
         ? await Promise.all([
             supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', bizIds),
             supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url').in('tenant_id', bizIds).eq('visibility', 'public'),
-            supabase.from('tenant_gallery').select('tenant_id, id, image_url, caption').in('tenant_id', bizIds).order('sort_order', { ascending: true }).limit(50),
+            supabase.from('location_gallery').select('tenant_id, id, image_url, caption').in('tenant_id', bizIds).order('sort_order', { ascending: true }).limit(50),
           ])
         : [{ data: [] }, { data: [] }, { data: [] }];
 
@@ -197,7 +197,7 @@ export async function POST(request: Request) {
         ? await Promise.all([
             supabase.from('tenant_locations').select('id, tenant_id, latitude, longitude').in('tenant_id', bizIds),
             supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url').in('tenant_id', bizIds).eq('visibility', 'public'),
-            supabase.from('tenant_gallery').select('tenant_id, id, image_url, caption').in('tenant_id', bizIds).order('sort_order', { ascending: true }).limit(50),
+            supabase.from('location_gallery').select('tenant_id, id, image_url, caption').in('tenant_id', bizIds).order('sort_order', { ascending: true }).limit(50),
           ])
         : [{ data: [] }, { data: [] }, { data: [] }];
 

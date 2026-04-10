@@ -725,6 +725,11 @@ export default function LocationsPage() {
                 </div>
               </div>
 
+              {/* Gallery Photos — only show when editing an existing location */}
+              {isEdit && editing && (
+                <LocationGallery locationId={editing.id} />
+              )}
+
               {error && <p className="text-sm text-red-600">{error}</p>}
             </div>
 
@@ -925,6 +930,127 @@ export default function LocationsPage() {
 
       {/* Slide-in Panel */}
       {showPanel && renderPanel()}
+    </div>
+  );
+}
+
+// ── Location Gallery Component ───────────────────────────────────────────────
+
+interface GalleryPhoto {
+  id: string;
+  image_url: string;
+  caption: string | null;
+  sort_order: number;
+}
+
+function LocationGallery({ locationId }: { locationId: string }) {
+  const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const fetchPhotos = useCallback(async () => {
+    const res = await fetch(`/api/gallery?locationId=${locationId}`);
+    const json = await res.json() as { photos: GalleryPhoto[] };
+    setPhotos(json.photos ?? []);
+    setLoading(false);
+  }, [locationId]);
+
+  useEffect(() => { fetchPhotos(); }, [fetchPhotos]);
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setUploading(true);
+
+    for (const file of Array.from(files)) {
+      if (photos.length >= 15) break;
+      const form = new FormData();
+      form.append('file', file);
+      form.append('locationId', locationId);
+      const res = await fetch('/api/gallery', { method: 'POST', body: form });
+      if (res.ok) {
+        const json = await res.json() as { photo: GalleryPhoto };
+        setPhotos(prev => [...prev, json.photo]);
+      }
+    }
+
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = '';
+  }
+
+  async function handleDelete(id: string) {
+    await fetch(`/api/gallery?id=${id}`, { method: 'DELETE' });
+    setPhotos(prev => prev.filter(p => p.id !== id));
+  }
+
+  function handleDragStart(idx: number) { setDragIdx(idx); }
+
+  async function handleDrop(targetIdx: number) {
+    if (dragIdx === null || dragIdx === targetIdx) { setDragIdx(null); return; }
+    const reordered = [...photos];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(targetIdx, 0, moved!);
+    const updated = reordered.map((p, i) => ({ ...p, sort_order: i }));
+    setPhotos(updated);
+    setDragIdx(null);
+    await fetch('/api/gallery', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photos: updated.map(p => ({ id: p.id, sort_order: p.sort_order })) }),
+    });
+  }
+
+  if (loading) return <div className="py-4 text-center text-xs text-gray-400">Loading gallery...</div>;
+
+  return (
+    <div className="rounded-lg border border-gray-200 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Gallery Photos</h3>
+          <p className="text-xs text-gray-500">{photos.length}/15 photos. Shown to customers during discovery.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading || photos.length >= 15}
+          className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+        >
+          {uploading ? 'Uploading...' : 'Add Photos'}
+        </button>
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleUpload} />
+      </div>
+
+      {photos.length === 0 ? (
+        <div className="rounded-lg border-2 border-dashed border-gray-200 p-8 text-center">
+          <p className="text-xs text-gray-400">No gallery photos yet</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {photos.map((photo, idx) => (
+            <div
+              key={photo.id}
+              draggable
+              onDragStart={() => handleDragStart(idx)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => handleDrop(idx)}
+              className={`group relative aspect-square cursor-grab overflow-hidden rounded-lg border ${dragIdx === idx ? 'border-brand-500 opacity-50' : 'border-gray-200'}`}
+            >
+              <img src={photo.image_url} alt={photo.caption ?? ''} className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => handleDelete(photo.id)}
+                className="absolute right-1 top-1 hidden rounded-full bg-black/60 p-1 text-white hover:bg-black/80 group-hover:block"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-3.5 w-3.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
