@@ -78,13 +78,14 @@ export async function POST(request: Request) {
 
       const bizIds = businesses.map((b) => b.id);
 
-      // Fetch locations and services in parallel
-      const [{ data: locs }, { data: svcs }] = bizIds.length > 0
+      // Fetch locations, services, and gallery photos in parallel
+      const [{ data: locs }, { data: svcs }, { data: galleryRows }] = bizIds.length > 0
         ? await Promise.all([
             supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', bizIds),
             supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url').in('tenant_id', bizIds).eq('visibility', 'public'),
+            supabase.from('tenant_gallery').select('tenant_id, id, image_url, caption').in('tenant_id', bizIds).order('sort_order', { ascending: true }).limit(50),
           ])
-        : [{ data: [] }, { data: [] }];
+        : [{ data: [] }, { data: [] }, { data: [] }];
 
       // Build service map per tenant
       const svcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]>();
@@ -109,7 +110,15 @@ export async function POST(request: Request) {
         }
       }
 
-      // Enrich businesses with services, distance, closest_location_id
+      // Build gallery map per tenant (max 5 per business for discovery)
+      const galleryMap = new Map<string, { id: string; image_url: string; caption: string | null }[]>();
+      for (const g of (galleryRows ?? []) as { tenant_id: string; id: string; image_url: string; caption: string | null }[]) {
+        const existing = galleryMap.get(g.tenant_id) ?? [];
+        if (existing.length < 5) existing.push({ id: g.id, image_url: g.image_url, caption: g.caption });
+        galleryMap.set(g.tenant_id, existing);
+      }
+
+      // Enrich businesses with services, distance, closest_location_id, gallery
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let enriched: any[] = businesses.map((b) => {
         const closest = locMap.get(b.id);
@@ -117,6 +126,7 @@ export async function POST(request: Request) {
         return {
           ...b,
           all_services: svcMap.get(b.id) ?? [],
+          gallery_photos: galleryMap.get(b.id) ?? [],
           closest_location_id: closest?.locationId,
           distance_km: distKm,
           distance_mi: distKm !== undefined ? Math.round(distKm * 0.621371 * 10) / 10 : undefined,
@@ -183,12 +193,13 @@ export async function POST(request: Request) {
 
       // Same enrichment as category path
       const bizIds = allTenants.map((t) => t.id);
-      const [{ data: locs }, { data: svcs }] = bizIds.length > 0
+      const [{ data: locs }, { data: svcs }, { data: galleryRows2 }] = bizIds.length > 0
         ? await Promise.all([
             supabase.from('tenant_locations').select('id, tenant_id, latitude, longitude').in('tenant_id', bizIds),
             supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url').in('tenant_id', bizIds).eq('visibility', 'public'),
+            supabase.from('tenant_gallery').select('tenant_id, id, image_url, caption').in('tenant_id', bizIds).order('sort_order', { ascending: true }).limit(50),
           ])
-        : [{ data: [] }, { data: [] }];
+        : [{ data: [] }, { data: [] }, { data: [] }];
 
       const svcMap = new Map<string, unknown[]>();
       for (const svc of (svcs ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]) {
@@ -211,6 +222,14 @@ export async function POST(request: Request) {
         }
       }
 
+      // Build gallery map for query path
+      const galleryMap2 = new Map<string, { id: string; image_url: string; caption: string | null }[]>();
+      for (const g of (galleryRows2 ?? []) as { tenant_id: string; id: string; image_url: string; caption: string | null }[]) {
+        const existing = galleryMap2.get(g.tenant_id) ?? [];
+        if (existing.length < 5) existing.push({ id: g.id, image_url: g.image_url, caption: g.caption });
+        galleryMap2.set(g.tenant_id, existing);
+      }
+
       let results = allTenants.map((t) => {
         const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
         const closest = locMap.get(t.id);
@@ -223,6 +242,7 @@ export async function POST(request: Request) {
           avg_rating: t.avg_rating ?? undefined,
           review_count: t.review_count ?? 0,
           all_services: svcMap.get(t.id) ?? [],
+          gallery_photos: galleryMap2.get(t.id) ?? [],
           closest_location_id: closest?.locationId,
           distance_km: distKm,
           distance_mi: distKm !== undefined ? Math.round(distKm * 0.621371 * 10) / 10 : undefined,

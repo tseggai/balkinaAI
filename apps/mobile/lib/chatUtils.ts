@@ -2,6 +2,12 @@
 
 // ── Card Type Interfaces ────────────────────────────────────────────────────
 
+export interface GalleryPhoto {
+  id: string;
+  image_url: string;
+  caption?: string | null;
+}
+
 export interface BusinessCardData {
   type: 'business_card';
   id: string;
@@ -12,6 +18,7 @@ export interface BusinessCardData {
   category: string;
   avg_rating?: number;
   review_count?: number;
+  gallery_photos?: GalleryPhoto[];
 }
 
 export interface ServiceCardData {

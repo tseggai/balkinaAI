@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 
-type Tab = 'profile' | 'billing' | 'notifications' | 'widget';
+type Tab = 'profile' | 'billing' | 'notifications' | 'widget' | 'gallery';
 
 interface TenantInfo {
   id: string;
@@ -158,6 +158,7 @@ export default function SettingsPage() {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'profile', label: 'Business Profile' },
+    { key: 'gallery', label: 'Gallery' },
     { key: 'billing', label: 'Billing' },
     { key: 'notifications', label: 'Notifications' },
     { key: 'widget', label: 'Chat Widget' },
@@ -291,6 +292,11 @@ export default function SettingsPage() {
         {tab === 'widget' && tenant && (
           <WidgetEmbed tenantId={tenant.id} tenantName={tenant.name} />
         )}
+
+        {/* Gallery */}
+        {tab === 'gallery' && tenant && (
+          <GalleryManager tenantId={tenant.id} />
+        )}
       </div>
     </div>
   );
@@ -389,5 +395,125 @@ function NotifToggle({ label, defaultChecked }: { label: string; defaultChecked:
         }`} />
       </button>
     </label>
+  );
+}
+
+// ── Gallery Manager ──────────────────────────────────────────────────────────
+
+interface GalleryPhoto {
+  id: string;
+  image_url: string;
+  caption: string | null;
+  sort_order: number;
+}
+
+function GalleryManager({ tenantId }: { tenantId: string }) {
+  const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const fetchPhotos = useCallback(async () => {
+    const res = await fetch(`/api/gallery?tenantId=${tenantId}`);
+    const json = await res.json() as { photos: GalleryPhoto[] };
+    setPhotos(json.photos ?? []);
+    setLoading(false);
+  }, [tenantId]);
+
+  useEffect(() => { fetchPhotos(); }, [fetchPhotos]);
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setUploading(true);
+
+    for (const file of Array.from(files)) {
+      const form = new FormData();
+      form.append('file', file);
+      await fetch('/api/gallery', { method: 'POST', body: form });
+    }
+
+    await fetchPhotos();
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = '';
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Delete this photo?')) return;
+    await fetch(`/api/gallery?id=${id}`, { method: 'DELETE' });
+    setPhotos((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  function handleDragStart(idx: number) {
+    setDragIdx(idx);
+  }
+
+  async function handleDrop(targetIdx: number) {
+    if (dragIdx === null || dragIdx === targetIdx) { setDragIdx(null); return; }
+    const reordered = [...photos];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(targetIdx, 0, moved!);
+    const updated = reordered.map((p, i) => ({ ...p, sort_order: i }));
+    setPhotos(updated);
+    setDragIdx(null);
+    await fetch('/api/gallery', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photos: updated.map((p) => ({ id: p.id, sort_order: p.sort_order })) }),
+    });
+  }
+
+  if (loading) return <div className="p-6 text-center text-sm text-gray-500">Loading gallery...</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-gray-900">Gallery Photos</h3>
+          <p className="text-sm text-gray-500">Photos shown to customers when they discover your business. Drag to reorder.</p>
+        </div>
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+        >
+          {uploading ? 'Uploading...' : 'Add Photos'}
+        </button>
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleUpload} />
+      </div>
+
+      {photos.length === 0 ? (
+        <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+          <p className="text-sm text-gray-500">No gallery photos yet. Add photos to showcase your business.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          {photos.map((photo, idx) => (
+            <div
+              key={photo.id}
+              draggable
+              onDragStart={() => handleDragStart(idx)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => handleDrop(idx)}
+              className={`group relative aspect-square cursor-grab overflow-hidden rounded-lg border ${dragIdx === idx ? 'border-brand-500 opacity-50' : 'border-gray-200'}`}
+            >
+              <Image src={photo.image_url} alt={photo.caption ?? 'Gallery photo'} fill className="object-cover" sizes="(max-width: 640px) 50vw, 25vw" />
+              <button
+                onClick={() => handleDelete(photo.id)}
+                className="absolute right-1 top-1 hidden rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80 group-hover:block"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100">
+                {idx + 1} of {photos.length}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

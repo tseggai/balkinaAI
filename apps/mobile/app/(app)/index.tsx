@@ -35,6 +35,7 @@ import {
   formatHumanDate,
   getAllDateLabels,
 } from '@/lib/useBookingFlow';
+import GalleryViewer from '@/components/GalleryViewer';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -48,6 +49,7 @@ import {
   nameToColor,
   getInitials,
   type BusinessCardData,
+  type GalleryPhoto,
   type ServiceCardData,
   type StaffCardData,
   type PackageCardData,
@@ -232,7 +234,7 @@ const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap }: { it
 
 // ── Business With Services Row (combined card) ──────────────────────────────
 
-const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ data, onTap }: { data: BusinessWithServicesData; onTap: (msg: string) => void }) {
+const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ data, onTap, onGalleryOpen }: { data: BusinessWithServicesData; onTap: (msg: string) => void; onGalleryOpen?: (photos: GalleryPhoto[]) => void }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [selectedSvcId, setSelectedSvcId] = useState<string | null>(null);
   const selectedBiz = data.items[selectedIdx];
@@ -275,13 +277,29 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
               onPress={() => setSelectedIdx(idx)}
               activeOpacity={0.7}
             >
-              <View style={richCardStyles.businessImage}>
+              <TouchableOpacity
+                style={richCardStyles.businessImage}
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (biz.gallery_photos?.length && onGalleryOpen) {
+                    onGalleryOpen(biz.gallery_photos);
+                  } else {
+                    setSelectedIdx(idx);
+                  }
+                }}
+              >
                 {biz.image_url ? (
                   <Image source={{ uri: biz.image_url }} style={richCardStyles.businessImg} />
                 ) : (
                   <Text style={richCardStyles.businessEmoji}>🏢</Text>
                 )}
-              </View>
+                {biz.gallery_photos && biz.gallery_photos.length > 0 && (
+                  <View style={{ position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3, flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="images-outline" size={12} color="#fff" />
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600', marginLeft: 3 }}>{biz.gallery_photos.length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
               <View style={richCardStyles.businessInfo}>
                 <Text style={richCardStyles.businessName} numberOfLines={2}>{biz.name}</Text>
                 {biz.avg_rating ? (
@@ -1047,7 +1065,7 @@ const actionBtnStyles = StyleSheet.create({
 
 // ── Render a single card segment ─────────────────────────────────────────────
 
-function CardRenderer({ card, onButtonPress, onSubmit }: { card: CardData; onButtonPress: (label: string) => void; onSubmit: (msg: string) => void }) {
+function CardRenderer({ card, onButtonPress, onSubmit, onGalleryOpen }: { card: CardData; onButtonPress: (label: string) => void; onSubmit: (msg: string) => void; onGalleryOpen?: (photos: GalleryPhoto[]) => void }) {
   switch (card.type) {
     case 'business_cards':
       return <BusinessCardRow items={card.items} onTap={onButtonPress} />;
@@ -1064,7 +1082,7 @@ function CardRenderer({ card, onButtonPress, onSubmit }: { card: CardData; onBut
     case 'confirmed_card':
       return <RichConfirmedCard data={card} onButtonPress={onButtonPress} />;
     case 'business_with_services':
-      return <BusinessWithServicesRow data={card as BusinessWithServicesData} onTap={onButtonPress} />;
+      return <BusinessWithServicesRow data={card as BusinessWithServicesData} onTap={onButtonPress} onGalleryOpen={onGalleryOpen} />;
     case 'staff_with_slots':
       return <StaffWithSlotsRow data={card as StaffWithSlotsData} onTap={onButtonPress} />;
     case 'booking_options':
@@ -1079,9 +1097,11 @@ function CardRenderer({ card, onButtonPress, onSubmit }: { card: CardData; onBut
 const MessageBubble = React.memo(function MessageBubble({
   message,
   onButtonPress,
+  onGalleryOpen,
 }: {
   message: ChatMessage;
   onButtonPress: (label: string) => void;
+  onGalleryOpen?: (photos: GalleryPhoto[]) => void;
 }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(10)).current;
@@ -1133,7 +1153,7 @@ const MessageBubble = React.memo(function MessageBubble({
         // Render segments (text + cards interspersed)
         segments.map((seg, i) => {
           if (seg.kind === 'card' && seg.card) {
-            return <CardRenderer key={`card-${i}`} card={seg.card} onButtonPress={onButtonPress} onSubmit={onButtonPress} />;
+            return <CardRenderer key={`card-${i}`} card={seg.card} onButtonPress={onButtonPress} onSubmit={onButtonPress} onGalleryOpen={onGalleryOpen} />;
           }
           // Text segment — parse for buttons/links
           const { text, buttons, links } = parseMessageContent(seg.text ?? '');
@@ -1264,6 +1284,7 @@ export default function ChatScreen() {
   const [confirmationModal, setConfirmationModal] = useState<ConfirmedCardData | null>(null);
   // In-app payment WebView modal state
   const [paymentModal, setPaymentModal] = useState<{ appointmentId: string; depositAmount?: number; pendingCard?: ConfirmedCardData } | null>(null);
+  const [galleryModal, setGalleryModal] = useState<{ photos: GalleryPhoto[]; initialIndex: number } | null>(null);
   // Track recently displayed service cards so we can match taps to IDs
   const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; tenantId?: string; tenantName?: string }[]>([]);
   // Stores structured tool data from SSE for deterministic rendering
@@ -1633,7 +1654,7 @@ export default function ChatScreen() {
           // Build business_with_services card
           const card = {
             type: 'business_with_services',
-            items: data.businesses.map((b) => ({
+            items: data.businesses.map((b: { id: string; name: string; image_url?: string; distance_mi?: number; estimated_drive_minutes?: number; category?: string; avg_rating?: number; review_count?: number; closest_location_id?: string; gallery_photos?: { id: string; image_url: string; caption?: string | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null }[] }) => ({
               id: b.id,
               name: b.name,
               image_url: b.image_url,
@@ -1643,6 +1664,7 @@ export default function ChatScreen() {
               avg_rating: b.avg_rating,
               review_count: b.review_count,
               closest_location_id: b.closest_location_id,
+              gallery_photos: b.gallery_photos ?? [],
               services: (b.all_services ?? []).map((s) => ({
                 id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
                 deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount,
@@ -2360,7 +2382,7 @@ export default function ChatScreen() {
           data={[...messages].reverse()}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <MessageBubble message={item} onButtonPress={handleButtonPress} />
+            <MessageBubble message={item} onButtonPress={handleButtonPress} onGalleryOpen={(photos) => setGalleryModal({ photos, initialIndex: 0 })} />
           )}
           contentContainerStyle={[styles.messagesList, { flexGrow: 1 }]}
           inverted
@@ -2588,6 +2610,14 @@ export default function ChatScreen() {
           }}
         />
       )}
+
+      {/* Gallery Viewer */}
+      <GalleryViewer
+        visible={galleryModal !== null}
+        photos={galleryModal?.photos ?? []}
+        initialIndex={galleryModal?.initialIndex ?? 0}
+        onClose={() => setGalleryModal(null)}
+      />
     </View>
   );
 }
