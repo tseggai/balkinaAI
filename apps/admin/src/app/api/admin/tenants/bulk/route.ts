@@ -148,6 +148,45 @@ const SERVICE_IMAGES: Record<string, string[]> = {
   ],
 };
 
+// Gallery images per category (Unsplash, 1200x800 crop for full-screen display)
+const GALLERY_IMAGES: Record<string, string[]> = {
+  barbershop: [
+    'https://images.unsplash.com/photo-1585747860830-63ab9dfd12f3?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=1200&h=800&fit=crop',
+  ],
+  beauty: [
+    'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1519014816548-bf5fe059798b?w=1200&h=800&fit=crop',
+  ],
+  wellness: [
+    'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1600334129128-685c5582fd35?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1540555700478-4be289fbec6d?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=1200&h=800&fit=crop',
+  ],
+  fitness: [
+    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1576678927484-cc907957088c?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1593079831268-3381b0db4a77?w=1200&h=800&fit=crop',
+  ],
+  medical: [
+    'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?w=1200&h=800&fit=crop',
+  ],
+};
+
 const SERVICE_TEMPLATES: Record<string, { name: string; price: number; duration: number }[]> = {
   barbershop: [
     { name: 'Haircut', price: 35, duration: 30 },
@@ -264,7 +303,7 @@ export async function POST(request: Request) {
     .limit(1)
     .single();
 
-  const results: { tenant_id: string; name: string; category: string; locations: number; staff: number; services: number }[] = [];
+  const results: { tenant_id: string; name: string; category: string; locations: number; staff: number; services: number; gallery: number; rating: number }[] = [];
 
   for (let i = 0; i < count; i++) {
     // Evenly distribute across categories: tenant 0 -> cat 0, tenant 1 -> cat 1, etc.
@@ -429,7 +468,42 @@ export async function POST(request: Request) {
       }
     }
 
-    results.push({ tenant_id: tenantId, name: bizName, category: categoryLabel, locations: locCount, staff: staffCount, services: svcCount });
+    // Create gallery photos (3-5 per tenant)
+    const galleryPool = GALLERY_IMAGES[bizType.category] ?? Object.values(GALLERY_IMAGES).flat();
+    const numPhotos = Math.floor(Math.random() * 3) + 3; // 3-5
+    const shuffledPhotos = [...galleryPool].sort(() => Math.random() - 0.5).slice(0, numPhotos);
+    let galleryCount = 0;
+    for (let gi = 0; gi < shuffledPhotos.length; gi++) {
+      const { error: gErr } = await auth.supabase
+        .from('tenant_gallery')
+        .insert({
+          tenant_id: tenantId,
+          image_url: shuffledPhotos[gi],
+          caption: null,
+          sort_order: gi,
+        } as never);
+      if (!gErr) galleryCount++;
+    }
+
+    // Set random ratings (3.5-5.0 avg_rating, 5-120 review_count)
+    const avgRating = Math.round((3.5 + Math.random() * 1.5) * 10) / 10;
+    const reviewCount = Math.floor(Math.random() * 116) + 5;
+    await auth.supabase
+      .from('tenants')
+      .update({ avg_rating: avgRating, review_count: reviewCount } as never)
+      .eq('id', tenantId);
+
+    // Set random staff ratings too
+    for (const sid of staffIds) {
+      const staffRating = Math.round((3.0 + Math.random() * 2.0) * 10) / 10;
+      const staffReviewCount = Math.floor(Math.random() * 50) + 1;
+      await auth.supabase
+        .from('staff')
+        .update({ avg_rating: staffRating, review_count: staffReviewCount } as never)
+        .eq('id', sid);
+    }
+
+    results.push({ tenant_id: tenantId, name: bizName, category: categoryLabel, locations: locCount, staff: staffCount, services: svcCount, gallery: galleryCount, rating: avgRating });
   }
 
   return NextResponse.json({
