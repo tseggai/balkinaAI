@@ -12,6 +12,7 @@
   "dependencies": {
     "@balkina/config": "*",
     "@balkina/db": "*",
+    "@balkina/notifications": "*",
     "@balkina/shared": "*",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.43.0",

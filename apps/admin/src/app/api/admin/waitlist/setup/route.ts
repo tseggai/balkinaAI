@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
+import { sendTenantLoginEmail } from '@balkina/notifications';
 
 /**
  * POST /api/admin/waitlist/setup
  * One-click tenant setup from a waitlist entry.
  * Creates: auth user → tenant → location → services
- * Then updates the waitlist entry status to 'onboarded'.
+ * Then updates the waitlist entry status to 'onboarded' and emails the
+ * tenant their branded login credentials directly from Balkina AI.
  */
 export async function POST(request: Request) {
   const auth = await requireAdmin();
@@ -35,8 +37,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'This entry has already been onboarded' }, { status: 400 });
   }
 
-  // 2. Create auth user (with temp password — they'll reset via invite link)
-  const tempPassword = `Balkina_${crypto.randomUUID().slice(0, 12)}!`;
+  // 2. Create auth user with a fresh temp password — we'll email it to them.
+  const tempPassword = generateTempPassword();
   const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
     email: entry.email,
     password: tempPassword,
@@ -59,18 +61,35 @@ export async function POST(request: Request) {
         if (existingTenant) {
           return NextResponse.json({ error: `User ${entry.email} already has a tenant. Update their waitlist status manually.` }, { status: 400 });
         }
-        // Use existing user
-        return await createTenantFromWaitlist(supabase, entry, existing.id, waitlist_id);
+        // Reset their password to a fresh temp password so the login email is valid.
+        await supabase.auth.admin.updateUserById(existing.id, { password: tempPassword });
+        return await createTenantFromWaitlist(supabase, entry, existing.id, waitlist_id, tempPassword);
       }
     }
     return NextResponse.json({ error: `Failed to create user: ${authErr.message}` }, { status: 500 });
   }
 
-  return await createTenantFromWaitlist(supabase, entry, authUser.user.id, waitlist_id);
+  return await createTenantFromWaitlist(supabase, entry, authUser.user.id, waitlist_id, tempPassword);
+}
+
+/**
+ * Generate a 14-character temp password with mixed case, digits, and one symbol.
+ * Avoids ambiguous characters so tenants can easily type it from the email.
+ */
+function generateTempPassword(): string {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghjkmnpqrstuvwxyz';
+  const digit = '23456789';
+  const symbol = '!@#$%&*';
+  const all = upper + lower + digit;
+  const pick = (chars: string) => chars[Math.floor(Math.random() * chars.length)];
+  const required = [pick(upper), pick(lower), pick(digit), pick(symbol)];
+  const remaining = Array.from({ length: 10 }, () => pick(all));
+  return [...required, ...remaining].sort(() => Math.random() - 0.5).join('');
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function createTenantFromWaitlist(supabase: any, entry: any, userId: string, waitlistId: string) {
+async function createTenantFromWaitlist(supabase: any, entry: any, userId: string, waitlistId: string, tempPassword: string) {
   // 3. Find category by name (optional)
   let categoryId: string | null = null;
   if (entry.category) {
@@ -148,10 +167,35 @@ async function createTenantFromWaitlist(supabase: any, entry: any, userId: strin
     .update({ status: 'onboarded', updated_at: new Date().toISOString() })
     .eq('id', waitlistId);
 
+  // 8. Email the tenant their branded login credentials. We never block tenant
+  //    creation on email failure — surface it in the response instead so the
+  //    admin can retry via the "Send Login" button.
+  const loginUrl = process.env.NEXTAUTH_URL
+    ? `${process.env.NEXTAUTH_URL}/auth/login`
+    : 'https://app.balkina.ai/auth/login';
+  let emailSent = false;
+  let emailError: string | null = null;
+  try {
+    await sendTenantLoginEmail({
+      email: entry.email,
+      ownerName: entry.owner_name,
+      businessName: entry.business_name,
+      tempPassword,
+      loginUrl,
+    });
+    emailSent = true;
+  } catch (err) {
+    emailError = err instanceof Error ? err.message : String(err);
+  }
+
   return NextResponse.json({
     success: true,
     tenant_id: tenantId,
     user_id: userId,
-    message: `Tenant "${entry.business_name}" created successfully.`,
+    email_sent: emailSent,
+    email_error: emailError,
+    message: emailSent
+      ? `Tenant "${entry.business_name}" created and login email sent to ${entry.email}.`
+      : `Tenant "${entry.business_name}" created. Email failed: ${emailError}. Use "Send Login" to retry.`,
   });
 }
