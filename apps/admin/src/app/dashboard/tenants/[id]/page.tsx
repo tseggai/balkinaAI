@@ -172,6 +172,14 @@ export default function TenantDetailPage() {
   const [tab, setTab] = useState<Tab>('Overview');
   const [error, setError] = useState<string | null>(null);
 
+  // Editing state
+  const [editingTenant, setEditingTenant] = useState(false);
+  const [editingService, setEditingService] = useState<Service | 'new' | null>(null);
+  const [editingStaff, setEditingStaff] = useState<Staff | 'new' | null>(null);
+  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -188,6 +196,30 @@ export default function TenantDetailPage() {
     }
     setLoading(false);
   }, [tenantId]);
+
+  // Generic save helper — sends PATCH to /api/admin/tenants/[id]
+  const adminSave = useCallback(async (body: Record<string, unknown>) => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenantId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Failed to save');
+      setToast('Saved successfully');
+      setTimeout(() => setToast(null), 3000);
+      await fetchData();
+      return json;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Save failed';
+      setToast(`Error: ${msg}`);
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setSaving(false);
+    }
+  }, [tenantId, fetchData]);
 
   useEffect(() => {
     fetchData();
@@ -290,6 +322,7 @@ export default function TenantDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={() => setEditingTenant(true)} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Edit Profile</button>
           <span className={`inline-flex rounded-full px-3 py-1 text-sm font-medium capitalize ${STATUS_BADGE[tenant.status] ?? 'bg-gray-100 text-gray-700'}`}>
             {tenant.status.replace('_', ' ')}
           </span>
@@ -332,14 +365,61 @@ export default function TenantDetailPage() {
       {/* Tab content */}
       <div className="mt-6">
         {tab === 'Overview' && <OverviewTab stats={stats} tenant={tenant} />}
-        {tab === 'Locations' && <LocationsTab locations={locations} locationStaffCount={locationStaffCount} />}
-        {tab === 'Staff' && <StaffTab staff={staff} staffToLocations={staffToLocations} />}
-        {tab === 'Services' && <ServicesTab services={services} serviceToStaff={serviceToStaff} serviceToLocations={serviceToLocations} />}
+        {tab === 'Locations' && <LocationsTab locations={locations} locationStaffCount={locationStaffCount} onEdit={setEditingLocation} />}
+        {tab === 'Staff' && <StaffTab staff={staff} staffToLocations={staffToLocations} onEdit={setEditingStaff} onAdd={() => setEditingStaff('new')} />}
+        {tab === 'Services' && <ServicesTab services={services} serviceToStaff={serviceToStaff} serviceToLocations={serviceToLocations} onEdit={setEditingService} onAdd={() => setEditingService('new')} />}
         {tab === 'Customers' && <CustomersTab customers={uniqueCustomers} />}
         {tab === 'Appointments' && <AppointmentsTab appointments={appointments} />}
         {tab === 'Reviews' && <ReviewsTab reviews={reviews} />}
         {tab === 'Settings' && <SettingsTab tenant={tenant} coupons={coupons} />}
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 rounded-lg px-4 py-3 text-sm font-medium shadow-lg ${toast.startsWith('Error') ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}>
+          {toast}
+        </div>
+      )}
+
+      {/* ── Edit Modals ──────────────────────────────────────────────────── */}
+
+      {editingTenant && (
+        <TenantEditModal
+          tenant={tenant}
+          saving={saving}
+          onSave={async (updates) => { await adminSave({ tenant: updates }); setEditingTenant(false); }}
+          onClose={() => setEditingTenant(false)}
+        />
+      )}
+
+      {editingService && (
+        <ServiceEditModal
+          service={editingService === 'new' ? null : editingService}
+          saving={saving}
+          onSave={async (svc) => { await adminSave({ services: [svc] }); setEditingService(null); }}
+          onDelete={editingService !== 'new' ? async () => { await adminSave({ services: [{ id: (editingService as Service).id, _delete: true }] }); setEditingService(null); } : undefined}
+          onClose={() => setEditingService(null)}
+        />
+      )}
+
+      {editingStaff && (
+        <StaffEditModal
+          staff={editingStaff === 'new' ? null : editingStaff}
+          saving={saving}
+          onSave={async (s) => { await adminSave({ staff: [s] }); setEditingStaff(null); }}
+          onDelete={editingStaff !== 'new' ? async () => { await adminSave({ staff: [{ id: (editingStaff as Staff).id, _delete: true }] }); setEditingStaff(null); } : undefined}
+          onClose={() => setEditingStaff(null)}
+        />
+      )}
+
+      {editingLocation && (
+        <LocationEditModal
+          location={editingLocation}
+          saving={saving}
+          onSave={async (loc) => { await adminSave({ locations: [loc] }); setEditingLocation(null); }}
+          onClose={() => setEditingLocation(null)}
+        />
+      )}
     </div>
   );
 }
@@ -371,12 +451,15 @@ function OverviewTab({ stats, tenant }: { stats: Stats; tenant: TenantDetail }) 
   );
 }
 
-function LocationsTab({ locations, locationStaffCount }: { locations: Location[]; locationStaffCount: Map<string, number> }) {
+function LocationsTab({ locations, locationStaffCount, onEdit }: { locations: Location[]; locationStaffCount: Map<string, number>; onEdit: (l: Location) => void }) {
   if (locations.length === 0) return <EmptyState text="No locations configured." />;
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {locations.map((loc) => (
-        <div key={loc.id} className="rounded-xl border border-gray-200 bg-white p-5">
+        <div key={loc.id} className="group relative rounded-xl border border-gray-200 bg-white p-5">
+          <button onClick={() => onEdit(loc)} className="absolute right-3 top-3 rounded p-1 text-gray-400 opacity-0 hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100" title="Edit location">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" /></svg>
+          </button>
           <h3 className="font-semibold text-gray-900">{loc.name}</h3>
           <p className="mt-1 text-sm text-gray-500">
             {loc.city ? [loc.city, loc.state, loc.country].filter(Boolean).join(', ') : loc.address}
@@ -395,10 +478,15 @@ function LocationsTab({ locations, locationStaffCount }: { locations: Location[]
   );
 }
 
-function StaffTab({ staff, staffToLocations }: { staff: Staff[]; staffToLocations: Map<string, string[]> }) {
-  if (staff.length === 0) return <EmptyState text="No staff members." />;
+function StaffTab({ staff, staffToLocations, onEdit, onAdd }: { staff: Staff[]; staffToLocations: Map<string, string[]>; onEdit: (s: Staff) => void; onAdd: () => void }) {
   return (
+    <>
+    <div className="mb-4 flex justify-end">
+      <button onClick={onAdd} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Add Staff</button>
+    </div>
+    {staff.length === 0 ? <EmptyState text="No staff members." /> : (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
@@ -413,7 +501,7 @@ function StaffTab({ staff, staffToLocations }: { staff: Staff[]; staffToLocation
           {staff.map((s) => {
             const locs = staffToLocations.get(s.id) ?? [];
             return (
-              <tr key={s.id} className="hover:bg-gray-50">
+              <tr key={s.id} className="cursor-pointer hover:bg-gray-50" onClick={() => onEdit(s)}>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     {s.image_url ? (
@@ -454,14 +542,22 @@ function StaffTab({ staff, staffToLocations }: { staff: Staff[]; staffToLocation
           })}
         </tbody>
       </table>
+      </div>
     </div>
+    )}
+    </>
   );
 }
 
-function ServicesTab({ services, serviceToStaff, serviceToLocations }: { services: Service[]; serviceToStaff: Map<string, string[]>; serviceToLocations: Map<string, string[]> }) {
-  if (services.length === 0) return <EmptyState text="No services configured." />;
+function ServicesTab({ services, serviceToStaff, serviceToLocations, onEdit, onAdd }: { services: Service[]; serviceToStaff: Map<string, string[]>; serviceToLocations: Map<string, string[]>; onEdit: (s: Service) => void; onAdd: () => void }) {
   return (
+    <>
+    <div className="mb-4 flex justify-end">
+      <button onClick={onAdd} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Add Service</button>
+    </div>
+    {services.length === 0 ? <EmptyState text="No services configured." /> : (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
@@ -479,7 +575,7 @@ function ServicesTab({ services, serviceToStaff, serviceToLocations }: { service
             const staffNames = serviceToStaff.get(svc.id) ?? [];
             const locNames = serviceToLocations.get(svc.id) ?? [];
             return (
-              <tr key={svc.id} className="hover:bg-gray-50">
+              <tr key={svc.id} className="cursor-pointer hover:bg-gray-50" onClick={() => onEdit(svc)}>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     {svc.image_url && <img src={svc.image_url} alt="" className="h-8 w-8 rounded object-cover" />}
@@ -518,7 +614,10 @@ function ServicesTab({ services, serviceToStaff, serviceToLocations }: { service
           })}
         </tbody>
       </table>
+      </div>
     </div>
+    )}
+    </>
   );
 }
 
@@ -720,5 +819,187 @@ function EmptyState({ text }: { text: string }) {
     <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center">
       <p className="text-sm text-gray-500">{text}</p>
     </div>
+  );
+}
+
+// ── Edit Modals ───────────────────────────────────────────────────────────────
+
+function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="relative mx-4 w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function InputField({ label, value, onChange, type = 'text', placeholder }: { label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+    </div>
+  );
+}
+
+function TenantEditModal({ tenant, saving, onSave, onClose }: { tenant: TenantDetail; saving: boolean; onSave: (u: Record<string, unknown>) => void; onClose: () => void }) {
+  const [name, setName] = useState(tenant.name);
+  const [ownerName, setOwnerName] = useState(tenant.owner_name ?? '');
+  const [email, setEmail] = useState(tenant.email ?? '');
+  const [phone, setPhone] = useState(tenant.phone ?? '');
+  const [logoUrl, setLogoUrl] = useState(tenant.logo_url ?? '');
+  const [status, setStatus] = useState(tenant.status);
+
+  return (
+    <ModalShell title="Edit Tenant Profile" onClose={onClose}>
+      <div className="space-y-3">
+        <InputField label="Business Name" value={name} onChange={setName} />
+        <InputField label="Owner Name" value={ownerName} onChange={setOwnerName} />
+        <div className="grid grid-cols-2 gap-3">
+          <InputField label="Email" value={email} onChange={setEmail} type="email" />
+          <InputField label="Phone" value={phone} onChange={setPhone} />
+        </div>
+        <InputField label="Logo URL" value={logoUrl} onChange={setLogoUrl} placeholder="https://..." />
+        {logoUrl && <img src={logoUrl} alt="Preview" className="h-16 w-16 rounded-xl object-cover" />}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Status</label>
+          <select value={status} onChange={e => setStatus(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </div>
+      </div>
+      <div className="mt-6 flex justify-end gap-3">
+        <button onClick={onClose} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+        <button onClick={() => onSave({ name, owner_name: ownerName, email, phone, logo_url: logoUrl || null, status })} disabled={saving || !name.trim()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function ServiceEditModal({ service, saving, onSave, onDelete, onClose }: { service: Service | null; saving: boolean; onSave: (s: Record<string, unknown>) => void; onDelete?: () => void; onClose: () => void }) {
+  const [name, setName] = useState(service?.name ?? '');
+  const [price, setPrice] = useState(String(service?.price ?? '0'));
+  const [duration, setDuration] = useState(String(service?.duration_minutes ?? '60'));
+  const [description, setDescription] = useState(service?.description ?? '');
+  const [imageUrl, setImageUrl] = useState(service?.image_url ?? '');
+  const [visibility, setVisibility] = useState(service?.visibility ?? 'public');
+
+  return (
+    <ModalShell title={service ? 'Edit Service' : 'Add Service'} onClose={onClose}>
+      <div className="space-y-3">
+        <InputField label="Service Name" value={name} onChange={setName} />
+        <div className="grid grid-cols-2 gap-3">
+          <InputField label="Price" value={price} onChange={setPrice} type="number" />
+          <InputField label="Duration (min)" value={duration} onChange={setDuration} type="number" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Description</label>
+          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+        </div>
+        <InputField label="Image URL" value={imageUrl} onChange={setImageUrl} placeholder="https://..." />
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Visibility</label>
+          <select value={visibility} onChange={e => setVisibility(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
+            <option value="public">Public</option>
+            <option value="hidden">Hidden</option>
+          </select>
+        </div>
+      </div>
+      <div className="mt-6 flex justify-between">
+        <div>
+          {onDelete && (
+            <button onClick={onDelete} disabled={saving} className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Delete</button>
+          )}
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+          <button onClick={() => onSave({ ...(service?.id ? { id: service.id } : {}), name, price: parseFloat(price) || 0, duration_minutes: parseInt(duration) || 60, description: description || null, image_url: imageUrl || null, visibility })} disabled={saving || !name.trim()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+function StaffEditModal({ staff, saving, onSave, onDelete, onClose }: { staff: Staff | null; saving: boolean; onSave: (s: Record<string, unknown>) => void; onDelete?: () => void; onClose: () => void }) {
+  const [name, setName] = useState(staff?.name ?? '');
+  const [email, setEmail] = useState(staff?.email ?? '');
+  const [phone, setPhone] = useState(staff?.phone ?? '');
+  const [imageUrl, setImageUrl] = useState(staff?.image_url ?? '');
+  const [status, setStatus] = useState(staff?.status ?? 'active');
+
+  return (
+    <ModalShell title={staff ? 'Edit Staff' : 'Add Staff'} onClose={onClose}>
+      <div className="space-y-3">
+        <InputField label="Full Name" value={name} onChange={setName} />
+        <div className="grid grid-cols-2 gap-3">
+          <InputField label="Email" value={email} onChange={setEmail} type="email" />
+          <InputField label="Phone" value={phone} onChange={setPhone} />
+        </div>
+        <InputField label="Photo URL" value={imageUrl} onChange={setImageUrl} placeholder="https://..." />
+        {imageUrl && <img src={imageUrl} alt="Preview" className="h-12 w-12 rounded-full object-cover" />}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Status</label>
+          <select value={status} onChange={e => setStatus(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+      <div className="mt-6 flex justify-between">
+        <div>
+          {onDelete && (
+            <button onClick={onDelete} disabled={saving} className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Delete</button>
+          )}
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+          <button onClick={() => onSave({ ...(staff?.id ? { id: staff.id } : {}), name, email: email || null, phone: phone || null, image_url: imageUrl || null, status })} disabled={saving || !name.trim()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+function LocationEditModal({ location, saving, onSave, onClose }: { location: Location; saving: boolean; onSave: (l: Record<string, unknown>) => void; onClose: () => void }) {
+  const [name, setName] = useState(location.name);
+  const [address, setAddress] = useState(location.address);
+  const [city, setCity] = useState(location.city ?? '');
+  const [state, setState] = useState(location.state ?? '');
+  const [country, setCountry] = useState(location.country ?? '');
+  const [phone, setPhone] = useState(location.phone ?? '');
+  const [description, setDescription] = useState(location.description ?? '');
+  const [imageUrl, setImageUrl] = useState(location.image_url ?? '');
+
+  return (
+    <ModalShell title="Edit Location" onClose={onClose}>
+      <div className="space-y-3">
+        <InputField label="Location Name" value={name} onChange={setName} />
+        <InputField label="Full Address" value={address} onChange={setAddress} />
+        <div className="grid grid-cols-3 gap-3">
+          <InputField label="City" value={city} onChange={setCity} />
+          <InputField label="State" value={state} onChange={setState} />
+          <InputField label="Country" value={country} onChange={setCountry} />
+        </div>
+        <InputField label="Phone" value={phone} onChange={setPhone} />
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Description</label>
+          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+        </div>
+        <InputField label="Image URL" value={imageUrl} onChange={setImageUrl} placeholder="https://..." />
+      </div>
+      <div className="mt-6 flex justify-end gap-3">
+        <button onClick={onClose} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+        <button onClick={() => onSave({ id: location.id, name, address, city: city || null, state: state || null, country: country || null, phone: phone || null, description: description || null, image_url: imageUrl || null })} disabled={saving || !name.trim()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
+      </div>
+    </ModalShell>
   );
 }
