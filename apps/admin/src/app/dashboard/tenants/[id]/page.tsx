@@ -176,7 +176,7 @@ export default function TenantDetailPage() {
   const [editingTenant, setEditingTenant] = useState(false);
   const [editingService, setEditingService] = useState<Service | 'new' | null>(null);
   const [editingStaff, setEditingStaff] = useState<Staff | 'new' | null>(null);
-  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const [editingLocation, setEditingLocation] = useState<Location | 'new' | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -365,7 +365,7 @@ export default function TenantDetailPage() {
       {/* Tab content */}
       <div className="mt-6">
         {tab === 'Overview' && <OverviewTab stats={stats} tenant={tenant} />}
-        {tab === 'Locations' && <LocationsTab locations={locations} locationStaffCount={locationStaffCount} onEdit={setEditingLocation} />}
+        {tab === 'Locations' && <LocationsTab locations={locations} locationStaffCount={locationStaffCount} onEdit={setEditingLocation} onAdd={() => setEditingLocation('new')} />}
         {tab === 'Staff' && <StaffTab staff={staff} staffToLocations={staffToLocations} onEdit={setEditingStaff} onAdd={() => setEditingStaff('new')} />}
         {tab === 'Services' && <ServicesTab services={services} serviceToStaff={serviceToStaff} serviceToLocations={serviceToLocations} onEdit={setEditingService} onAdd={() => setEditingService('new')} />}
         {tab === 'Customers' && <CustomersTab customers={uniqueCustomers} />}
@@ -414,7 +414,7 @@ export default function TenantDetailPage() {
 
       {editingLocation && (
         <LocationEditModal
-          location={editingLocation}
+          location={editingLocation === 'new' ? null : editingLocation}
           saving={saving}
           onSave={async (loc) => { await adminSave({ locations: [loc] }); setEditingLocation(null); }}
           onClose={() => setEditingLocation(null)}
@@ -451,9 +451,13 @@ function OverviewTab({ stats, tenant }: { stats: Stats; tenant: TenantDetail }) 
   );
 }
 
-function LocationsTab({ locations, locationStaffCount, onEdit }: { locations: Location[]; locationStaffCount: Map<string, number>; onEdit: (l: Location) => void }) {
-  if (locations.length === 0) return <EmptyState text="No locations configured." />;
+function LocationsTab({ locations, locationStaffCount, onEdit, onAdd }: { locations: Location[]; locationStaffCount: Map<string, number>; onEdit: (l: Location) => void; onAdd: () => void }) {
   return (
+    <>
+    <div className="mb-4 flex justify-end">
+      <button onClick={onAdd} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Add Location</button>
+    </div>
+    {locations.length === 0 ? <EmptyState text="No locations configured." /> : (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {locations.map((loc) => (
         <div key={loc.id} className="group relative rounded-xl border border-gray-200 bg-white p-5">
@@ -475,6 +479,8 @@ function LocationsTab({ locations, locationStaffCount, onEdit }: { locations: Lo
         </div>
       ))}
     </div>
+    )}
+    </>
   );
 }
 
@@ -969,19 +975,20 @@ function StaffEditModal({ staff, saving, onSave, onDelete, onClose }: { staff: S
   );
 }
 
-function LocationEditModal({ location, saving, onSave, onClose }: { location: Location; saving: boolean; onSave: (l: Record<string, unknown>) => void; onClose: () => void }) {
-  const [name, setName] = useState(location.name);
-  const [address, setAddress] = useState(location.address);
-  const [city, setCity] = useState(location.city ?? '');
-  const [state, setState] = useState(location.state ?? '');
-  const [country, setCountry] = useState(location.country ?? '');
-  const [postalCode, setPostalCode] = useState(location.postal_code ?? '');
-  const [lat, setLat] = useState(location.latitude);
-  const [lng, setLng] = useState(location.longitude);
-  const [phone, setPhone] = useState(location.phone ?? '');
-  const [description, setDescription] = useState(location.description ?? '');
-  const [imageUrl, setImageUrl] = useState(location.image_url ?? '');
-  const [streetAddress, setStreetAddress] = useState(location.street_address ?? '');
+function LocationEditModal({ location, saving, onSave, onClose }: { location: Location | null; saving: boolean; onSave: (l: Record<string, unknown>) => void; onClose: () => void }) {
+  const isNew = !location;
+  const [name, setName] = useState(location?.name ?? '');
+  const [address, setAddress] = useState(location?.address ?? '');
+  const [city, setCity] = useState(location?.city ?? '');
+  const [state, setState] = useState(location?.state ?? '');
+  const [country, setCountry] = useState(location?.country ?? '');
+  const [postalCode, setPostalCode] = useState(location?.postal_code ?? '');
+  const [lat, setLat] = useState(location?.latitude ?? null);
+  const [lng, setLng] = useState(location?.longitude ?? null);
+  const [phone, setPhone] = useState(location?.phone ?? '');
+  const [description, setDescription] = useState(location?.description ?? '');
+  const [imageUrl, setImageUrl] = useState(location?.image_url ?? '');
+  const [streetAddress, setStreetAddress] = useState(location?.street_address ?? '');
 
   // Google Places Autocomplete
   const addressRef = useRef<HTMLInputElement>(null);
@@ -1035,11 +1042,11 @@ function LocationEditModal({ location, saving, onSave, onClose }: { location: Lo
   }, [mapsLoaded]);
 
   return (
-    <ModalShell title="Edit Location" onClose={onClose}>
+    <ModalShell title={isNew ? 'Add Location' : 'Edit Location'} onClose={onClose}>
       <div className="space-y-3">
         <InputField label="Location Name" value={name} onChange={setName} />
         <div>
-          <label className="block text-sm font-medium text-gray-700">Address</label>
+          <label className="block text-sm font-medium text-gray-700">Search Address (auto-fills fields below)</label>
           <input
             ref={addressRef}
             type="text"
@@ -1070,7 +1077,7 @@ function LocationEditModal({ location, saving, onSave, onClose }: { location: Lo
       <div className="mt-6 flex justify-end gap-3">
         <button onClick={onClose} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
         <button onClick={() => onSave({
-          id: location.id, name, address,
+          ...(location?.id ? { id: location.id } : {}), name, address,
           street_address: streetAddress || null, city: city || null, state: state || null,
           country: country || null, postal_code: postalCode || null,
           latitude: lat, longitude: lng,
