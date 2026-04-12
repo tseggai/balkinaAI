@@ -281,7 +281,7 @@ export default function CouponsPage() {
   /* ── List view ──────────────────────────────────────────────────────── */
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Coupons</h1>
@@ -318,6 +318,7 @@ export default function CouponsPage() {
             </button>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -423,6 +424,7 @@ export default function CouponsPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -482,7 +484,7 @@ export default function CouponsPage() {
                     </div>
 
                     {/* Discount Type + Discount Value */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-0.5">
                         <span className="text-xs text-gray-400">Discount Type</span>
                         <select
@@ -707,7 +709,7 @@ export default function CouponsPage() {
                     </div>
 
                     {/* Discount type + value */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <select
                           value={form.discount_type}

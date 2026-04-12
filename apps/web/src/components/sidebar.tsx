@@ -25,9 +25,11 @@ const navItems = [
 export function Sidebar({
   tenantName,
   planName,
+  onNavigate,
 }: {
   tenantName: string;
   planName: string;
+  onNavigate?: () => void;
 }) {
   const pathname = usePathname();
 
@@ -38,7 +40,7 @@ export function Sidebar({
   }
 
   return (
-    <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
+    <aside className="flex h-full flex-col border-r border-gray-200 bg-white">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-6">
         <img src="/assets/Balkina_logo_color.png" alt="Balkina AI" className="h-7 w-auto" />
@@ -56,6 +58,7 @@ export function Sidebar({
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  onClick={onNavigate}
                   className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-brand-50 text-brand-700'

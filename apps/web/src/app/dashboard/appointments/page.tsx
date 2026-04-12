@@ -811,7 +811,7 @@ export default function AppointmentsPage() {
   return (
     <div className="relative flex h-full">
       {/* Main content */}
-      <div className="flex-1 overflow-auto p-6 lg:p-8">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -1196,7 +1196,7 @@ export default function AppointmentsPage() {
           <div className="fixed inset-0 z-40 bg-black/30" onClick={closePanel} />
 
           {/* Panel */}
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:w-[40%] sm:min-w-[630px]">
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl md:w-[40%] md:min-w-[630px]">
             {/* Panel header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -1232,7 +1232,7 @@ export default function AppointmentsPage() {
                   </select>
 
                   {/* Service & Staff side by side */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <select
                       value={formServiceId}
                       onChange={(e) => setFormServiceId(e.target.value)}
@@ -1271,7 +1271,7 @@ export default function AppointmentsPage() {
                   </div>
 
                   {/* Date & Time */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="date"
                       value={formDate}
@@ -1316,7 +1316,7 @@ export default function AppointmentsPage() {
                   </div>
 
                   {/* Customer & Status side by side */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <select
                       value={isNewCustomer ? '__new__' : formCustomerId}
                       onChange={(e) => {
@@ -1354,15 +1354,15 @@ export default function AppointmentsPage() {
                   {isNewCustomer && (
                     <div className="space-y-3 rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] p-4">
                       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">New Customer</p>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input type="text" value={newCustFirstName} onChange={(e) => setNewCustFirstName(e.target.value)} className={addInputClass} placeholder="First Name *" />
                         <input type="text" value={newCustLastName} onChange={(e) => setNewCustLastName(e.target.value)} className={addInputClass} placeholder="Last Name" />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input type="email" value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} className={addInputClass} placeholder="Email" />
                         <input type="tel" value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} className={addInputClass} placeholder="Phone" />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input type="date" value={newCustDob} onChange={(e) => setNewCustDob(e.target.value)} className={addInputClass} placeholder="Date of Birth" />
                         <select value={newCustGender} onChange={(e) => setNewCustGender(e.target.value)} className={addInputClass}>
                           <option value="">Gender...</option>
@@ -1580,7 +1580,7 @@ export default function AppointmentsPage() {
                   </div>
 
                   {/* Row 2: Service 50% + Staff 50% */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <span className="text-xs text-gray-400">Service</span>
                       <div className="flex items-center gap-2">
@@ -1639,7 +1639,7 @@ export default function AppointmentsPage() {
                   </div>
 
                   {/* Date & Time — human readable */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <span className="text-xs text-gray-400">Date</span>
                       <div className="flex h-[46px] items-center text-sm text-gray-900">

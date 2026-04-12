@@ -762,7 +762,7 @@ export default function StaffPage() {
           />
 
           {/* First Name + Last Name */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <span className="text-xs text-gray-400">First Name *</span>
               <input
@@ -796,7 +796,7 @@ export default function StaffPage() {
           </div>
 
           {/* Email + Phone */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <span className="text-xs text-gray-400">Email *</span>
               <input
@@ -889,7 +889,7 @@ export default function StaffPage() {
         />
 
         {/* First Name + Last Name */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <input
               required
@@ -920,7 +920,7 @@ export default function StaffPage() {
         </div>
 
         {/* Email + Phone */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <input
               type="email"
@@ -1372,7 +1372,7 @@ export default function StaffPage() {
   // ── Main Render ────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">

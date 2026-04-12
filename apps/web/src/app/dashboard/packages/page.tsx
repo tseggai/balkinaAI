@@ -227,7 +227,7 @@ export default function PackagesPage() {
   const isEditMode = showForm && !!editing;
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900">Packages</h1>
@@ -357,7 +357,7 @@ export default function PackagesPage() {
                   onChange={(url) => setForm({ ...form, image_url: url })}
                   label=""
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <input
                       value={form.name}
@@ -521,7 +521,7 @@ export default function PackagesPage() {
                   label=""
                 />
                 {/* Name + Price side by side */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs text-gray-400">Name</label>
                     <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Name *" className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3" />

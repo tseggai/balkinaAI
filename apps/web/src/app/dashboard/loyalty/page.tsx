@@ -321,14 +321,14 @@ export default function LoyaltyPage() {
 
   if (loading) {
     return (
-      <div className="p-6 lg:p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="p-12 text-center text-sm text-gray-500">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -370,6 +370,7 @@ export default function LoyaltyPage() {
             </button>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -456,6 +457,7 @@ export default function LoyaltyPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -620,7 +622,7 @@ export default function LoyaltyPage() {
                 {/* Redemption */}
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-gray-900">Redemption</h3>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-gray-400">Pts to $1</label>
                       <input

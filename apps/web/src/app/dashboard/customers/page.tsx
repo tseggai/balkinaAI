@@ -210,7 +210,7 @@ export default function CustomersPage() {
   return (
     <div className="relative h-full">
       {/* Main list - always full width */}
-      <div className="h-full p-6 lg:p-8">
+      <div className="h-full p-4 sm:p-6 lg:p-8">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
@@ -242,6 +242,7 @@ export default function CustomersPage() {
               <p className="mt-1 text-xs text-gray-400">Customers will appear here once they book appointments.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -303,6 +304,7 @@ export default function CustomersPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>
@@ -327,7 +329,7 @@ export default function CustomersPage() {
                 <ImageUpload value={editProfileImage} onChange={setEditProfileImage} label="" />
 
                 {/* Row 2: First Name (50%) + Last Name (50%) */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs text-gray-400">First Name</label>
                     <input type="text" value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} placeholder="First name" className={editInputClass} />
@@ -339,7 +341,7 @@ export default function CustomersPage() {
                 </div>
 
                 {/* Row 3: Email (50%) + Phone (50%) */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs text-gray-400">Email</label>
                     <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Email" className={editInputClass} />
@@ -351,7 +353,7 @@ export default function CustomersPage() {
                 </div>
 
                 {/* Row 4: Birthday (50%) + Gender (50%) */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs text-gray-400">Birthday</label>
                     <input type="text" value={editDob} onChange={(e) => setEditDob(e.target.value)} placeholder="MM/DD" className={editInputClass} />
@@ -456,19 +458,19 @@ export default function CustomersPage() {
                 <ImageUpload value={newProfileImage} onChange={setNewProfileImage} label="" />
 
                 {/* Row 2: First Name (50%) + Last Name (50%) */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <input type="text" value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} placeholder="First name" className={addInputClass} />
                   <input type="text" value={newLastName} onChange={(e) => setNewLastName(e.target.value)} placeholder="Last name" className={addInputClass} />
                 </div>
 
                 {/* Row 3: Email (50%) + Phone (50%) */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email" className={addInputClass} />
                   <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="Phone" className={addInputClass} />
                 </div>
 
                 {/* Row 4: Birthday (50%) + Gender (50%) */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <input type="text" value={newDob} onChange={(e) => setNewDob(e.target.value)} placeholder="Birthday (MM/DD)" className={addInputClass} />
                   <select value={newGender} onChange={(e) => setNewGender(e.target.value)} className={addInputClass}>
                     <option value="">Gender</option>

@@ -119,7 +119,7 @@ export default function ReviewsPage() {
   const totalPages = Math.ceil(total / perPage);
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Reviews</h1>
