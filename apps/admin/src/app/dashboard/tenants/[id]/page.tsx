@@ -987,8 +987,8 @@ function LocationEditModal({ location, saving, onSave, onClose }: { location: Lo
   const [lng, setLng] = useState(location?.longitude ?? null);
   const [phone, setPhone] = useState(location?.phone ?? '');
   const [description, setDescription] = useState(location?.description ?? '');
-  const [imageUrl, setImageUrl] = useState(location?.image_url ?? '');
   const [streetAddress, setStreetAddress] = useState(location?.street_address ?? '');
+  const [addressLine2, setAddressLine2] = useState(location?.address_line2 ?? '');
 
   // Google Places Autocomplete
   const addressRef = useRef<HTMLInputElement>(null);
@@ -1043,45 +1043,56 @@ function LocationEditModal({ location, saving, onSave, onClose }: { location: Lo
 
   return (
     <ModalShell title={isNew ? 'Add Location' : 'Edit Location'} onClose={onClose}>
-      <div className="space-y-3">
-        <InputField label="Location Name" value={name} onChange={setName} />
+      <div className="space-y-4">
+        <InputField label="Location Name *" value={name} onChange={setName} />
+
+        {/* Search address — Google Places Autocomplete */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Search Address (auto-fills fields below)</label>
           <input
             ref={addressRef}
             type="text"
             value={address}
             onChange={e => setAddress(e.target.value)}
-            placeholder="Start typing to search..."
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            placeholder="Search address (auto-fills fields below)..."
+            autoComplete="off"
+            className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
-          {!mapsLoaded && process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && (
-            <p className="mt-1 text-xs text-gray-400">Loading address search...</p>
-          )}
+          <p className="mt-1 text-[11px] text-gray-400">Type to search — fields below will auto-fill</p>
         </div>
+
+        {/* Country */}
+        <input value={country} onChange={e => setCountry(e.target.value)} placeholder="Country" className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
+
+        {/* Street Address */}
+        <input value={streetAddress} onChange={e => setStreetAddress(e.target.value)} placeholder="Street Address" className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
+
+        {/* Apt, Suite, Unit */}
+        <input value={addressLine2} onChange={e => setAddressLine2(e.target.value)} placeholder="Apt, Suite, Unit (Optional)" className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
+
+        {/* City + State */}
         <div className="grid grid-cols-2 gap-3">
-          <InputField label="City" value={city} onChange={setCity} />
-          <InputField label="State" value={state} onChange={setState} />
+          <input value={city} onChange={e => setCity(e.target.value)} placeholder="City" className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
+          <input value={state} onChange={e => setState(e.target.value)} placeholder="State / Province" className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <InputField label="Country" value={country} onChange={setCountry} />
-          <InputField label="Postal Code" value={postalCode} onChange={setPostalCode} />
-        </div>
-        <InputField label="Phone" value={phone} onChange={setPhone} />
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Description</label>
-          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-        </div>
-        <InputField label="Image URL" value={imageUrl} onChange={setImageUrl} placeholder="https://..." />
+
+        {/* ZIP / Postal Code */}
+        <input value={postalCode} onChange={e => setPostalCode(e.target.value)} placeholder="ZIP / Postal Code" className="w-full max-w-[50%] rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
+
+        {/* Phone */}
+        <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone (+1 (555) 123-4567)" className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
+
+        {/* Description */}
+        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Description (optional)" className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
       </div>
       <div className="mt-6 flex justify-end gap-3">
         <button onClick={onClose} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
         <button onClick={() => onSave({
           ...(location?.id ? { id: location.id } : {}), name, address,
-          street_address: streetAddress || null, city: city || null, state: state || null,
+          street_address: streetAddress || null, address_line2: addressLine2 || null,
+          city: city || null, state: state || null,
           country: country || null, postal_code: postalCode || null,
           latitude: lat, longitude: lng,
-          phone: phone || null, description: description || null, image_url: imageUrl || null,
+          phone: phone || null, description: description || null,
         })} disabled={saving || !name.trim()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
       </div>
     </ModalShell>

@@ -243,7 +243,7 @@ export async function PATCH(
   // 4. Upsert / delete locations
   if (Array.isArray(body.locations)) {
     const locResults: unknown[] = [];
-    const allowed = ['name', 'address', 'street_address', 'city', 'state', 'country', 'postal_code', 'phone', 'description', 'image_url', 'latitude', 'longitude', 'timezone'];
+    const allowed = ['name', 'address', 'street_address', 'address_line2', 'city', 'state', 'country', 'postal_code', 'phone', 'description', 'image_url', 'latitude', 'longitude', 'timezone'];
     for (const loc of body.locations) {
       if (loc._delete && loc.id) {
         const { error } = await auth.supabase.from('tenant_locations').delete().eq('id', loc.id);
