@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { Sidebar } from '@/components/sidebar';
+import { OnboardingWizard } from '@/components/onboarding-wizard';
 
 /**
  * Client wrapper around the dashboard layout that manages mobile sidebar
@@ -23,6 +24,8 @@ export function DashboardShell({
 
   return (
     <div className="flex h-[100dvh] bg-gray-50">
+      {/* Onboarding wizard overlay */}
+      <OnboardingWizard tenantName={tenantName} />
       {/* Backdrop overlay — mobile only */}
       {sidebarOpen && (
         <div
