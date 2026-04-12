@@ -146,3 +146,120 @@ export async function GET(
     stats,
   });
 }
+
+/**
+ * PATCH /api/admin/tenants/[id]
+ * Update tenant profile, services, staff, or locations on behalf of the tenant.
+ * Body: { tenant?, services?, staff?, locations? }
+ */
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const auth = await requireAdmin();
+  if (!auth.admin) return auth.response;
+
+  const { id } = await params;
+  const body = await request.json();
+  const results: Record<string, unknown> = {};
+
+  // 1. Update tenant profile fields
+  if (body.tenant) {
+    const allowed = ['name', 'owner_name', 'email', 'phone', 'logo_url', 'category_id', 'status', 'payments_enabled', 'currency'];
+    const updates: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (key in body.tenant) updates[key] = body.tenant[key];
+    }
+    if (Object.keys(updates).length > 0) {
+      const { error } = await auth.supabase
+        .from('tenants')
+        .update(updates as never)
+        .eq('id', id);
+      results.tenant = error ? { error: error.message } : { updated: true };
+    }
+  }
+
+  // 2. Upsert / delete services
+  if (Array.isArray(body.services)) {
+    const svcResults: unknown[] = [];
+    for (const svc of body.services) {
+      if (svc._delete && svc.id) {
+        // Delete
+        await auth.supabase.from('service_staff').delete().eq('service_id', svc.id);
+        await auth.supabase.from('service_locations').delete().eq('service_id', svc.id);
+        const { error } = await auth.supabase.from('services').delete().eq('id', svc.id);
+        svcResults.push({ id: svc.id, deleted: !error, error: error?.message });
+      } else if (svc.id) {
+        // Update existing
+        const { name, price, duration_minutes, description, image_url, visibility } = svc;
+        const { error } = await auth.supabase
+          .from('services')
+          .update({ name, price, duration_minutes, description, image_url, visibility } as never)
+          .eq('id', svc.id);
+        svcResults.push({ id: svc.id, updated: !error, error: error?.message });
+      } else {
+        // Create new
+        const { name, price, duration_minutes, description, image_url, visibility } = svc;
+        const { data, error } = await auth.supabase
+          .from('services')
+          .insert({ tenant_id: id, name, price: price ?? 0, duration_minutes: duration_minutes ?? 60, description, image_url, visibility: visibility ?? 'public' } as never)
+          .select('id')
+          .single();
+        svcResults.push({ id: (data as { id: string } | null)?.id, created: !error, error: error?.message });
+      }
+    }
+    results.services = svcResults;
+  }
+
+  // 3. Upsert / delete staff
+  if (Array.isArray(body.staff)) {
+    const staffResults: unknown[] = [];
+    for (const s of body.staff) {
+      if (s._delete && s.id) {
+        await auth.supabase.from('staff_locations').delete().eq('staff_id', s.id);
+        await auth.supabase.from('service_staff').delete().eq('staff_id', s.id);
+        const { error } = await auth.supabase.from('staff').delete().eq('id', s.id);
+        staffResults.push({ id: s.id, deleted: !error, error: error?.message });
+      } else if (s.id) {
+        const { name, email, phone, image_url, status } = s;
+        const { error } = await auth.supabase
+          .from('staff')
+          .update({ name, email, phone, image_url, status } as never)
+          .eq('id', s.id);
+        staffResults.push({ id: s.id, updated: !error, error: error?.message });
+      } else {
+        const { name, email, phone, image_url } = s;
+        const { data, error } = await auth.supabase
+          .from('staff')
+          .insert({ tenant_id: id, name, email, phone, image_url, status: 'active' } as never)
+          .select('id')
+          .single();
+        staffResults.push({ id: (data as { id: string } | null)?.id, created: !error, error: error?.message });
+      }
+    }
+    results.staff = staffResults;
+  }
+
+  // 4. Update locations
+  if (Array.isArray(body.locations)) {
+    const locResults: unknown[] = [];
+    for (const loc of body.locations) {
+      if (!loc.id) continue;
+      const allowed = ['name', 'address', 'street_address', 'city', 'state', 'country', 'postal_code', 'phone', 'description', 'image_url', 'latitude', 'longitude', 'timezone'];
+      const updates: Record<string, unknown> = {};
+      for (const key of allowed) {
+        if (key in loc) updates[key] = loc[key];
+      }
+      if (Object.keys(updates).length > 0) {
+        const { error } = await auth.supabase
+          .from('tenant_locations')
+          .update(updates as never)
+          .eq('id', loc.id);
+        locResults.push({ id: loc.id, updated: !error, error: error?.message });
+      }
+    }
+    results.locations = locResults;
+  }
+
+  return NextResponse.json({ success: true, results });
+}
