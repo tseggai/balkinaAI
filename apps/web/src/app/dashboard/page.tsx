@@ -247,7 +247,7 @@ export default function DashboardOverview() {
   ];
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -349,6 +349,7 @@ export default function DashboardOverview() {
             </div>
             <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
               {recentAppointments.length > 0 ? (
+              <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
@@ -394,6 +395,7 @@ export default function DashboardOverview() {
                     ))}
                   </tbody>
                 </table>
+              </div>
               ) : (
                 <div className="px-6 py-12 text-center">
                   <p className="text-sm text-gray-500">No appointments in this period.</p>

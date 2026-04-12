@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { Sidebar } from '@/components/sidebar';
+import { DashboardShell } from '@/components/dashboard-shell';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,12 +28,8 @@ export default async function DashboardLayout({
   const planName = tenant.subscription_plans?.name ?? 'Free';
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar
-        tenantName={tenant.name}
-        planName={planName}
-      />
-      <main className="flex-1 overflow-auto">{children}</main>
-    </div>
+    <DashboardShell tenantName={tenant.name} planName={planName}>
+      {children}
+    </DashboardShell>
   );
 }

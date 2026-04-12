@@ -235,7 +235,7 @@ export default function InventoryPage() {
   const editTextareaClass = 'w-full rounded-[.3rem] border border-transparent bg-transparent px-0 py-1.5 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3';
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
@@ -446,7 +446,7 @@ export default function InventoryPage() {
                       </div>
                     </div>
                     {/* Row 3: Purchase Price + Sell Price */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-0.5">
                         <span className="text-xs text-gray-400">Purchase Price ($)</span>
                         <input
@@ -473,7 +473,7 @@ export default function InventoryPage() {
                     {/* Row 4: Linked Services (50% select + 50% qty+add) */}
                     <div>
                       <label className="mb-1 block text-xs text-gray-400">Linked Services</label>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <select
                           value={addServiceId}
                           onChange={(e) => setAddServiceId(e.target.value)}
@@ -585,7 +585,7 @@ export default function InventoryPage() {
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <input
                           type="number"
@@ -611,7 +611,7 @@ export default function InventoryPage() {
                     </div>
                     {/* Linked Services */}
                     <div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <select
                           value={addServiceId}
                           onChange={(e) => setAddServiceId(e.target.value)}

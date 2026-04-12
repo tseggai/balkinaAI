@@ -164,7 +164,7 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
 
       {/* Tabs */}

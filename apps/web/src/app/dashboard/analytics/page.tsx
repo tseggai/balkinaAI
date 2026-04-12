@@ -59,7 +59,7 @@ export default function AnalyticsPage() {
   const maxDailyCount = data ? Math.max(...data.dailyRevenue.map((d) => d.count), 1) : 1;
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
