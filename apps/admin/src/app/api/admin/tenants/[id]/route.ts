@@ -33,7 +33,7 @@ export async function GET(
     // 2. Locations
     auth.supabase
       .from('tenant_locations')
-      .select('id, name, address, latitude, longitude, timezone, phone, description, image_url, created_at')
+      .select('id, name, address, street_address, address_line2, city, state, postal_code, country, latitude, longitude, timezone, phone, description, image_url, created_at')
       .eq('tenant_id', id)
       .order('name'),
 
