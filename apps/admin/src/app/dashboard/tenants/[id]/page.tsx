@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -975,19 +975,90 @@ function LocationEditModal({ location, saving, onSave, onClose }: { location: Lo
   const [city, setCity] = useState(location.city ?? '');
   const [state, setState] = useState(location.state ?? '');
   const [country, setCountry] = useState(location.country ?? '');
+  const [postalCode, setPostalCode] = useState(location.postal_code ?? '');
+  const [lat, setLat] = useState(location.latitude);
+  const [lng, setLng] = useState(location.longitude);
   const [phone, setPhone] = useState(location.phone ?? '');
   const [description, setDescription] = useState(location.description ?? '');
   const [imageUrl, setImageUrl] = useState(location.image_url ?? '');
+  const [streetAddress, setStreetAddress] = useState(location.street_address ?? '');
+
+  // Google Places Autocomplete
+  const addressRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
+
+  useEffect(() => {
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) return;
+    const g = window as unknown as { google?: { maps?: unknown } };
+    if (g.google?.maps) { setMapsLoaded(true); return; }
+    const existing = document.querySelector('script[src*="maps.googleapis.com"]');
+    if (existing) { existing.addEventListener('load', () => setMapsLoaded(true)); return; }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.onload = () => setMapsLoaded(true);
+    document.head.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    if (!mapsLoaded || !addressRef.current || autocompleteRef.current) return;
+    const ac = new google.maps.places.Autocomplete(addressRef.current, {
+      types: ['establishment', 'geocode'],
+    });
+    autocompleteRef.current = ac;
+    ac.addListener('place_changed', () => {
+      const place = ac.getPlace();
+      if (!place) return;
+      if (place.formatted_address) setAddress(place.formatted_address);
+      if (place.geometry?.location) {
+        setLat(place.geometry.location.lat());
+        setLng(place.geometry.location.lng());
+      }
+      const components = place.address_components;
+      if (components) {
+        let streetNum = '';
+        let route = '';
+        for (const comp of components) {
+          const t = comp.types;
+          if (t.includes('street_number')) streetNum = comp.long_name;
+          else if (t.includes('route')) route = comp.long_name;
+          else if (t.includes('locality') || t.includes('postal_town')) setCity(comp.long_name);
+          else if (t.includes('administrative_area_level_1')) setState(comp.short_name);
+          else if (t.includes('country')) setCountry(comp.long_name);
+          else if (t.includes('postal_code')) setPostalCode(comp.long_name);
+        }
+        if (streetNum || route) setStreetAddress([streetNum, route].filter(Boolean).join(' '));
+      }
+    });
+  }, [mapsLoaded]);
 
   return (
     <ModalShell title="Edit Location" onClose={onClose}>
       <div className="space-y-3">
         <InputField label="Location Name" value={name} onChange={setName} />
-        <InputField label="Full Address" value={address} onChange={setAddress} />
-        <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Address</label>
+          <input
+            ref={addressRef}
+            type="text"
+            value={address}
+            onChange={e => setAddress(e.target.value)}
+            placeholder="Start typing to search..."
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+          {!mapsLoaded && process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && (
+            <p className="mt-1 text-xs text-gray-400">Loading address search...</p>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <InputField label="City" value={city} onChange={setCity} />
           <InputField label="State" value={state} onChange={setState} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <InputField label="Country" value={country} onChange={setCountry} />
+          <InputField label="Postal Code" value={postalCode} onChange={setPostalCode} />
         </div>
         <InputField label="Phone" value={phone} onChange={setPhone} />
         <div>
@@ -998,7 +1069,13 @@ function LocationEditModal({ location, saving, onSave, onClose }: { location: Lo
       </div>
       <div className="mt-6 flex justify-end gap-3">
         <button onClick={onClose} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-        <button onClick={() => onSave({ id: location.id, name, address, city: city || null, state: state || null, country: country || null, phone: phone || null, description: description || null, image_url: imageUrl || null })} disabled={saving || !name.trim()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
+        <button onClick={() => onSave({
+          id: location.id, name, address,
+          street_address: streetAddress || null, city: city || null, state: state || null,
+          country: country || null, postal_code: postalCode || null,
+          latitude: lat, longitude: lng,
+          phone: phone || null, description: description || null, image_url: imageUrl || null,
+        })} disabled={saving || !name.trim()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
       </div>
     </ModalShell>
   );
