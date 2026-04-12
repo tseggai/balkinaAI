@@ -3,6 +3,7 @@ export {
   sendEmail,
   sendBookingConfirmationEmail,
   sendTenantWelcomeEmail,
+  sendTenantLoginEmail,
   sendSubscriptionActivatedEmail,
   sendPaymentFailedEmail,
 } from './email.js';

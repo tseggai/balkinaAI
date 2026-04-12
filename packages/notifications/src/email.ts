@@ -92,6 +92,65 @@ export async function sendBookingConfirmationEmail(params: {
 // ─── Tenant lifecycle emails ──────────────────────────────────────────────────
 
 /**
+ * Send tenant login credentials email — used after waitlist onboarding.
+ * Replaces Supabase's default password reset email so tenants get a branded
+ * "Welcome to Balkina AI" message containing their actual temporary password.
+ */
+export async function sendTenantLoginEmail(params: {
+  email: string;
+  ownerName: string;
+  businessName: string;
+  tempPassword: string;
+  loginUrl: string;
+}): Promise<EmailResult> {
+  const { email, ownerName, businessName, tempPassword, loginUrl } = params;
+
+  return sendEmail({
+    to: email,
+    subject: `Your Balkina AI login — ${businessName}`,
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111;">
+        <h2 style="color:#111;margin-top:0;">Welcome to Balkina AI, ${ownerName}!</h2>
+        <p>Your business <strong>${businessName}</strong> is now set up on Balkina AI.</p>
+        <p>You can sign in to your tenant dashboard with the credentials below:</p>
+        <div style="background:#f4f4f5;border:1px solid #e4e4e7;border-radius:8px;padding:16px;margin:16px 0;">
+          <p style="margin:0 0 8px 0;"><strong>Email:</strong> ${email}</p>
+          <p style="margin:0;"><strong>Temporary password:</strong> <code style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid #e4e4e7;">${tempPassword}</code></p>
+        </div>
+        <p style="margin:24px 0;">
+          <a href="${loginUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Sign in to Balkina AI</a>
+        </p>
+        <p style="color:#52525b;font-size:14px;">
+          For your security, please change your password after your first sign-in from the
+          dashboard's <em>Settings → Account</em> page.
+        </p>
+        <p style="color:#52525b;font-size:14px;">
+          If you didn't expect this email or need help, reply to this message or contact us at
+          <a href="mailto:support@balkina.ai">support@balkina.ai</a>.
+        </p>
+        <hr style="border:none;border-top:1px solid #e4e4e7;margin:24px 0;" />
+        <p style="color:#a1a1aa;font-size:12px;margin:0;">Balkina AI · AI-powered appointment booking</p>
+      </div>
+    `,
+    text: `Welcome to Balkina AI, ${ownerName}!
+
+Your business ${businessName} is now set up on Balkina AI.
+
+Sign in with the credentials below:
+Email: ${email}
+Temporary password: ${tempPassword}
+
+Sign in: ${loginUrl}
+
+For your security, please change your password after your first sign-in from Settings → Account.
+
+If you need help, reply to this email or contact support@balkina.ai.
+
+— Balkina AI`,
+  });
+}
+
+/**
  * Send welcome email to newly registered tenant.
  */
 export async function sendTenantWelcomeEmail(params: {
