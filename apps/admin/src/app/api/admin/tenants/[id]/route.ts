@@ -240,22 +240,41 @@ export async function PATCH(
     results.staff = staffResults;
   }
 
-  // 4. Update locations
+  // 4. Upsert / delete locations
   if (Array.isArray(body.locations)) {
     const locResults: unknown[] = [];
+    const allowed = ['name', 'address', 'street_address', 'city', 'state', 'country', 'postal_code', 'phone', 'description', 'image_url', 'latitude', 'longitude', 'timezone'];
     for (const loc of body.locations) {
-      if (!loc.id) continue;
-      const allowed = ['name', 'address', 'street_address', 'city', 'state', 'country', 'postal_code', 'phone', 'description', 'image_url', 'latitude', 'longitude', 'timezone'];
-      const updates: Record<string, unknown> = {};
-      for (const key of allowed) {
-        if (key in loc) updates[key] = loc[key];
-      }
-      if (Object.keys(updates).length > 0) {
-        const { error } = await auth.supabase
+      if (loc._delete && loc.id) {
+        const { error } = await auth.supabase.from('tenant_locations').delete().eq('id', loc.id);
+        locResults.push({ id: loc.id, deleted: !error, error: error?.message });
+      } else if (loc.id) {
+        // Update existing
+        const updates: Record<string, unknown> = {};
+        for (const key of allowed) {
+          if (key in loc) updates[key] = loc[key];
+        }
+        if (Object.keys(updates).length > 0) {
+          const { error } = await auth.supabase
+            .from('tenant_locations')
+            .update(updates as never)
+            .eq('id', loc.id);
+          locResults.push({ id: loc.id, updated: !error, error: error?.message });
+        }
+      } else {
+        // Create new
+        const insert: Record<string, unknown> = { tenant_id: id };
+        for (const key of allowed) {
+          if (key in loc) insert[key] = loc[key];
+        }
+        if (!insert.name) insert.name = insert.address ?? 'New Location';
+        if (!insert.timezone) insert.timezone = 'UTC';
+        const { data, error } = await auth.supabase
           .from('tenant_locations')
-          .update(updates as never)
-          .eq('id', loc.id);
-        locResults.push({ id: loc.id, updated: !error, error: error?.message });
+          .insert(insert as never)
+          .select('id')
+          .single();
+        locResults.push({ id: (data as { id: string } | null)?.id, created: !error, error: error?.message });
       }
     }
     results.locations = locResults;
