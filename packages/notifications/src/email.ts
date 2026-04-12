@@ -107,8 +107,10 @@ export async function sendTenantLoginEmail(params: {
 
   return sendEmail({
     to: email,
-    subject: `Your Balkina AI login — ${businessName}`,
+    subject: `Welcome to Balkina AI`,
     html: `
+      <!-- Hidden preview text shown in email list view -->
+      <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Your business ${businessName} is now set up on Balkina AI. Sign in with your credentials below.</div>
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111;">
         <h2 style="color:#111;margin-top:0;">Welcome to Balkina AI, ${ownerName}!</h2>
         <p>Your business <strong>${businessName}</strong> is now set up on Balkina AI.</p>
