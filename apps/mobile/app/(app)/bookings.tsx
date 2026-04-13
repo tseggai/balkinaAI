@@ -610,7 +610,17 @@ export default function BookingsScreen() {
         return;
       }
 
-      // 4. Payment succeeded — refresh to show updated status
+      // 4. Payment succeeded — verify and update DB (don't rely on webhook timing)
+      try {
+        await fetch(`${API_BASE}/api/payments/verify-deposit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appointmentId }),
+        });
+      } catch {
+        // Verification failed — webhook will handle it eventually
+      }
+
       Alert.alert('Deposit Paid!', 'Your deposit has been processed successfully.');
       fetchAppointments();
     } catch {
