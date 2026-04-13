@@ -89,7 +89,7 @@ export default function RootLayout() {
     <ErrorBoundary>
       <SafeStripeProvider
         publishableKey={STRIPE_PUBLISHABLE_KEY}
-        merchantIdentifier="merchant.com.tseggaid.balkinaai"
+        merchantIdentifier="merchant.ai.balkina.app"
       >
         <RootLayoutContent />
       </SafeStripeProvider>
