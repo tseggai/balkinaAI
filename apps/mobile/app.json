@@ -99,7 +99,7 @@
       [
         "@stripe/stripe-react-native",
         {
-          "merchantIdentifier": "merchant.com.tseggaid.balkinaai",
+          "merchantIdentifier": "merchant.ai.balkina.app",
           "enableGooglePay": true
         }
       ]
