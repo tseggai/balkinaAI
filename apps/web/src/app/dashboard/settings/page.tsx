@@ -74,7 +74,7 @@ export default function SettingsPage() {
     const filePath = `tenant-logos/${tenant.id}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('public-assets')
+      .from('images')
       .upload(filePath, file, { upsert: true, contentType: file.type });
 
     if (uploadError) {
@@ -83,7 +83,7 @@ export default function SettingsPage() {
       return;
     }
 
-    const { data: urlData } = supabase.storage.from('public-assets').getPublicUrl(filePath);
+    const { data: urlData } = supabase.storage.from('images').getPublicUrl(filePath);
     const logoUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
     const { error: updateError } = await supabase
