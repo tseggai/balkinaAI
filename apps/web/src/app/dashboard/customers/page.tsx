@@ -139,7 +139,9 @@ export default function CustomersPage() {
           profile_image_url: newProfileImage || null,
         }),
       });
-      if (res.ok) {
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setCustomers(prev => [{ ...json.data, total_bookings: 0, total_spent: 0, last_booking_date: null, avg_interval_days: null, predicted_next_date: null }, ...prev]);
         setNewFirstName('');
         setNewLastName('');
         setNewEmail('');
@@ -149,7 +151,8 @@ export default function CustomersPage() {
         setNewNote('');
         setNewProfileImage('');
         setShowAddModal(false);
-        fetchCustomers();
+      } else {
+        alert(json.error?.message ?? 'Failed to add customer');
       }
     } finally {
       setAddLoading(false);

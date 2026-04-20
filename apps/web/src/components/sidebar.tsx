@@ -6,13 +6,13 @@ import { createClient } from '@/lib/supabase/client';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: HomeIcon },
-  { href: '/dashboard/appointments', label: 'Appointments', icon: CalendarIcon },
   { href: '/dashboard/services', label: 'Services', icon: BriefcaseIcon },
-  { href: '/dashboard/categories', label: 'Categories', icon: CategoryIcon },
   { href: '/dashboard/staff', label: 'Staff', icon: UsersIcon },
   { href: '/dashboard/locations', label: 'Locations', icon: MapPinIcon },
-  { href: '/dashboard/packages', label: 'Packages', icon: PackageIcon },
+  { href: '/dashboard/appointments', label: 'Appointments', icon: CalendarIcon },
   { href: '/dashboard/customers', label: 'Customers', icon: UserGroupIcon },
+  { href: '/dashboard/categories', label: 'Categories', icon: CategoryIcon },
+  { href: '/dashboard/packages', label: 'Packages', icon: PackageIcon },
   { href: '/dashboard/coupons', label: 'Coupons', icon: TagIcon },
   { href: '/dashboard/loyalty', label: 'Loyalty', icon: StarIcon },
   { href: '/dashboard/reviews', label: 'Reviews', icon: ReviewIcon },
