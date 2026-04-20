@@ -1009,7 +1009,7 @@ function LocationGallery({ locationId }: { locationId: string }) {
       <div className="flex items-center justify-between mb-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Gallery Photos</h3>
-          <p className="text-xs text-gray-500">{photos.length}/15 photos. Shown to customers during discovery.</p>
+          <p className="text-xs text-gray-500">{photos.length}/15 photos. Photos save automatically.</p>
         </div>
         <button
           type="button"
