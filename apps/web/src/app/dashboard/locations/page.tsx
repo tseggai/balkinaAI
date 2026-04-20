@@ -91,6 +91,7 @@ export default function LocationsPage() {
   const [bookingLimitEnabled, setBookingLimitEnabled] = useState(false);
   const [bookingLimitCapacity, setBookingLimitCapacity] = useState('1');
   const [bookingLimitInterval, setBookingLimitInterval] = useState('day');
+  const [galleryChanged, setGalleryChanged] = useState(false);
   const [phone, setPhone] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -218,6 +219,7 @@ export default function LocationsPage() {
     setBookingLimitEnabled(false);
     setBookingLimitCapacity('1');
     setBookingLimitInterval('day');
+    setGalleryChanged(false);
     setError('');
     autocompleteRef.current = null;
     setShowPanel(true);
@@ -262,6 +264,7 @@ export default function LocationsPage() {
       bookingLimitCapacity: String(loc.booking_limit_capacity ?? 1),
       bookingLimitInterval: loc.booking_limit_interval ?? 'day',
     };
+    setGalleryChanged(false);
     setError('');
     autocompleteRef.current = null;
     setShowPanel(true);
@@ -364,7 +367,7 @@ export default function LocationsPage() {
     timezone, lat, lng, phone, description, imageUrl,
     bookingLimitEnabled, bookingLimitCapacity, bookingLimitInterval,
   };
-  const isDirty = JSON.stringify(currentLocationValues) !== JSON.stringify(initialFormValues.current);
+  const isDirty = galleryChanged || JSON.stringify(currentLocationValues) !== JSON.stringify(initialFormValues.current);
 
   // ── Slide-in Panel ─────────────────────────────────────────────────────────
 
@@ -727,7 +730,7 @@ export default function LocationsPage() {
 
               {/* Gallery Photos — only show when editing an existing location */}
               {isEdit && editing && (
-                <LocationGallery locationId={editing.id} />
+                <LocationGallery locationId={editing.id} onChanged={() => setGalleryChanged(true)} />
               )}
 
               {error && <p className="text-sm text-red-600">{error}</p>}
@@ -943,7 +946,7 @@ interface GalleryPhoto {
   sort_order: number;
 }
 
-function LocationGallery({ locationId }: { locationId: string }) {
+function LocationGallery({ locationId, onChanged }: { locationId: string; onChanged?: () => void }) {
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -977,12 +980,14 @@ function LocationGallery({ locationId }: { locationId: string }) {
     }
 
     setUploading(false);
+    onChanged?.();
     if (fileRef.current) fileRef.current.value = '';
   }
 
   async function handleDelete(id: string) {
     await fetch(`/api/gallery?id=${id}`, { method: 'DELETE' });
     setPhotos(prev => prev.filter(p => p.id !== id));
+    onChanged?.();
   }
 
   function handleDragStart(idx: number) { setDragIdx(idx); }

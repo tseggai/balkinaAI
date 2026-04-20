@@ -69,24 +69,22 @@ export default function SettingsPage() {
     setUploadingLogo(true);
     setMessage('');
 
-    const supabase = createClient();
-    const ext = file.name.split('.').pop() ?? 'png';
-    const filePath = `tenant-logos/${tenant.id}.${ext}`;
+    const formData = new FormData();
+    formData.append('file', file);
 
-    const { error: uploadError } = await supabase.storage
-      .from('images')
-      .upload(filePath, file, { upsert: true, contentType: file.type });
+    const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+    const uploadJson = await uploadRes.json();
 
-    if (uploadError) {
+    if (!uploadRes.ok || !uploadJson.url) {
       setUploadingLogo(false);
-      setMessage('Failed to upload logo');
+      setMessage(uploadJson.error ?? 'Failed to upload logo');
       return;
     }
 
-    const { data: urlData } = supabase.storage.from('images').getPublicUrl(filePath);
-    const logoUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+    const logoUrl = uploadJson.url;
 
-    const { error: updateError } = await supabase
+    const sb = createClient();
+    const { error: updateError } = await sb
       .from('tenants')
       .update({ logo_url: logoUrl } as never)
       .eq('id', tenant.id);
