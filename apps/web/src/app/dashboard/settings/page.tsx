@@ -15,17 +15,24 @@ interface TenantInfo {
   logo_url: string | null;
   stripe_customer_id: string | null;
   subscription_plan_id: string | null;
+  category_id: string | null;
+}
+
+interface Category {
+  id: string;
+  name: string;
 }
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('profile');
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: '', phone: '' });
+  const [form, setForm] = useState({ name: '', phone: '', category_id: '' });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const initialFormValues = useRef<Record<string, unknown>>({});
 
@@ -34,16 +41,25 @@ export default function SettingsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data } = await supabase
-      .from('tenants')
-      .select('id, name, owner_name, email, phone, logo_url, stripe_customer_id, subscription_plan_id')
-      .eq('user_id', user.id)
-      .single();
+    const [{ data }, { data: cats }] = await Promise.all([
+      supabase
+        .from('tenants')
+        .select('id, name, owner_name, email, phone, logo_url, stripe_customer_id, subscription_plan_id, category_id')
+        .eq('user_id', user.id)
+        .single(),
+      supabase
+        .from('categories')
+        .select('id, name')
+        .is('parent_id', null)
+        .order('display_order'),
+    ]);
+
+    if (cats) setCategories(cats as Category[]);
 
     const tenantInfo = data as TenantInfo | null;
     if (tenantInfo) {
       setTenant(tenantInfo);
-      const formValues = { name: tenantInfo.name, phone: tenantInfo.phone ?? '' };
+      const formValues = { name: tenantInfo.name, phone: tenantInfo.phone ?? '', category_id: tenantInfo.category_id ?? '' };
       setForm(formValues);
       initialFormValues.current = { ...formValues };
       setLogoPreview(tenantInfo.logo_url);
@@ -127,7 +143,7 @@ export default function SettingsPage() {
     const supabase = createClient();
     const { error } = await supabase
       .from('tenants')
-      .update({ name: form.name, phone: form.phone || null } as never)
+      .update({ name: form.name, phone: form.phone || null, category_id: form.category_id || null } as never)
       .eq('id', tenant.id);
 
     setSaving(false);
@@ -245,6 +261,17 @@ export default function SettingsPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
               <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Business Category</label>
+              <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                <option value="">Select a category...</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-400">This determines where customers find you when browsing by category.</p>
             </div>
             {message && <p className={`text-sm ${message.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}>{message}</p>}
             <button type="submit" disabled={!isDirty || saving}
