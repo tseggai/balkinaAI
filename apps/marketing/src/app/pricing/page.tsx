@@ -1,18 +1,25 @@
 import type { Metadata } from 'next';
+import { createClient } from '@supabase/supabase-js';
 
 export const metadata: Metadata = {
   title: 'Pricing — Balkina AI',
   description: 'Simple, transparent pricing for every business size. Start free with a 14-day trial.',
 };
 
-const PLANS = [
-  {
-    name: 'Starter',
-    price: '49',
+export const revalidate = 300;
+
+interface Plan {
+  name: string;
+  price_monthly: number;
+  max_staff: number;
+  max_locations: number;
+  features: Record<string, boolean> | null;
+}
+
+const PLAN_DETAILS: Record<string, { desc: string; features: string[]; limits: string[]; popular?: boolean }> = {
+  Starter: {
     desc: 'Perfect for solo professionals — barbers, therapists, consultants.',
     features: [
-      '1 staff member',
-      '1 location',
       'AI booking chatbot',
       'Email notifications',
       'Appointment management',
@@ -26,14 +33,10 @@ const PLANS = [
       'No coupons',
     ],
   },
-  {
-    name: 'Pro',
-    price: '99',
+  Pro: {
     desc: 'For growing teams that need the full toolkit.',
     popular: true,
     features: [
-      'Up to 10 staff members',
-      'Up to 3 locations',
       'Everything in Starter, plus:',
       'SMS notifications',
       'Deposit & online payments',
@@ -45,13 +48,9 @@ const PLANS = [
     ],
     limits: [],
   },
-  {
-    name: 'Enterprise',
-    price: '199',
+  Enterprise: {
     desc: 'For multi-location businesses at scale.',
     features: [
-      'Unlimited staff',
-      'Unlimited locations',
       'Everything in Pro, plus:',
       'Custom branding',
       'API access',
@@ -62,7 +61,7 @@ const PLANS = [
     ],
     limits: [],
   },
-];
+};
 
 const FAQ = [
   { q: 'Is there a free trial?', a: 'Yes! Every plan comes with a 14-day free trial. No credit card required to start.' },
@@ -73,7 +72,37 @@ const FAQ = [
   { q: 'What if I have more than 10 staff?', a: 'The Enterprise plan supports unlimited staff and locations. Contact us if you need a custom arrangement.' },
 ];
 
-export default function PricingPage() {
+async function getPlans(): Promise<Plan[]> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return [];
+  const supabase = createClient(url, key);
+  const { data } = await supabase
+    .from('subscription_plans')
+    .select('name, price_monthly, max_staff, max_locations, features')
+    .order('price_monthly');
+  return (data ?? []) as Plan[];
+}
+
+export default async function PricingPage() {
+  const plans = await getPlans();
+
+  const displayPlans = plans.map((plan) => {
+    const details = PLAN_DETAILS[plan.name] ?? { desc: '', features: [], limits: [] };
+    const staffLabel = plan.max_staff >= 50 ? 'Unlimited staff' : `Up to ${plan.max_staff} staff member${plan.max_staff > 1 ? 's' : ''}`;
+    const locLabel = plan.max_locations >= 10 ? 'Unlimited locations' : `${plan.max_locations} location${plan.max_locations > 1 ? 's' : ''}`;
+    return {
+      name: plan.name,
+      price: Math.floor(plan.price_monthly) === plan.price_monthly
+        ? String(Math.floor(plan.price_monthly))
+        : plan.price_monthly.toFixed(2),
+      desc: details.desc,
+      popular: details.popular ?? false,
+      features: [staffLabel, locLabel, ...details.features],
+      limits: details.limits,
+    };
+  });
+
   return (
     <>
       {/* Header */}
@@ -88,7 +117,7 @@ export default function PricingPage() {
       <section className="pb-24 pt-16">
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid gap-8 md:grid-cols-3">
-            {PLANS.map((plan, i) => (
+            {displayPlans.map((plan, i) => (
               <div key={i} className={`relative flex flex-col rounded-2xl border p-8 ${plan.popular ? 'border-brand-600 bg-white shadow-xl shadow-brand-100/50' : 'border-gray-200 bg-white'}`}>
                 {plan.popular && (
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-brand-600 px-4 py-1 text-xs font-semibold text-white">Most Popular</div>
