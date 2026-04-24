@@ -640,7 +640,7 @@ export default function HomePage() {
           </div>
           <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {[
-              { name: 'Solo', price: '0', desc: 'For individuals getting started', staff: '1 staff', locations: '1 location', bookings: '20/month', trial: false, features: ['AI chatbot', 'Staff app', 'Smart reminders', 'SMS notifications', 'Reviews & ratings', 'Basic analytics'] },
+              { name: 'Solo', price: '5', desc: 'For individuals getting started', staff: '1 staff', locations: '1 location', bookings: '20/month', trial: false, features: ['AI chatbot', 'Staff app', 'Smart reminders', 'SMS notifications', 'Reviews & ratings', 'Basic analytics'] },
               { name: 'Solo Pro', price: '19', desc: 'For serious solo professionals', staff: '1 staff', locations: '1 location', bookings: 'Unlimited', trial: true, features: ['Everything in Solo', 'Unlimited bookings', 'Full service management', 'Service add-ons', 'Coupons'] },
               { name: 'Team', price: '49', desc: 'For small teams', staff: 'Up to 5 staff', locations: '2 locations', bookings: 'Unlimited', popular: true, trial: true, extra: '+\u20AC6/additional staff', features: ['Everything in Solo Pro', 'Service packages', 'Staff management', 'Advanced analytics'] },
               { name: 'Scale', price: '99', desc: 'For growing businesses', staff: 'Up to 15 staff', locations: '5 locations', bookings: 'Unlimited', trial: true, extra: '+\u20AC6/additional staff', features: ['Everything in Team', 'Role management', 'Loyalty programs', 'Inventory management', 'Dedicated support'] },
@@ -707,7 +707,7 @@ export default function HomePage() {
                   <thead>
                     <tr className="border-b border-gray-200">
                       <th className="pb-4 pr-4 font-medium text-gray-500" style={{ minWidth: 200 }}>Feature</th>
-                      <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Solo</div><div className="text-xs font-normal text-gray-400">&euro;0/mo</div></th>
+                      <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Solo</div><div className="text-xs font-normal text-gray-400">&euro;5/mo</div></th>
                       <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Solo Pro</div><div className="text-xs font-normal text-gray-400">&euro;19/mo</div></th>
                       <th className="pb-4 text-center font-semibold text-brand-700" style={{ minWidth: 90 }}><div className="rounded-t-lg bg-brand-50 px-2 py-1.5 -mx-2">Team<div className="text-xs font-normal text-brand-500">&euro;49/mo</div></div></th>
                       <th className="pb-4 text-center font-medium text-gray-500" style={{ minWidth: 90 }}><div>Scale</div><div className="text-xs font-normal text-gray-400">&euro;99/mo</div></th>
