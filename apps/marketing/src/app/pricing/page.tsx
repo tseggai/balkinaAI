@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 const PLANS = [
   {
     name: 'Starter',
-    price: '49',
+    price: '5',
     desc: 'Perfect for solo professionals — barbers, therapists, consultants.',
     features: [
       '1 staff member',
