@@ -134,11 +134,14 @@ export async function POST(request: Request) {
         };
       });
 
-      // Sort by distance if user has location
+      // Sort by distance if user has location — include tenants without coords at the end
       if (latitude && longitude) {
-        enriched = enriched
-          .filter((b) => b.distance_km !== undefined && b.distance_km <= radiusKm)
-          .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
+        const withDist = enriched.filter((b) => b.distance_km !== undefined && b.distance_km <= radiusKm);
+        const noDist = enriched.filter((b) => b.distance_km === undefined);
+        enriched = [
+          ...withDist.sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999)),
+          ...noDist,
+        ];
       }
 
       const totalCount = enriched.length;
@@ -251,9 +254,12 @@ export async function POST(request: Request) {
       });
 
       if (latitude && longitude) {
-        results = results
-          .filter((b) => b.distance_km !== undefined && b.distance_km <= radiusKm)
-          .sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
+        const withDist = results.filter((b) => b.distance_km !== undefined && b.distance_km <= radiusKm);
+        const noDist = results.filter((b) => b.distance_km === undefined);
+        results = [
+          ...withDist.sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999)),
+          ...noDist,
+        ];
       }
 
       const totalCount = results.length;

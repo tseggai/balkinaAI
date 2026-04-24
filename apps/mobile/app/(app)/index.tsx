@@ -220,7 +220,7 @@ const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap }: { it
               <View style={richCardStyles.depositBadge}>
                 <Text style={richCardStyles.depositText}>
                   {svc.deposit_type === 'percentage'
-                    ? `${svc.deposit_amount}% deposit`
+                    ? `$${(svc.price * svc.deposit_amount / 100).toFixed(2)} deposit`
                     : `$${svc.deposit_amount} deposit`}
                 </Text>
               </View>
@@ -336,7 +336,7 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
                     {svc.deposit_enabled && svc.deposit_amount ? (
                       <Text style={combinedStyles.serviceCardLgDepositText}>
                         {svc.deposit_type === 'percentage'
-                          ? `(${svc.deposit_amount}% deposit)`
+                          ? `($${(svc.price * svc.deposit_amount / 100).toFixed(2)} deposit)`
                           : `($${svc.deposit_amount} deposit)`}
                       </Text>
                     ) : null}
