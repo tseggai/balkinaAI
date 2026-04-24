@@ -1,79 +1,113 @@
 import type { Metadata } from 'next';
+import { createClient } from '@supabase/supabase-js';
 
 export const metadata: Metadata = {
   title: 'Pricing — Balkina AI',
   description: 'Simple, transparent pricing for every business size. Start free with a 14-day trial.',
 };
 
-const PLANS = [
-  {
-    name: 'Starter',
-    price: '49',
-    desc: 'Perfect for solo professionals — barbers, therapists, consultants.',
+export const revalidate = 300;
+
+interface Plan {
+  name: string;
+  price_monthly: number;
+  max_staff: number;
+  max_locations: number;
+}
+
+const PLAN_DETAILS: Record<string, { desc: string; popular?: boolean; features: string[]; limits: string[] }> = {
+  Solo: {
+    desc: 'For individuals getting started',
     features: [
-      '1 staff member',
-      '1 location',
-      'AI booking chatbot',
-      'Email notifications',
-      'Appointment management',
-      'Customer CRM',
+      'AI chatbot',
+      'Staff app',
+      'Smart reminders',
+      'SMS notifications',
+      'Reviews & ratings',
       'Basic analytics',
-      'Review collection',
     ],
-    limits: [
-      'No SMS notifications',
-      'No deposit payments',
-      'No coupons',
-    ],
+    limits: [],
   },
-  {
-    name: 'Pro',
-    price: '99',
-    desc: 'For growing teams that need the full toolkit.',
+  'Solo Pro': {
+    desc: 'For serious solo professionals',
+    features: [
+      'Everything in Solo',
+      'Unlimited bookings',
+      'Full service management',
+      'Service add-ons',
+      'Coupons',
+    ],
+    limits: [],
+  },
+  Team: {
+    desc: 'For small teams',
     popular: true,
     features: [
-      'Up to 10 staff members',
-      'Up to 3 locations',
-      'Everything in Starter, plus:',
-      'SMS notifications',
-      'Deposit & online payments',
-      'Coupons & promotions',
-      'Service extras & packages',
-      'Staff scheduling & buffers',
-      'Smart rebooking reminders',
-      'Priority support',
+      'Everything in Solo Pro',
+      'Service packages',
+      'Staff management',
+      'Advanced analytics',
     ],
     limits: [],
   },
-  {
-    name: 'Enterprise',
-    price: '199',
-    desc: 'For multi-location businesses at scale.',
+  Scale: {
+    desc: 'For growing businesses',
     features: [
-      'Unlimited staff',
-      'Unlimited locations',
-      'Everything in Pro, plus:',
-      'Custom branding',
-      'API access',
-      'Advanced analytics & forecasting',
-      'Dedicated account manager',
-      'Custom integrations',
-      'SLA guarantee',
+      'Everything in Team',
+      'Role management',
+      'Loyalty programs',
+      'Inventory management',
+      'Dedicated support',
     ],
     limits: [],
   },
-];
+};
 
 const FAQ = [
-  { q: 'Is there a free trial?', a: 'Yes! Every plan comes with a 14-day free trial. No credit card required to start.' },
+  { q: 'Is there a free trial?', a: 'Yes! Every plan comes with a 7-day free trial. No credit card required to start.' },
   { q: 'Can I change plans later?', a: 'Absolutely. Upgrade or downgrade at any time from your dashboard. Changes take effect on your next billing cycle.' },
   { q: 'How does the AI chatbot work?', a: 'Customers open the Balkina app and describe what they need in plain language. The AI searches for matching businesses, shows real-time availability, and books the appointment — all in a single conversation.' },
   { q: 'Do my customers need to download an app?', a: 'Yes, the customer experience is through the Balkina mobile app (iOS and Android). This gives them the best experience with push notifications, Apple Pay, and smart reminders.' },
   { q: 'How do payments work?', a: 'We use Stripe Connect. When a customer pays a deposit, the money goes directly to your Stripe account minus a small platform commission. You\'ll need to complete Stripe\'s verification process.' },
-  { q: 'What if I have more than 10 staff?', a: 'The Enterprise plan supports unlimited staff and locations. Contact us if you need a custom arrangement.' },
+  { q: 'What if I need more staff?', a: 'You can add additional staff members for €6/month each on the Team and Scale plans. Contact us if you need a custom arrangement.' },
 ];
 
-export default function PricingPage() {
+async function getPlans(): Promise<Plan[]> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return [];
+  const supabase = createClient(url, key);
+  const { data } = await supabase
+    .from('subscription_plans')
+    .select('name, price_monthly, max_staff, max_locations')
+    .order('price_monthly');
+  return (data ?? []) as Plan[];
+}
+
+export default async function PricingPage() {
+  const plans = await getPlans();
+
+  const displayPlans = plans.map((plan) => {
+    const details = PLAN_DETAILS[plan.name] ?? { desc: '', features: [], limits: [] };
+    const staffLabel = plan.max_staff >= 50 ? 'Unlimited staff' : `${plan.max_staff > 1 ? `Up to ${plan.max_staff}` : plan.max_staff} staff`;
+    const locLabel = `${plan.max_locations > 1 ? plan.max_locations : plan.max_locations} location${plan.max_locations > 1 ? 's' : ''}`;
+    const bookingsLabel = plan.name === 'Solo' ? '20/month bookings' : 'Unlimited bookings';
+    const extraStaff = (plan.name === 'Team' || plan.name === 'Scale') ? '+€6/additional staff' : undefined;
+    return {
+      name: plan.name,
+      price: Math.floor(plan.price_monthly),
+      desc: details.desc,
+      popular: details.popular ?? false,
+      staffLabel,
+      locLabel,
+      bookingsLabel,
+      extraStaff,
+      features: details.features,
+      limits: details.limits,
+      hasTrial: plan.price_monthly > 0,
+    };
+  });
+
   return (
     <>
       {/* Header */}
@@ -85,27 +119,33 @@ export default function PricingPage() {
       </section>
 
       {/* Plans */}
-      <section className="pb-24 pt-16">
+      <section className="pb-16 pt-16">
         <div className="mx-auto max-w-7xl px-6">
-          <div className="grid gap-8 md:grid-cols-3">
-            {PLANS.map((plan, i) => (
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+            {displayPlans.map((plan, i) => (
               <div key={i} className={`relative flex flex-col rounded-2xl border p-8 ${plan.popular ? 'border-brand-600 bg-white shadow-xl shadow-brand-100/50' : 'border-gray-200 bg-white'}`}>
                 {plan.popular && (
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-brand-600 px-4 py-1 text-xs font-semibold text-white">Most Popular</div>
                 )}
                 <h2 className="text-xl font-bold text-gray-900">{plan.name}</h2>
-                <p className="mt-2 text-sm text-gray-500">{plan.desc}</p>
-                <div className="mt-6">
-                  <span className="text-5xl font-extrabold text-gray-900">&euro;{plan.price}</span>
-                  <span className="text-base text-gray-500">/month</span>
+                <p className="mt-1 text-sm text-gray-500">{plan.desc}</p>
+                <div className="mt-5">
+                  <span className="text-4xl font-extrabold text-gray-900">&euro;{plan.price}</span>
+                  <span className="text-base text-gray-500">/mo</span>
                 </div>
-                <a href="/join" className={`mt-8 block rounded-full py-3.5 text-center text-sm font-semibold transition-colors ${plan.popular ? 'bg-brand-600 text-white hover:bg-brand-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
-                  Join the Beta
-                </a>
+                {plan.hasTrial && (
+                  <p className="mt-1 text-xs font-medium text-brand-600">7-day free trial</p>
+                )}
 
-                <div className="mt-8 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Includes</p>
-                  <ul className="mt-4 space-y-3">
+                {/* Capacity box */}
+                <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                  <p>{plan.staffLabel} &middot; {plan.locLabel}</p>
+                  <p>{plan.bookingsLabel}</p>
+                  {plan.extraStaff && <p className="text-brand-600">{plan.extraStaff}</p>}
+                </div>
+
+                <div className="mt-6 flex-1">
+                  <ul className="space-y-3">
                     {plan.features.map((f, fi) => (
                       <li key={fi} className="flex items-start gap-2.5 text-sm text-gray-600">
                         <svg className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
@@ -113,22 +153,29 @@ export default function PricingPage() {
                       </li>
                     ))}
                   </ul>
-                  {plan.limits.length > 0 && (
-                    <>
-                      <p className="mt-6 text-xs font-semibold uppercase tracking-wider text-gray-400">Not included</p>
-                      <ul className="mt-4 space-y-3">
-                        {plan.limits.map((l, li) => (
-                          <li key={li} className="flex items-start gap-2.5 text-sm text-gray-400">
-                            <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                            {l}
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
                 </div>
+
+                <a href="/join" className={`mt-8 block rounded-full py-3.5 text-center text-sm font-semibold transition-colors ${plan.popular ? 'bg-brand-600 text-white hover:bg-brand-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
+                  Join the Beta
+                </a>
               </div>
             ))}
+          </div>
+
+          {/* Online Payments add-on */}
+          <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-gray-200 bg-white p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50">
+                  <svg className="h-5 w-5 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg>
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">Online Payments</p>
+                  <p className="text-sm text-gray-500">Accept deposits and payments via Stripe. Available where Stripe is supported.</p>
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-gray-900">+&euro;14<span className="text-sm font-normal text-gray-500">/mo</span></p>
+            </div>
           </div>
         </div>
       </section>
@@ -151,7 +198,7 @@ export default function PricingPage() {
       {/* CTA */}
       <section className="bg-brand-600 py-16">
         <div className="mx-auto max-w-2xl px-6 text-center">
-          <h2 className="text-2xl font-bold text-white md:text-3xl">Start your 14-day free trial today</h2>
+          <h2 className="text-2xl font-bold text-white md:text-3xl">Start your free trial today</h2>
           <p className="mt-3 text-base text-brand-100">No credit card required. Set up in minutes.</p>
           <a href="/join" className="mt-8 inline-block rounded-full bg-white px-8 py-3.5 text-base font-semibold text-brand-600 shadow-lg hover:bg-gray-50 transition-colors">
             Get Started Free
