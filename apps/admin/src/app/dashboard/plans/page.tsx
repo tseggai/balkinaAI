@@ -185,7 +185,7 @@ export default function PlansPage() {
                   <div>
                     <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
                     <p className="mt-1 text-3xl font-bold text-brand-600">
-                      ${plan.price_monthly}<span className="text-sm font-normal text-gray-400">/mo</span>
+                      &euro;{plan.price_monthly}<span className="text-sm font-normal text-gray-400">/mo</span>
                     </p>
                   </div>
                   <button
