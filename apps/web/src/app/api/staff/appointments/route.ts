@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
   let query = admin
     .from('appointments')
-    .select('*, services(name, duration_minutes), customers(display_name, phone, email), tenant_locations(name)')
+    .select('*, services(name, duration_minutes), customers(display_name, phone, email, no_show_count), tenant_locations(name)')
     .eq('staff_id', staff.id)
     .eq('tenant_id', staff.tenant_id);
 
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
   // Map to StaffAppointment shape
   const appointments = ((data ?? []) as Record<string, unknown>[]).map((row) => {
     const svc = row.services as { name: string; duration_minutes: number } | null;
-    const cust = row.customers as { display_name: string | null; phone: string | null } | null;
+    const cust = row.customers as { display_name: string | null; phone: string | null; no_show_count?: number } | null;
     const loc = row.tenant_locations as { name: string } | null;
     return {
       id: row.id,
@@ -93,6 +93,7 @@ export async function GET(request: Request) {
       staff_id: row.staff_id,
       customer_name: cust?.display_name ?? 'Guest',
       customer_phone: cust?.phone ?? null,
+      customer_no_show_count: cust?.no_show_count ?? 0,
       service_name: svc?.name ?? 'Service',
       service_duration: svc?.duration_minutes ?? 0,
       date: typeof row.start_time === 'string' ? row.start_time.split('T')[0] : '',

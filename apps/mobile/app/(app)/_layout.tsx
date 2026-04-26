@@ -1,6 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { Tabs, useRouter } from 'expo-router';
-import { AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
@@ -23,44 +22,33 @@ try {
 
 export default function AppTabsLayout() {
   const router = useRouter();
-  const tokenRegistered = useRef(false);
 
-  const tryRegisterPushToken = async () => {
+  useEffect(() => {
     if (!supabaseConfigured) return;
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const customerId = session.user.id;
-      console.log('[push-reg] registering push token for customer', customerId);
-      await registerPushToken({
-        recipientType: 'customer',
-        recipientId: customerId,
-        accessToken: session.access_token,
-      });
-      tokenRegistered.current = true;
-      console.log('[push-reg] token registered successfully');
-    } catch (err) {
-      console.warn('[push-reg] push token registration failed:', err);
-    }
-  };
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log('[push-reg] no session, skipping push token registration');
+          return;
+        }
 
-  // Register on mount + retry after 5s if first attempt fails
-  useEffect(() => {
-    tryRegisterPushToken().then(() => {
-      if (!tokenRegistered.current) {
-        setTimeout(tryRegisterPushToken, 5000);
+        // Use session.user.id directly as customerId — in our schema customer.id = auth uid.
+        // DB queries fail here when the refresh token is expired (RLS sees null auth.uid()),
+        // so we skip the DB lookup entirely.
+        const customerId = session.user.id;
+        console.log('[push-reg] registering push token for customer', customerId);
+        registerPushToken({
+          recipientType: 'customer',
+          recipientId: customerId,
+          accessToken: session.access_token,
+        }).catch((err) => {
+          console.warn('[push-reg] push token registration failed:', err);
+        });
+      } catch (err) {
+        console.warn('[push-reg] error during push setup:', err);
       }
-    });
-  }, []);
-
-  // Re-register when app comes back to foreground (token may have expired)
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && !tokenRegistered.current) {
-        tryRegisterPushToken();
-      }
-    });
-    return () => sub.remove();
+    })();
   }, []);
 
   // Listen for incoming notifications while app is in foreground

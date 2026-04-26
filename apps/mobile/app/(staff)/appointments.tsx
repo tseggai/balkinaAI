@@ -24,6 +24,7 @@ interface StaffAppointment {
   staff_id: string;
   customer_name: string;
   customer_phone: string | null;
+  customer_no_show_count: number;
   service_name: string;
   service_duration: number;
   date: string;
@@ -270,7 +271,14 @@ export default function StaffAppointments() {
             <Text style={styles.apptTime}>{formatTime(item.start_time)}</Text>
           </View>
           <View style={styles.apptInfo}>
-            <Text style={styles.apptCustomer}>{item.customer_name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.apptCustomer}>{item.customer_name}</Text>
+              {item.customer_no_show_count >= 2 && (
+                <View style={{ backgroundColor: '#fee2e2', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#991b1b' }}>{item.customer_no_show_count} no-shows</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.apptService}>{item.service_name} — {item.service_duration} min</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: colors.bg }]}>

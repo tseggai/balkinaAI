@@ -8,13 +8,15 @@ export function getDateButtons(): string[] {
   return ['Today', 'Tomorrow', 'Next Week', 'Pick a date'];
 }
 
-/** Next 7 days starting from 2 days out */
+/** Monday through Sunday of next week */
 export function getNextWeekDays(): string[] {
   const today = new Date();
+  const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ...
+  const daysUntilNextMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
   const days: string[] = [];
-  for (let i = 2; i <= 8; i++) {
+  for (let i = 0; i < 7; i++) {
     const d = new Date(today);
-    d.setDate(today.getDate() + i);
+    d.setDate(today.getDate() + daysUntilNextMonday + i);
     days.push(`${DAY_NAMES[d.getDay()]} ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`);
   }
   return days;
