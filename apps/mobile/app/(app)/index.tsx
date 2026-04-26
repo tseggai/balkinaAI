@@ -1309,7 +1309,7 @@ export default function ChatScreen() {
   const [paymentModal, setPaymentModal] = useState<{ appointmentId: string; depositAmount?: number; pendingCard?: ConfirmedCardData } | null>(null);
   const [galleryModal, setGalleryModal] = useState<{ photos: GalleryPhoto[]; initialIndex: number } | null>(null);
   // Track recently displayed service cards so we can match taps to IDs
-  const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; tenantId?: string; tenantName?: string }[]>([]);
+  const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; tenantId?: string; tenantName?: string; locationId?: string }[]>([]);
   // Stores structured tool data from SSE for deterministic rendering
   const pendingToolData = useRef<{ tool: string; data: Record<string, unknown> } | null>(null);
   // Stores last booking options so we can look up package/extras prices
@@ -1465,13 +1465,13 @@ export default function ChatScreen() {
   }, [addAssistantMessage]);
 
   // Fetch staff + availability from direct API
-  const fetchStaffAvailability = useCallback(async (tenantId: string, serviceId: string, date: string) => {
+  const fetchStaffAvailability = useCallback(async (tenantId: string, serviceId: string, date: string, locationId?: string | null) => {
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/booking/staff-availability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId, serviceId, date, customerId: null, userId, userLatitude: userCoords?.latitude, userLongitude: userCoords?.longitude }),
+        body: JSON.stringify({ tenantId, serviceId, date, locationId: locationId ?? undefined, customerId: null, userId, userLatitude: userCoords?.latitude, userLongitude: userCoords?.longitude }),
       });
       if (!res.ok) {
         addAssistantMessage('Sorry, I could not check availability. Please try again.');
@@ -1669,7 +1669,7 @@ export default function ChatScreen() {
           const allSvcs: typeof lastDisplayedServices.current = [];
           for (const biz of data.businesses) {
             for (const svc of biz.all_services ?? []) {
-              allSvcs.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled ?? false, deposit_amount: svc.deposit_amount ?? null, tenantId: biz.id, tenantName: biz.name });
+              allSvcs.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled ?? false, deposit_amount: svc.deposit_amount ?? null, tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id });
             }
           }
           lastDisplayedServices.current = allSvcs;
@@ -1724,6 +1724,7 @@ export default function ChatScreen() {
             ...INITIAL_BOOKING_STATE,
             tenantId: matchedService.tenantId ?? bookingState.tenantId,
             tenantName: matchedService.tenantName ?? bookingState.tenantName,
+            locationId: matchedService.locationId ?? bookingState.locationId,
             serviceId: matchedService.id,
             serviceName: matchedService.name,
             servicePrice: matchedService.price,
@@ -1764,7 +1765,7 @@ export default function ChatScreen() {
           const newState = { ...bookingState, date: dateStr };
           setBookingState(newState);
           addUserMessage(userText);
-          fetchStaffAvailability(newState.tenantId!, newState.serviceId!, dateStr);
+          fetchStaffAvailability(newState.tenantId!, newState.serviceId!, dateStr, newState.locationId);
           return true;
         }
       }
@@ -1793,7 +1794,7 @@ export default function ChatScreen() {
           const newState = { ...bookingState, date: dateStr };
           setBookingState(newState);
           addUserMessage(userText);
-          fetchStaffAvailability(newState.tenantId!, newState.serviceId!, dateStr);
+          fetchStaffAvailability(newState.tenantId!, newState.serviceId!, dateStr, newState.locationId);
           return true;
         }
 
@@ -1880,6 +1881,7 @@ export default function ChatScreen() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               tenantId: bookingState.tenantId,
+              locationId: bookingState.locationId,
               serviceId: bookingState.serviceId,
               staffId: bookingState.staffId,
               staffName: bookingState.staffName,

@@ -3,6 +3,7 @@
 export interface BookingState {
   tenantId: string | null;
   tenantName: string | null;
+  locationId: string | null;
   serviceId: string | null;
   serviceName: string | null;
   servicePrice: number | null;
@@ -25,6 +26,7 @@ export interface BookingState {
 export const INITIAL_BOOKING_STATE: BookingState = {
   tenantId: null,
   tenantName: null,
+  locationId: null,
   serviceId: null,
   serviceName: null,
   servicePrice: null,
