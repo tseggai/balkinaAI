@@ -67,7 +67,10 @@ function getDateForOption(option: DayOption): string {
   const d = new Date();
   if (option === 'tomorrow') d.setDate(d.getDate() + 1);
   if (option === 'next_week') d.setDate(d.getDate() + 7);
-  return d.toISOString().split('T')[0];
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function getDateLabel(option: DayOption): string {
