@@ -329,14 +329,12 @@ export default function StaffAppointments() {
           </View>
           <View style={[styles.apptInfo, { flex: 1 }]}>
             <Text style={styles.apptCustomer} numberOfLines={1}>{item.customer_name}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-              <Text style={styles.apptService} numberOfLines={1}>{item.service_name} — {item.service_duration} min</Text>
-              {item.customer_no_show_count >= 2 && (
-                <View style={{ backgroundColor: '#fee2e2', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
-                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#991b1b' }}>{item.customer_no_show_count} no-shows</Text>
-                </View>
-              )}
-            </View>
+            <Text style={styles.apptService} numberOfLines={1}>{item.service_name} — {item.service_duration} min</Text>
+            {item.customer_no_show_count >= 2 && (
+              <View style={{ backgroundColor: '#fee2e2', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start', marginTop: 3 }}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: '#991b1b' }}>{item.customer_no_show_count} no-shows</Text>
+              </View>
+            )}
           </View>
           <View style={[styles.statusBadge, { backgroundColor: colors.bg }]}>
             <Text style={[styles.statusText, { color: colors.text }]}>{item.status.replace('_', ' ')}</Text>
