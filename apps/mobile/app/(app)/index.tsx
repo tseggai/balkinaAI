@@ -963,7 +963,7 @@ const richCardStyles = StyleSheet.create({
   // Extras grid
   extrasContainer: { marginVertical: 6 },
   extrasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  extrasChip: { width: '47%', backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e5e7eb', padding: 14, minHeight: 70, justifyContent: 'center' as const },
+  extrasChip: { minWidth: 140, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e5e7eb', padding: 14, minHeight: 70, justifyContent: 'center' as const },
   extrasChipSelected: { borderColor: '#6B7FC4', backgroundColor: '#eef2ff' },
   extrasChipName: { fontSize: 14, fontWeight: '700', color: '#374151' },
   extrasChipNameSelected: { color: '#4338ca' },

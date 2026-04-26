@@ -68,11 +68,32 @@ export async function POST(request: Request) {
             to: staff.email,
             subject: `You've been invited to join ${tenant.name} on Balkina AI`,
             html: `
-              <h2>Welcome to Balkina AI!</h2>
-              <p>${tenant.name} has invited you to join their team.</p>
-              <p>Download the Balkina AI app and enter your invite code:</p>
-              <h1 style="font-size: 32px; letter-spacing: 4px; color: #6B7FC4; text-align: center;">${token}</h1>
-              <p>This code expires in 7 days.</p>
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111;">
+                <h2 style="color:#111;margin-top:0;">You're invited to join ${tenant.name}!</h2>
+                <p>${tenant.name} has invited you to join their team on Balkina AI — an AI-powered appointment booking platform.</p>
+
+                <div style="background:#f4f4f5;border:1px solid #e4e4e7;border-radius:8px;padding:16px;margin:16px 0;">
+                  <p style="margin:0 0 8px 0;"><strong>Your email:</strong> ${staff.email}</p>
+                  <p style="margin:0 0 8px 0;"><strong>Invite code:</strong></p>
+                  <p style="margin:0;font-size:32px;letter-spacing:4px;color:#6B7FC4;text-align:center;font-weight:700;">${token}</p>
+                </div>
+
+                <h3 style="margin-top:24px;">How to get started</h3>
+                <ol style="color:#52525b;font-size:14px;line-height:1.8;">
+                  <li>Download the Balkina AI app on your phone</li>
+                  <li>Tap <strong>"I'm a staff member"</strong> on the login screen</li>
+                  <li>Tap <strong>"New staff? Use invite code"</strong></li>
+                  <li>Enter the invite code above, your email, and create a password</li>
+                </ol>
+
+                <p style="margin:24px 0;">
+                  <a href="https://apps.apple.com/us/app/balkina-ai/id6761651423" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Download for iOS</a>
+                </p>
+
+                <p style="color:#9ca3af;font-size:13px;">This invite code expires in 7 days. If you need help, contact your manager or email <a href="mailto:support@balkina.ai" style="color:#6B7FC4;">support@balkina.ai</a>.</p>
+                <hr style="border:none;border-top:1px solid #e4e4e7;margin:24px 0;" />
+                <p style="color:#a1a1aa;font-size:12px;margin:0;">Balkina AI · AI-powered appointment booking</p>
+              </div>
             `,
           }),
         });

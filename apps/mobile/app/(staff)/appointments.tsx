@@ -373,6 +373,17 @@ export default function StaffAppointments() {
                   <Ionicons name="chatbubble-outline" size={16} color="#6B7FC4" />
                   <Text style={styles.contactBtnText}>Message</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.contactBtn}
+                  onPress={() => {
+                    const cleaned = item.customer_phone!.replace(/[^0-9+]/g, '');
+                    const waNumber = cleaned.startsWith('+') ? cleaned.slice(1) : cleaned;
+                    Linking.openURL(`https://wa.me/${waNumber}`);
+                  }}
+                >
+                  <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                  <Text style={styles.contactBtnText}>WhatsApp</Text>
+                </TouchableOpacity>
               </View>
             )}
 

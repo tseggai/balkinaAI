@@ -480,18 +480,29 @@ export default function BookingsScreen() {
   const handleGetDirections = useCallback((item: Appointment) => {
     const loc = item.tenant_locations;
     if (!loc) return;
-    if (loc.latitude && loc.longitude) {
-      const url = Platform.OS === 'ios'
-        ? `maps://maps.apple.com/?daddr=${loc.latitude},${loc.longitude}`
-        : `https://www.google.com/maps/dir/?api=1&destination=${loc.latitude},${loc.longitude}`;
-      Linking.openURL(url);
-    } else if (loc.address) {
-      const encoded = encodeURIComponent(loc.address);
-      const url = Platform.OS === 'ios'
-        ? `maps://maps.apple.com/?daddr=${encoded}`
-        : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
-      Linking.openURL(url);
+
+    const dest = loc.latitude && loc.longitude
+      ? `${loc.latitude},${loc.longitude}`
+      : loc.address ? encodeURIComponent(loc.address) : null;
+    if (!dest) return;
+
+    const appleUrl = loc.latitude && loc.longitude
+      ? `maps://maps.apple.com/?daddr=${dest}`
+      : `maps://maps.apple.com/?daddr=${dest}`;
+    const googleUrl = loc.latitude && loc.longitude
+      ? `https://www.google.com/maps/dir/?api=1&destination=${dest}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
+
+    if (Platform.OS === 'android') {
+      Linking.openURL(googleUrl);
+      return;
     }
+
+    Alert.alert('Open Directions', 'Choose your maps app', [
+      { text: 'Apple Maps', onPress: () => Linking.openURL(appleUrl) },
+      { text: 'Google Maps', onPress: () => Linking.openURL(googleUrl) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }, []);
 
   // Submit a review

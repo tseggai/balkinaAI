@@ -122,6 +122,18 @@ export async function sendTenantLoginEmail(params: {
         <p style="margin:24px 0;">
           <a href="${loginUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Sign in to Balkina AI</a>
         </p>
+        <div style="background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:16px;margin:16px 0;">
+          <p style="margin:0 0 8px 0;font-weight:600;color:#111;">Manage bookings on the go</p>
+          <p style="margin:0;font-size:14px;color:#52525b;">
+            Download the Balkina AI app to manage appointments, approve or decline booking requests, and communicate with customers directly from your phone.
+          </p>
+          <p style="margin:12px 0 0 0;">
+            <a href="https://apps.apple.com/us/app/balkina-ai/id6761651423" style="color:#2563eb;font-weight:600;font-size:14px;text-decoration:none;">Download for iOS →</a>
+          </p>
+          <p style="margin:4px 0 0 0;font-size:13px;color:#6b7280;">
+            Sign in as a staff member using the same email and password above.
+          </p>
+        </div>
         <p style="color:#52525b;font-size:14px;">
           For your security, please change your password after your first sign-in from the
           dashboard's <em>Settings → Account</em> page.
@@ -143,6 +155,11 @@ Email: ${email}
 Temporary password: ${tempPassword}
 
 Sign in: ${loginUrl}
+
+MANAGE BOOKINGS ON THE GO
+Download the Balkina AI app to manage appointments from your phone.
+iOS: https://apps.apple.com/us/app/balkina-ai/id6761651423
+Sign in as a staff member using the same email and password above.
 
 For your security, please change your password after your first sign-in from Settings → Account.
 
