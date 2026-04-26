@@ -584,6 +584,7 @@ const PackageCardRow = React.memo(function PackageCardRow({ items, onTap }: { it
 // ── Extras Grid ──────────────────────────────────────────────────────────────
 
 function ExtrasGridComponent({ data, onSubmit }: { data: ExtrasGridData; onSubmit: (msg: string) => void }) {
+  console.log('[ExtrasGrid] STANDALONE extras:', data.extras.length, 'names:', data.extras.map(e => e.name));
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const toggle = (id: string) => {
@@ -636,6 +637,7 @@ function ExtrasGridComponent({ data, onSubmit }: { data: ExtrasGridData; onSubmi
 // ── Booking Options (combined packages + extras) ────────────────────────────
 
 function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData; onSubmit: (msg: string) => void }) {
+  console.log('[BookingOptions] packages:', data.packages.length, 'extras:', data.extras.length, 'extras names:', data.extras.map(e => e.name));
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [selectedExtras, setSelectedExtras] = useState<Set<string>>(new Set());
 
@@ -702,24 +704,24 @@ function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData;
       {data.extras.length > 0 ? (
         <>
           <Text style={combinedStyles.sectionLabel}>Add extras</Text>
-          <View style={richCardStyles.extrasGrid}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 4 }}>
             {data.extras.map((extra) => {
               const isSelected = selectedExtras.has(extra.id);
               return (
                 <TouchableOpacity
                   key={extra.id}
-                  style={[richCardStyles.extrasChip, isSelected && richCardStyles.extrasChipSelected]}
+                  style={[combinedStyles.packageChip, isSelected && combinedStyles.packageChipSelected]}
                   onPress={() => toggleExtra(extra.id)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[richCardStyles.extrasChipName, isSelected && richCardStyles.extrasChipNameSelected]}>{extra.name}</Text>
-                  <Text style={[richCardStyles.extrasChipDetail, isSelected && richCardStyles.extrasChipDetailSelected]}>
+                  <Text style={[combinedStyles.packageChipName, isSelected && combinedStyles.packageChipNameSelected]}>{extra.name}</Text>
+                  <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>
                     +${extra.price} · +{extra.duration_minutes}min
                   </Text>
                 </TouchableOpacity>
               );
             })}
-          </View>
+          </ScrollView>
         </>
       ) : null}
       <TouchableOpacity style={richCardStyles.extrasDoneBtn} onPress={handleDone} activeOpacity={0.7}>
@@ -2358,6 +2360,7 @@ export default function ChatScreen() {
             )}
           </ScrollView>
           <View style={styles.inputBar}>
+          <View style={{ position: 'relative' }}>
             <TextInput
               style={styles.textInput}
               value={input}
@@ -2367,8 +2370,6 @@ export default function ChatScreen() {
               multiline
               maxLength={2000}
               editable={!isLoading}
-              returnKeyType="send"
-              onSubmitEditing={() => sendMessage()}
               blurOnSubmit={false}
             />
             <TouchableOpacity
