@@ -244,14 +244,21 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
   const SNAP_INTERVAL = CARD_WIDTH + CARD_MARGIN;
   const SIDE_PADDING = (SCREEN_WIDTH - CARD_WIDTH) / 2;
 
+  // Fade animation for service cards
+  const serviceFade = useRef(new Animated.Value(1)).current;
+
   // Auto-select business on snap
   const onBusinessScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = e.nativeEvent.contentOffset.x;
     const idx = Math.round(offsetX / SNAP_INTERVAL);
-    if (idx >= 0 && idx < data.items.length) {
-      setSelectedIdx(idx);
+    if (idx >= 0 && idx < data.items.length && idx !== selectedIdx) {
+      // Fade out, switch, fade in
+      Animated.timing(serviceFade, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
+        setSelectedIdx(idx);
+        Animated.timing(serviceFade, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+      });
     }
-  }, [data.items.length, SNAP_INTERVAL]);
+  }, [data.items.length, SNAP_INTERVAL, selectedIdx, serviceFade]);
 
   return (
     <View style={{ marginTop: 4, marginBottom: 6, flexShrink: 0 }}>
@@ -316,6 +323,7 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
         />
       </View>
       {services.length > 0 && selectedBiz ? (
+        <Animated.View style={{ opacity: serviceFade }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 10 }}>
           {services.map((svc, svcIdx) => {
             const isSelected = selectedSvcId === svc.id;
@@ -329,10 +337,20 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={[combinedStyles.serviceCardLgName, isSelected && combinedStyles.serviceCardLgNameSelected]} numberOfLines={1}>{svc.name}</Text>
-                <View style={combinedStyles.serviceCardLgRow}>
-                  <View style={combinedStyles.serviceCardLgLeft}>
-                    <Text style={[combinedStyles.serviceCardLgPrice, isSelected && combinedStyles.serviceCardLgPriceSelected]}>${svc.price}</Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  {svc.image_url ? (
+                    <Image source={{ uri: svc.image_url }} style={{ width: 52, height: 52, borderRadius: 8 }} />
+                  ) : (
+                    <View style={{ width: 52, height: 52, borderRadius: 8, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' }}>
+                      <Ionicons name="briefcase-outline" size={22} color="#9ca3af" />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[combinedStyles.serviceCardLgName, isSelected && combinedStyles.serviceCardLgNameSelected]} numberOfLines={1}>{svc.name}</Text>
+                    <View style={combinedStyles.serviceCardLgRow}>
+                      <Text style={[combinedStyles.serviceCardLgPrice, isSelected && combinedStyles.serviceCardLgPriceSelected]}>${svc.price}</Text>
+                      <Text style={[combinedStyles.serviceCardLgDuration, isSelected && combinedStyles.serviceCardLgDurationSelected]}>{svc.duration_minutes} min</Text>
+                    </View>
                     {svc.deposit_enabled && svc.deposit_amount ? (
                       <Text style={combinedStyles.serviceCardLgDepositText}>
                         {svc.deposit_type === 'percentage'
@@ -341,12 +359,12 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
                       </Text>
                     ) : null}
                   </View>
-                  <Text style={[combinedStyles.serviceCardLgDuration, isSelected && combinedStyles.serviceCardLgDurationSelected]}>{svc.duration_minutes} min</Text>
                 </View>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
+        </Animated.View>
       ) : null}
     </View>
   );
@@ -679,13 +697,13 @@ function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData;
       {data.extras.length > 0 ? (
         <>
           <Text style={combinedStyles.sectionLabel}>Add extras</Text>
-          <View style={richCardStyles.extrasGrid}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 4 }}>
             {data.extras.map((extra) => {
               const isSelected = selectedExtras.has(extra.id);
               return (
                 <TouchableOpacity
                   key={extra.id}
-                  style={[richCardStyles.extrasChip, isSelected && richCardStyles.extrasChipSelected]}
+                  style={[richCardStyles.extrasChip, isSelected && richCardStyles.extrasChipSelected, { marginRight: 8 }]}
                   onPress={() => toggleExtra(extra.id)}
                   activeOpacity={0.7}
                 >
@@ -696,7 +714,7 @@ function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData;
                 </TouchableOpacity>
               );
             })}
-          </View>
+          </ScrollView>
         </>
       ) : null}
       <TouchableOpacity style={richCardStyles.extrasDoneBtn} onPress={handleDone} activeOpacity={0.7}>
