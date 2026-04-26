@@ -59,7 +59,7 @@ export async function PATCH(
   // Verify appointment belongs to this staff
   const { data: appt, error: fetchErr } = await admin
     .from('appointments')
-    .select('id, status, customer_id, service_id, tenant_id, deposit_paid, deposit_amount_paid, stripe_payment_intent_id, services(deposit_enabled, deposit_amount, deposit_type, price)')
+    .select('id, status, customer_id, service_id, tenant_id, start_time, end_time, deposit_paid, deposit_amount_paid, stripe_payment_intent_id, services(deposit_enabled, deposit_amount, deposit_type, price)')
     .eq('id', params.id)
     .eq('staff_id', staff.id)
     .single();
@@ -74,6 +74,8 @@ export async function PATCH(
     customer_id: string;
     service_id: string;
     tenant_id: string;
+    start_time: string;
+    end_time: string;
     deposit_paid: boolean | null;
     deposit_amount_paid: number | null;
     stripe_payment_intent_id: string | null;
@@ -103,6 +105,25 @@ export async function PATCH(
     !depositPaid
   ) {
     effectiveStatus = 'approved';
+  }
+
+  // Block confirming/approving if another appointment is already booked for this slot
+  if ((effectiveStatus === 'confirmed' || effectiveStatus === 'approved') && appointment.status === 'pending') {
+    const { data: conflicts } = await admin
+      .from('appointments')
+      .select('id')
+      .eq('staff_id', staff.id)
+      .in('status', ['confirmed', 'approved'])
+      .neq('id', params.id)
+      .lt('start_time', appointment.end_time)
+      .gt('end_time', appointment.start_time)
+      .limit(1);
+    if (conflicts && conflicts.length > 0) {
+      return NextResponse.json({
+        data: null,
+        error: { message: 'Another appointment is already confirmed for this time slot. Please decline this one or cancel the conflicting appointment first.' },
+      }, { status: 409 });
+    }
   }
 
   // Update appointment status (+ save suggested times if declining with suggestions)
