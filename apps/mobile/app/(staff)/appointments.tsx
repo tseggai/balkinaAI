@@ -481,21 +481,19 @@ export default function StaffAppointments() {
               ))}
             </View>
 
-            {/* Next Week day sub-picker */}
+            {/* Next Week day grid */}
             {nextWeekDays.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {nextWeekDays.map((d) => (
-                    <TouchableOpacity
-                      key={d.dateStr}
-                      style={[styles.dayBtn, { paddingHorizontal: 12, paddingVertical: 8 }]}
-                      onPress={() => fetchSlotsForDate(d.dateStr)}
-                    >
-                      <Text style={styles.dayBtnText}>{d.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                {nextWeekDays.map((d) => (
+                  <TouchableOpacity
+                    key={d.dateStr}
+                    style={[styles.slotBtn, { paddingVertical: 10, paddingHorizontal: 14 }]}
+                    onPress={() => fetchSlotsForDate(d.dateStr)}
+                  >
+                    <Text style={styles.slotBtnText}>{d.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             )}
 
             {/* Time slots */}
