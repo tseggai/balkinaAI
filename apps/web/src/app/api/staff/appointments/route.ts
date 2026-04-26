@@ -102,6 +102,7 @@ export async function GET(request: Request) {
       status: row.status,
       total_price: row.total_price,
       notes: row.notes ?? null,
+      location_id: row.location_id ?? null,
       location_name: loc?.name ?? null,
     };
   });
