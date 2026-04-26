@@ -96,6 +96,7 @@ export default function StaffAppointments() {
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [declineLoading, setDeclineLoading] = useState(false);
+  const [nextWeekDays, setNextWeekDays] = useState<{ label: string; dateStr: string }[]>([]);
 
   // Get staff ID for realtime subscription
   useEffect(() => {
@@ -198,10 +199,66 @@ export default function StaffAppointments() {
     setDeclineAppointment(appt);
     setSelectedDay(null);
     setAvailableSlots([]);
+    setNextWeekDays([]);
     setDeclineModalVisible(true);
   }, []);
 
-  // Fetch available slots for a given day
+  // Handle day selection — if next_week, expand to Mon-Sun picker first
+  const handleDaySelect = useCallback((day: DayOption) => {
+    if (day === 'next_week') {
+      setSelectedDay('next_week');
+      setAvailableSlots([]);
+      const today = new Date();
+      const dow = today.getDay();
+      const daysUntilMon = dow === 0 ? 1 : 8 - dow;
+      const days: { label: string; dateStr: string }[] = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + daysUntilMon + i);
+        days.push({
+          label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+          dateStr: d.toISOString().split('T')[0],
+        });
+      }
+      setNextWeekDays(days);
+      return;
+    }
+    setNextWeekDays([]);
+    fetchSlots(day);
+  }, []);
+
+  // Fetch available slots for a specific date string
+  const fetchSlotsForDate = useCallback(async (dateStr: string) => {
+    if (!declineAppointment) return;
+    setNextWeekDays([]);
+    setSlotsLoading(true);
+    setAvailableSlots([]);
+    try {
+      const res = await fetch(`${API_BASE}/api/booking/staff-availability`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: declineAppointment.tenant_id,
+          serviceId: declineAppointment.service_id,
+          date: dateStr,
+          staffId: declineAppointment.staff_id,
+        }),
+      });
+      const json = await res.json() as { staff?: { slots?: { time: string; iso?: string }[] }[] };
+      const staffData = json.staff?.[0];
+      const slots: TimeSlot[] = (staffData?.slots ?? []).map((s) => ({
+        time: s.time,
+        iso: s.iso ?? `${dateStr}T${s.time}:00.000Z`,
+      }));
+      setAvailableSlots(slots);
+    } catch {
+      setAvailableSlots([]);
+    } finally {
+      setSlotsLoading(false);
+    }
+  }, [declineAppointment]);
+
+  // Fetch available slots for a given day option
   const fetchSlots = useCallback(async (day: DayOption) => {
     if (!declineAppointment) return;
     setSelectedDay(day);
@@ -270,16 +327,16 @@ export default function StaffAppointments() {
             <Text style={styles.apptDate}>{formatDate(item.start_time)}</Text>
             <Text style={styles.apptTime}>{formatTime(item.start_time)}</Text>
           </View>
-          <View style={styles.apptInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.apptCustomer}>{item.customer_name}</Text>
+          <View style={[styles.apptInfo, { flex: 1 }]}>
+            <Text style={styles.apptCustomer} numberOfLines={1}>{item.customer_name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+              <Text style={styles.apptService} numberOfLines={1}>{item.service_name} — {item.service_duration} min</Text>
               {item.customer_no_show_count >= 2 && (
                 <View style={{ backgroundColor: '#fee2e2', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#991b1b' }}>{item.customer_no_show_count} no-shows</Text>
+                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#991b1b' }}>{item.customer_no_show_count} no-shows</Text>
                 </View>
               )}
             </View>
-            <Text style={styles.apptService}>{item.service_name} — {item.service_duration} min</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: colors.bg }]}>
             <Text style={[styles.statusText, { color: colors.text }]}>{item.status.replace('_', ' ')}</Text>
@@ -414,7 +471,7 @@ export default function StaffAppointments() {
                 <TouchableOpacity
                   key={day}
                   style={[styles.dayBtn, selectedDay === day && styles.dayBtnActive]}
-                  onPress={() => fetchSlots(day)}
+                  onPress={() => handleDaySelect(day)}
                 >
                   <Text style={[styles.dayBtnText, selectedDay === day && styles.dayBtnTextActive]}>
                     {day === 'today' ? 'Today' : day === 'tomorrow' ? 'Tomorrow' : 'Next Week'}
@@ -426,8 +483,25 @@ export default function StaffAppointments() {
               ))}
             </View>
 
+            {/* Next Week day sub-picker */}
+            {nextWeekDays.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {nextWeekDays.map((d) => (
+                    <TouchableOpacity
+                      key={d.dateStr}
+                      style={[styles.dayBtn, { paddingHorizontal: 12, paddingVertical: 8 }]}
+                      onPress={() => fetchSlotsForDate(d.dateStr)}
+                    >
+                      <Text style={styles.dayBtnText}>{d.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            )}
+
             {/* Time slots */}
-            {selectedDay && (
+            {selectedDay && nextWeekDays.length === 0 && (
               <View style={styles.slotsContainer}>
                 {slotsLoading ? (
                   <ActivityIndicator size="small" color="#6B7FC4" style={{ marginVertical: 20 }} />

@@ -10,25 +10,31 @@ export async function registerPushToken(params: {
   accessToken: string;
 }): Promise<void> {
 
+  console.log('[push-reg] checking notification permissions...');
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  console.log('[push-reg] existing permission status:', existingStatus);
   let finalStatus = existingStatus;
   if (existingStatus !== 'granted') {
+    console.log('[push-reg] requesting notification permissions...');
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
+    console.log('[push-reg] permission after request:', finalStatus);
   }
   if (finalStatus !== 'granted') {
-    console.log('[push-reg] notification permission not granted:', finalStatus);
+    console.log('[push-reg] notification permission NOT granted:', finalStatus);
     return;
   }
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+  console.log('[push-reg] EAS projectId:', projectId ?? 'MISSING');
   if (!projectId) {
-    console.warn('[push-reg] no EAS projectId found in app config');
+    console.warn('[push-reg] no EAS projectId found — cannot get push token');
     return;
   }
 
+  console.log('[push-reg] getting expo push token...');
   const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-  console.log('[push-reg] got expo push token:', tokenData.data?.slice(0, 30) + '...');
+  console.log('[push-reg] got expo push token:', tokenData.data);
 
   try {
     const response = await fetch(`${API_BASE}/api/push-tokens`, {
