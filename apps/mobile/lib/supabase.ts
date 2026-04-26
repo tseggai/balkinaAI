@@ -108,11 +108,21 @@ export interface StaffInfo {
   requires_approval: boolean;
 }
 
+export interface TenantInfo {
+  id: string;
+  name: string;
+  logo_url: string | null;
+}
+
 /**
- * Determine if the logged-in user is a staff member or a customer.
- * Includes a timeout to prevent the app from hanging if the network is slow.
+ * Determine if the logged-in user is a tenant owner, staff member, or customer.
+ * Priority: tenant owner > staff > customer.
  */
-export async function getAuthenticatedRole(): Promise<{ role: 'customer' | 'staff' | null; staffInfo?: StaffInfo }> {
+export async function getAuthenticatedRole(): Promise<{
+  role: 'tenant' | 'staff' | 'customer' | null;
+  staffInfo?: StaffInfo;
+  tenantInfo?: TenantInfo;
+}> {
   const timeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
     Promise.race([
       promise,
@@ -123,6 +133,22 @@ export async function getAuthenticatedRole(): Promise<{ role: 'customer' | 'staf
     const { data: { user } } = await timeout(supabase.auth.getUser(), 8000);
     if (!user) return { role: null };
 
+    // Check tenant owner first
+    const { data: tenantRecord } = await timeout(
+      supabase
+        .from('tenants')
+        .select('id, name, logo_url')
+        .eq('user_id', user.id)
+        .single(),
+      5000,
+    );
+
+    if (tenantRecord) {
+      const tenant = tenantRecord as TenantInfo;
+      return { role: 'tenant', tenantInfo: tenant };
+    }
+
+    // Check staff
     const { data: staffRecord } = await timeout(
       supabase
         .from('staff')
@@ -139,7 +165,6 @@ export async function getAuthenticatedRole(): Promise<{ role: 'customer' | 'staf
 
     return { role: 'customer' };
   } catch {
-    // Timeout or network error — default to customer so the app isn't stuck
     return { role: 'customer' };
   }
 }
