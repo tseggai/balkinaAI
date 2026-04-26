@@ -125,8 +125,9 @@ async function createTenantFromWaitlist(supabase: any, entry: any, userId: strin
   const tenantId = tenant.id;
 
   // 5. Create location (if address provided)
+  let locationId: string | null = null;
   if (entry.location) {
-    await supabase.from('tenant_locations').insert({
+    const { data: loc } = await supabase.from('tenant_locations').insert({
       tenant_id: tenantId,
       name: 'Main Location',
       address: entry.location,
@@ -135,14 +136,39 @@ async function createTenantFromWaitlist(supabase: any, entry: any, userId: strin
       state: entry.state || null,
       country: entry.country || null,
       postal_code: entry.postal_code || null,
-    });
+    }).select('id').single();
+    if (loc) locationId = (loc as { id: string }).id;
+  }
+
+  // 5b. Create staff member from the owner (so bookings work immediately)
+  const { data: ownerStaff } = await supabase.from('staff').insert({
+    tenant_id: tenantId,
+    name: entry.owner_name,
+    email: entry.email,
+    phone: entry.phone || null,
+    user_id: userId,
+    status: 'active',
+    availability_schedule: {
+      monday: { start: '09:00', end: '17:00' },
+      tuesday: { start: '09:00', end: '17:00' },
+      wednesday: { start: '09:00', end: '17:00' },
+      thursday: { start: '09:00', end: '17:00' },
+      friday: { start: '09:00', end: '17:00' },
+      saturday: { start: '09:00', end: '17:00' },
+    },
+  } as never).select('id').single();
+  const staffId = ownerStaff ? (ownerStaff as { id: string }).id : null;
+
+  // Assign staff to location
+  if (staffId && locationId) {
+    await supabase.from('staff_locations').insert({ staff_id: staffId, location_id: locationId } as never);
   }
 
   // 6. Parse and create services (from services_description)
+  const serviceIds: string[] = [];
   if (entry.services_description) {
     const serviceStrings = entry.services_description.split(',').map((s: string) => s.trim()).filter(Boolean);
     for (const svcStr of serviceStrings) {
-      // Parse "Service Name (60 min) - $30" format
       const nameMatch = svcStr.match(/^([^(–-]+)/);
       const durationMatch = svcStr.match(/\((\d+)\s*min\)/);
       const priceMatch = svcStr.match(/[€$£](\d+(?:\.\d+)?)/);
@@ -151,13 +177,24 @@ async function createTenantFromWaitlist(supabase: any, entry: any, userId: strin
       const duration = durationMatch ? parseInt(durationMatch[1]) : 60;
       const price = priceMatch ? parseFloat(priceMatch[1]) : 0;
 
-      await supabase.from('services').insert({
+      const { data: svc } = await supabase.from('services').insert({
         tenant_id: tenantId,
         name,
         duration_minutes: duration,
         price,
         visibility: 'public',
-      });
+      }).select('id').single();
+      if (svc) serviceIds.push((svc as { id: string }).id);
+    }
+  }
+
+  // Assign all services to location and staff
+  for (const svcId of serviceIds) {
+    if (locationId) {
+      await supabase.from('service_locations').insert({ service_id: svcId, location_id: locationId } as never);
+    }
+    if (staffId) {
+      await supabase.from('service_staff').insert({ service_id: svcId, staff_id: staffId } as never);
     }
   }
 
