@@ -1682,20 +1682,19 @@ export default function ChatScreen() {
         return true;
       }
 
-      // Check if user selected a service (match against recently displayed cards)
+      // Check if user selected a service (match against recently displayed cards).
+      // Always try to match — even if bookingState.serviceId is set (stale closure
+      // after a booking resets state async). Starting a new service resets the flow.
       const serviceAtBusinessMatch = userText.match(/^(.+) at (.+)$/);
 
-      // Match service selection from service_cards (just service name)
-      if (!bookingState.serviceId) {
+      {
         const matchedService = lastDisplayedServices.current.find((s) => {
-          // Match "ServiceName" (from service_cards) or "ServiceName at BusinessName" (from business_with_services)
           if (s.name === userText) return true;
           if (serviceAtBusinessMatch && s.name === serviceAtBusinessMatch[1]?.trim() && s.tenantName === serviceAtBusinessMatch[2]?.trim()) return true;
           return false;
         });
 
         if (matchedService) {
-          // Remove stale cards from previous booking flow to prevent duplicate staff/options
           removeStaleBookingCards();
           addUserMessage(userText);
           const newState: BookingState = {
