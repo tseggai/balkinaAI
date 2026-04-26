@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 
 export default function WelcomeScreen() {
@@ -34,13 +34,6 @@ export default function WelcomeScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.btnSecondary}
-          onPress={() => router.push('/(auth)/phone-login')}
-        >
-          <Text style={styles.btnSecondaryText}>Continue with phone</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={styles.btnStaff}
           onPress={() => router.push('/(auth)/staff-invite')}
         >
@@ -49,7 +42,10 @@ export default function WelcomeScreen() {
       </View>
 
       <Text style={styles.terms}>
-        By continuing, you agree to our Terms of Service and Privacy Policy.
+        By continuing, you agree to our{' '}
+        <Text style={styles.link} onPress={() => Linking.openURL('https://balkina.ai/terms')}>Terms of Service</Text>
+        {' '}and{' '}
+        <Text style={styles.link} onPress={() => Linking.openURL('https://balkina.ai/privacy')}>Privacy Policy</Text>.
       </Text>
     </Animated.View>
   );
@@ -118,5 +114,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9ca3af',
     lineHeight: 18,
+  },
+  link: {
+    color: '#6B7FC4',
+    textDecorationLine: 'underline' as const,
   },
 });

@@ -236,15 +236,6 @@ export default function ProfileScreen() {
 
         {/* Account actions */}
         <View style={[styles.card, { marginTop: 24 }]}>
-          <TouchableOpacity style={styles.cardRow} onPress={handleDeleteAccount} activeOpacity={0.6}>
-            <View style={styles.cardRowLeft}>
-              <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2' }]}>
-                <Ionicons name="trash-outline" size={18} color="#dc2626" />
-              </View>
-              <Text style={[styles.cardRowLabel, { color: '#dc2626' }]}>Delete Account</Text>
-            </View>
-          </TouchableOpacity>
-          <View style={styles.separator} />
           <TouchableOpacity style={styles.cardRow} onPress={handleSignOut} activeOpacity={0.6}>
             <View style={styles.cardRowLeft}>
               <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2' }]}>
@@ -254,6 +245,11 @@ export default function ProfileScreen() {
             </View>
           </TouchableOpacity>
         </View>
+
+        {/* Delete account — subtle link at the very bottom */}
+        <TouchableOpacity onPress={handleDeleteAccount} activeOpacity={0.6} style={{ marginTop: 32, marginBottom: 16, alignItems: 'center' }}>
+          <Text style={{ fontSize: 13, color: '#9ca3af' }}>Delete Account</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {profile && (
