@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -50,6 +51,7 @@ export default function ProfileScreen() {
   const [notifyPush, setNotifyPush] = useState(true);
   const [toggling, setToggling] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   const getToken = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -178,11 +180,7 @@ export default function ProfileScreen() {
 
         {/* Edit Profile */}
         <View style={styles.card}>
-          <TouchableOpacity
-            style={styles.cardRow}
-            onPress={() => setEditModalVisible(true)}
-            activeOpacity={0.6}
-          >
+          <TouchableOpacity style={styles.cardRow} onPress={() => setEditModalVisible(true)} activeOpacity={0.6}>
             <View style={styles.cardRowLeft}>
               <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
                 <Ionicons name="person-outline" size={18} color="#6B7FC4" />
@@ -234,7 +232,21 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Account actions */}
+        {/* Settings */}
+        <Text style={styles.sectionTitle}>General</Text>
+        <View style={styles.card}>
+          <TouchableOpacity style={styles.cardRow} onPress={() => setSettingsVisible(true)} activeOpacity={0.6}>
+            <View style={styles.cardRowLeft}>
+              <View style={[styles.iconCircle, { backgroundColor: '#F3F4F6' }]}>
+                <Ionicons name="settings-outline" size={18} color="#6b7280" />
+              </View>
+              <Text style={styles.cardRowLabel}>Settings</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Sign Out */}
         <View style={[styles.card, { marginTop: 24 }]}>
           <TouchableOpacity style={styles.cardRow} onPress={handleSignOut} activeOpacity={0.6}>
             <View style={styles.cardRowLeft}>
@@ -245,13 +257,9 @@ export default function ProfileScreen() {
             </View>
           </TouchableOpacity>
         </View>
-
-        {/* Delete account — subtle link at the very bottom */}
-        <TouchableOpacity onPress={handleDeleteAccount} activeOpacity={0.6} style={{ marginTop: 32, marginBottom: 16, alignItems: 'center' }}>
-          <Text style={{ fontSize: 13, color: '#9ca3af' }}>Delete Account</Text>
-        </TouchableOpacity>
       </ScrollView>
 
+      {/* Edit Profile Modal */}
       {profile && (
         <EditProfileModal
           visible={editModalVisible}
@@ -261,7 +269,113 @@ export default function ProfileScreen() {
           getToken={getToken}
         />
       )}
+
+      {/* Settings Modal */}
+      <SettingsModal
+        visible={settingsVisible}
+        onClose={() => setSettingsVisible(false)}
+        onDeleteAccount={handleDeleteAccount}
+      />
     </View>
+  );
+}
+
+// ── Settings Modal ──────────────────────────────────────────────────────────
+
+function SettingsModal({
+  visible,
+  onClose,
+  onDeleteAccount,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onDeleteAccount: () => void;
+}) {
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+      <View style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <TouchableOpacity onPress={onClose} style={styles.headerBtn}>
+            <Ionicons name="arrow-back" size={24} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.modalTitle}>Settings</Text>
+          <View style={styles.headerBtn} />
+        </View>
+
+        <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 60 }}>
+          {/* Legal */}
+          <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Legal</Text>
+          <View style={styles.card}>
+            <TouchableOpacity
+              style={[styles.cardRow, styles.cardRowBorder]}
+              onPress={() => Linking.openURL('https://balkina.ai/terms')}
+              activeOpacity={0.6}
+            >
+              <View style={styles.cardRowLeft}>
+                <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
+                  <Ionicons name="document-text-outline" size={18} color="#6B7FC4" />
+                </View>
+                <Text style={styles.cardRowLabel}>Terms of Service</Text>
+              </View>
+              <Ionicons name="open-outline" size={16} color="#d1d5db" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cardRow}
+              onPress={() => Linking.openURL('https://balkina.ai/privacy')}
+              activeOpacity={0.6}
+            >
+              <View style={styles.cardRowLeft}>
+                <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
+                  <Ionicons name="shield-checkmark-outline" size={18} color="#6B7FC4" />
+                </View>
+                <Text style={styles.cardRowLabel}>Privacy Policy</Text>
+              </View>
+              <Ionicons name="open-outline" size={16} color="#d1d5db" />
+            </TouchableOpacity>
+          </View>
+
+          {/* About */}
+          <Text style={styles.sectionTitle}>About</Text>
+          <View style={styles.card}>
+            <View style={[styles.cardRow, styles.cardRowBorder]}>
+              <View style={styles.cardRowLeft}>
+                <View style={[styles.iconCircle, { backgroundColor: '#F3F4F6' }]}>
+                  <Ionicons name="information-circle-outline" size={18} color="#6b7280" />
+                </View>
+                <Text style={styles.cardRowLabel}>App Version</Text>
+              </View>
+              <Text style={{ fontSize: 14, color: '#9ca3af' }}>1.0.0</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.cardRow}
+              onPress={() => Linking.openURL('mailto:support@balkina.ai')}
+              activeOpacity={0.6}
+            >
+              <View style={styles.cardRowLeft}>
+                <View style={[styles.iconCircle, { backgroundColor: '#DBEAFE' }]}>
+                  <Ionicons name="mail-outline" size={18} color="#2563EB" />
+                </View>
+                <Text style={styles.cardRowLabel}>Contact Support</Text>
+              </View>
+              <Ionicons name="open-outline" size={16} color="#d1d5db" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Account Management */}
+          <Text style={styles.sectionTitle}>Account</Text>
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.cardRow} onPress={onDeleteAccount} activeOpacity={0.6}>
+              <View style={styles.cardRowLeft}>
+                <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2' }]}>
+                  <Ionicons name="trash-outline" size={18} color="#dc2626" />
+                </View>
+                <Text style={[styles.cardRowLabel, { color: '#dc2626' }]}>Delete Account</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
   );
 }
 
@@ -295,7 +409,6 @@ function EditProfileModal({
     setFirstName(profile.first_name ?? '');
     setLastName(profile.last_name ?? '');
     setPhone(profile.phone ?? '');
-    // Parse date_of_birth (YYYY-MM-DD) into month/day
     if (profile.date_of_birth) {
       const parts = profile.date_of_birth.split('T')[0].split('-');
       setBirthdayMonth(parts[1] ?? '');
@@ -324,35 +437,26 @@ function EditProfileModal({
 
   const uploadAvatar = async (): Promise<string | null> => {
     if (!newAvatarLocal) return null;
-
     try {
       const token = await getToken();
       if (!token) return null;
-
-      // Build FormData with the image file
       const uriParts = newAvatarLocal.split('.');
       const fileExt = uriParts[uriParts.length - 1] ?? 'jpg';
-
       const formData = new FormData();
       formData.append('file', {
         uri: newAvatarLocal,
         name: `avatar.${fileExt}`,
         type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
       } as unknown as Blob);
-
       const res = await fetch(`${API_BASE}/api/avatar`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-
       const json = await res.json();
       if (json.url) return json.url;
-
-      console.warn('[avatar-upload] failed:', json.error);
       return null;
-    } catch (err) {
-      console.warn('[avatar-upload] error:', err);
+    } catch {
       return null;
     }
   };
@@ -362,15 +466,12 @@ function EditProfileModal({
       Alert.alert('Required', 'First name is required.');
       return;
     }
-
     setSaving(true);
     const token = await getToken();
     if (!token) { setSaving(false); return; }
 
     try {
       const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
-
-      // Build birthday as YYYY-MM-DD (using 2000 as placeholder year)
       let birthdayValue: string | null = null;
       const mm = birthdayMonth.trim().padStart(2, '0');
       const dd = birthdayDay.trim().padStart(2, '0');
@@ -378,7 +479,6 @@ function EditProfileModal({
         birthdayValue = `2000-${mm}-${dd}`;
       }
 
-      // Only include profile_image_url when a new image was actually picked
       const payload: Record<string, unknown> = {
         display_name: displayName,
         first_name: firstName.trim(),
@@ -390,9 +490,7 @@ function EditProfileModal({
 
       if (newAvatarLocal) {
         const uploadedUrl = await uploadAvatar();
-        if (uploadedUrl) {
-          payload.profile_image_url = uploadedUrl;
-        }
+        if (uploadedUrl) payload.profile_image_url = uploadedUrl;
       }
 
       const res = await fetch(`${API_BASE}/api/customers/profile`, {
@@ -400,7 +498,6 @@ function EditProfileModal({
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
       const json = await res.json();
       if (json.data) {
         onSaved(json.data);
@@ -423,7 +520,6 @@ function EditProfileModal({
         style={styles.modalContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header */}
         <View style={styles.modalHeader}>
           <TouchableOpacity onPress={onClose} disabled={saving} style={styles.headerBtn}>
             <Text style={styles.modalCancel}>Cancel</Text>
@@ -452,132 +548,92 @@ function EditProfileModal({
                 <Text style={styles.photoPlaceholderText}>{initial}</Text>
               </View>
             )}
-            <View style={styles.photoBadge}>
-              <Ionicons name="camera" size={14} color="#fff" />
-            </View>
+            <Text style={styles.photoChangeText}>Change photo</Text>
           </TouchableOpacity>
-          <Text style={styles.photoLabel}>Change Photo</Text>
 
-          {/* Form Fields */}
-          <View style={styles.formCard}>
-            <View style={styles.formRow}>
-              <Text style={styles.formLabel}>First Name</Text>
+          {/* Form fields */}
+          <View style={styles.formRow}>
+            <View style={styles.formHalf}>
+              <Text style={styles.label}>First Name *</Text>
               <TextInput
-                style={styles.formInput}
+                style={styles.input}
                 value={firstName}
                 onChangeText={setFirstName}
                 placeholder="First name"
-                placeholderTextColor="#c9cdd4"
-                autoCapitalize="words"
+                placeholderTextColor="#9ca3af"
               />
             </View>
-            <View style={styles.formDivider} />
-
-            <View style={styles.formRow}>
-              <Text style={styles.formLabel}>Last Name</Text>
+            <View style={styles.formHalf}>
+              <Text style={styles.label}>Last Name</Text>
               <TextInput
-                style={styles.formInput}
+                style={styles.input}
                 value={lastName}
                 onChangeText={setLastName}
                 placeholder="Last name"
-                placeholderTextColor="#c9cdd4"
-                autoCapitalize="words"
+                placeholderTextColor="#9ca3af"
               />
             </View>
-            <View style={styles.formDivider} />
-
-            <View style={styles.formRow}>
-              <Text style={styles.formLabel}>Email</Text>
-              <Text style={styles.formValueReadonly}>{profile.email ?? 'Not set'}</Text>
-            </View>
-            <View style={styles.formDivider} />
-
-            <View style={styles.formRow}>
-              <Text style={styles.formLabel}>Phone</Text>
-              <TextInput
-                style={styles.formInput}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="+1 (555) 000-0000"
-                placeholderTextColor="#c9cdd4"
-                keyboardType="phone-pad"
-              />
-            </View>
-            <View style={styles.formDivider} />
-
-            <View style={styles.formRow}>
-              <Text style={styles.formLabel}>Birthday</Text>
-              <View style={styles.birthdayRow}>
-                <TextInput
-                  style={styles.birthdayInput}
-                  value={birthdayMonth}
-                  onChangeText={(t) => setBirthdayMonth(t.replace(/[^0-9]/g, '').slice(0, 2))}
-                  placeholder="MM"
-                  placeholderTextColor="#c9cdd4"
-                  keyboardType="number-pad"
-                  maxLength={2}
-                />
-                <Text style={styles.birthdaySep}>/</Text>
-                <TextInput
-                  style={styles.birthdayInput}
-                  value={birthdayDay}
-                  onChangeText={(t) => setBirthdayDay(t.replace(/[^0-9]/g, '').slice(0, 2))}
-                  placeholder="DD"
-                  placeholderTextColor="#c9cdd4"
-                  keyboardType="number-pad"
-                  maxLength={2}
-                />
-              </View>
-            </View>
-            <View style={styles.formDivider} />
-
-            <TouchableOpacity style={styles.formRow} onPress={() => setGenderPickerVisible(true)}>
-              <Text style={styles.formLabel}>Gender</Text>
-              <View style={styles.formSelectRow}>
-                <Text style={gender ? styles.formSelectText : styles.formSelectPlaceholder}>
-                  {GENDER_OPTIONS.find((o) => o.value === gender)?.label || 'Select'}
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
-              </View>
-            </TouchableOpacity>
           </View>
 
-          <Text style={styles.formHint}>
-            Email is linked to your account and cannot be changed here.
-          </Text>
-        </ScrollView>
+          <Text style={styles.label}>Phone</Text>
+          <TextInput
+            style={styles.input}
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="Phone number"
+            placeholderTextColor="#9ca3af"
+            keyboardType="phone-pad"
+          />
 
-        {/* Gender Picker */}
-        <Modal visible={genderPickerVisible} transparent animationType="fade">
+          <Text style={styles.label}>Birthday (Month / Day)</Text>
+          <View style={styles.formRow}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={birthdayMonth}
+              onChangeText={setBirthdayMonth}
+              placeholder="MM"
+              placeholderTextColor="#9ca3af"
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+            <Text style={styles.bdaySeparator}>/</Text>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={birthdayDay}
+              onChangeText={setBirthdayDay}
+              placeholder="DD"
+              placeholderTextColor="#9ca3af"
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+          </View>
+
+          <Text style={styles.label}>Gender</Text>
           <TouchableOpacity
-            style={styles.pickerOverlay}
-            activeOpacity={1}
-            onPress={() => setGenderPickerVisible(false)}
+            style={styles.input}
+            onPress={() => setGenderPickerVisible(!genderPickerVisible)}
+            activeOpacity={0.7}
           >
-            <View style={styles.pickerSheet}>
-              <View style={styles.pickerHandle} />
-              <Text style={styles.pickerTitle}>Select Gender</Text>
-              {GENDER_OPTIONS.map((option) => (
+            <Text style={{ color: gender ? '#111827' : '#9ca3af', fontSize: 15 }}>
+              {gender ? GENDER_OPTIONS.find(g => g.value === gender)?.label ?? gender : 'Select gender'}
+            </Text>
+          </TouchableOpacity>
+          {genderPickerVisible && (
+            <View style={styles.genderPicker}>
+              {GENDER_OPTIONS.map((opt) => (
                 <TouchableOpacity
-                  key={option.value}
-                  style={[styles.pickerOption, gender === option.value && styles.pickerOptionActive]}
-                  onPress={() => { setGender(option.value); setGenderPickerVisible(false); }}
+                  key={opt.value}
+                  style={[styles.genderOption, gender === opt.value && styles.genderOptionSelected]}
+                  onPress={() => { setGender(opt.value); setGenderPickerVisible(false); }}
                 >
-                  <Text style={[styles.pickerOptionText, gender === option.value && styles.pickerOptionTextActive]}>
-                    {option.label}
+                  <Text style={[styles.genderOptionText, gender === opt.value && styles.genderOptionTextSelected]}>
+                    {opt.label}
                   </Text>
-                  {gender === option.value && <Ionicons name="checkmark-circle" size={22} color="#6B7FC4" />}
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity
-                style={[styles.pickerOption, { marginTop: 4 }]}
-                onPress={() => { setGender(''); setGenderPickerVisible(false); }}
-              >
-                <Text style={[styles.pickerOptionText, { color: '#9ca3af' }]}>Clear Selection</Text>
-              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        </Modal>
+          )}
+        </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -586,132 +642,50 @@ function EditProfileModal({
 // ── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  // Main screen
   container: { flex: 1, backgroundColor: '#f9fafb' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
   content: { paddingBottom: 40 },
-
-  avatarSection: { alignItems: 'center', paddingTop: 32, paddingBottom: 24 },
-  avatar: {
-    width: 88, height: 88, borderRadius: 44, backgroundColor: '#6B7FC4',
-    justifyContent: 'center', alignItems: 'center', marginBottom: 16,
-  },
-  avatarImage: {
-    width: 88, height: 88, borderRadius: 44, marginBottom: 16,
-    borderWidth: 3, borderColor: '#EEF0FB',
-  },
-  avatarText: { color: '#fff', fontSize: 32, fontWeight: '700' },
-  nameText: { fontSize: 22, fontWeight: '700', color: '#111827' },
-  subtitleText: { fontSize: 14, color: '#6b7280', marginTop: 3 },
-
-  sectionTitle: {
-    fontSize: 13, fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase',
-    letterSpacing: 0.8, marginHorizontal: 20, marginTop: 28, marginBottom: 10,
-  },
-
-  card: {
-    backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04,
-    shadowRadius: 4, elevation: 1,
-  },
-  cardRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
-  },
+  avatarSection: { alignItems: 'center', paddingTop: 24, paddingBottom: 20 },
+  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#6B7FC4', justifyContent: 'center', alignItems: 'center' },
+  avatarImage: { width: 80, height: 80, borderRadius: 40 },
+  avatarText: { fontSize: 32, fontWeight: '700', color: '#fff' },
+  nameText: { marginTop: 12, fontSize: 20, fontWeight: '700', color: '#111827' },
+  subtitleText: { marginTop: 2, fontSize: 14, color: '#6b7280' },
+  sectionTitle: { marginTop: 24, marginBottom: 8, marginLeft: 20, fontSize: 13, fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 },
+  card: { marginHorizontal: 16, backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#f3f4f6' },
+  cardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16 },
   cardRowBorder: { borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   cardRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  iconCircle: {
-    width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center',
-  },
   cardRowLabel: { fontSize: 15, fontWeight: '500', color: '#111827' },
   cardRowSub: { fontSize: 12, color: '#9ca3af', marginTop: 1 },
+  iconCircle: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
 
   // Modal
   modalContainer: { flex: 1, backgroundColor: '#f9fafb' },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
-  },
-  headerBtn: { minWidth: 60 },
-  modalCancel: { fontSize: 16, color: '#6b7280' },
-  modalTitle: { fontSize: 17, fontWeight: '600', color: '#111827' },
-  modalSave: { fontSize: 16, fontWeight: '600', color: '#6B7FC4', textAlign: 'right' },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 16 : 12, paddingBottom: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  headerBtn: { width: 60, alignItems: 'center' },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: '#111827' },
+  modalCancel: { fontSize: 15, color: '#6b7280' },
+  modalSave: { fontSize: 15, fontWeight: '600', color: '#6B7FC4' },
   modalBody: { flex: 1 },
-  modalBodyContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
+  modalBodyContent: { padding: 20, paddingBottom: 60 },
 
   // Photo
-  photoSection: { alignSelf: 'center', marginBottom: 8 },
-  photoImage: {
-    width: 100, height: 100, borderRadius: 50,
-    borderWidth: 3, borderColor: '#EEF0FB',
-  },
-  photoPlaceholder: {
-    width: 100, height: 100, borderRadius: 50, backgroundColor: '#6B7FC4',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  photoPlaceholderText: { color: '#fff', fontSize: 36, fontWeight: '700' },
-  photoBadge: {
-    position: 'absolute', bottom: 2, right: 2,
-    width: 30, height: 30, borderRadius: 15, backgroundColor: '#6B7FC4',
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 3, borderColor: '#f9fafb',
-  },
-  photoLabel: {
-    textAlign: 'center', fontSize: 14, color: '#6B7FC4', fontWeight: '500', marginBottom: 24,
-  },
+  photoSection: { alignItems: 'center', marginBottom: 24 },
+  photoImage: { width: 88, height: 88, borderRadius: 44 },
+  photoPlaceholder: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#6B7FC4', justifyContent: 'center', alignItems: 'center' },
+  photoPlaceholderText: { fontSize: 34, fontWeight: '700', color: '#fff' },
+  photoChangeText: { marginTop: 8, fontSize: 14, fontWeight: '600', color: '#6B7FC4' },
 
-  // Form card
-  formCard: {
-    backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04,
-    shadowRadius: 4, elevation: 1,
-  },
-  formRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
-  },
-  formDivider: { height: 1, backgroundColor: '#f3f4f6', marginLeft: 16 },
-  formLabel: { fontSize: 15, fontWeight: '500', color: '#374151', width: 100 },
-  formInput: {
-    flex: 1, fontSize: 15, color: '#111827', textAlign: 'right', paddingVertical: 0,
-  },
-  formValueReadonly: {
-    flex: 1, fontSize: 15, color: '#9ca3af', textAlign: 'right',
-  },
-  birthdayRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  birthdayInput: {
-    width: 42, fontSize: 15, color: '#111827', textAlign: 'center', paddingVertical: 0,
-  },
-  birthdaySep: { fontSize: 15, color: '#9ca3af' },
-  formSelectRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  formSelectText: { fontSize: 15, color: '#111827' },
-  formSelectPlaceholder: { fontSize: 15, color: '#c9cdd4' },
-  formHint: {
-    fontSize: 12, color: '#9ca3af', marginTop: 16, textAlign: 'center', paddingHorizontal: 20,
-  },
-
-  // Gender picker
-  pickerOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end',
-  },
-  pickerSheet: {
-    backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24, paddingHorizontal: 8,
-  },
-  pickerHandle: {
-    width: 36, height: 4, borderRadius: 2, backgroundColor: '#e5e7eb',
-    alignSelf: 'center', marginTop: 10, marginBottom: 12,
-  },
-  pickerTitle: {
-    fontSize: 17, fontWeight: '600', color: '#111827', textAlign: 'center',
-    paddingVertical: 12, marginBottom: 4,
-  },
-  pickerOption: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14, marginHorizontal: 8, borderRadius: 12,
-  },
-  pickerOptionActive: { backgroundColor: '#F0F2FF' },
-  pickerOptionText: { fontSize: 16, color: '#111827' },
-  pickerOptionTextActive: { color: '#6B7FC4', fontWeight: '600' },
+  // Form
+  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6, marginTop: 16 },
+  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111827' },
+  formRow: { flexDirection: 'row', gap: 12 },
+  formHalf: { flex: 1 },
+  bdaySeparator: { fontSize: 20, color: '#9ca3af', alignSelf: 'center', marginTop: 16 },
+  genderPicker: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#e5e7eb', marginTop: 4, overflow: 'hidden' },
+  genderOption: { paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  genderOptionSelected: { backgroundColor: '#EEF0FB' },
+  genderOptionText: { fontSize: 15, color: '#374151' },
+  genderOptionTextSelected: { color: '#6B7FC4', fontWeight: '600' },
 });
