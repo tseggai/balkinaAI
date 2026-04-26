@@ -2335,7 +2335,7 @@ export default function ChatScreen() {
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 50 : 0}
         >
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
             <View style={{ alignItems: 'center', marginBottom: 24 }}>
@@ -2392,7 +2392,7 @@ export default function ChatScreen() {
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 50 : 0}
         >
           <View style={styles.chatHeader}>
             <TouchableOpacity style={styles.resetBtn} onPress={resetConversation} activeOpacity={0.7}>
@@ -2679,9 +2679,9 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 18, color: '#6b7280', marginTop: 20, marginBottom: 28 },
   chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   messagesList: { paddingVertical: 4 },
-  inputBar: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f3f4f6' },
-  textInput: { minHeight: 44, maxHeight: 120, backgroundColor: '#f9fafb', borderRadius: 16, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, paddingRight: 48, fontSize: 16, color: '#111827', borderWidth: 1, borderColor: '#e5e7eb' },
-  sendBtn: { position: 'absolute' as const, right: 20, bottom: 14, width: 34, height: 34, borderRadius: 17, backgroundColor: '#6B7FC4', justifyContent: 'center' as const, alignItems: 'center' as const },
+  inputBar: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  textInput: { minHeight: 48, maxHeight: 140, backgroundColor: '#f3f4f6', borderRadius: 22, paddingHorizontal: 18, paddingTop: 13, paddingBottom: 13, paddingRight: 50, fontSize: 16, color: '#111827' },
+  sendBtn: { position: 'absolute' as const, right: 8, bottom: 8, width: 34, height: 34, borderRadius: 17, backgroundColor: '#6B7FC4', justifyContent: 'center' as const, alignItems: 'center' as const },
   sendBtnDisabled: { opacity: 0.5 },
   chatHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
