@@ -18,12 +18,31 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
 export default function StaffInviteScreen() {
   const router = useRouter();
-  const [step, setStep] = useState<'code' | 'signup'>('code');
+  const [mode, setMode] = useState<'signin' | 'invite'>('signin');
   const [inviteCode, setInviteCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleSignIn = async () => {
+    if (!email.trim()) { Alert.alert('Error', 'Enter your email'); return; }
+    if (password.length < 6) { Alert.alert('Error', 'Password must be at least 6 characters'); return; }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (error) {
+        Alert.alert('Sign In Failed', error.message);
+      }
+    } catch {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAcceptInvite = async () => {
     if (!inviteCode.trim()) { Alert.alert('Error', 'Enter your invite code'); return; }
@@ -81,24 +100,36 @@ export default function StaffInviteScreen() {
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Join your team</Text>
+        <Text style={styles.title}>{mode === 'signin' ? 'Staff Sign In' : 'Join Your Team'}</Text>
         <Text style={styles.subtitle}>
-          Enter the invite code from your manager to set up your staff account.
+          {mode === 'signin'
+            ? 'Sign in with your staff email and password.'
+            : 'Enter the invite code from your manager to set up your staff account.'}
         </Text>
 
-        {/* Invite code */}
-        <Text style={styles.label}>Invite Code</Text>
-        <TextInput
-          style={styles.codeInput}
-          value={inviteCode}
-          onChangeText={setInviteCode}
-          placeholder="XXXXXX"
-          autoCapitalize="characters"
-          maxLength={6}
-          textAlign="center"
-        />
+        {mode === 'invite' && (
+          <>
+            <Text style={styles.label}>Invite Code</Text>
+            <TextInput
+              style={styles.codeInput}
+              value={inviteCode}
+              onChangeText={setInviteCode}
+              placeholder="XXXXXX"
+              autoCapitalize="characters"
+              maxLength={6}
+              textAlign="center"
+            />
 
-        {/* Email */}
+            <Text style={styles.label}>Name (optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Your name"
+            />
+          </>
+        )}
+
         <Text style={styles.label}>Email</Text>
         <TextInput
           style={styles.input}
@@ -109,16 +140,6 @@ export default function StaffInviteScreen() {
           autoCapitalize="none"
         />
 
-        {/* Name (optional) */}
-        <Text style={styles.label}>Name (optional)</Text>
-        <TextInput
-          style={styles.input}
-          value={name}
-          onChangeText={setName}
-          placeholder="Your name"
-        />
-
-        {/* Password */}
         <Text style={styles.label}>Password</Text>
         <TextInput
           style={styles.input}
@@ -128,19 +149,25 @@ export default function StaffInviteScreen() {
           secureTextEntry
         />
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleAcceptInvite} disabled={loading}>
+        <TouchableOpacity
+          style={styles.submitBtn}
+          onPress={mode === 'signin' ? handleSignIn : handleAcceptInvite}
+          disabled={loading}
+        >
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.submitBtnText}>Create Account</Text>
+            <Text style={styles.submitBtnText}>{mode === 'signin' ? 'Sign In' : 'Create Account'}</Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.loginLink}
-          onPress={() => router.push('/(auth)/email-login')}
+          onPress={() => setMode(mode === 'signin' ? 'invite' : 'signin')}
         >
-          <Text style={styles.loginLinkText}>Already have an account? Sign in</Text>
+          <Text style={styles.loginLinkText}>
+            {mode === 'signin' ? 'New staff? Use invite code' : 'Already have an account? Sign in'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

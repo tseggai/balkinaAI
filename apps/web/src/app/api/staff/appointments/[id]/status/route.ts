@@ -105,10 +105,20 @@ export async function PATCH(
     effectiveStatus = 'approved';
   }
 
-  // Update appointment status
+  // Update appointment status (+ save suggested times if declining with suggestions)
+  const updateData: Record<string, unknown> = { status: effectiveStatus };
+  if (newStatus === 'cancelled' && suggestedTimes.length > 0) {
+    const tz = 'UTC';
+    updateData.suggested_times = suggestedTimes.map((t) => ({
+      date: new Date(t).toLocaleDateString('en-US', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric' }),
+      time: new Date(t).toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }),
+      iso: t,
+    }));
+  }
+
   const { data: updated, error: updateErr } = await admin
     .from('appointments')
-    .update({ status: effectiveStatus } as never)
+    .update(updateData as never)
     .eq('id', params.id)
     .select()
     .single();

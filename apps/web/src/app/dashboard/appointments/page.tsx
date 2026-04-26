@@ -33,7 +33,7 @@ interface Appointment {
   notes: string | null;
   created_at: string;
   services: { name: string; duration_minutes: number; price: number } | null;
-  customers: { id: string; display_name: string | null; email: string | null; phone: string | null } | null;
+  customers: { id: string; display_name: string | null; email: string | null; phone: string | null; no_show_count?: number } | null;
   staff: { id: string; name: string } | null;
   tenant_locations: { id: string; name: string } | null;
 }
@@ -1073,7 +1073,14 @@ export default function AppointmentsPage() {
                               {getInitials(custName)}
                             </div>
                             <div>
-                              <div className="text-sm font-medium text-gray-900">{custName}</div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-medium text-gray-900">{custName}</span>
+                                {(appt.customers?.no_show_count ?? 0) >= 2 && (
+                                  <span className="inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700" title={`${appt.customers!.no_show_count} no-shows`}>
+                                    {appt.customers!.no_show_count} no-shows
+                                  </span>
+                                )}
+                              </div>
                               {custEmail && <div className="text-xs text-gray-500">{custEmail}</div>}
                             </div>
                           </div>
@@ -1658,7 +1665,14 @@ export default function AppointmentsPage() {
                   {/* Row 3: Customer 80% + Status indicator 20% */}
                   <div className="flex gap-3">
                     <div className="flex-[4]">
-                      <span className="text-xs text-gray-400">Customer</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400">Customer</span>
+                        {(editing.customers?.no_show_count ?? 0) >= 2 && (
+                          <span className="inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                            {editing.customers!.no_show_count} no-shows
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2">
                         {editing.customers && (
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">

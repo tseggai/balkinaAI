@@ -49,7 +49,7 @@ export async function GET(request: Request) {
   // Build query for data
   let dataQuery = supabase
     .from('appointments')
-    .select('*, services(name, duration_minutes, price), customers(id, display_name, email, phone), staff(id, name), tenant_locations(id, name)')
+    .select('*, services(name, duration_minutes, price), customers(id, display_name, email, phone, no_show_count), staff(id, name), tenant_locations(id, name)')
     .eq('tenant_id', tenantId)
     .order(safeSortBy, { ascending })
     .range(offset, offset + limit - 1);
