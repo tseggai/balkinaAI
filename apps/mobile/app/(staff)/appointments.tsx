@@ -33,6 +33,7 @@ interface StaffAppointment {
   status: string;
   total_price: number;
   notes: string | null;
+  location_id: string | null;
   location_name: string | null;
 }
 
@@ -218,9 +219,12 @@ export default function StaffAppointments() {
       for (let i = 0; i < 7; i++) {
         const d = new Date(today);
         d.setDate(today.getDate() + daysUntilMon + i);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
         days.push({
           label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-          dateStr: d.toISOString().split('T')[0],
+          dateStr: `${yyyy}-${mm}-${dd}`,
         });
       }
       setNextWeekDays(days);
@@ -228,7 +232,7 @@ export default function StaffAppointments() {
     }
     setNextWeekDays([]);
     fetchSlots(day);
-  }, []);
+  }, [fetchSlots]);
 
   // Fetch available slots for a specific date string
   const fetchSlotsForDate = useCallback(async (dateStr: string) => {
@@ -245,6 +249,7 @@ export default function StaffAppointments() {
           serviceId: declineAppointment.service_id,
           date: dateStr,
           staffId: declineAppointment.staff_id,
+          locationId: declineAppointment.location_id ?? undefined,
         }),
       });
       const json = await res.json() as { staff?: { slots?: { time: string; iso?: string }[] }[] };
@@ -278,6 +283,7 @@ export default function StaffAppointments() {
           serviceId: declineAppointment.service_id,
           date: dateStr,
           staffId: declineAppointment.staff_id,
+          locationId: declineAppointment.location_id ?? undefined,
         }),
       });
       const json = await res.json() as { staff?: { slots?: { time: string; iso?: string }[] }[] };
