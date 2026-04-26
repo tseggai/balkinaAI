@@ -169,7 +169,6 @@ export default function EmailLoginScreen() {
 
         {isSignUp && (
           <>
-            <Text style={styles.label}>Full name</Text>
             <TextInput
               style={styles.input}
               value={name}
@@ -179,8 +178,6 @@ export default function EmailLoginScreen() {
               autoCapitalize="words"
               autoComplete="name"
             />
-
-            <Text style={styles.label}>Phone number</Text>
             <TextInput
               style={styles.input}
               value={phone}
@@ -193,7 +190,6 @@ export default function EmailLoginScreen() {
           </>
         )}
 
-        <Text style={styles.label}>Email address</Text>
         <TextInput
           style={styles.input}
           value={email}
@@ -204,13 +200,11 @@ export default function EmailLoginScreen() {
           autoCapitalize="none"
           autoComplete="email"
         />
-
-        <Text style={styles.label}>Password</Text>
         <TextInput
           style={styles.input}
           value={password}
           onChangeText={setPassword}
-          placeholder="Password"
+          placeholder={isSignUp ? 'Create password (min 6 characters)' : 'Password'}
           placeholderTextColor="#9ca3af"
           secureTextEntry
           autoComplete={isSignUp ? 'new-password' : 'current-password'}
@@ -275,26 +269,21 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     color: '#6b7280',
-    marginBottom: 32,
+    marginBottom: 24,
     lineHeight: 22,
   },
   bold: {
     fontWeight: '600',
     color: '#111827',
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
-  },
   input: {
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    backgroundColor: '#f9fafb',
     borderRadius: 12,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
     color: '#111827',
+    marginBottom: 10,
     marginBottom: 16,
   },
   btn: {

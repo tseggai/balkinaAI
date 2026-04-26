@@ -109,43 +109,41 @@ export default function StaffInviteScreen() {
 
         {mode === 'invite' && (
           <>
-            <Text style={styles.label}>Invite Code</Text>
             <TextInput
               style={styles.codeInput}
               value={inviteCode}
               onChangeText={setInviteCode}
-              placeholder="XXXXXX"
+              placeholder="Invite Code"
+              placeholderTextColor="#9ca3af"
               autoCapitalize="characters"
               maxLength={6}
               textAlign="center"
             />
-
-            <Text style={styles.label}>Name (optional)</Text>
             <TextInput
               style={styles.input}
               value={name}
               onChangeText={setName}
-              placeholder="Your name"
+              placeholder="Your name (optional)"
+              placeholderTextColor="#9ca3af"
             />
           </>
         )}
 
-        <Text style={styles.label}>Email</Text>
         <TextInput
           style={styles.input}
           value={email}
           onChangeText={setEmail}
-          placeholder="your@email.com"
+          placeholder="Email address"
+          placeholderTextColor="#9ca3af"
           keyboardType="email-address"
           autoCapitalize="none"
         />
-
-        <Text style={styles.label}>Password</Text>
         <TextInput
           style={styles.input}
           value={password}
           onChangeText={setPassword}
-          placeholder="Min 6 characters"
+          placeholder={mode === 'invite' ? 'Create password (min 6 characters)' : 'Password'}
+          placeholderTextColor="#9ca3af"
           secureTextEntry
         />
 
@@ -181,15 +179,14 @@ const styles = StyleSheet.create({
   backBtn: { marginBottom: 24 },
   backText: { fontSize: 16, color: '#6B7FC4', fontWeight: '500' },
   title: { fontSize: 28, fontWeight: '700', color: '#111827', marginBottom: 8 },
-  subtitle: { fontSize: 15, color: '#6b7280', marginBottom: 32, lineHeight: 22 },
-  label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 6, marginTop: 16 },
+  subtitle: { fontSize: 15, color: '#6b7280', marginBottom: 24, lineHeight: 22 },
   codeInput: {
     height: 56, borderRadius: 12, borderWidth: 2, borderColor: '#6B7FC4',
-    fontSize: 24, fontWeight: '700', letterSpacing: 8, color: '#111827',
+    fontSize: 24, fontWeight: '700', letterSpacing: 8, color: '#111827', marginBottom: 10,
   },
   input: {
-    height: 48, borderRadius: 12, borderWidth: 1, borderColor: '#e5e7eb',
-    paddingHorizontal: 16, fontSize: 16, backgroundColor: '#f9fafb',
+    borderRadius: 12, backgroundColor: '#f9fafb',
+    paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#111827', marginBottom: 10,
   },
   submitBtn: {
     backgroundColor: '#6B7FC4', paddingVertical: 16, borderRadius: 12,
