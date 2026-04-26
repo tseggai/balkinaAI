@@ -207,41 +207,12 @@ export default function StaffAppointments() {
     setDeclineModalVisible(true);
   }, []);
 
-  // Handle day selection — if next_week, expand to Mon-Sun picker first
-  const handleDaySelect = useCallback((day: DayOption) => {
-    console.log('[decline] handleDaySelect called with:', day);
-    if (day === 'next_week') {
-      console.log('[decline] expanding next week days');
-      setSelectedDay('next_week');
-      setAvailableSlots([]);
-      const today = new Date();
-      const dow = today.getDay();
-      const daysUntilMon = dow === 0 ? 1 : 8 - dow;
-      const days: { label: string; dateStr: string }[] = [];
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(today);
-        d.setDate(today.getDate() + daysUntilMon + i);
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        days.push({
-          label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-          dateStr: `${yyyy}-${mm}-${dd}`,
-        });
-      }
-      setNextWeekDays(days);
-      return;
-    }
-    console.log('[decline] clearing nextWeekDays, fetching slots for', day);
-    setNextWeekDays([]);
-    fetchSlots(day);
-  }, [fetchSlots]);
-
-  // Fetch available slots for a specific date string
+  // Fetch slots for a specific date string
   const fetchSlotsForDate = useCallback(async (dateStr: string) => {
     if (!declineAppointment) return;
     console.log('[decline] fetchSlotsForDate:', dateStr, 'tenant:', declineAppointment.tenant_id, 'location:', declineAppointment.location_id);
     setNextWeekDays([]);
+    setSelectedDay('next_week');
     setSlotsLoading(true);
     setAvailableSlots([]);
     try {
@@ -272,44 +243,74 @@ export default function StaffAppointments() {
     }
   }, [declineAppointment]);
 
-  // Fetch available slots for a given day option
-  const fetchSlots = useCallback(async (day: DayOption) => {
+  // Handle day selection — all logic inline to avoid stale closures
+  const handleDaySelect = useCallback((day: DayOption) => {
+    console.log('[decline] handleDaySelect called with:', day, 'declineAppointment:', declineAppointment?.id ?? 'null');
     if (!declineAppointment) {
-      console.log('[decline] fetchSlots: no declineAppointment, skipping');
+      console.warn('[decline] no declineAppointment, skipping');
       return;
     }
-    const dateStr = getDateForOption(day);
-    console.log('[decline] fetchSlots:', day, 'date:', dateStr, 'tenant:', declineAppointment.tenant_id, 'service:', declineAppointment.service_id, 'staff:', declineAppointment.staff_id, 'location:', declineAppointment.location_id);
+
+    if (day === 'next_week') {
+      console.log('[decline] expanding next week days');
+      setSelectedDay('next_week');
+      setAvailableSlots([]);
+      const today = new Date();
+      const dow = today.getDay();
+      const daysUntilMon = dow === 0 ? 1 : 8 - dow;
+      const days: { label: string; dateStr: string }[] = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + daysUntilMon + i);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        days.push({
+          label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+          dateStr: `${yyyy}-${mm}-${dd}`,
+        });
+      }
+      setNextWeekDays(days);
+      return;
+    }
+
+    // Today or Tomorrow — fetch slots directly
+    setNextWeekDays([]);
     setSelectedDay(day);
     setSlotsLoading(true);
     setAvailableSlots([]);
 
-    try {
-      const res = await fetch(`${API_BASE}/api/booking/staff-availability`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenantId: declineAppointment.tenant_id,
-          serviceId: declineAppointment.service_id,
-          date: dateStr,
-          staffId: declineAppointment.staff_id,
-          locationId: declineAppointment.location_id ?? undefined,
-        }),
-      });
-      const json = await res.json() as { staff?: { slots?: { time: string; iso?: string }[] }[] };
-      const staffData = json.staff?.[0];
-      const slots: TimeSlot[] = (staffData?.slots ?? []).map((s) => ({
-        time: s.time,
-        iso: s.iso ?? `${dateStr}T${s.time}:00.000Z`,
-      }));
-      console.log('[decline] fetchSlots got', slots.length, 'slots for', day);
-      setAvailableSlots(slots);
-    } catch (err) {
-      console.error('[decline] fetchSlots error:', err);
-      setAvailableSlots([]);
-    } finally {
-      setSlotsLoading(false);
-    }
+    const dateStr = getDateForOption(day);
+    console.log('[decline] fetching slots for', day, 'date:', dateStr);
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/booking/staff-availability`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenantId: declineAppointment.tenant_id,
+            serviceId: declineAppointment.service_id,
+            date: dateStr,
+            staffId: declineAppointment.staff_id,
+            locationId: declineAppointment.location_id ?? undefined,
+          }),
+        });
+        const json = await res.json() as { staff?: { slots?: { time: string; iso?: string }[] }[] };
+        const staffData = json.staff?.[0];
+        const slots: TimeSlot[] = (staffData?.slots ?? []).map((s) => ({
+          time: s.time,
+          iso: s.iso ?? `${dateStr}T${s.time}:00.000Z`,
+        }));
+        console.log('[decline] got', slots.length, 'slots for', day);
+        setAvailableSlots(slots);
+      } catch (err) {
+        console.error('[decline] fetchSlots error:', err);
+        setAvailableSlots([]);
+      } finally {
+        setSlotsLoading(false);
+      }
+    })();
   }, [declineAppointment]);
 
   // Decline with a suggested time
