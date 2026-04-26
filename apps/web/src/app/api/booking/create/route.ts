@@ -300,7 +300,7 @@ export async function POST(request: Request) {
         .limit(1);
       if (conflicts && conflicts.length > 0) {
         return NextResponse.json(
-          { error: 'This time slot is no longer available. Please choose a different time.' },
+          { error: 'This time slot was just booked. Please go back and choose a different time.' },
           { status: 409, headers: CORS_HEADERS },
         );
       }

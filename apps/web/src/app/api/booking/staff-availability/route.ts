@@ -247,7 +247,7 @@ export async function POST(request: Request) {
         .eq('tenant_id', tenantId)
         .gte('start_time', dayStartUtc)
         .lte('start_time', dayEndUtc)
-        .in('status', ['pending', 'confirmed']),
+        .in('status', ['pending', 'confirmed', 'approved']),
       // Customer's existing appointments for conflict awareness
       (async () => {
         let resolvedId = customerId ?? null;

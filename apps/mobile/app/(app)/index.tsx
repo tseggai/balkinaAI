@@ -244,8 +244,9 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
   const SNAP_INTERVAL = CARD_WIDTH + CARD_MARGIN;
   const SIDE_PADDING = (SCREEN_WIDTH - CARD_WIDTH) / 2;
 
-  // Fade animation for service cards
+  // Fade + slide-up animation for service cards
   const serviceFade = useRef(new Animated.Value(1)).current;
+  const serviceSlide = useRef(new Animated.Value(0)).current;
 
   // Auto-select business on snap
   const onBusinessScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -255,10 +256,14 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
       // Fade out, switch, fade in
       Animated.timing(serviceFade, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
         setSelectedIdx(idx);
-        Animated.timing(serviceFade, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+        serviceSlide.setValue(20);
+        Animated.parallel([
+          Animated.timing(serviceFade, { toValue: 1, duration: 250, useNativeDriver: true }),
+          Animated.timing(serviceSlide, { toValue: 0, duration: 250, useNativeDriver: true }),
+        ]).start();
       });
     }
-  }, [data.items.length, SNAP_INTERVAL, selectedIdx, serviceFade]);
+  }, [data.items.length, SNAP_INTERVAL, selectedIdx, serviceFade, serviceSlide]);
 
   return (
     <View style={{ marginTop: 4, marginBottom: 6, flexShrink: 0 }}>
@@ -323,7 +328,7 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
         />
       </View>
       {services.length > 0 && selectedBiz ? (
-        <Animated.View style={{ opacity: serviceFade }}>
+        <Animated.View style={{ opacity: serviceFade, transform: [{ translateY: serviceSlide }] }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 10 }}>
           {services.map((svc, svcIdx) => {
             const isSelected = selectedSvcId === svc.id;
@@ -1672,7 +1677,7 @@ export default function ChatScreen() {
           // Build business_with_services card
           const card = {
             type: 'business_with_services',
-            items: data.businesses.map((b: { id: string; name: string; image_url?: string; distance_mi?: number; estimated_drive_minutes?: number; category?: string; avg_rating?: number; review_count?: number; closest_location_id?: string; gallery_photos?: { id: string; image_url: string; caption?: string | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null }[] }) => ({
+            items: data.businesses.map((b: { id: string; name: string; image_url?: string; distance_mi?: number; estimated_drive_minutes?: number; category?: string; avg_rating?: number; review_count?: number; closest_location_id?: string; gallery_photos?: { id: string; image_url: string; caption?: string | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; image_url?: string | null }[] }) => ({
               id: b.id,
               name: b.name,
               image_url: b.image_url,
@@ -1685,7 +1690,7 @@ export default function ChatScreen() {
               gallery_photos: b.gallery_photos ?? [],
               services: (b.all_services ?? []).map((s) => ({
                 id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
-                deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount,
+                deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, image_url: s.image_url,
               })),
             })),
           };

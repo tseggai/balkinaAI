@@ -109,6 +109,7 @@ export interface ServiceChipData {
   deposit_enabled?: boolean;
   deposit_amount?: number;
   deposit_type?: 'fixed' | 'percentage';
+  image_url?: string | null;
 }
 
 export interface BusinessWithServicesData {

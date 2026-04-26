@@ -933,27 +933,7 @@ export default function BookingsScreen() {
               <TouchableOpacity
                 style={styles.declineSuggestionBtn}
                 disabled={suggestionLoading}
-                onPress={async () => {
-                  if (!suggestionAppointmentId) {
-                    setSuggestionModalVisible(false);
-                    router.navigate('/(app)/');
-                    return;
-                  }
-                  try {
-                    const res = await fetch(`${API_BASE}/api/customer/bookings/cancel`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ appointmentId: suggestionAppointmentId, userId }),
-                    });
-                    if (!res.ok) {
-                      const err = (await res.json().catch(() => ({}))) as { error?: string };
-                      Alert.alert('Error', err.error ?? 'Failed to cancel');
-                      return;
-                    }
-                  } catch {
-                    Alert.alert('Error', 'Connection error. Please try again.');
-                    return;
-                  }
+                onPress={() => {
                   setAppointments((prev) => prev.filter((a) => a.id !== suggestionAppointmentId));
                   setSuggestionModalVisible(false);
                   setSuggestionAppointmentId(null);
