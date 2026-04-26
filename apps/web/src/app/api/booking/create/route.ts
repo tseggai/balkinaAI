@@ -21,6 +21,7 @@ export async function OPTIONS() {
 
 interface CreateBookingBody {
   tenantId: string;
+  locationId?: string;
   serviceId: string;
   staffId?: string;
   staffName?: string;
@@ -88,7 +89,7 @@ function localTimeToUTC(date: string, time12h: string, timezone: string): Date {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CreateBookingBody;
-    const { tenantId, serviceId, staffId, date, timeSlot, timeSlotIso, extras, packageName, userId, customerName, customerPhone, customerEmail } = body;
+    const { tenantId, locationId: requestedLocationId, serviceId, staffId, date, timeSlot, timeSlotIso, extras, packageName, userId, customerName, customerPhone, customerEmail } = body;
 
     if (!tenantId || !serviceId || !date || !timeSlot) {
       return NextResponse.json(
@@ -162,8 +163,12 @@ export async function POST(request: Request) {
       })(),
 
       // 5. Location (includes timezone, address, coordinates)
-      supabase.from('tenant_locations').select('id, address, latitude, longitude, timezone')
-        .eq('tenant_id', tenantId).limit(1),
+      // Use the specific location from the booking flow if provided, otherwise first location
+      requestedLocationId
+        ? supabase.from('tenant_locations').select('id, address, latitude, longitude, timezone')
+            .eq('id', requestedLocationId).limit(1)
+        : supabase.from('tenant_locations').select('id, address, latitude, longitude, timezone')
+            .eq('tenant_id', tenantId).limit(1),
 
       // 6. Staff — prefer service_staff assignment over random tenant staff
       (async (): Promise<{ id: string | null; name: string | null; requiresApproval: boolean }> => {
