@@ -38,6 +38,7 @@ interface Appointment {
   deposit_paid: boolean | null;
   deposit_amount_paid: number | null;
   stripe_payment_intent_id: string | null;
+  suggested_times: { date: string; time: string; iso: string }[] | null;
   services: { name: string } | null;
   staff: { name: string } | null;
   tenant_locations: { name: string; address?: string; latitude?: number; longitude?: number } | null;
@@ -103,6 +104,7 @@ function BookingCardRow({
   onGetDirections,
   onRate,
   onPayDeposit,
+  onViewSuggestion,
 }: {
   item: Appointment;
   expanded: boolean;
@@ -111,10 +113,12 @@ function BookingCardRow({
   onGetDirections: (item: Appointment) => void;
   onRate: (id: string) => void;
   onPayDeposit: (id: string) => void;
+  onViewSuggestion: (item: Appointment) => void;
 }) {
   const isCancellable = item.status === 'confirmed' || item.status === 'approved' || item.status === 'pending';
   const isCompleted = item.status === 'completed';
   const hasLocation = !!(item.tenant_locations?.address || item.tenant_locations?.latitude);
+  const hasSuggestion = item.status === 'cancelled' && item.suggested_times && item.suggested_times.length > 0;
   const hasUnpaidDeposit = item.deposit_amount_paid != null && item.deposit_amount_paid > 0 && item.deposit_paid !== true && (item.status === 'approved' || item.status === 'confirmed' || item.status === 'pending');
 
   const { date, time } = formatDateTime(item.start_time);
@@ -185,6 +189,18 @@ function BookingCardRow({
         >
           <Ionicons name="card-outline" size={18} color="#fff" />
           <Text style={styles.payDepositBtnText}>Pay Deposit (${item.deposit_amount_paid!.toFixed(2)})</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {/* View Suggestion button — shown on cancelled appointments with suggested times */}
+      {hasSuggestion && !expanded ? (
+        <TouchableOpacity
+          style={[styles.payDepositBtn, { backgroundColor: '#6B7FC4' }]}
+          onPress={() => onViewSuggestion(item)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="time-outline" size={18} color="#fff" />
+          <Text style={styles.payDepositBtnText}>View Suggested Times</Text>
         </TouchableOpacity>
       ) : null}
 
@@ -639,6 +655,13 @@ export default function BookingsScreen() {
       onGetDirections={handleGetDirections}
       onRate={openRatingModal}
       onPayDeposit={handlePayDeposit}
+      onViewSuggestion={(appt) => {
+        const times = appt.suggested_times ?? [];
+        setSuggestionAppointmentId(appt.id);
+        setSuggestedTimeOptions(times);
+        setSelectedSuggestionIdx(0);
+        setSuggestionModalVisible(true);
+      }}
     />
   );
 
