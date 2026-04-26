@@ -932,18 +932,8 @@ export default function BookingsScreen() {
 
               <TouchableOpacity
                 style={styles.declineSuggestionBtn}
-                onPress={async () => {
-                  // Clear suggestions so the button disappears from bookings
-                  if (suggestionAppointmentId) {
-                    try {
-                      await supabase
-                        .from('appointments')
-                        .update({ suggested_times: null } as never)
-                        .eq('id', suggestionAppointmentId);
-                    } catch { /* ignore */ }
-                  }
+                onPress={() => {
                   setSuggestionModalVisible(false);
-                  fetchAppointments();
                   router.navigate('/(app)/');
                 }}
               >

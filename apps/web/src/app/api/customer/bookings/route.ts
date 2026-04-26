@@ -110,10 +110,10 @@ export async function GET(request: Request) {
     if (isUpcoming) {
       query = query
         .gte('start_time', todayISO)
-        .or('status.in.(pending,approved,confirmed),and(status.eq.cancelled,suggested_times.not.is.null)');
+        .in('status', ['pending', 'approved', 'confirmed', 'cancelled']);
     } else {
       query = query.or(
-        `start_time.lt.${now},status.eq.completed,and(status.eq.cancelled,suggested_times.is.null)`,
+        `start_time.lt.${now},status.eq.completed,status.eq.cancelled`,
       );
     }
 
@@ -126,7 +126,28 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json({ data: data ?? [], error: null }, { headers: CORS_HEADERS });
+    let results = (data ?? []) as (typeof data extends (infer T)[] | null ? T : never)[];
+
+    // For upcoming: only show cancelled appointments that have suggestions
+    if (isUpcoming) {
+      results = results.filter((a) => {
+        if ((a as Record<string, unknown>).status === 'cancelled') {
+          return (a as Record<string, unknown>).suggested_times != null;
+        }
+        return true;
+      });
+    }
+    // For past: exclude cancelled with active suggestions (those show in upcoming)
+    if (!isUpcoming) {
+      results = results.filter((a) => {
+        if ((a as Record<string, unknown>).status === 'cancelled' && (a as Record<string, unknown>).suggested_times != null) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    return NextResponse.json({ data: results, error: null }, { headers: CORS_HEADERS });
   } catch (err) {
     console.error('[customer/bookings] error:', err);
     return NextResponse.json(
