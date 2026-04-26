@@ -110,10 +110,10 @@ export async function GET(request: Request) {
     if (isUpcoming) {
       query = query
         .gte('start_time', todayISO)
-        .in('status', ['pending', 'approved', 'confirmed']);
+        .or('status.in.(pending,approved,confirmed),and(status.eq.cancelled,suggested_times.not.is.null)');
     } else {
       query = query.or(
-        `start_time.lt.${now},status.eq.completed,status.eq.cancelled`,
+        `start_time.lt.${now},status.eq.completed,and(status.eq.cancelled,suggested_times.is.null)`,
       );
     }
 
