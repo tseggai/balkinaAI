@@ -53,6 +53,7 @@ export async function registerPushToken(params: {
     if (!response.ok) {
       const text = await response.text();
       console.warn('[push-reg] API returned', response.status, text);
+      throw new Error(`Push token API failed: ${response.status}`);
     } else {
       console.log('[push-reg] push token registered successfully');
     }

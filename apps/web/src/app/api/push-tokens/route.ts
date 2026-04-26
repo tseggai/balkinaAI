@@ -33,6 +33,19 @@ export async function POST(request: Request) {
   const table = body.recipientType === 'customer' ? 'customer_push_tokens' : 'staff_push_tokens';
   const idColumn = body.recipientType === 'customer' ? 'customer_id' : 'staff_id';
 
+  // Ensure the customer record exists (auto-create from auth user if missing)
+  if (body.recipientType === 'customer') {
+    const { data: existing } = await admin.from('customers').select('id').eq('id', body.recipientId).maybeSingle();
+    if (!existing) {
+      await admin.from('customers').insert({
+        id: body.recipientId,
+        display_name: user.user_metadata?.display_name ?? user.email?.split('@')[0] ?? null,
+        email: user.email ?? null,
+        phone: user.phone ?? null,
+      } as never);
+    }
+  }
+
   // Delete old tokens for this recipient, then insert the current one.
   // This prevents stale tokens from accumulating across app reinstalls/rebuilds
   // and wasting Expo push API calls on every notification.
