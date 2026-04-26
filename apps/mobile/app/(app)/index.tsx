@@ -2333,7 +2333,7 @@ export default function ChatScreen() {
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
         >
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
             <View style={{ alignItems: 'center', marginBottom: 24 }}>
@@ -2379,6 +2379,7 @@ export default function ChatScreen() {
               <Ionicons name="send" size={18} color="#fff" />
             </TouchableOpacity>
           </View>
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     );
@@ -2390,7 +2391,7 @@ export default function ChatScreen() {
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
         >
           <View style={styles.chatHeader}>
             <TouchableOpacity style={styles.resetBtn} onPress={resetConversation} activeOpacity={0.7}>
@@ -2418,30 +2419,30 @@ export default function ChatScreen() {
         />
 
         <View style={styles.inputBar}>
-          <TextInput
-            style={styles.textInput}
-            value={input}
-            onChangeText={setInput}
-            placeholder="Ask me anything..."
-            placeholderTextColor="#9ca3af"
-            multiline
-            maxLength={2000}
-            editable={!isLoading}
-            returnKeyType="send"
-            onSubmitEditing={() => sendMessage()}
-            blurOnSubmit={false}
-          />
-          <TouchableOpacity
-            style={[styles.sendBtn, (!input.trim() || isLoading) && styles.sendBtnDisabled]}
-            onPress={() => sendMessage()}
-            disabled={!input.trim() || isLoading}
-          >
+          <View style={{ position: 'relative' }}>
+            <TextInput
+              style={styles.textInput}
+              value={input}
+              onChangeText={setInput}
+              placeholder="Ask me anything..."
+              placeholderTextColor="#9ca3af"
+              multiline
+              maxLength={2000}
+              editable={!isLoading}
+              blurOnSubmit={false}
+            />
+            <TouchableOpacity
+              style={[styles.sendBtn, (!input.trim() || isLoading) && styles.sendBtnDisabled]}
+              onPress={() => sendMessage()}
+              disabled={!input.trim() || isLoading}
+            >
             {isLoading ? (
               <Ionicons name="hourglass-outline" size={18} color="#fff" />
             ) : (
               <Ionicons name="send" size={18} color="#fff" />
             )}
           </TouchableOpacity>
+          </View>
         </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -2677,9 +2678,9 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 18, color: '#6b7280', marginTop: 20, marginBottom: 28 },
   chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   messagesList: { paddingVertical: 4 },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f3f4f6', gap: 8 },
-  textInput: { flex: 1, minHeight: 40, maxHeight: 100, backgroundColor: '#f9fafb', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 16, color: '#111827', borderWidth: 1, borderColor: '#e5e7eb' },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#6B7FC4', justifyContent: 'center', alignItems: 'center' },
+  inputBar: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  textInput: { minHeight: 44, maxHeight: 120, backgroundColor: '#f9fafb', borderRadius: 16, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, paddingRight: 48, fontSize: 16, color: '#111827', borderWidth: 1, borderColor: '#e5e7eb' },
+  sendBtn: { position: 'absolute' as const, right: 20, bottom: 14, width: 34, height: 34, borderRadius: 17, backgroundColor: '#6B7FC4', justifyContent: 'center' as const, alignItems: 'center' as const },
   sendBtnDisabled: { opacity: 0.5 },
   chatHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
