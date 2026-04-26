@@ -937,7 +937,7 @@ export default function BookingsScreen() {
                   router.navigate('/(app)/');
                 }}
               >
-                <Text style={styles.declineSuggestionText}>Find Another Time</Text>
+                <Text style={styles.declineSuggestionText}>Cancel & Book Again</Text>
               </TouchableOpacity>
             </View>
           </View>

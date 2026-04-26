@@ -24,27 +24,29 @@ export default function AppTabsLayout() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!supabaseConfigured) return;
+    if (!supabaseConfigured) {
+      console.log('[push-reg] supabase not configured, skipping');
+      return;
+    }
     (async () => {
       try {
+        console.log('[push-reg] getting session...');
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-          console.log('[push-reg] no session, skipping push token registration');
+          console.log('[push-reg] no session found, skipping');
           return;
         }
 
-        // Use session.user.id directly as customerId — in our schema customer.id = auth uid.
-        // DB queries fail here when the refresh token is expired (RLS sees null auth.uid()),
-        // so we skip the DB lookup entirely.
         const customerId = session.user.id;
-        console.log('[push-reg] registering push token for customer', customerId);
-        registerPushToken({
+        const email = session.user.email;
+        console.log('[push-reg] session found — customerId:', customerId, 'email:', email);
+        console.log('[push-reg] calling registerPushToken...');
+        await registerPushToken({
           recipientType: 'customer',
           recipientId: customerId,
           accessToken: session.access_token,
-        }).catch((err) => {
-          console.warn('[push-reg] push token registration failed:', err);
         });
+        console.log('[push-reg] registerPushToken completed successfully');
       } catch (err) {
         console.warn('[push-reg] error during push setup:', err);
       }
