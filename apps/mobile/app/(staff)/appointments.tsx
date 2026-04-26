@@ -209,7 +209,9 @@ export default function StaffAppointments() {
 
   // Handle day selection — if next_week, expand to Mon-Sun picker first
   const handleDaySelect = useCallback((day: DayOption) => {
+    console.log('[decline] handleDaySelect called with:', day);
     if (day === 'next_week') {
+      console.log('[decline] expanding next week days');
       setSelectedDay('next_week');
       setAvailableSlots([]);
       const today = new Date();
@@ -230,6 +232,7 @@ export default function StaffAppointments() {
       setNextWeekDays(days);
       return;
     }
+    console.log('[decline] clearing nextWeekDays, fetching slots for', day);
     setNextWeekDays([]);
     fetchSlots(day);
   }, [fetchSlots]);
@@ -237,6 +240,7 @@ export default function StaffAppointments() {
   // Fetch available slots for a specific date string
   const fetchSlotsForDate = useCallback(async (dateStr: string) => {
     if (!declineAppointment) return;
+    console.log('[decline] fetchSlotsForDate:', dateStr, 'tenant:', declineAppointment.tenant_id, 'location:', declineAppointment.location_id);
     setNextWeekDays([]);
     setSlotsLoading(true);
     setAvailableSlots([]);
@@ -258,8 +262,10 @@ export default function StaffAppointments() {
         time: s.time,
         iso: s.iso ?? `${dateStr}T${s.time}:00.000Z`,
       }));
+      console.log('[decline] fetchSlotsForDate got', slots.length, 'slots');
       setAvailableSlots(slots);
-    } catch {
+    } catch (err) {
+      console.error('[decline] fetchSlotsForDate error:', err);
       setAvailableSlots([]);
     } finally {
       setSlotsLoading(false);
@@ -268,13 +274,17 @@ export default function StaffAppointments() {
 
   // Fetch available slots for a given day option
   const fetchSlots = useCallback(async (day: DayOption) => {
-    if (!declineAppointment) return;
+    if (!declineAppointment) {
+      console.log('[decline] fetchSlots: no declineAppointment, skipping');
+      return;
+    }
+    const dateStr = getDateForOption(day);
+    console.log('[decline] fetchSlots:', day, 'date:', dateStr, 'tenant:', declineAppointment.tenant_id, 'service:', declineAppointment.service_id, 'staff:', declineAppointment.staff_id, 'location:', declineAppointment.location_id);
     setSelectedDay(day);
     setSlotsLoading(true);
     setAvailableSlots([]);
 
     try {
-      const dateStr = getDateForOption(day);
       const res = await fetch(`${API_BASE}/api/booking/staff-availability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -292,8 +302,10 @@ export default function StaffAppointments() {
         time: s.time,
         iso: s.iso ?? `${dateStr}T${s.time}:00.000Z`,
       }));
+      console.log('[decline] fetchSlots got', slots.length, 'slots for', day);
       setAvailableSlots(slots);
-    } catch {
+    } catch (err) {
+      console.error('[decline] fetchSlots error:', err);
       setAvailableSlots([]);
     } finally {
       setSlotsLoading(false);
