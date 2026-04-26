@@ -220,7 +220,7 @@ export async function POST(request: Request) {
     }
 
     const locationData = timezoneResult.data as { timezone: string; address: string | null } | null;
-    const timezone = locationData?.timezone || 'UTC';
+    const timezone = locationData?.timezone || 'Europe/Podgorica';
     const address = locationData?.address || null;
     const staffIds = eligibleStaff.map((s) => s.id);
     console.log('[staff-availability] timezone:', timezone, 'locationId:', locationId, 'eligible staff:', eligibleStaff.map(s => s.name));

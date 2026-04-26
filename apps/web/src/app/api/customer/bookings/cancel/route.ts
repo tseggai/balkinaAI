@@ -67,8 +67,17 @@ export async function POST(request: Request) {
     }
 
     const status = (appt as { status: string }).status;
-    if (status === 'cancelled' || status === 'completed') {
-      return NextResponse.json({ error: `Cannot cancel a ${status} appointment` }, { status: 400, headers: CORS_HEADERS });
+    if (status === 'completed') {
+      return NextResponse.json({ error: 'Cannot cancel a completed appointment' }, { status: 400, headers: CORS_HEADERS });
+    }
+
+    if (status === 'cancelled') {
+      // Already cancelled — just clear suggestions so it stops showing in upcoming
+      await supabase
+        .from('appointments')
+        .update({ suggested_times: null } as never)
+        .eq('id', appointmentId);
+      return NextResponse.json({ success: true }, { headers: CORS_HEADERS });
     }
 
     const { error: updateErr } = await supabase

@@ -220,7 +220,7 @@ export async function POST(request: Request) {
     // Unpack location
     const loc = (locationResult.data as { id: string; address: string; latitude: number | null; longitude: number | null; timezone: string }[] | null)?.[0];
     const locationId = loc?.id ?? null;
-    const tz = loc?.timezone || 'America/Los_Angeles';
+    const tz = loc?.timezone || 'Europe/Podgorica';
 
     // Unpack staff
     const finalStaffId = staffResult.id;
