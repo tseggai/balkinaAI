@@ -43,6 +43,7 @@ export default function TenantServices() {
   const [extraType, setExtraType] = useState<'time' | 'item'>('time');
   const [extraMaxQty, setExtraMaxQty] = useState('1');
   const [extraUnitLabel, setExtraUnitLabel] = useState('');
+  const [editingExtraIdx, setEditingExtraIdx] = useState<number | null>(null);
 
   const getToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -83,18 +84,37 @@ export default function TenantServices() {
     setModalVisible(true);
   };
 
+  const openEditExtra = (idx: number) => {
+    const ext = formExtras[idx];
+    if (!ext) return;
+    setExtraName(ext.name);
+    setExtraPrice(String(ext.price));
+    setExtraDuration(String(ext.duration_minutes));
+    setExtraType((ext.type === 'item' ? 'item' : 'time') as 'time' | 'item');
+    setExtraMaxQty(String(ext.max_quantity));
+    setExtraUnitLabel(ext.unit_label ?? '');
+    setEditingExtraIdx(idx);
+    setShowAddExtra(true);
+  };
+
   const addExtra = () => {
     if (!extraName.trim()) return;
-    setFormExtras([...formExtras, {
+    const newExtra: Extra = {
       name: extraName.trim(),
       price: parseFloat(extraPrice) || 0,
       duration_minutes: extraType === 'time' ? (parseInt(extraDuration) || 0) : 0,
       type: extraType,
       max_quantity: extraType === 'item' ? (parseInt(extraMaxQty) || 1) : 1,
       unit_label: extraType === 'item' && extraUnitLabel.trim() ? extraUnitLabel.trim() : null,
-    }]);
+    };
+    if (editingExtraIdx !== null) {
+      setFormExtras(formExtras.map((e, i) => i === editingExtraIdx ? newExtra : e));
+    } else {
+      setFormExtras([...formExtras, newExtra]);
+    }
     setExtraName(''); setExtraPrice(''); setExtraDuration('');
     setExtraType('time'); setExtraMaxQty('1'); setExtraUnitLabel('');
+    setEditingExtraIdx(null);
     setShowAddExtra(false);
   };
 
@@ -222,7 +242,7 @@ export default function TenantServices() {
             {/* Extras */}
             <Text style={styles.sectionLabel}>Service Extras</Text>
             {formExtras.map((ext, idx) => (
-              <View key={idx} style={styles.extraRow}>
+              <TouchableOpacity key={idx} style={styles.extraRow} onPress={() => openEditExtra(idx)} activeOpacity={0.7}>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={{ fontSize: 15, fontWeight: '500', color: '#111827' }}>{ext.name}</Text>
@@ -234,10 +254,13 @@ export default function TenantServices() {
                     +${ext.price}{ext.type === 'time' ? ` · +${ext.duration_minutes}min` : ext.unit_label ? `/${ext.unit_label}` : ''}{ext.type === 'item' && ext.max_quantity > 1 ? ` · up to ${ext.max_quantity}` : ''}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => removeExtra(idx)}>
-                  <Ionicons name="close-circle" size={22} color="#ef4444" />
-                </TouchableOpacity>
-              </View>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <Ionicons name="create-outline" size={18} color="#9ca3af" />
+                  <TouchableOpacity onPress={() => removeExtra(idx)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close-circle" size={20} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
             ))}
 
             {showAddExtra ? (
@@ -274,9 +297,9 @@ export default function TenantServices() {
 
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity style={[styles.extraActionBtn, { backgroundColor: '#6B7FC4' }]} onPress={addExtra}>
-                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Add</Text>
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>{editingExtraIdx !== null ? 'Update' : 'Add'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.extraActionBtn, { backgroundColor: '#f3f4f6' }]} onPress={() => { setShowAddExtra(false); setExtraType('time'); }}>
+                  <TouchableOpacity style={[styles.extraActionBtn, { backgroundColor: '#f3f4f6' }]} onPress={() => { setShowAddExtra(false); setExtraType('time'); setEditingExtraIdx(null); }}>
                     <Text style={{ color: '#6b7280', fontWeight: '600', fontSize: 14 }}>Cancel</Text>
                   </TouchableOpacity>
                 </View>

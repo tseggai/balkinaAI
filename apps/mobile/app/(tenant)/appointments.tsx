@@ -48,9 +48,12 @@ export default function TenantAppointments() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [staffFilter, setStaffFilter] = useState<string>('all');
   const [serviceFilter, setServiceFilter] = useState<string>('all');
+  const [locationFilter, setLocationFilter] = useState<string>('all');
+  const [activeFilterModal, setActiveFilterModal] = useState<string | null>(null);
   const [staffList, setStaffList] = useState<StaffOption[]>([]);
   const [filterStaffOptions, setFilterStaffOptions] = useState<StaffOption[]>([]);
   const [filterServiceOptions, setFilterServiceOptions] = useState<{ id: string; name: string }[]>([]);
+  const [filterLocationOptions, setFilterLocationOptions] = useState<{ id: string; name: string }[]>([]);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [assigningApptId, setAssigningApptId] = useState<string | null>(null);
 
@@ -72,6 +75,7 @@ export default function TenantAppointments() {
       if (json.filters) {
         setFilterStaffOptions(json.filters.staff ?? []);
         setFilterServiceOptions(json.filters.services ?? []);
+        setFilterLocationOptions(json.filters.locations ?? []);
       }
 
       // Also fetch staff list for assignment
@@ -257,29 +261,21 @@ export default function TenantAppointments() {
           ))}
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-          {STATUS_FILTERS.map((s) => (
-            <TouchableOpacity key={s} style={[styles.filterChip, statusFilter === s && styles.filterChipActive]} onPress={() => setStatusFilter(s)}>
-              <Text style={[styles.filterChipText, statusFilter === s && styles.filterChipTextActive]}>{s === 'all' ? 'Status' : s.replace('_', ' ')}</Text>
-            </TouchableOpacity>
-          ))}
-          <View style={styles.filterDivider} />
-          <TouchableOpacity style={[styles.filterChip, staffFilter !== 'all' && styles.filterChipActive]} onPress={() => {
-            const options = ['all', ...filterStaffOptions.map(s => s.id)];
-            const current = options.indexOf(staffFilter);
-            setStaffFilter(options[(current + 1) % options.length] ?? 'all');
-          }}>
-            <Text style={[styles.filterChipText, staffFilter !== 'all' && styles.filterChipTextActive]}>
-              {staffFilter === 'all' ? 'Staff' : filterStaffOptions.find(s => s.id === staffFilter)?.name ?? 'Staff'}
-            </Text>
+          <TouchableOpacity style={[styles.filterBtn, statusFilter !== 'all' && styles.filterBtnActive]} onPress={() => setActiveFilterModal('status')}>
+            <Text style={[styles.filterBtnText, statusFilter !== 'all' && styles.filterBtnTextActive]}>{statusFilter === 'all' ? 'Status' : statusFilter.replace('_', ' ')}</Text>
+            <Ionicons name="chevron-down" size={14} color={statusFilter !== 'all' ? '#6B7FC4' : '#9ca3af'} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.filterChip, serviceFilter !== 'all' && styles.filterChipActive]} onPress={() => {
-            const options = ['all', ...filterServiceOptions.map(s => s.id)];
-            const current = options.indexOf(serviceFilter);
-            setServiceFilter(options[(current + 1) % options.length] ?? 'all');
-          }}>
-            <Text style={[styles.filterChipText, serviceFilter !== 'all' && styles.filterChipTextActive]}>
-              {serviceFilter === 'all' ? 'Service' : filterServiceOptions.find(s => s.id === serviceFilter)?.name ?? 'Service'}
-            </Text>
+          <TouchableOpacity style={[styles.filterBtn, locationFilter !== 'all' && styles.filterBtnActive]} onPress={() => setActiveFilterModal('location')}>
+            <Text style={[styles.filterBtnText, locationFilter !== 'all' && styles.filterBtnTextActive]}>{locationFilter === 'all' ? 'Location' : filterLocationOptions.find(l => l.id === locationFilter)?.name ?? 'Location'}</Text>
+            <Ionicons name="chevron-down" size={14} color={locationFilter !== 'all' ? '#6B7FC4' : '#9ca3af'} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.filterBtn, staffFilter !== 'all' && styles.filterBtnActive]} onPress={() => setActiveFilterModal('staff')}>
+            <Text style={[styles.filterBtnText, staffFilter !== 'all' && styles.filterBtnTextActive]}>{staffFilter === 'all' ? 'Staff' : filterStaffOptions.find(s => s.id === staffFilter)?.name ?? 'Staff'}</Text>
+            <Ionicons name="chevron-down" size={14} color={staffFilter !== 'all' ? '#6B7FC4' : '#9ca3af'} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.filterBtn, serviceFilter !== 'all' && styles.filterBtnActive]} onPress={() => setActiveFilterModal('service')}>
+            <Text style={[styles.filterBtnText, serviceFilter !== 'all' && styles.filterBtnTextActive]}>{serviceFilter === 'all' ? 'Service' : filterServiceOptions.find(s => s.id === serviceFilter)?.name ?? 'Service'}</Text>
+            <Ionicons name="chevron-down" size={14} color={serviceFilter !== 'all' ? '#6B7FC4' : '#9ca3af'} />
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -292,6 +288,7 @@ export default function TenantAppointments() {
             if (statusFilter !== 'all' && a.status !== statusFilter) return false;
             if (staffFilter !== 'all' && a.staff?.id !== staffFilter) return false;
             if (serviceFilter !== 'all' && (a as Record<string, unknown>).service_id !== serviceFilter) return false;
+            if (locationFilter !== 'all' && (a as Record<string, unknown>).location_id !== locationFilter) return false;
             return true;
           })}
           keyExtractor={(item) => item.id}
@@ -301,6 +298,55 @@ export default function TenantAppointments() {
           ListEmptyComponent={<View style={styles.emptyCard}><Text style={styles.emptyText}>No {tab} appointments</Text></View>}
         />
       )}
+
+      {/* Filter dropdown modal */}
+      <Modal visible={activeFilterModal !== null} transparent animationType="slide" onRequestClose={() => setActiveFilterModal(null)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setActiveFilterModal(null)}>
+          <View style={styles.filterModalContent}>
+            <Text style={styles.filterModalTitle}>
+              {activeFilterModal === 'status' ? 'Filter by Status' : activeFilterModal === 'location' ? 'Filter by Location' : activeFilterModal === 'staff' ? 'Filter by Staff' : 'Filter by Service'}
+            </Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              <TouchableOpacity style={styles.filterOption} onPress={() => {
+                if (activeFilterModal === 'status') setStatusFilter('all');
+                else if (activeFilterModal === 'location') setLocationFilter('all');
+                else if (activeFilterModal === 'staff') setStaffFilter('all');
+                else setServiceFilter('all');
+                setActiveFilterModal(null);
+              }}>
+                <Text style={styles.filterOptionText}>All</Text>
+                {((activeFilterModal === 'status' && statusFilter === 'all') || (activeFilterModal === 'location' && locationFilter === 'all') || (activeFilterModal === 'staff' && staffFilter === 'all') || (activeFilterModal === 'service' && serviceFilter === 'all')) && (
+                  <Ionicons name="checkmark" size={20} color="#6B7FC4" />
+                )}
+              </TouchableOpacity>
+              {activeFilterModal === 'status' && STATUS_FILTERS.filter(s => s !== 'all').map(s => (
+                <TouchableOpacity key={s} style={styles.filterOption} onPress={() => { setStatusFilter(s); setActiveFilterModal(null); }}>
+                  <Text style={[styles.filterOptionText, { textTransform: 'capitalize' }]}>{s.replace('_', ' ')}</Text>
+                  {statusFilter === s && <Ionicons name="checkmark" size={20} color="#6B7FC4" />}
+                </TouchableOpacity>
+              ))}
+              {activeFilterModal === 'location' && filterLocationOptions.map(l => (
+                <TouchableOpacity key={l.id} style={styles.filterOption} onPress={() => { setLocationFilter(l.id); setActiveFilterModal(null); }}>
+                  <Text style={styles.filterOptionText}>{l.name}</Text>
+                  {locationFilter === l.id && <Ionicons name="checkmark" size={20} color="#6B7FC4" />}
+                </TouchableOpacity>
+              ))}
+              {activeFilterModal === 'staff' && filterStaffOptions.map(s => (
+                <TouchableOpacity key={s.id} style={styles.filterOption} onPress={() => { setStaffFilter(s.id); setActiveFilterModal(null); }}>
+                  <Text style={styles.filterOptionText}>{s.name}</Text>
+                  {staffFilter === s.id && <Ionicons name="checkmark" size={20} color="#6B7FC4" />}
+                </TouchableOpacity>
+              ))}
+              {activeFilterModal === 'service' && filterServiceOptions.map(s => (
+                <TouchableOpacity key={s.id} style={styles.filterOption} onPress={() => { setServiceFilter(s.id); setActiveFilterModal(null); }}>
+                  <Text style={styles.filterOptionText}>{s.name}</Text>
+                  {serviceFilter === s.id && <Ionicons name="checkmark" size={20} color="#6B7FC4" />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Staff assignment modal */}
       <Modal visible={assignModalVisible} transparent animationType="slide" onRequestClose={() => setAssignModalVisible(false)}>
@@ -334,11 +380,14 @@ const styles = StyleSheet.create({
   tabSection: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   tabRow: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8, gap: 8 },
   filterRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 6 },
-  filterChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, backgroundColor: '#f3f4f6' },
-  filterChipActive: { backgroundColor: '#eef2ff' },
-  filterChipText: { fontSize: 12, fontWeight: '500', color: '#6b7280', textTransform: 'capitalize' },
-  filterChipTextActive: { color: '#6B7FC4', fontWeight: '600' },
-  filterDivider: { width: 1, height: 20, backgroundColor: '#e5e7eb', marginHorizontal: 4 },
+  filterBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb' },
+  filterBtnActive: { backgroundColor: '#eef2ff', borderColor: '#6B7FC4' },
+  filterBtnText: { fontSize: 13, fontWeight: '500', color: '#6b7280' },
+  filterBtnTextActive: { color: '#6B7FC4', fontWeight: '600' },
+  filterModalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 },
+  filterModalTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 12 },
+  filterOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  filterOptionText: { fontSize: 16, color: '#111827' },
   tab: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center', backgroundColor: '#f3f4f6' },
   tabActive: { backgroundColor: '#6B7FC4' },
   tabText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },
