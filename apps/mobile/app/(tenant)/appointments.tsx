@@ -48,58 +48,33 @@ export default function TenantAppointments() {
 
   const fetchAppointments = useCallback(async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`${API_BASE}/api/tenant/appointments?tab=${tab}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        console.error('[tenant-appts]', json.error);
+        setAppointments([]);
+        return;
+      }
+      setAppointments(json.data ?? []);
+
+      // Also fetch staff list for assignment
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      let tid = tenantId;
-      if (!tid) {
-        const { data: tenant } = await supabase.from('tenants').select('id').eq('user_id', user.id).single();
-        if (!tenant) return;
-        tid = (tenant as { id: string }).id;
-        setTenantId(tid);
-      }
-
-      // Fetch staff list for assignment
-      const { data: staffData } = await supabase.from('staff').select('id, name').eq('tenant_id', tid).eq('status', 'active').order('name');
-      setStaffList((staffData ?? []) as StaffOption[]);
-
-      const now = new Date().toISOString();
-      let query = supabase
-        .from('appointments')
-        .select('id, start_time, end_time, status, total_price, notes, staff_id, location_id, customer_id, services(name, duration_minutes), staff(id, name), tenant_locations(name)')
-        .eq('tenant_id', tid)
-        .order('start_time', { ascending: tab === 'upcoming' });
-
-      if (tab === 'upcoming') {
-        query = query.gte('start_time', now).in('status', ['confirmed', 'approved', 'pending']);
-      } else if (tab === 'past') {
-        query = query.or(`start_time.lt.${now},status.eq.completed,status.eq.cancelled,status.eq.no_show`);
-      } else {
-        query = query.eq('status', 'pending');
-      }
-
-      const { data, error } = await query.limit(50);
-      if (error) { console.error('[tenant-appts]', error.message); setAppointments([]); return; }
-
-      // Fetch customer names separately to avoid RLS recursion on customers table
-      const rows = (data ?? []) as unknown as (Omit<Appointment, 'customers'> & { customer_id: string | null })[];
-      const customerIds = [...new Set(rows.map(r => r.customer_id).filter(Boolean))] as string[];
-      let customerMap = new Map<string, { display_name: string | null; phone: string | null; no_show_count: number }>();
-      if (customerIds.length > 0) {
-        const { data: custData } = await supabase
-          .from('customers')
-          .select('id, display_name, phone, no_show_count')
-          .in('id', customerIds);
-        for (const c of (custData ?? []) as { id: string; display_name: string | null; phone: string | null; no_show_count: number }[]) {
-          customerMap.set(c.id, { display_name: c.display_name, phone: c.phone, no_show_count: c.no_show_count ?? 0 });
+      if (user) {
+        let tid = tenantId;
+        if (!tid) {
+          const { data: tenant } = await supabase.from('tenants').select('id').eq('user_id', user.id).single();
+          if (tenant) { tid = (tenant as { id: string }).id; setTenantId(tid); }
+        }
+        if (tid) {
+          const { data: staffData } = await supabase.from('staff').select('id, name').eq('tenant_id', tid).eq('status', 'active').order('name');
+          setStaffList((staffData ?? []) as StaffOption[]);
         }
       }
-
-      const enriched: Appointment[] = rows.map(r => ({
-        ...r,
-        customers: r.customer_id ? (customerMap.get(r.customer_id) ?? { display_name: null, phone: null, no_show_count: 0 }) : null,
-      }));
-      setAppointments(enriched);
     } catch (err) {
       console.error('[tenant-appts] error:', err);
       setAppointments([]);
@@ -114,30 +89,36 @@ export default function TenantAppointments() {
   const updateStatus = useCallback(async (appointmentId: string, newStatus: string) => {
     setActionLoading(appointmentId);
     try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ status: newStatus } as never)
-        .eq('id', appointmentId);
-      if (error) { Alert.alert('Error', error.message); }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`${API_BASE}/api/tenant/appointments`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: appointmentId, status: newStatus }),
+      });
+      const json = await res.json();
+      if (!res.ok) { Alert.alert('Error', json.error ?? 'Failed to update'); }
       else { fetchAppointments(); }
-    } catch {
-      Alert.alert('Error', 'Connection error');
-    } finally {
-      setActionLoading(null);
-    }
+    } catch { Alert.alert('Error', 'Connection error'); }
+    finally { setActionLoading(null); }
   }, [fetchAppointments]);
 
   const assignStaff = useCallback(async (appointmentId: string, staffId: string) => {
     try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ staff_id: staffId } as never)
-        .eq('id', appointmentId);
-      if (error) { Alert.alert('Error', error.message); }
-      else {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`${API_BASE}/api/tenant/appointments`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: appointmentId, staff_id: staffId }),
+      });
+      if (res.ok) {
         setAssignModalVisible(false);
         setAssigningApptId(null);
         fetchAppointments();
+      } else {
+        const json = await res.json();
+        Alert.alert('Error', json.error ?? 'Failed to assign');
       }
     } catch { Alert.alert('Error', 'Connection error'); }
   }, [fetchAppointments]);
