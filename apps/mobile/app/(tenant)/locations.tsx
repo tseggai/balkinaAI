@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
+import { pickAndUploadPhoto } from '@/lib/usePhotoUpload';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
@@ -35,6 +36,8 @@ export default function TenantLocations() {
   const [formLng, setFormLng] = useState<number | null>(null);
   const [formTimezone, setFormTimezone] = useState('');
   const [geocoding, setGeocoding] = useState(false);
+  const [galleryPhotos, setGalleryPhotos] = useState<{ id: string; image_url: string }[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const getToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -61,13 +64,83 @@ export default function TenantLocations() {
   const openAdd = () => {
     setEditing(null);
     setFormName(''); setFormAddress(''); setFormCity(''); setFormState(''); setFormCountry(''); setFormPhone('');
+    setFormLat(null); setFormLng(null); setFormTimezone('');
+    setGalleryPhotos([]);
     setModalVisible(true);
   };
 
   const openEdit = (loc: Location) => {
     setEditing(loc);
     setFormName(loc.name); setFormAddress(loc.address); setFormCity(loc.city ?? ''); setFormState(loc.state ?? ''); setFormCountry(loc.country ?? ''); setFormPhone(loc.phone ?? '');
+    setGalleryPhotos([]);
+    fetchGallery(loc.id);
     setModalVisible(true);
+  };
+
+  const fetchGallery = async (locationId: string) => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(`${API_BASE}/api/tenant/gallery?locationId=${locationId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      setGalleryPhotos(json.photos ?? []);
+    } catch { setGalleryPhotos([]); }
+  };
+
+  const handleUploadGalleryPhoto = async () => {
+    if (!editing) return;
+    setUploadingPhoto(true);
+    try {
+      const token = await getToken();
+      if (!token) { setUploadingPhoto(false); return; }
+
+      // Use ImagePicker directly and upload via gallery API
+      const ImagePicker = require('expo-image-picker');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets[0]) { setUploadingPhoto(false); return; }
+
+      const uri = result.assets[0].uri;
+      const ext = uri.split('.').pop() ?? 'jpg';
+      const formData = new FormData();
+      formData.append('file', {
+        uri,
+        name: `gallery.${ext}`,
+        type: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+      } as unknown as Blob);
+      formData.append('locationId', editing.id);
+
+      const res = await fetch(`${API_BASE}/api/tenant/gallery`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const json = await res.json();
+      if (res.ok && json.photo) {
+        setGalleryPhotos(prev => [...prev, json.photo]);
+      } else {
+        Alert.alert('Error', json.error ?? 'Upload failed');
+      }
+    } catch { Alert.alert('Error', 'Upload failed'); }
+    finally { setUploadingPhoto(false); }
+  };
+
+  const handleDeleteGalleryPhoto = async (photoId: string) => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      await fetch(`${API_BASE}/api/tenant/gallery?id=${photoId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setGalleryPhotos(prev => prev.filter(p => p.id !== photoId));
+    } catch { Alert.alert('Error', 'Delete failed'); }
   };
 
   const handleGeocode = async () => {
@@ -205,6 +278,67 @@ export default function TenantLocations() {
             </View>
             <TextInput style={styles.input} value={formCountry} onChangeText={setFormCountry} placeholder="Country" placeholderTextColor="#9ca3af" />
             <TextInput style={styles.input} value={formPhone} onChangeText={setFormPhone} placeholder="Phone number" placeholderTextColor="#9ca3af" keyboardType="phone-pad" />
+
+            {/* Location Photo */}
+            <Text style={styles.sectionLabel}>Location Photo</Text>
+            <TouchableOpacity style={styles.photoPicker} onPress={async () => {
+              if (!editing) return;
+              const url = await pickAndUploadPhoto('location');
+              if (url) {
+                const token = await getToken();
+                if (token) {
+                  await fetch(`${API_BASE}/api/tenant/locations`, {
+                    method: 'PATCH',
+                    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: editing.id, image_url: url }),
+                  });
+                  fetchLocations();
+                }
+              }
+            }}>
+              <View style={styles.photoPlaceholder}>
+                <Ionicons name="camera-outline" size={28} color="#9ca3af" />
+                <Text style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>{editing ? 'Change Photo' : 'Save location first'}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Gallery Photos */}
+            {editing && (
+              <>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+                  <Text style={styles.sectionLabel}>Gallery Photos ({galleryPhotos.length}/15)</Text>
+                  <TouchableOpacity onPress={handleUploadGalleryPhoto} disabled={uploadingPhoto || galleryPhotos.length >= 15}>
+                    {uploadingPhoto ? (
+                      <ActivityIndicator size="small" color="#6B7FC4" />
+                    ) : (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons name="add-circle" size={20} color={galleryPhotos.length >= 15 ? '#d1d5db' : '#6B7FC4'} />
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: galleryPhotos.length >= 15 ? '#d1d5db' : '#6B7FC4' }}>Add</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.formHint}>Photos are shown to customers during discovery.</Text>
+                {galleryPhotos.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                    {galleryPhotos.map((photo) => (
+                      <View key={photo.id} style={styles.galleryThumb}>
+                        <Image source={{ uri: photo.image_url }} style={styles.galleryImg} />
+                        <TouchableOpacity
+                          style={styles.galleryDelete}
+                          onPress={() => Alert.alert('Delete Photo', 'Remove this photo?', [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Delete', style: 'destructive', onPress: () => handleDeleteGalleryPhoto(photo.id) },
+                          ])}
+                        >
+                          <Ionicons name="close-circle" size={22} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                )}
+              </>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -229,6 +363,12 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 18, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   form: { padding: 20 },
   input: { backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#111827', marginBottom: 10, borderWidth: 1, borderColor: '#e5e7eb' },
+  sectionLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  photoPicker: { alignItems: 'center', marginBottom: 12 },
+  photoPlaceholder: { width: 100, height: 100, borderRadius: 14, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#e5e7eb', borderStyle: 'dashed' },
+  galleryThumb: { width: 80, height: 80, marginRight: 8, borderRadius: 10, overflow: 'hidden', position: 'relative' as const },
+  galleryImg: { width: 80, height: 80, borderRadius: 10 },
+  galleryDelete: { position: 'absolute' as const, top: -4, right: -4, backgroundColor: '#fff', borderRadius: 11 },
   geocodeBtn: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#6B7FC4', justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
   tzBadge: { fontSize: 12, color: '#10b981', backgroundColor: '#d1fae5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 10, overflow: 'hidden' },
   formHint: { fontSize: 13, color: '#9ca3af', marginBottom: 10, lineHeight: 18 },
