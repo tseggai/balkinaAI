@@ -66,7 +66,7 @@ export default function TenantAppointments() {
       const now = new Date().toISOString();
       let query = supabase
         .from('appointments')
-        .select('id, start_time, end_time, status, total_price, notes, staff_id, location_id, customers(display_name, phone, no_show_count), services(name, duration_minutes), staff(id, name), tenant_locations(name)')
+        .select('id, start_time, end_time, status, total_price, notes, staff_id, location_id, customer_id, services(name, duration_minutes), staff(id, name), tenant_locations(name)')
         .eq('tenant_id', tid)
         .order('start_time', { ascending: tab === 'upcoming' });
 
@@ -80,7 +80,26 @@ export default function TenantAppointments() {
 
       const { data, error } = await query.limit(50);
       if (error) { console.error('[tenant-appts]', error.message); setAppointments([]); return; }
-      setAppointments((data ?? []) as unknown as Appointment[]);
+
+      // Fetch customer names separately to avoid RLS recursion on customers table
+      const rows = (data ?? []) as unknown as (Omit<Appointment, 'customers'> & { customer_id: string | null })[];
+      const customerIds = [...new Set(rows.map(r => r.customer_id).filter(Boolean))] as string[];
+      let customerMap = new Map<string, { display_name: string | null; phone: string | null; no_show_count: number }>();
+      if (customerIds.length > 0) {
+        const { data: custData } = await supabase
+          .from('customers')
+          .select('id, display_name, phone, no_show_count')
+          .in('id', customerIds);
+        for (const c of (custData ?? []) as { id: string; display_name: string | null; phone: string | null; no_show_count: number }[]) {
+          customerMap.set(c.id, { display_name: c.display_name, phone: c.phone, no_show_count: c.no_show_count ?? 0 });
+        }
+      }
+
+      const enriched: Appointment[] = rows.map(r => ({
+        ...r,
+        customers: r.customer_id ? (customerMap.get(r.customer_id) ?? { display_name: null, phone: null, no_show_count: 0 }) : null,
+      }));
+      setAppointments(enriched);
     } catch (err) {
       console.error('[tenant-appts] error:', err);
       setAppointments([]);
