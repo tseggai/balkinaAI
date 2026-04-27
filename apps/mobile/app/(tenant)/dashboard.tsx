@@ -8,6 +8,7 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
 interface DashboardData {
   tenantName: string;
+  ownerName: string;
   stats: {
     totalAppointments: number;
     todayAppointments: number;
@@ -66,7 +67,7 @@ export default function TenantDashboard() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchDashboard(); }} tintColor="#6B7FC4" />}
     >
-      <Text style={styles.greeting}>Welcome, {data?.tenantName ?? ''}</Text>
+      <Text style={styles.greeting}>Welcome, {data?.ownerName ?? data?.tenantName ?? ''}</Text>
 
       {/* Compact stats */}
       <View style={styles.statsRow}>
@@ -124,7 +125,7 @@ export default function TenantDashboard() {
         </View>
       ) : (
         recent.map((appt) => (
-          <View key={appt.id} style={styles.apptCard}>
+          <TouchableOpacity key={appt.id} style={styles.apptCard} onPress={() => router.navigate('/(tenant)/appointments')} activeOpacity={0.7}>
             <View style={styles.apptRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.apptCustomer}>{appt.customer_name}</Text>
@@ -136,26 +137,10 @@ export default function TenantDashboard() {
               </View>
               <View style={[styles.statusDot, { backgroundColor: statusColor[appt.status] ?? '#6b7280' }]} />
             </View>
-          </View>
+          </TouchableOpacity>
         ))
       )}
 
-      {/* Business snapshot */}
-      <Text style={styles.sectionTitle}>Business Snapshot</Text>
-      <View style={styles.snapshotRow}>
-        <View style={styles.snapshotItem}>
-          <Text style={styles.snapshotValue}>{stats?.totalServices ?? 0}</Text>
-          <Text style={styles.snapshotLabel}>Services</Text>
-        </View>
-        <View style={styles.snapshotItem}>
-          <Text style={styles.snapshotValue}>{stats?.totalStaff ?? 0}</Text>
-          <Text style={styles.snapshotLabel}>Staff</Text>
-        </View>
-        <View style={styles.snapshotItem}>
-          <Text style={styles.snapshotValue}>{stats?.totalAppointments ?? 0}</Text>
-          <Text style={styles.snapshotLabel}>Total</Text>
-        </View>
-      </View>
     </ScrollView>
   );
 }
@@ -183,8 +168,4 @@ const styles = StyleSheet.create({
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   emptyCard: { backgroundColor: '#fff', borderRadius: 12, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: '#f3f4f6' },
   emptyText: { fontSize: 14, color: '#9ca3af' },
-  snapshotRow: { flexDirection: 'row', gap: 10 },
-  snapshotItem: { flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#f3f4f6' },
-  snapshotValue: { fontSize: 22, fontWeight: '700', color: '#111827' },
-  snapshotLabel: { fontSize: 12, color: '#6b7280', marginTop: 4 },
 });

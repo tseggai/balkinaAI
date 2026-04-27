@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     const ctx = await getTenantContext(request);
     if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS });
 
-    const { tenantId, tenantName, admin } = ctx;
+    const { tenantId, tenantName, ownerName, admin } = ctx;
     const today = new Date();
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
     const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
@@ -53,6 +53,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       tenantName,
+      ownerName: ownerName ?? tenantName,
       stats: {
         totalAppointments: allData.length,
         todayAppointments: (todayAppts.data ?? []).length,

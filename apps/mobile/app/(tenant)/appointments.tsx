@@ -25,7 +25,7 @@ interface StaffOption {
   name: string;
 }
 
-type Tab = 'upcoming' | 'past';
+type Tab = 'today' | 'all';
 const STATUS_FILTERS = ['all', 'pending', 'confirmed', 'approved', 'completed', 'cancelled', 'no_show'] as const;
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
@@ -38,7 +38,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 export default function TenantAppointments() {
-  const [tab, setTab] = useState<Tab>('upcoming');
+  const [tab, setTab] = useState<Tab>('today');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,7 +46,11 @@ export default function TenantAppointments() {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [staffFilter, setStaffFilter] = useState<string>('all');
+  const [serviceFilter, setServiceFilter] = useState<string>('all');
   const [staffList, setStaffList] = useState<StaffOption[]>([]);
+  const [filterStaffOptions, setFilterStaffOptions] = useState<StaffOption[]>([]);
+  const [filterServiceOptions, setFilterServiceOptions] = useState<{ id: string; name: string }[]>([]);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [assigningApptId, setAssigningApptId] = useState<string | null>(null);
 
@@ -65,6 +69,10 @@ export default function TenantAppointments() {
         return;
       }
       setAppointments(json.data ?? []);
+      if (json.filters) {
+        setFilterStaffOptions(json.filters.staff ?? []);
+        setFilterServiceOptions(json.filters.services ?? []);
+      }
 
       // Also fetch staff list for assignment
       const { data: { user } } = await supabase.auth.getUser();
@@ -240,10 +248,10 @@ export default function TenantAppointments() {
     <View style={styles.container}>
       <View style={styles.tabSection}>
         <View style={styles.tabRow}>
-          {(['upcoming', 'past'] as Tab[]).map((t) => (
-            <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => { setTab(t); setStatusFilter('all'); }}>
+          {(['today', 'all'] as Tab[]).map((t) => (
+            <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => { setTab(t); setStatusFilter('all'); setStaffFilter('all'); setServiceFilter('all'); }}>
               <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-                {t === 'upcoming' ? 'Upcoming' : 'Past'}
+                {t === 'today' ? 'Today' : 'All'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -251,9 +259,28 @@ export default function TenantAppointments() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
           {STATUS_FILTERS.map((s) => (
             <TouchableOpacity key={s} style={[styles.filterChip, statusFilter === s && styles.filterChipActive]} onPress={() => setStatusFilter(s)}>
-              <Text style={[styles.filterChipText, statusFilter === s && styles.filterChipTextActive]}>{s === 'all' ? 'All' : s.replace('_', ' ')}</Text>
+              <Text style={[styles.filterChipText, statusFilter === s && styles.filterChipTextActive]}>{s === 'all' ? 'Status' : s.replace('_', ' ')}</Text>
             </TouchableOpacity>
           ))}
+          <View style={styles.filterDivider} />
+          <TouchableOpacity style={[styles.filterChip, staffFilter !== 'all' && styles.filterChipActive]} onPress={() => {
+            const options = ['all', ...filterStaffOptions.map(s => s.id)];
+            const current = options.indexOf(staffFilter);
+            setStaffFilter(options[(current + 1) % options.length] ?? 'all');
+          }}>
+            <Text style={[styles.filterChipText, staffFilter !== 'all' && styles.filterChipTextActive]}>
+              {staffFilter === 'all' ? 'Staff' : filterStaffOptions.find(s => s.id === staffFilter)?.name ?? 'Staff'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.filterChip, serviceFilter !== 'all' && styles.filterChipActive]} onPress={() => {
+            const options = ['all', ...filterServiceOptions.map(s => s.id)];
+            const current = options.indexOf(serviceFilter);
+            setServiceFilter(options[(current + 1) % options.length] ?? 'all');
+          }}>
+            <Text style={[styles.filterChipText, serviceFilter !== 'all' && styles.filterChipTextActive]}>
+              {serviceFilter === 'all' ? 'Service' : filterServiceOptions.find(s => s.id === serviceFilter)?.name ?? 'Service'}
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -261,7 +288,12 @@ export default function TenantAppointments() {
         <View style={styles.centered}><ActivityIndicator size="large" color="#6B7FC4" /></View>
       ) : (
         <FlatList
-          data={statusFilter === 'all' ? appointments : appointments.filter(a => a.status === statusFilter)}
+          data={appointments.filter(a => {
+            if (statusFilter !== 'all' && a.status !== statusFilter) return false;
+            if (staffFilter !== 'all' && a.staff?.id !== staffFilter) return false;
+            if (serviceFilter !== 'all' && (a as Record<string, unknown>).service_id !== serviceFilter) return false;
+            return true;
+          })}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
@@ -306,6 +338,7 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: '#eef2ff' },
   filterChipText: { fontSize: 12, fontWeight: '500', color: '#6b7280', textTransform: 'capitalize' },
   filterChipTextActive: { color: '#6B7FC4', fontWeight: '600' },
+  filterDivider: { width: 1, height: 20, backgroundColor: '#e5e7eb', marginHorizontal: 4 },
   tab: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center', backgroundColor: '#f3f4f6' },
   tabActive: { backgroundColor: '#6B7FC4' },
   tabText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },

@@ -34,19 +34,31 @@ export async function GET(request: Request) {
 
     const { id: tenantId, admin } = ctx;
     const { searchParams } = new URL(request.url);
-    const tab = searchParams.get('tab') ?? 'upcoming';
-    const now = new Date().toISOString();
+    const tab = searchParams.get('tab') ?? 'today';
+
+    // Also fetch staff + services + locations for filter dropdowns
+    const [{ data: staffList }, { data: svcList }, { data: locList }] = await Promise.all([
+      admin.from('staff').select('id, name').eq('tenant_id', tenantId).eq('status', 'active').order('name'),
+      admin.from('services').select('id, name').eq('tenant_id', tenantId).order('name'),
+      admin.from('tenant_locations').select('id, name').eq('tenant_id', tenantId).order('name'),
+    ]);
+
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+    const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
 
     let query = admin
       .from('appointments')
-      .select('id, start_time, end_time, status, total_price, notes, staff_id, location_id, customer_id, services(name, duration_minutes), staff(id, name), tenant_locations(name)')
+      .select('id, start_time, end_time, status, total_price, notes, staff_id, location_id, customer_id, service_id, services(name, duration_minutes), staff(id, name), tenant_locations(name)')
       .eq('tenant_id', tenantId)
-      .order('start_time', { ascending: tab === 'upcoming' });
+      .order('start_time', { ascending: true });
 
-    if (tab === 'upcoming') {
-      query = query.gte('start_time', now).in('status', ['confirmed', 'approved', 'pending']);
+    if (tab === 'today') {
+      query = query.gte('start_time', todayStart).lt('start_time', todayEnd);
+    } else if (tab === 'upcoming') {
+      query = query.gte('start_time', todayStart).in('status', ['confirmed', 'approved', 'pending']);
     } else if (tab === 'past') {
-      query = query.or(`start_time.lt.${now},status.eq.completed,status.eq.cancelled,status.eq.no_show`);
+      query = query.lt('start_time', todayStart);
     } else if (tab === 'pending') {
       query = query.eq('status', 'pending');
     }
@@ -70,7 +82,14 @@ export async function GET(request: Request) {
       customers: r.customer_id ? (customerMap.get(r.customer_id as string) ?? null) : null,
     }));
 
-    return NextResponse.json({ data: enriched }, { headers: CORS_HEADERS });
+    return NextResponse.json({
+      data: enriched,
+      filters: {
+        staff: staffList ?? [],
+        services: svcList ?? [],
+        locations: locList ?? [],
+      },
+    }, { headers: CORS_HEADERS });
   } catch (err) {
     console.error('[tenant/appointments] error:', err);
     return NextResponse.json({ data: [], error: 'Internal error' }, { status: 500, headers: CORS_HEADERS });

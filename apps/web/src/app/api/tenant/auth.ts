@@ -18,8 +18,8 @@ export async function getTenantContext(request: Request) {
   const admin = createAdminClient();
   const { data: { user } } = await admin.auth.getUser(token);
   if (!user) return null;
-  const { data: tenant } = await admin.from('tenants').select('id, name').eq('user_id', user.id).single();
+  const { data: tenant } = await admin.from('tenants').select('id, name, owner_name').eq('user_id', user.id).single();
   if (!tenant) return null;
-  const t = tenant as { id: string; name: string };
-  return { tenantId: t.id, tenantName: t.name, userId: user.id, admin };
+  const t = tenant as { id: string; name: string; owner_name: string | null };
+  return { tenantId: t.id, tenantName: t.name, ownerName: t.owner_name, userId: user.id, admin };
 }
