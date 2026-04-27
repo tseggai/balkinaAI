@@ -87,6 +87,15 @@ export async function PATCH(request: Request) {
 
     if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400, headers: CORS_HEADERS });
 
+    // Get current appointment for staff change detection
+    const { data: currentAppt } = await admin
+      .from('appointments')
+      .select('staff_id, customer_id, start_time, services(name)')
+      .eq('id', body.id)
+      .eq('tenant_id', tenantId)
+      .single();
+    const current = currentAppt as { staff_id: string | null; customer_id: string | null; start_time: string; services: { name: string } | null } | null;
+
     const updates: Record<string, unknown> = {};
     if (body.status) updates.status = body.status;
     if (body.staff_id) updates.staff_id = body.staff_id;
@@ -98,6 +107,39 @@ export async function PATCH(request: Request) {
       .eq('tenant_id', tenantId);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: CORS_HEADERS });
+
+    // Notify staff on reassignment
+    if (body.staff_id && current && current.staff_id !== body.staff_id) {
+      try {
+        const { sendNotification } = await import('@/lib/notifications/send');
+        const svcName = current.services?.name ?? 'appointment';
+        const date = new Date(current.start_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const time = new Date(current.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+        // Notify new staff
+        await sendNotification({
+          type: 'new_booking_assigned',
+          appointmentId: body.id,
+          recipientType: 'staff',
+          recipientId: body.staff_id,
+          data: { customerName: '', serviceName: svcName, date, time, requiresApproval: 0 },
+        });
+
+        // Notify old staff (cancellation)
+        if (current.staff_id) {
+          await sendNotification({
+            type: 'booking_cancelled_staff_notify',
+            appointmentId: body.id,
+            recipientType: 'staff',
+            recipientId: current.staff_id,
+            data: { customerName: '', serviceName: svcName, date, time },
+          });
+        }
+      } catch (e) {
+        console.error('[tenant/appointments] notification error:', e);
+      }
+    }
+
     return NextResponse.json({ success: true }, { headers: CORS_HEADERS });
   } catch {
     return NextResponse.json({ error: 'Internal error' }, { status: 500, headers: CORS_HEADERS });

@@ -210,6 +210,32 @@ export default function TenantStaff() {
               </View>
             )}
 
+            {/* Send invite for existing staff */}
+            {editing && formEmail.trim() && (
+              <TouchableOpacity style={[styles.addBtn, { margin: 0, marginTop: 16 }]} onPress={async () => {
+                try {
+                  const token = await getToken();
+                  if (!token) return;
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) return;
+                  const res = await fetch(`${API_BASE}/api/tenant/staff-invite`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ staff_id: editing.id }),
+                  });
+                  const json = await res.json();
+                  if (res.ok && json.data) {
+                    Alert.alert('Invite Sent', `Invite code ${json.data.token} sent to ${formEmail.trim()}`);
+                  } else {
+                    Alert.alert('Error', json.error?.message ?? 'Failed to send invite');
+                  }
+                } catch { Alert.alert('Error', 'Connection error'); }
+              }}>
+                <Ionicons name="mail-outline" size={18} color="#fff" />
+                <Text style={styles.addBtnText}>Send Invite Email</Text>
+              </TouchableOpacity>
+            )}
+
             <Text style={styles.formHint}>Default schedule: Mon-Sat 9am-5pm. Adjust from the desktop dashboard.</Text>
           </ScrollView>
         </KeyboardAvoidingView>
