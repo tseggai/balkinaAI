@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Act
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
+
 interface Appointment {
   id: string;
   start_time: string;
