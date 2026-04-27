@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -32,6 +33,7 @@ interface StaffProfileData {
 }
 
 export default function StaffProfile() {
+  const router = useRouter();
   const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
   const [profileData, setProfileData] = useState<StaffProfileData | null>(null);
   const [email, setEmail] = useState('');
@@ -259,8 +261,24 @@ export default function StaffProfile() {
           </View>
         </View>
 
-        {/* Sign out */}
+        {/* Switch to customer */}
         <View style={[styles.card, { marginTop: 24 }]}>
+          <TouchableOpacity style={styles.cardRow} onPress={() => router.replace('/(app)')} activeOpacity={0.6}>
+            <View style={styles.cardRowLeft}>
+              <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
+                <Ionicons name="swap-horizontal-outline" size={18} color="#6B7FC4" />
+              </View>
+              <View>
+                <Text style={styles.cardRowLabel}>Switch to Customer</Text>
+                <Text style={styles.cardRowSub}>Book services as a customer</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Sign out */}
+        <View style={[styles.card, { marginTop: 12 }]}>
           <TouchableOpacity style={styles.cardRow} onPress={handleSignOut} activeOpacity={0.6}>
             <View style={styles.cardRowLeft}>
               <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2' }]}>
