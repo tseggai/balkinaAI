@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
@@ -117,15 +117,27 @@ export default function TenantDashboard() {
     >
       <Text style={styles.greeting}>Welcome, {tenantName}</Text>
 
-      {/* Stats grid */}
-      <View style={styles.statsGrid}>
-        <StatCard icon="calendar" label="Today" value={String(stats?.todayAppointments ?? 0)} color="#3b82f6" />
-        <StatCard icon="time" label="Pending" value={String(stats?.pendingAppointments ?? 0)} color="#f59e0b" />
-        <StatCard icon="people" label="Customers" value={String(stats?.totalCustomers ?? 0)} color="#8b5cf6" />
-        <StatCard icon="cash" label="Revenue" value={`$${(stats?.totalRevenue ?? 0).toFixed(0)}`} color="#10b981" />
+      {/* Compact stats */}
+      <View style={styles.statsRow}>
+        <View style={styles.statChip}>
+          <Text style={styles.statChipValue}>{stats?.todayAppointments ?? 0}</Text>
+          <Text style={styles.statChipLabel}>Today</Text>
+        </View>
+        <View style={styles.statChip}>
+          <Text style={[styles.statChipValue, { color: '#f59e0b' }]}>{stats?.pendingAppointments ?? 0}</Text>
+          <Text style={styles.statChipLabel}>Pending</Text>
+        </View>
+        <View style={styles.statChip}>
+          <Text style={styles.statChipValue}>{stats?.totalCustomers ?? 0}</Text>
+          <Text style={styles.statChipLabel}>Customers</Text>
+        </View>
+        <View style={styles.statChip}>
+          <Text style={[styles.statChipValue, { color: '#10b981' }]}>${(stats?.totalRevenue ?? 0).toFixed(0)}</Text>
+          <Text style={styles.statChipLabel}>Revenue</Text>
+        </View>
       </View>
 
-      {/* Quick actions */}
+      {/* Manage section */}
       <Text style={styles.sectionTitle}>Manage</Text>
       <View style={styles.manageGrid}>
         <TouchableOpacity style={styles.manageCard} onPress={() => router.navigate('/(tenant)/appointments')}>
@@ -145,6 +157,13 @@ export default function TenantDashboard() {
           <Text style={styles.manageLabel}>Locations</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Full dashboard link */}
+      <TouchableOpacity style={styles.dashboardLink} onPress={() => Linking.openURL('https://app.balkina.ai/dashboard')}>
+        <Ionicons name="desktop-outline" size={18} color="#6B7FC4" />
+        <Text style={styles.dashboardLinkText}>Open Full Dashboard on Web</Text>
+        <Ionicons name="open-outline" size={14} color="#9ca3af" />
+      </TouchableOpacity>
 
       {/* Recent appointments */}
       <Text style={styles.sectionTitle}>Recent Bookings</Text>
@@ -190,29 +209,23 @@ export default function TenantDashboard() {
   );
 }
 
-function StatCard({ icon, label, value, color }: { icon: string; label: string; value: string; color: string }) {
-  return (
-    <View style={styles.statCard}>
-      <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} />
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
-  content: { padding: 20, paddingBottom: 40 },
+  content: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
-  greeting: { fontSize: 22, fontWeight: '700', color: '#111827', marginBottom: 20 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  statCard: { width: '47%', backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#f3f4f6' },
-  statValue: { fontSize: 24, fontWeight: '700', color: '#111827', marginTop: 8 },
-  statLabel: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  greeting: { fontSize: 22, fontWeight: '700', color: '#111827', marginBottom: 16 },
+  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
+  statChip: { flex: 1, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#f3f4f6' },
+  statChipValue: { fontSize: 20, fontWeight: '700', color: '#111827' },
+  statChipLabel: { fontSize: 11, color: '#6b7280', marginTop: 2 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 12, marginTop: 8 },
-  manageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  manageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 },
   manageCard: { width: '47%', backgroundColor: '#fff', borderRadius: 14, padding: 16, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#f3f4f6' },
   manageLabel: { fontSize: 14, fontWeight: '600', color: '#111827' },
+  dashboardLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 24 },
+  dashboardLinkText: { fontSize: 14, fontWeight: '500', color: '#6B7FC4' },
   apptCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#f3f4f6' },
   apptRow: { flexDirection: 'row', alignItems: 'center' },
   apptCustomer: { fontSize: 15, fontWeight: '600', color: '#111827' },

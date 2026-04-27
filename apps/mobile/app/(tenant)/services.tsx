@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
+import { pickAndUploadPhoto } from '@/lib/usePhotoUpload';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
@@ -32,6 +33,7 @@ export default function TenantServices() {
   const [formPrice, setFormPrice] = useState('');
   const [formDuration, setFormDuration] = useState('60');
   const [formDesc, setFormDesc] = useState('');
+  const [formImageUrl, setFormImageUrl] = useState<string | null>(null);
   const [formLocIds, setFormLocIds] = useState<string[]>([]);
   const [formExtras, setFormExtras] = useState<Extra[]>([]);
   const [showAddExtra, setShowAddExtra] = useState(false);
@@ -66,14 +68,14 @@ export default function TenantServices() {
 
   const openAdd = () => {
     setEditing(null);
-    setFormName(''); setFormPrice(''); setFormDuration('60'); setFormDesc('');
+    setFormName(''); setFormPrice(''); setFormDuration('60'); setFormDesc(''); setFormImageUrl(null);
     setFormLocIds([]); setFormExtras([]); setShowAddExtra(false);
     setModalVisible(true);
   };
 
   const openEdit = (svc: Service) => {
     setEditing(svc);
-    setFormName(svc.name); setFormPrice(String(svc.price)); setFormDuration(String(svc.duration_minutes)); setFormDesc(svc.description ?? '');
+    setFormName(svc.name); setFormPrice(String(svc.price)); setFormDuration(String(svc.duration_minutes)); setFormDesc(svc.description ?? ''); setFormImageUrl(svc.image_url);
     setFormLocIds(svc.location_ids); setFormExtras(svc.extras); setShowAddExtra(false);
     setModalVisible(true);
   };
@@ -98,6 +100,7 @@ export default function TenantServices() {
         name: formName.trim(), price: parseFloat(formPrice) || 0,
         duration_minutes: parseInt(formDuration) || 60,
         description: formDesc.trim() || null,
+        image_url: formImageUrl,
         location_ids: formLocIds, extras: formExtras,
       };
       if (editing) body.id = editing.id;
@@ -170,6 +173,21 @@ export default function TenantServices() {
             <TouchableOpacity onPress={handleSave} disabled={saving}><Text style={{ fontSize: 16, fontWeight: '600', color: '#6B7FC4' }}>{saving ? 'Saving...' : 'Save'}</Text></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+            {/* Service photo */}
+            <TouchableOpacity style={styles.photoPicker} onPress={async () => {
+              const url = await pickAndUploadPhoto('service');
+              if (url) setFormImageUrl(url);
+            }}>
+              {formImageUrl ? (
+                <Image source={{ uri: formImageUrl }} style={styles.photoPreview} />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <Ionicons name="camera-outline" size={28} color="#9ca3af" />
+                  <Text style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>Add Photo</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
             <TextInput style={styles.input} value={formName} onChangeText={setFormName} placeholder="Service name *" placeholderTextColor="#9ca3af" />
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <TextInput style={[styles.input, { flex: 1 }]} value={formPrice} onChangeText={setFormPrice} placeholder="Price" placeholderTextColor="#9ca3af" keyboardType="decimal-pad" />
@@ -227,7 +245,6 @@ export default function TenantServices() {
               </TouchableOpacity>
             )}
 
-            <Text style={styles.formHint}>For service photos, use the desktop dashboard.</Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -249,7 +266,7 @@ const styles = StyleSheet.create({
   svcLocs: { fontSize: 11, color: '#6B7FC4', marginTop: 1 },
   emptyCard: { padding: 40, alignItems: 'center' },
   emptyText: { fontSize: 14, color: '#9ca3af', textAlign: 'center' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 18, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   form: { padding: 20, paddingBottom: 60 },
   input: { backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#111827', marginBottom: 10, borderWidth: 1, borderColor: '#e5e7eb' },
   sectionLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginTop: 16, marginBottom: 8 },
@@ -259,5 +276,8 @@ const styles = StyleSheet.create({
   addExtraForm: { marginTop: 8, padding: 12, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#e5e7eb' },
   extraActionBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
   addExtraBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10 },
+  photoPicker: { alignItems: 'center', marginBottom: 16 },
+  photoPreview: { width: 100, height: 100, borderRadius: 14 },
+  photoPlaceholder: { width: 100, height: 100, borderRadius: 14, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#e5e7eb', borderStyle: 'dashed' },
   formHint: { fontSize: 13, color: '#9ca3af', marginTop: 16, lineHeight: 18 },
 });
