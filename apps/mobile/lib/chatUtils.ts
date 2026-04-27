@@ -56,7 +56,7 @@ export interface PackageCardData {
 
 export interface ExtrasGridData {
   type: 'extras_grid';
-  extras: Array<{ id: string; name: string; price: number; duration_minutes: number; selected?: boolean }>;
+  extras: Array<{ id: string; name: string; price: number; duration_minutes: number; type?: string; max_quantity?: number; unit_label?: string | null; selected?: boolean }>;
 }
 
 export interface SummaryCardData {
@@ -133,7 +133,7 @@ export interface StaffWithSlotsData {
 export interface BookingOptionsData {
   type: 'booking_options';
   packages: PackageCardData[];
-  extras: Array<{ id: string; name: string; price: number; duration_minutes: number }>;
+  extras: Array<{ id: string; name: string; price: number; duration_minutes: number; type?: string; max_quantity?: number; unit_label?: string | null }>;
 }
 
 export type CardData =

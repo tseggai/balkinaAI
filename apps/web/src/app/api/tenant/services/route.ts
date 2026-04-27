@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const [{ data: services }, { data: svcLocs }, { data: extras }, { data: locations }] = await Promise.all([
     ctx.admin.from('services').select('id, name, price, duration_minutes, description, image_url, visibility, deposit_enabled, deposit_amount, deposit_type').eq('tenant_id', ctx.tenantId).order('name'),
     ctx.admin.from('service_locations').select('service_id, location_id'),
-    ctx.admin.from('service_extras').select('id, service_id, name, price, duration_minutes'),
+    ctx.admin.from('service_extras').select('id, service_id, name, price, duration_minutes, type, max_quantity, unit_label'),
     ctx.admin.from('tenant_locations').select('id, name').eq('tenant_id', ctx.tenantId),
   ]);
 
@@ -24,11 +24,11 @@ export async function GET(request: Request) {
     locMap.set(sl.service_id, arr);
   }
 
-  const extMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number }[]>();
-  for (const e of (extras ?? []) as { id: string; service_id: string; name: string; price: number; duration_minutes: number }[]) {
+  const extMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; type: string; max_quantity: number; unit_label: string | null }[]>();
+  for (const e of (extras ?? []) as { id: string; service_id: string; name: string; price: number; duration_minutes: number; type: string; max_quantity: number; unit_label: string | null }[]) {
     if (!svcIds.has(e.service_id)) continue;
     const arr = extMap.get(e.service_id) ?? [];
-    arr.push({ id: e.id, name: e.name, price: e.price, duration_minutes: e.duration_minutes });
+    arr.push({ id: e.id, name: e.name, price: e.price, duration_minutes: e.duration_minutes, type: e.type, max_quantity: e.max_quantity, unit_label: e.unit_label });
     extMap.set(e.service_id, arr);
   }
 
@@ -74,8 +74,9 @@ export async function POST(request: Request) {
   // Add extras
   if (Array.isArray(body.extras) && body.extras.length > 0) {
     await ctx.admin.from('service_extras').insert(
-      body.extras.map((e: { name: string; price: number; duration_minutes: number }) => ({
+      body.extras.map((e: { name: string; price: number; duration_minutes: number; type?: string; max_quantity?: number; unit_label?: string }) => ({
         service_id: svcId, name: e.name, price: e.price ?? 0, duration_minutes: e.duration_minutes ?? 0,
+        type: e.type ?? 'time', max_quantity: e.max_quantity ?? 1, unit_label: e.unit_label ?? null,
       })) as never[]
     );
   }
