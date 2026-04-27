@@ -30,6 +30,7 @@ export default function TenantSettings() {
 
   // Form
   const [formName, setFormName] = useState('');
+  const [formOwnerName, setFormOwnerName] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formCategoryId, setFormCategoryId] = useState('');
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -48,6 +49,7 @@ export default function TenantSettings() {
         const td = t as TenantData;
         setTenant(td);
         setFormName(td.name);
+        setFormOwnerName(td.owner_name ?? '');
         setFormPhone(td.phone ?? '');
         setFormCategoryId(td.category_id ?? '');
       }
@@ -66,6 +68,7 @@ export default function TenantSettings() {
     try {
       await supabase.from('tenants').update({
         name: formName.trim(),
+        owner_name: formOwnerName.trim() || null,
         phone: formPhone.trim() || null,
         category_id: formCategoryId || null,
       } as never).eq('id', tenant.id);
@@ -126,6 +129,7 @@ export default function TenantSettings() {
         {editMode && (
           <View style={styles.editSection}>
             <TextInput style={styles.input} value={formName} onChangeText={setFormName} placeholder="Business name" placeholderTextColor="#9ca3af" />
+            <TextInput style={styles.input} value={formOwnerName} onChangeText={setFormOwnerName} placeholder="Owner name" placeholderTextColor="#9ca3af" />
             <TextInput style={styles.input} value={formPhone} onChangeText={setFormPhone} placeholder="Phone number" placeholderTextColor="#9ca3af" keyboardType="phone-pad" />
 
             <TouchableOpacity style={styles.input} onPress={() => setShowCategoryPicker(!showCategoryPicker)}>
