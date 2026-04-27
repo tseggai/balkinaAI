@@ -60,7 +60,7 @@ export default function TenantTabsLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
+          title: 'Home',
           tabBarIcon: ({ color }) => <Ionicons name="grid-outline" size={24} color={color} />,
         }}
       />
@@ -75,29 +75,28 @@ export default function TenantTabsLayout() {
         name="services"
         options={{
           title: 'Services',
-          tabBarIcon: ({ color }) => <Ionicons name="briefcase-outline" size={24} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="staff"
         options={{
           title: 'Staff',
-          tabBarIcon: ({ color }) => <Ionicons name="people-outline" size={24} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="locations"
         options={{
           title: 'Locations',
-          tabBarIcon: ({ color }) => <Ionicons name="location-outline" size={24} color={color} />,
           href: null,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'More',
-          tabBarIcon: ({ color }) => <Ionicons name="ellipsis-horizontal" size={24} color={color} />,
+          title: 'Settings',
+          tabBarIcon: ({ color }) => <Ionicons name="settings-outline" size={24} color={color} />,
         }}
       />
     </Tabs>

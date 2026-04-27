@@ -126,15 +126,23 @@ export default function TenantDashboard() {
       </View>
 
       {/* Quick actions */}
-      <Text style={styles.sectionTitle}>Quick Actions</Text>
-      <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => router.navigate('/(tenant)/appointments')}>
-          <Ionicons name="calendar-outline" size={22} color="#6B7FC4" />
-          <Text style={styles.actionBtnText}>View Bookings</Text>
+      <Text style={styles.sectionTitle}>Manage</Text>
+      <View style={styles.manageGrid}>
+        <TouchableOpacity style={styles.manageCard} onPress={() => router.navigate('/(tenant)/appointments')}>
+          <Ionicons name="calendar-outline" size={24} color="#3b82f6" />
+          <Text style={styles.manageLabel}>Bookings</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => router.navigate('/(tenant)/services')}>
-          <Ionicons name="add-circle-outline" size={22} color="#6B7FC4" />
-          <Text style={styles.actionBtnText}>Add Service</Text>
+        <TouchableOpacity style={styles.manageCard} onPress={() => router.navigate('/(tenant)/services')}>
+          <Ionicons name="briefcase-outline" size={24} color="#8b5cf6" />
+          <Text style={styles.manageLabel}>Services</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.manageCard} onPress={() => router.navigate('/(tenant)/staff')}>
+          <Ionicons name="people-outline" size={24} color="#10b981" />
+          <Text style={styles.manageLabel}>Staff</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.manageCard} onPress={() => router.navigate('/(tenant)/locations')}>
+          <Ionicons name="location-outline" size={24} color="#f59e0b" />
+          <Text style={styles.manageLabel}>Locations</Text>
         </TouchableOpacity>
       </View>
 
@@ -202,9 +210,9 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 24, fontWeight: '700', color: '#111827', marginTop: 8 },
   statLabel: { fontSize: 13, color: '#6b7280', marginTop: 2 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 12, marginTop: 8 },
-  actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 14, borderWidth: 1, borderColor: '#e5e7eb' },
-  actionBtnText: { fontSize: 14, fontWeight: '600', color: '#6B7FC4' },
+  manageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  manageCard: { width: '47%', backgroundColor: '#fff', borderRadius: 14, padding: 16, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#f3f4f6' },
+  manageLabel: { fontSize: 14, fontWeight: '600', color: '#111827' },
   apptCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#f3f4f6' },
   apptRow: { flexDirection: 'row', alignItems: 'center' },
   apptCustomer: { fontSize: 15, fontWeight: '600', color: '#111827' },
