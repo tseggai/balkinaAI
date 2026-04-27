@@ -6,7 +6,7 @@ import { pickAndUploadPhoto } from '@/lib/usePhotoUpload';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
-interface Extra { id?: string; name: string; price: number; duration_minutes: number; }
+interface Extra { id?: string; name: string; price: number; duration_minutes: number; type: string; max_quantity: number; unit_label: string | null; }
 interface Service {
   id: string;
   name: string;
@@ -40,6 +40,9 @@ export default function TenantServices() {
   const [extraName, setExtraName] = useState('');
   const [extraPrice, setExtraPrice] = useState('');
   const [extraDuration, setExtraDuration] = useState('');
+  const [extraType, setExtraType] = useState<'time' | 'item'>('time');
+  const [extraMaxQty, setExtraMaxQty] = useState('1');
+  const [extraUnitLabel, setExtraUnitLabel] = useState('');
 
   const getToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -82,8 +85,16 @@ export default function TenantServices() {
 
   const addExtra = () => {
     if (!extraName.trim()) return;
-    setFormExtras([...formExtras, { name: extraName.trim(), price: parseFloat(extraPrice) || 0, duration_minutes: parseInt(extraDuration) || 0 }]);
+    setFormExtras([...formExtras, {
+      name: extraName.trim(),
+      price: parseFloat(extraPrice) || 0,
+      duration_minutes: extraType === 'time' ? (parseInt(extraDuration) || 0) : 0,
+      type: extraType,
+      max_quantity: extraType === 'item' ? (parseInt(extraMaxQty) || 1) : 1,
+      unit_label: extraType === 'item' && extraUnitLabel.trim() ? extraUnitLabel.trim() : null,
+    }]);
     setExtraName(''); setExtraPrice(''); setExtraDuration('');
+    setExtraType('time'); setExtraMaxQty('1'); setExtraUnitLabel('');
     setShowAddExtra(false);
   };
 
@@ -213,8 +224,15 @@ export default function TenantServices() {
             {formExtras.map((ext, idx) => (
               <View key={idx} style={styles.extraRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '500', color: '#111827' }}>{ext.name}</Text>
-                  <Text style={{ fontSize: 13, color: '#6b7280' }}>+${ext.price} · +{ext.duration_minutes}min</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '500', color: '#111827' }}>{ext.name}</Text>
+                    <View style={{ backgroundColor: ext.type === 'item' ? '#dbeafe' : '#f3f4f6', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '600', color: ext.type === 'item' ? '#1e40af' : '#6b7280' }}>{ext.type === 'item' ? 'ITEM' : 'TIME'}</Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 13, color: '#6b7280' }}>
+                    +${ext.price}{ext.type === 'time' ? ` · +${ext.duration_minutes}min` : ext.unit_label ? `/${ext.unit_label}` : ''}{ext.type === 'item' && ext.max_quantity > 1 ? ` · up to ${ext.max_quantity}` : ''}
+                  </Text>
                 </View>
                 <TouchableOpacity onPress={() => removeExtra(idx)}>
                   <Ionicons name="close-circle" size={22} color="#ef4444" />
@@ -224,16 +242,41 @@ export default function TenantServices() {
 
             {showAddExtra ? (
               <View style={styles.addExtraForm}>
-                <TextInput style={styles.input} value={extraName} onChangeText={setExtraName} placeholder="Extra name" placeholderTextColor="#9ca3af" />
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <TextInput style={[styles.input, { flex: 1 }]} value={extraPrice} onChangeText={setExtraPrice} placeholder="Price" placeholderTextColor="#9ca3af" keyboardType="decimal-pad" />
-                  <TextInput style={[styles.input, { flex: 1 }]} value={extraDuration} onChangeText={setExtraDuration} placeholder="Duration (min)" placeholderTextColor="#9ca3af" keyboardType="number-pad" />
+                {/* Type selector */}
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+                  <TouchableOpacity
+                    style={[styles.typeBtn, extraType === 'time' && styles.typeBtnActive]}
+                    onPress={() => setExtraType('time')}
+                  >
+                    <Ionicons name="time-outline" size={16} color={extraType === 'time' ? '#6B7FC4' : '#9ca3af'} />
+                    <Text style={[styles.typeBtnText, extraType === 'time' && styles.typeBtnTextActive]}>Time-based</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.typeBtn, extraType === 'item' && styles.typeBtnActive]}
+                    onPress={() => setExtraType('item')}
+                  >
+                    <Ionicons name="cube-outline" size={16} color={extraType === 'item' ? '#6B7FC4' : '#9ca3af'} />
+                    <Text style={[styles.typeBtnText, extraType === 'item' && styles.typeBtnTextActive]}>Item</Text>
+                  </TouchableOpacity>
                 </View>
+
+                <TextInput style={styles.input} value={extraName} onChangeText={setExtraName} placeholder={extraType === 'time' ? 'e.g. Deep Tissue Upgrade' : 'e.g. Champagne Bottle'} placeholderTextColor="#9ca3af" />
+                <TextInput style={styles.input} value={extraPrice} onChangeText={setExtraPrice} placeholder={extraType === 'time' ? 'Price per add-on' : 'Price per unit'} placeholderTextColor="#9ca3af" keyboardType="decimal-pad" />
+
+                {extraType === 'time' ? (
+                  <TextInput style={styles.input} value={extraDuration} onChangeText={setExtraDuration} placeholder="Additional time (min)" placeholderTextColor="#9ca3af" keyboardType="number-pad" />
+                ) : (
+                  <>
+                    <TextInput style={styles.input} value={extraUnitLabel} onChangeText={setExtraUnitLabel} placeholder="Unit label (e.g. bottle, session)" placeholderTextColor="#9ca3af" />
+                    <TextInput style={styles.input} value={extraMaxQty} onChangeText={setExtraMaxQty} placeholder="Max quantity (default: 1)" placeholderTextColor="#9ca3af" keyboardType="number-pad" />
+                  </>
+                )}
+
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity style={[styles.extraActionBtn, { backgroundColor: '#6B7FC4' }]} onPress={addExtra}>
                     <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Add</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.extraActionBtn, { backgroundColor: '#f3f4f6' }]} onPress={() => setShowAddExtra(false)}>
+                  <TouchableOpacity style={[styles.extraActionBtn, { backgroundColor: '#f3f4f6' }]} onPress={() => { setShowAddExtra(false); setExtraType('time'); }}>
                     <Text style={{ color: '#6b7280', fontWeight: '600', fontSize: 14 }}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
@@ -275,6 +318,10 @@ const styles = StyleSheet.create({
   extraRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   addExtraForm: { marginTop: 8, padding: 12, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#e5e7eb' },
   extraActionBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+  typeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' },
+  typeBtnActive: { borderColor: '#6B7FC4', backgroundColor: '#eef2ff' },
+  typeBtnText: { fontSize: 13, fontWeight: '500', color: '#9ca3af' },
+  typeBtnTextActive: { color: '#6B7FC4', fontWeight: '600' },
   addExtraBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10 },
   photoPicker: { alignItems: 'center', marginBottom: 16 },
   photoPreview: { width: 100, height: 100, borderRadius: 14 },

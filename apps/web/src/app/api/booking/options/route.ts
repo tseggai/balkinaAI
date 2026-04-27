@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     }
 
     const serviceData = serviceResult.data as Record<string, unknown> & {
-      service_extras: { id: string; name: string; price: number; duration_minutes: number }[];
+      service_extras: { id: string; name: string; price: number; duration_minutes: number; type?: string; max_quantity?: number; unit_label?: string | null }[];
     };
 
     return NextResponse.json({

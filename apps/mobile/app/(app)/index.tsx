@@ -638,15 +638,25 @@ function ExtrasGridComponent({ data, onSubmit }: { data: ExtrasGridData; onSubmi
 // ── Booking Options (combined packages + extras) ────────────────────────────
 
 function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData; onSubmit: (msg: string) => void }) {
-  console.log('[BookingOptions] packages:', data.packages.length, 'extras:', data.extras.length, 'extras names:', data.extras.map(e => e.name));
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
-  const [selectedExtras, setSelectedExtras] = useState<Set<string>>(new Set());
+  const [extraQuantities, setExtraQuantities] = useState<Map<string, number>>(new Map());
 
   const toggleExtra = (id: string) => {
-    setSelectedExtras((prev) => {
-      const next = new Set(prev);
+    setExtraQuantities(prev => {
+      const next = new Map(prev);
       if (next.has(id)) next.delete(id);
-      else next.add(id);
+      else next.set(id, 1);
+      return next;
+    });
+  };
+
+  const adjustQuantity = (id: string, delta: number, maxQty: number) => {
+    setExtraQuantities(prev => {
+      const next = new Map(prev);
+      const current = next.get(id) ?? 0;
+      const newVal = Math.max(0, Math.min(maxQty, current + delta));
+      if (newVal === 0) next.delete(id);
+      else next.set(id, newVal);
       return next;
     });
   };
@@ -656,9 +666,15 @@ function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData;
     if (selectedPackage) {
       parts.push(`Package: ${selectedPackage}`);
     }
-    const extraNames = data.extras.filter((e) => selectedExtras.has(e.id)).map((e) => e.name);
-    if (extraNames.length > 0) {
-      parts.push(`Extras: ${extraNames.join(', ')}`);
+    const extraParts: string[] = [];
+    for (const [id, qty] of extraQuantities) {
+      const extra = data.extras.find(e => e.id === id);
+      if (extra) {
+        extraParts.push(qty > 1 ? `${extra.name} x${qty}` : extra.name);
+      }
+    }
+    if (extraParts.length > 0) {
+      parts.push(`Extras: ${extraParts.join(', ')}`);
     }
     if (parts.length === 0) {
       onSubmit('No packages or extras');
@@ -707,18 +723,33 @@ function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData;
           <Text style={combinedStyles.sectionLabel}>Add extras</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 4 }}>
             {data.extras.map((extra) => {
-              const isSelected = selectedExtras.has(extra.id);
+              const qty = extraQuantities.get(extra.id) ?? 0;
+              const isSelected = qty > 0;
+              const isItem = extra.type === 'item';
+              const maxQty = extra.max_quantity ?? 1;
+
               return (
                 <TouchableOpacity
                   key={extra.id}
                   style={[combinedStyles.packageChip, isSelected && combinedStyles.packageChipSelected]}
-                  onPress={() => toggleExtra(extra.id)}
+                  onPress={() => { if (!isItem || maxQty <= 1) toggleExtra(extra.id); else if (!isSelected) adjustQuantity(extra.id, 1, maxQty); }}
                   activeOpacity={0.7}
                 >
                   <Text style={[combinedStyles.packageChipName, isSelected && combinedStyles.packageChipNameSelected]}>{extra.name}</Text>
                   <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>
-                    +${extra.price} · +{extra.duration_minutes}min
+                    +${extra.price}{isItem && extra.unit_label ? `/${extra.unit_label}` : ''}{!isItem ? ` · +${extra.duration_minutes}min` : ''}
                   </Text>
+                  {isItem && maxQty > 1 && isSelected && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
+                      <TouchableOpacity onPress={() => adjustQuantity(extra.id, -1, maxQty)} style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#e5e7eb', justifyContent: 'center', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: '#374151' }}>−</Text>
+                      </TouchableOpacity>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>{qty}</Text>
+                      <TouchableOpacity onPress={() => adjustQuantity(extra.id, 1, maxQty)} style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#6B7FC4', justifyContent: 'center', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -727,7 +758,7 @@ function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData;
       ) : null}
       <TouchableOpacity style={richCardStyles.extrasDoneBtn} onPress={handleDone} activeOpacity={0.7}>
         <Text style={richCardStyles.extrasDoneBtnText}>
-          {selectedPackage || selectedExtras.size > 0 ? 'Continue with selections →' : 'Skip →'}
+          {selectedPackage || extraQuantities.size > 0 ? 'Continue with selections →' : 'Skip →'}
         </Text>
       </TouchableOpacity>
     </View>
@@ -1541,7 +1572,7 @@ export default function ChatScreen() {
       const data = (await res.json()) as {
         packages: { id: string; name: string; price?: number; image_url?: string; package_services: { quantity: number; services: { name: string } | null }[] }[];
         customer_packages: { id: string; package: { name: string; price: number } | null; sessions: { sessions_remaining: number; services: { name: string } | null }[] }[];
-        extras: { id: string; name: string; price: number; duration_minutes: number }[];
+        extras: { id: string; name: string; price: number; duration_minutes: number; type?: string; max_quantity?: number; unit_label?: string | null }[];
       };
 
       const hasPackages = data.packages.length > 0 || data.customer_packages.length > 0;

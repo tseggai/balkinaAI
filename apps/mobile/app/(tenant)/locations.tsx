@@ -31,6 +31,10 @@ export default function TenantLocations() {
   const [formState, setFormState] = useState('');
   const [formCountry, setFormCountry] = useState('');
   const [formPhone, setFormPhone] = useState('');
+  const [formLat, setFormLat] = useState<number | null>(null);
+  const [formLng, setFormLng] = useState<number | null>(null);
+  const [formTimezone, setFormTimezone] = useState('');
+  const [geocoding, setGeocoding] = useState(false);
 
   const getToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -66,6 +70,31 @@ export default function TenantLocations() {
     setModalVisible(true);
   };
 
+  const handleGeocode = async () => {
+    if (!formAddress.trim()) { Alert.alert('Error', 'Enter an address to search'); return; }
+    setGeocoding(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(`${API_BASE}/api/tenant/geocode?address=${encodeURIComponent(formAddress.trim())}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setFormAddress(json.formatted_address ?? formAddress);
+        if (json.city) setFormCity(json.city);
+        if (json.state) setFormState(json.state);
+        if (json.country) setFormCountry(json.country);
+        setFormLat(json.latitude);
+        setFormLng(json.longitude);
+        setFormTimezone(json.timezone ?? '');
+      } else {
+        Alert.alert('Not Found', json.error ?? 'Address not found');
+      }
+    } catch { Alert.alert('Error', 'Search failed'); }
+    finally { setGeocoding(false); }
+  };
+
   const handleSave = async () => {
     if (!formName.trim()) { Alert.alert('Error', 'Location name is required'); return; }
     setSaving(true);
@@ -77,6 +106,8 @@ export default function TenantLocations() {
         name: formName.trim(), address: formAddress.trim(),
         city: formCity.trim() || null, state: formState.trim() || null,
         country: formCountry.trim() || null, phone: formPhone.trim() || null,
+        latitude: formLat, longitude: formLng,
+        timezone: formTimezone || null,
       };
       if (editing) body.id = editing.id;
 
@@ -151,14 +182,29 @@ export default function TenantLocations() {
           </View>
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
             <TextInput style={styles.input} value={formName} onChangeText={setFormName} placeholder="Location name *" placeholderTextColor="#9ca3af" />
-            <TextInput style={styles.input} value={formAddress} onChangeText={setFormAddress} placeholder="Full address" placeholderTextColor="#9ca3af" />
+
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput style={[styles.input, { flex: 1 }]} value={formAddress} onChangeText={setFormAddress} placeholder="Search address..." placeholderTextColor="#9ca3af" />
+              <TouchableOpacity style={styles.geocodeBtn} onPress={handleGeocode} disabled={geocoding}>
+                {geocoding ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="search" size={18} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+            {formTimezone ? (
+              <Text style={styles.tzBadge}>Timezone: {formTimezone}</Text>
+            ) : (
+              <Text style={styles.formHint}>Enter address and tap search to auto-fill fields below</Text>
+            )}
+
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <TextInput style={[styles.input, { flex: 1 }]} value={formCity} onChangeText={setFormCity} placeholder="City" placeholderTextColor="#9ca3af" />
               <TextInput style={[styles.input, { flex: 1 }]} value={formState} onChangeText={setFormState} placeholder="State" placeholderTextColor="#9ca3af" />
             </View>
             <TextInput style={styles.input} value={formCountry} onChangeText={setFormCountry} placeholder="Country" placeholderTextColor="#9ca3af" />
             <TextInput style={styles.input} value={formPhone} onChangeText={setFormPhone} placeholder="Phone number" placeholderTextColor="#9ca3af" keyboardType="phone-pad" />
-            <Text style={styles.formHint}>For gallery photos and Google Maps address lookup, use the desktop dashboard.</Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -183,5 +229,7 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 18, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   form: { padding: 20 },
   input: { backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#111827', marginBottom: 10, borderWidth: 1, borderColor: '#e5e7eb' },
-  formHint: { fontSize: 13, color: '#9ca3af', marginTop: 8, lineHeight: 18 },
+  geocodeBtn: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#6B7FC4', justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  tzBadge: { fontSize: 12, color: '#10b981', backgroundColor: '#d1fae5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 10, overflow: 'hidden' },
+  formHint: { fontSize: 13, color: '#9ca3af', marginBottom: 10, lineHeight: 18 },
 });
