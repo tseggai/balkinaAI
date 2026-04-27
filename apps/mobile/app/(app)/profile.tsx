@@ -16,6 +16,7 @@ import {
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
 
@@ -45,8 +46,10 @@ const GENDER_OPTIONS = [
 // ── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isTenantOwner, setIsTenantOwner] = useState(false);
   const [notifySms, setNotifySms] = useState(true);
   const [notifyPush, setNotifyPush] = useState(true);
   const [toggling, setToggling] = useState(false);
@@ -86,6 +89,14 @@ export default function ProfileScreen() {
         });
       }
     }
+    // Check if user is also a tenant owner
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        const { data: tenantCheck } = await supabase.from('tenants').select('id').eq('user_id', authUser.id).maybeSingle();
+        setIsTenantOwner(!!tenantCheck);
+      }
+    } catch {}
     setLoading(false);
   }, [getToken]);
 
@@ -246,8 +257,26 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Switch to Business (only if tenant owner) */}
+        {isTenantOwner && (
+          <View style={[styles.card, { marginTop: 24 }]}>
+            <TouchableOpacity style={styles.cardRow} onPress={() => router.replace('/(tenant)/dashboard')} activeOpacity={0.6}>
+              <View style={styles.cardRowLeft}>
+                <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
+                  <Ionicons name="swap-horizontal-outline" size={18} color="#6B7FC4" />
+                </View>
+                <View>
+                  <Text style={styles.cardRowLabel}>Switch to Business</Text>
+                  <Text style={styles.cardRowSub}>Manage your business</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Sign Out */}
-        <View style={[styles.card, { marginTop: 24 }]}>
+        <View style={[styles.card, { marginTop: isTenantOwner ? 12 : 24 }]}>
           <TouchableOpacity style={styles.cardRow} onPress={handleSignOut} activeOpacity={0.6}>
             <View style={styles.cardRowLeft}>
               <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2' }]}>

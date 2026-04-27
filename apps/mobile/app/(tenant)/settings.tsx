@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Image, Linking } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 
@@ -19,6 +20,7 @@ interface Category {
 }
 
 export default function TenantSettings() {
+  const router = useRouter();
   const [tenant, setTenant] = useState<TenantData | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,9 +140,23 @@ export default function TenantSettings() {
         )}
       </View>
 
-      {/* Desktop Management */}
+      {/* In-App Management */}
       <Text style={styles.sectionTitle}>Management</Text>
       <View style={styles.card}>
+        <TouchableOpacity style={styles.linkRow} onPress={() => router.navigate('/(tenant)/locations')}>
+          <View style={styles.linkRowLeft}>
+            <Ionicons name="location-outline" size={20} color="#6B7FC4" />
+            <View>
+              <Text style={styles.linkRowLabel}>Locations</Text>
+              <Text style={styles.linkRowSub}>Manage your business locations</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+        </TouchableOpacity>
+
+        <View style={styles.separator} />
+
+        {/* Desktop links for advanced features */}
         <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://app.balkina.ai/dashboard')}>
           <View style={styles.linkRowLeft}>
             <Ionicons name="desktop-outline" size={20} color="#6B7FC4" />
@@ -199,8 +215,22 @@ export default function TenantSettings() {
         </TouchableOpacity>
       </View>
 
-      {/* Sign Out */}
+      {/* Switch Role */}
       <View style={[styles.card, { marginTop: 20 }]}>
+        <TouchableOpacity style={styles.linkRow} onPress={() => router.replace('/(app)')}>
+          <View style={styles.linkRowLeft}>
+            <Ionicons name="swap-horizontal-outline" size={20} color="#6B7FC4" />
+            <View>
+              <Text style={styles.linkRowLabel}>Switch to Customer</Text>
+              <Text style={styles.linkRowSub}>Book services as a customer</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Sign Out */}
+      <View style={[styles.card, { marginTop: 12 }]}>
         <TouchableOpacity style={styles.linkRow} onPress={handleSignOut}>
           <View style={styles.linkRowLeft}>
             <Ionicons name="log-out-outline" size={20} color="#dc2626" />

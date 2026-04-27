@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  KeyboardAvoidingView,
   Platform,
   Animated,
   Keyboard,
@@ -22,6 +21,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import { useStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
@@ -1295,6 +1295,8 @@ const chipStyles = StyleSheet.create({
 export default function ChatScreen() {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const tabBarHeight = useBottomTabBarHeight();
+  const keyboardHeight = useKeyboardHeight();
+  const kbPadding = Platform.OS === 'ios' && keyboardHeight > 0 ? keyboardHeight - tabBarHeight : 0;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -2334,11 +2336,7 @@ export default function ChatScreen() {
   if (!hasMessages) {
     return (
       <SafeAreaView style={styles.container}>
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? tabBarHeight : 0}
-        >
+        <View style={[styles.flex, { paddingBottom: kbPadding }]}>
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
             <View style={{ alignItems: 'center', marginBottom: 24 }}>
               <BalkinaLogo size="large" />
@@ -2383,7 +2381,7 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </View>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </SafeAreaView>
     );
   }
@@ -2391,11 +2389,7 @@ export default function ChatScreen() {
   return (
     <View style={styles.chatScreenWrapper}>
       <SafeAreaView style={styles.chatScreenSafe}>
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? tabBarHeight : 0}
-        >
+        <View style={[styles.flex, { paddingBottom: kbPadding }]}>
           <View style={styles.chatHeader}>
             <TouchableOpacity style={styles.resetBtn} onPress={resetConversation} activeOpacity={0.7}>
               <Ionicons name="arrow-back" size={18} color="#6B7FC4" />
@@ -2447,7 +2441,7 @@ export default function ChatScreen() {
           </TouchableOpacity>
           </View>
         </View>
-        </KeyboardAvoidingView>
+        </View>
       </SafeAreaView>
 
       {/* Full-screen booking confirmation modal */}
