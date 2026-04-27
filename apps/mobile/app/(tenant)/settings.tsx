@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
+import { pickAndUploadPhoto } from '@/lib/usePhotoUpload';
 
 interface TenantData {
   id: string;
@@ -95,13 +96,24 @@ export default function TenantSettings() {
       {/* Business Profile */}
       <View style={styles.card}>
         <View style={styles.profileHeader}>
-          {tenant?.logo_url ? (
-            <Image source={{ uri: tenant.logo_url }} style={styles.logo} />
-          ) : (
-            <View style={styles.logoPlaceholder}>
-              <Text style={styles.logoText}>{(tenant?.name ?? 'B').charAt(0)}</Text>
+          <TouchableOpacity onPress={async () => {
+            const url = await pickAndUploadPhoto('logo');
+            if (url && tenant) {
+              await supabase.from('tenants').update({ logo_url: url } as never).eq('id', tenant.id);
+              fetchTenant();
+            }
+          }}>
+            {tenant?.logo_url ? (
+              <Image source={{ uri: tenant.logo_url }} style={styles.logo} />
+            ) : (
+              <View style={styles.logoPlaceholder}>
+                <Text style={styles.logoText}>{(tenant?.name ?? 'B').charAt(0)}</Text>
+              </View>
+            )}
+            <View style={{ position: 'absolute', bottom: -2, right: -2, backgroundColor: '#6B7FC4', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="camera" size={12} color="#fff" />
             </View>
-          )}
+          </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.businessName}>{tenant?.name}</Text>
             {tenant?.email && <Text style={styles.businessEmail}>{tenant.email}</Text>}
@@ -138,61 +150,6 @@ export default function TenantSettings() {
             </TouchableOpacity>
           </View>
         )}
-      </View>
-
-      {/* In-App Management */}
-      <Text style={styles.sectionTitle}>Management</Text>
-      <View style={styles.card}>
-        <TouchableOpacity style={styles.linkRow} onPress={() => router.navigate('/(tenant)/locations')}>
-          <View style={styles.linkRowLeft}>
-            <Ionicons name="location-outline" size={20} color="#6B7FC4" />
-            <View>
-              <Text style={styles.linkRowLabel}>Locations</Text>
-              <Text style={styles.linkRowSub}>Manage your business locations</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
-        </TouchableOpacity>
-
-        <View style={styles.separator} />
-
-        {/* Desktop links for advanced features */}
-        <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://app.balkina.ai/dashboard')}>
-          <View style={styles.linkRowLeft}>
-            <Ionicons name="desktop-outline" size={20} color="#6B7FC4" />
-            <View>
-              <Text style={styles.linkRowLabel}>Full Dashboard</Text>
-              <Text style={styles.linkRowSub}>Staff schedules, analytics, advanced settings</Text>
-            </View>
-          </View>
-          <Ionicons name="open-outline" size={16} color="#d1d5db" />
-        </TouchableOpacity>
-
-        <View style={styles.separator} />
-
-        <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://app.balkina.ai/dashboard/staff')}>
-          <View style={styles.linkRowLeft}>
-            <Ionicons name="people-outline" size={20} color="#6B7FC4" />
-            <View>
-              <Text style={styles.linkRowLabel}>Staff Management</Text>
-              <Text style={styles.linkRowSub}>Add staff, set schedules, send invites</Text>
-            </View>
-          </View>
-          <Ionicons name="open-outline" size={16} color="#d1d5db" />
-        </TouchableOpacity>
-
-        <View style={styles.separator} />
-
-        <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://app.balkina.ai/dashboard/locations')}>
-          <View style={styles.linkRowLeft}>
-            <Ionicons name="location-outline" size={20} color="#6B7FC4" />
-            <View>
-              <Text style={styles.linkRowLabel}>Locations</Text>
-              <Text style={styles.linkRowSub}>Manage addresses, gallery photos</Text>
-            </View>
-          </View>
-          <Ionicons name="open-outline" size={16} color="#d1d5db" />
-        </TouchableOpacity>
       </View>
 
       {/* Legal */}
