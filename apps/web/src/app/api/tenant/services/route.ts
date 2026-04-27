@@ -115,8 +115,9 @@ export async function PATCH(request: Request) {
     await ctx.admin.from('service_extras').delete().eq('service_id', body.id);
     if (body.extras.length > 0) {
       await ctx.admin.from('service_extras').insert(
-        body.extras.map((e: { name: string; price: number; duration_minutes: number }) => ({
+        body.extras.map((e: { name: string; price: number; duration_minutes: number; type?: string; max_quantity?: number; unit_label?: string }) => ({
           service_id: body.id, name: e.name, price: e.price ?? 0, duration_minutes: e.duration_minutes ?? 0,
+          type: e.type ?? 'time', max_quantity: e.max_quantity ?? 1, unit_label: e.unit_label ?? null,
         })) as never[]
       );
     }
