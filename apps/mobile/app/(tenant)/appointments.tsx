@@ -25,7 +25,8 @@ interface StaffOption {
   name: string;
 }
 
-type Tab = 'upcoming' | 'past' | 'pending';
+type Tab = 'upcoming' | 'past';
+const STATUS_FILTERS = ['all', 'pending', 'confirmed', 'approved', 'completed', 'cancelled', 'no_show'] as const;
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   pending: { bg: '#fef3c7', text: '#92400e' },
@@ -44,6 +45,7 @@ export default function TenantAppointments() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [staffList, setStaffList] = useState<StaffOption[]>([]);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [assigningApptId, setAssigningApptId] = useState<string | null>(null);
@@ -236,21 +238,30 @@ export default function TenantAppointments() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.tabRow}>
-        {(['upcoming', 'past', 'pending'] as Tab[]).map((t) => (
-          <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'upcoming' ? 'Upcoming' : t === 'past' ? 'Past' : 'Pending'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.tabSection}>
+        <View style={styles.tabRow}>
+          {(['upcoming', 'past'] as Tab[]).map((t) => (
+            <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => { setTab(t); setStatusFilter('all'); }}>
+              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
+                {t === 'upcoming' ? 'Upcoming' : 'Past'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+          {STATUS_FILTERS.map((s) => (
+            <TouchableOpacity key={s} style={[styles.filterChip, statusFilter === s && styles.filterChipActive]} onPress={() => setStatusFilter(s)}>
+              <Text style={[styles.filterChipText, statusFilter === s && styles.filterChipTextActive]}>{s === 'all' ? 'All' : s.replace('_', ' ')}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {loading ? (
         <View style={styles.centered}><ActivityIndicator size="large" color="#6B7FC4" /></View>
       ) : (
         <FlatList
-          data={appointments}
+          data={statusFilter === 'all' ? appointments : appointments.filter(a => a.status === statusFilter)}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
@@ -288,7 +299,13 @@ export default function TenantAppointments() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  tabRow: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 8, gap: 8, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  tabSection: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  tabRow: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8, gap: 8 },
+  filterRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 6 },
+  filterChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, backgroundColor: '#f3f4f6' },
+  filterChipActive: { backgroundColor: '#eef2ff' },
+  filterChipText: { fontSize: 12, fontWeight: '500', color: '#6b7280', textTransform: 'capitalize' },
+  filterChipTextActive: { color: '#6B7FC4', fontWeight: '600' },
   tab: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center', backgroundColor: '#f3f4f6' },
   tabActive: { backgroundColor: '#6B7FC4' },
   tabText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },

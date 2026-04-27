@@ -6,88 +6,41 @@ import { supabase } from '@/lib/supabase';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
-interface Stats {
-  totalAppointments: number;
-  todayAppointments: number;
-  pendingAppointments: number;
-  totalRevenue: number;
-  totalCustomers: number;
-  totalStaff: number;
-  totalServices: number;
-}
-
-interface RecentAppointment {
-  id: string;
-  start_time: string;
-  status: string;
-  customer_name: string;
-  service_name: string;
+interface DashboardData {
+  tenantName: string;
+  stats: {
+    totalAppointments: number;
+    todayAppointments: number;
+    pendingAppointments: number;
+    totalRevenue: number;
+    totalCustomers: number;
+    totalStaff: number;
+    totalServices: number;
+  };
+  recent: {
+    id: string;
+    start_time: string;
+    status: string;
+    customer_name: string;
+    service_name: string;
+  }[];
 }
 
 export default function TenantDashboard() {
   const router = useRouter();
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [recent, setRecent] = useState<RecentAppointment[]>([]);
-  const [tenantName, setTenantName] = useState('');
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: tenant } = await supabase
-        .from('tenants')
-        .select('id, name')
-        .eq('user_id', user.id)
-        .single();
-      if (!tenant) return;
-      setTenantName((tenant as { name: string }).name);
-      const tenantId = (tenant as { id: string }).id;
-
-      const today = new Date();
-      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-      const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
-
-      const [allAppts, todayAppts, pendingAppts, customers, staffCount, svcCount] = await Promise.all([
-        supabase.from('appointments').select('id, total_price, status').eq('tenant_id', tenantId),
-        supabase.from('appointments').select('id').eq('tenant_id', tenantId).gte('start_time', todayStart).lt('start_time', todayEnd).in('status', ['confirmed', 'approved', 'pending']),
-        supabase.from('appointments').select('id').eq('tenant_id', tenantId).eq('status', 'pending'),
-        supabase.from('appointments').select('customer_id').eq('tenant_id', tenantId),
-        supabase.from('staff').select('id').eq('tenant_id', tenantId),
-        supabase.from('services').select('id').eq('tenant_id', tenantId),
-      ]);
-
-      const allData = (allAppts.data ?? []) as { id: string; total_price: number; status: string }[];
-      const completedRevenue = allData.filter(a => a.status === 'completed').reduce((sum, a) => sum + (a.total_price ?? 0), 0);
-      const uniqueCustomers = new Set((customers.data ?? []).map((c: { customer_id: string }) => c.customer_id));
-
-      setStats({
-        totalAppointments: allData.length,
-        todayAppointments: (todayAppts.data ?? []).length,
-        pendingAppointments: (pendingAppts.data ?? []).length,
-        totalRevenue: completedRevenue,
-        totalCustomers: uniqueCustomers.size,
-        totalStaff: (staffCount.data ?? []).length,
-        totalServices: (svcCount.data ?? []).length,
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`${API_BASE}/api/tenant/dashboard`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
-
-      // Recent appointments
-      const { data: recentData } = await supabase
-        .from('appointments')
-        .select('id, start_time, status, customers(display_name), services(name)')
-        .eq('tenant_id', tenantId)
-        .order('start_time', { ascending: false })
-        .limit(5);
-
-      setRecent((recentData ?? []).map((a: Record<string, unknown>) => ({
-        id: a.id as string,
-        start_time: a.start_time as string,
-        status: a.status as string,
-        customer_name: ((a.customers as { display_name: string } | null)?.display_name) ?? 'Guest',
-        service_name: ((a.services as { name: string } | null)?.name) ?? 'Service',
-      })));
+      const json = await res.json();
+      if (res.ok) setData(json);
     } catch (err) {
       console.error('[tenant-dashboard] error:', err);
     } finally {
@@ -98,12 +51,10 @@ export default function TenantDashboard() {
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
-  const onRefresh = () => { setRefreshing(true); fetchDashboard(); };
+  if (loading) return <View style={styles.centered}><ActivityIndicator size="large" color="#6B7FC4" /></View>;
 
-  if (loading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color="#6B7FC4" /></View>;
-  }
-
+  const stats = data?.stats;
+  const recent = data?.recent ?? [];
   const statusColor: Record<string, string> = {
     pending: '#f59e0b', confirmed: '#3b82f6', approved: '#3b82f6',
     completed: '#10b981', cancelled: '#ef4444', no_show: '#6b7280',
@@ -113,9 +64,9 @@ export default function TenantDashboard() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6B7FC4" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchDashboard(); }} tintColor="#6B7FC4" />}
     >
-      <Text style={styles.greeting}>Welcome, {tenantName}</Text>
+      <Text style={styles.greeting}>Welcome, {data?.tenantName ?? ''}</Text>
 
       {/* Compact stats */}
       <View style={styles.statsRow}>
@@ -202,14 +153,12 @@ export default function TenantDashboard() {
         </View>
         <View style={styles.snapshotItem}>
           <Text style={styles.snapshotValue}>{stats?.totalAppointments ?? 0}</Text>
-          <Text style={styles.snapshotLabel}>Total Bookings</Text>
+          <Text style={styles.snapshotLabel}>Total</Text>
         </View>
       </View>
     </ScrollView>
   );
 }
-
-
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
