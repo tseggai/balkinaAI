@@ -15,6 +15,7 @@ interface Location {
   country: string | null;
   phone: string | null;
   timezone: string;
+  image_url: string | null;
   gallery_count: number;
 }
 
@@ -36,6 +37,7 @@ export default function TenantLocations() {
   const [formLng, setFormLng] = useState<number | null>(null);
   const [formTimezone, setFormTimezone] = useState('');
   const [geocoding, setGeocoding] = useState(false);
+  const [locationImageUrl, setLocationImageUrl] = useState<string | null>(null);
   const [galleryPhotos, setGalleryPhotos] = useState<{ id: string; image_url: string }[]>([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
@@ -65,13 +67,14 @@ export default function TenantLocations() {
     setEditing(null);
     setFormName(''); setFormAddress(''); setFormCity(''); setFormState(''); setFormCountry(''); setFormPhone('');
     setFormLat(null); setFormLng(null); setFormTimezone('');
-    setGalleryPhotos([]);
+    setLocationImageUrl(null); setGalleryPhotos([]);
     setModalVisible(true);
   };
 
   const openEdit = (loc: Location) => {
     setEditing(loc);
     setFormName(loc.name); setFormAddress(loc.address); setFormCity(loc.city ?? ''); setFormState(loc.state ?? ''); setFormCountry(loc.country ?? ''); setFormPhone(loc.phone ?? '');
+    setLocationImageUrl(loc.image_url);
     setGalleryPhotos([]);
     fetchGallery(loc.id);
     setModalVisible(true);
@@ -170,6 +173,10 @@ export default function TenantLocations() {
 
   const handleSave = async () => {
     if (!formName.trim()) { Alert.alert('Error', 'Location name is required'); return; }
+    if (!formLat && !editing) {
+      Alert.alert('Address Required', 'Please search and select an address to set the correct timezone and coordinates.');
+      return;
+    }
     setSaving(true);
     try {
       const token = await getToken();
@@ -269,7 +276,7 @@ export default function TenantLocations() {
             {formTimezone ? (
               <Text style={styles.tzBadge}>Timezone: {formTimezone}</Text>
             ) : (
-              <Text style={styles.formHint}>Enter address and tap search to auto-fill fields below</Text>
+              <Text style={[styles.formHint, { color: '#dc2626' }]}>Enter address and tap search to verify location *</Text>
             )}
 
             <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -282,9 +289,10 @@ export default function TenantLocations() {
             {/* Location Photo */}
             <Text style={styles.sectionLabel}>Location Photo</Text>
             <TouchableOpacity style={styles.photoPicker} onPress={async () => {
-              if (!editing) return;
+              if (!editing) { Alert.alert('Save First', 'Save the location before adding a photo.'); return; }
               const url = await pickAndUploadPhoto('location');
               if (url) {
+                setLocationImageUrl(url);
                 const token = await getToken();
                 if (token) {
                   await fetch(`${API_BASE}/api/tenant/locations`, {
@@ -296,10 +304,14 @@ export default function TenantLocations() {
                 }
               }
             }}>
-              <View style={styles.photoPlaceholder}>
-                <Ionicons name="camera-outline" size={28} color="#9ca3af" />
-                <Text style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>{editing ? 'Change Photo' : 'Save location first'}</Text>
-              </View>
+              {locationImageUrl ? (
+                <Image source={{ uri: locationImageUrl }} style={styles.photoPreview} />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <Ionicons name="camera-outline" size={28} color="#9ca3af" />
+                  <Text style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>{editing ? 'Add Photo' : 'Save location first'}</Text>
+                </View>
+              )}
             </TouchableOpacity>
 
             {/* Gallery Photos */}
@@ -365,7 +377,8 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#111827', marginBottom: 10, borderWidth: 1, borderColor: '#e5e7eb' },
   sectionLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
   photoPicker: { alignItems: 'center', marginBottom: 12 },
-  photoPlaceholder: { width: 100, height: 100, borderRadius: 14, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#e5e7eb', borderStyle: 'dashed' },
+  photoPreview: { width: 120, height: 90, borderRadius: 14 },
+  photoPlaceholder: { width: 120, height: 90, borderRadius: 14, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#e5e7eb', borderStyle: 'dashed' },
   galleryThumb: { width: 80, height: 80, marginRight: 8, borderRadius: 10, overflow: 'hidden', position: 'relative' as const },
   galleryImg: { width: 80, height: 80, borderRadius: 10 },
   galleryDelete: { position: 'absolute' as const, top: -4, right: -4, backgroundColor: '#fff', borderRadius: 11 },
