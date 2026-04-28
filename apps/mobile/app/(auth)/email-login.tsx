@@ -10,15 +10,21 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
+
 export default function EmailLoginScreen() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isStaffInvite, setIsStaffInvite] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
   async function handleSignIn() {
@@ -98,7 +104,45 @@ export default function EmailLoginScreen() {
     }
 
     setLoading(false);
-    // On success, onAuthStateChange in _layout.tsx handles redirect to /(main)
+  }
+
+  async function handleStaffInvite() {
+    if (!inviteCode.trim()) { Alert.alert('Error', 'Enter your invite code'); return; }
+    if (!email.trim()) { Alert.alert('Error', 'Enter your email'); return; }
+    if (password.length < 6) { Alert.alert('Error', 'Password must be at least 6 characters'); return; }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/staff/accept-invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: inviteCode.trim().toUpperCase(),
+          email: email.trim().toLowerCase(),
+          password,
+          name: name.trim() || undefined,
+        }),
+      });
+      const json = await res.json() as { data: { message: string } | null; error: { message: string } | null };
+      if (json.error) {
+        Alert.alert('Error', json.error.message);
+        setLoading(false);
+        return;
+      }
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (signInErr) {
+        Alert.alert('Account Created', 'Your staff account was created. Please sign in.');
+        setIsStaffInvite(false);
+        setIsSignUp(false);
+      }
+    } catch {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleForgotPassword() {
@@ -159,15 +203,31 @@ export default function EmailLoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.title}>
-          {isSignUp ? 'Create your account' : 'Welcome back'}
+          {isStaffInvite ? 'Join your team' : isSignUp ? 'Create your account' : 'Welcome back'}
         </Text>
         <Text style={styles.subtitle}>
-          {isSignUp
-            ? 'Sign up to start booking appointments.'
-            : 'Sign in with your email and password.'}
+          {isStaffInvite
+            ? 'Enter your invite code to set up your staff account.'
+            : isSignUp
+              ? 'Sign up to start booking appointments.'
+              : 'Sign in with your email and password.'}
         </Text>
 
-        {isSignUp && (
+        {/* Staff invite code field */}
+        {isStaffInvite && (
+          <TextInput
+            style={[styles.input, { textAlign: 'center', fontSize: 20, fontWeight: '700', letterSpacing: 6, borderWidth: 2, borderColor: '#6B7FC4' }]}
+            value={inviteCode}
+            onChangeText={setInviteCode}
+            placeholder="INVITE CODE"
+            placeholderTextColor="#9ca3af"
+            autoCapitalize="characters"
+            maxLength={6}
+          />
+        )}
+
+        {/* Name + phone for customer sign-up and staff invite */}
+        {(isSignUp || isStaffInvite) && (
           <>
             <TextInput
               style={styles.input}
@@ -178,15 +238,17 @@ export default function EmailLoginScreen() {
               autoCapitalize="words"
               autoComplete="name"
             />
-            <TextInput
-              style={styles.input}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="Phone number (optional)"
-              placeholderTextColor="#9ca3af"
-              keyboardType="phone-pad"
-              autoComplete="tel"
-            />
+            {isSignUp && !isStaffInvite && (
+              <TextInput
+                style={styles.input}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="Phone number (optional)"
+                placeholderTextColor="#9ca3af"
+                keyboardType="phone-pad"
+                autoComplete="tel"
+              />
+            )}
           </>
         )}
 
@@ -204,29 +266,25 @@ export default function EmailLoginScreen() {
           style={styles.input}
           value={password}
           onChangeText={setPassword}
-          placeholder={isSignUp ? 'Create password (min 6 characters)' : 'Password'}
+          placeholder={(isSignUp || isStaffInvite) ? 'Create password (min 6 characters)' : 'Password'}
           placeholderTextColor="#9ca3af"
           secureTextEntry
-          autoComplete={isSignUp ? 'new-password' : 'current-password'}
+          autoComplete={(isSignUp || isStaffInvite) ? 'new-password' : 'current-password'}
         />
 
         <TouchableOpacity
           style={[styles.btn, loading && styles.btnDisabled]}
-          onPress={isSignUp ? handleSignUp : handleSignIn}
+          onPress={isStaffInvite ? handleStaffInvite : isSignUp ? handleSignUp : handleSignIn}
           disabled={loading}
         >
           <Text style={styles.btnText}>
             {loading
-              ? isSignUp
-                ? 'Creating account...'
-                : 'Signing in...'
-              : isSignUp
-                ? 'Create account'
-                : 'Sign in'}
+              ? isStaffInvite ? 'Joining...' : isSignUp ? 'Creating account...' : 'Signing in...'
+              : isStaffInvite ? 'Join Team' : isSignUp ? 'Create account' : 'Sign in'}
           </Text>
         </TouchableOpacity>
 
-        {!isSignUp && (
+        {!isSignUp && !isStaffInvite && (
           <TouchableOpacity
             style={styles.forgotBtn}
             onPress={handleForgotPassword}
@@ -236,16 +294,38 @@ export default function EmailLoginScreen() {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity
-          style={styles.switchBtn}
-          onPress={() => setIsSignUp(!isSignUp)}
-        >
-          <Text style={styles.switchText}>
-            {isSignUp
-              ? 'Already have an account? Sign in'
-              : "Don't have an account? Sign up"}
-          </Text>
-        </TouchableOpacity>
+        {/* Toggle between sign in / sign up */}
+        {!isStaffInvite && (
+          <TouchableOpacity
+            style={styles.switchBtn}
+            onPress={() => { setIsSignUp(!isSignUp); setIsStaffInvite(false); }}
+          >
+            <Text style={styles.switchText}>
+              {isSignUp
+                ? 'Already have an account? Sign in'
+                : "Don't have an account? Sign up"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Staff invite toggle */}
+        {isSignUp && !isStaffInvite && (
+          <TouchableOpacity
+            style={styles.switchBtn}
+            onPress={() => setIsStaffInvite(true)}
+          >
+            <Text style={[styles.switchText, { color: '#6B7FC4' }]}>Have a staff invite code?</Text>
+          </TouchableOpacity>
+        )}
+
+        {isStaffInvite && (
+          <TouchableOpacity
+            style={styles.switchBtn}
+            onPress={() => { setIsStaffInvite(false); setInviteCode(''); }}
+          >
+            <Text style={styles.switchText}>Back to sign up</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -32,13 +32,6 @@ export default function WelcomeScreen() {
         >
           <Text style={styles.btnPrimaryText}>Continue with email</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.btnStaff}
-          onPress={() => router.push('/(auth)/staff-invite')}
-        >
-          <Text style={styles.btnStaffText}>I'm a staff member</Text>
-        </TouchableOpacity>
       </View>
 
       <Text style={styles.terms}>
