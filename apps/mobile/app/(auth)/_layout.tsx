@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 export default function AuthLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="email-login" />
       <Stack.Screen name="welcome" />
       <Stack.Screen
         name="phone-login"
@@ -11,10 +12,6 @@ export default function AuthLayout() {
       <Stack.Screen
         name="verify-otp"
         options={{ headerShown: true, title: 'Verify Code', headerBackTitle: 'Back' }}
-      />
-      <Stack.Screen
-        name="email-login"
-        options={{ headerShown: true, title: 'Email Login', headerBackTitle: 'Back' }}
       />
       <Stack.Screen
         name="profile-setup"

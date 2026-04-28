@@ -9,6 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -202,6 +204,11 @@ export default function EmailLoginScreen() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+        </View>
+
         <Text style={styles.title}>
           {isStaffInvite ? 'Join your team' : isSignUp ? 'Create your account' : 'Welcome back'}
         </Text>
@@ -326,6 +333,14 @@ export default function EmailLoginScreen() {
             <Text style={styles.switchText}>Back to sign up</Text>
           </TouchableOpacity>
         )}
+
+        {/* Terms */}
+        <Text style={styles.terms}>
+          By continuing, you agree to our{' '}
+          <Text style={styles.termsLink} onPress={() => Linking.openURL('https://balkina.ai/terms')}>Terms of Service</Text>
+          {' '}and{' '}
+          <Text style={styles.termsLink} onPress={() => Linking.openURL('https://balkina.ai/privacy')}>Privacy Policy</Text>.
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -339,7 +354,15 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 24,
-    paddingTop: 80,
+    paddingTop: 60,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  logo: {
+    width: 64,
+    height: 64,
   },
   title: {
     fontSize: 24,
@@ -398,5 +421,17 @@ const styles = StyleSheet.create({
     color: '#6B7FC4',
     fontSize: 15,
     fontWeight: '500',
+  },
+  terms: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#9ca3af',
+    lineHeight: 18,
+    marginTop: 24,
+    paddingBottom: 20,
+  },
+  termsLink: {
+    color: '#6B7FC4',
+    textDecorationLine: 'underline',
   },
 });

@@ -45,12 +45,12 @@ function RootLayoutContent() {
     const inTenantGroup = segments[0] === '(tenant)';
 
     if (!supabaseConfigured && !inAuthGroup) {
-      router.replace('/(auth)/welcome');
+      router.replace('/(auth)/email-login');
       return;
     }
 
     if (!session && !inAuthGroup) {
-      router.replace('/(auth)/welcome');
+      router.replace('/(auth)/email-login');
     } else if (session && !inAppGroup && !inStaffGroup && !inTenantGroup) {
       getAuthenticatedRole().then(({ role }) => {
         if (role === 'tenant') {
