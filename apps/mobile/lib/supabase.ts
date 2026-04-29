@@ -106,6 +106,7 @@ export interface StaffInfo {
   tenant_id: string;
   name: string;
   requires_approval: boolean;
+  role: 'owner' | 'manager' | 'staff';
 }
 
 export interface TenantInfo {
@@ -116,7 +117,7 @@ export interface TenantInfo {
 
 /**
  * Determine if the logged-in user is a tenant owner, staff member, or customer.
- * Priority: tenant owner > staff > customer.
+ * Tenant owners and staff both route to the tenant app with role-based permissions.
  */
 export async function getAuthenticatedRole(): Promise<{
   role: 'tenant' | 'staff' | 'customer' | null;
@@ -133,7 +134,7 @@ export async function getAuthenticatedRole(): Promise<{
     const { data: { user } } = await timeout(supabase.auth.getUser(), 8000);
     if (!user) return { role: null };
 
-    // Check tenant owner first
+    // Check if user is a tenant owner (has a tenants row)
     const { data: tenantRecord } = await timeout(
       supabase
         .from('tenants')
@@ -148,11 +149,11 @@ export async function getAuthenticatedRole(): Promise<{
       return { role: 'tenant', tenantInfo: tenant };
     }
 
-    // Check staff
+    // Check if user is a staff member
     const { data: staffRecord } = await timeout(
       supabase
         .from('staff')
-        .select('id, tenant_id, name, requires_approval')
+        .select('id, tenant_id, name, requires_approval, role')
         .eq('user_id', user.id)
         .single(),
       5000,
@@ -160,6 +161,7 @@ export async function getAuthenticatedRole(): Promise<{
 
     if (staffRecord) {
       const staff = staffRecord as StaffInfo;
+      // Staff members also route to the tenant app, with their role determining permissions
       return { role: 'staff', staffInfo: staff };
     }
 

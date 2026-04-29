@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, A
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
+import { useTenantPermissions } from '@/lib/tenantPermissions';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
@@ -29,6 +30,7 @@ interface DashboardData {
 
 export default function TenantDashboard() {
   const router = useRouter();
+  const perms = useTenantPermissions();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -67,7 +69,7 @@ export default function TenantDashboard() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchDashboard(); }} tintColor="#6B7FC4" />}
     >
-      <Text style={styles.greeting}>Welcome, {data?.ownerName ?? data?.tenantName ?? ''}</Text>
+      <Text style={styles.greeting}>Welcome, {perms.staffName ?? data?.ownerName ?? data?.tenantName ?? ''}</Text>
 
       {/* Compact stats */}
       <View style={styles.statsRow}>
@@ -96,26 +98,34 @@ export default function TenantDashboard() {
           <Ionicons name="calendar-outline" size={24} color="#3b82f6" />
           <Text style={styles.manageLabel}>Bookings</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.manageCard} onPress={() => router.navigate('/(tenant)/services')}>
-          <Ionicons name="briefcase-outline" size={24} color="#8b5cf6" />
-          <Text style={styles.manageLabel}>Services</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.manageCard} onPress={() => router.navigate('/(tenant)/staff')}>
-          <Ionicons name="people-outline" size={24} color="#10b981" />
-          <Text style={styles.manageLabel}>Staff</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.manageCard} onPress={() => router.navigate('/(tenant)/locations')}>
-          <Ionicons name="location-outline" size={24} color="#f59e0b" />
-          <Text style={styles.manageLabel}>Locations</Text>
-        </TouchableOpacity>
+        {perms.canManageServices && (
+          <TouchableOpacity style={styles.manageCard} onPress={() => router.navigate('/(tenant)/services')}>
+            <Ionicons name="briefcase-outline" size={24} color="#8b5cf6" />
+            <Text style={styles.manageLabel}>Services</Text>
+          </TouchableOpacity>
+        )}
+        {perms.canManageStaff && (
+          <TouchableOpacity style={styles.manageCard} onPress={() => router.navigate('/(tenant)/staff')}>
+            <Ionicons name="people-outline" size={24} color="#10b981" />
+            <Text style={styles.manageLabel}>Staff</Text>
+          </TouchableOpacity>
+        )}
+        {perms.canManageLocations && (
+          <TouchableOpacity style={styles.manageCard} onPress={() => router.navigate('/(tenant)/locations')}>
+            <Ionicons name="location-outline" size={24} color="#f59e0b" />
+            <Text style={styles.manageLabel}>Locations</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Full dashboard link */}
-      <TouchableOpacity style={styles.dashboardLink} onPress={() => Linking.openURL('https://app.balkina.ai/dashboard')}>
-        <Ionicons name="desktop-outline" size={18} color="#6B7FC4" />
-        <Text style={styles.dashboardLinkText}>Open Full Dashboard on Web</Text>
-        <Ionicons name="open-outline" size={14} color="#9ca3af" />
-      </TouchableOpacity>
+      {/* Full dashboard link — owner only */}
+      {perms.canManageSettings && (
+        <TouchableOpacity style={styles.dashboardLink} onPress={() => Linking.openURL('https://app.balkina.ai/dashboard')}>
+          <Ionicons name="desktop-outline" size={18} color="#6B7FC4" />
+          <Text style={styles.dashboardLinkText}>Open Full Dashboard on Web</Text>
+          <Ionicons name="open-outline" size={14} color="#9ca3af" />
+        </TouchableOpacity>
+      )}
 
       {/* Recent appointments */}
       <Text style={styles.sectionTitle}>Recent Bookings</Text>

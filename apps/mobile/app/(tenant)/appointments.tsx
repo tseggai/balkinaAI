@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Linking, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
+import { useTenantPermissions } from '@/lib/tenantPermissions';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
@@ -38,6 +39,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 export default function TenantAppointments() {
+  const perms = useTenantPermissions();
   const [tab, setTab] = useState<Tab>('today');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -285,6 +287,8 @@ export default function TenantAppointments() {
       ) : (
         <FlatList
           data={appointments.filter(a => {
+            // Staff role: only see own appointments
+            if (!perms.canViewAllBookings && perms.staffId && a.staff?.id !== perms.staffId) return false;
             if (statusFilter !== 'all' && a.status !== statusFilter) return false;
             if (staffFilter !== 'all' && a.staff?.id !== staffFilter) return false;
             if (serviceFilter !== 'all' && (a as Record<string, unknown>).service_id !== serviceFilter) return false;

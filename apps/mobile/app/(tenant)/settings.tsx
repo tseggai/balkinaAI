@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { pickAndUploadPhoto } from '@/lib/usePhotoUpload';
+import { useTenantPermissions } from '@/lib/tenantPermissions';
 
 interface TenantData {
   id: string;
@@ -22,6 +23,7 @@ interface Category {
 
 export default function TenantSettings() {
   const router = useRouter();
+  const perms = useTenantPermissions();
   const [tenant, setTenant] = useState<TenantData | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
