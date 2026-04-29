@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
 import { registerPushToken } from '@/lib/registerPushToken';
+import { TenantPermissionsProvider, useTenantPermissions } from '@/lib/tenantPermissions';
 
 try {
   Notifications.setNotificationHandler({
@@ -17,7 +18,9 @@ try {
   });
 } catch {}
 
-export default function TenantTabsLayout() {
+function TenantTabs() {
+  const { canManageSettings } = useTenantPermissions();
+
   useEffect(() => {
     if (!supabaseConfigured) return;
     (async () => {
@@ -73,24 +76,15 @@ export default function TenantTabsLayout() {
       />
       <Tabs.Screen
         name="services"
-        options={{
-          title: 'Services',
-          href: null,
-        }}
+        options={{ title: 'Services', href: null }}
       />
       <Tabs.Screen
         name="staff"
-        options={{
-          title: 'Staff',
-          href: null,
-        }}
+        options={{ title: 'Staff', href: null }}
       />
       <Tabs.Screen
         name="locations"
-        options={{
-          title: 'Locations',
-          href: null,
-        }}
+        options={{ title: 'Locations', href: null }}
       />
       <Tabs.Screen
         name="settings"
@@ -100,5 +94,13 @@ export default function TenantTabsLayout() {
         }}
       />
     </Tabs>
+  );
+}
+
+export default function TenantTabsLayout() {
+  return (
+    <TenantPermissionsProvider>
+      <TenantTabs />
+    </TenantPermissionsProvider>
   );
 }

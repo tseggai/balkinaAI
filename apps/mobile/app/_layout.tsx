@@ -41,7 +41,6 @@ function RootLayoutContent() {
 
     const inAuthGroup = segments[0] === '(auth)';
     const inAppGroup = segments[0] === '(app)';
-    const inStaffGroup = segments[0] === '(staff)';
     const inTenantGroup = segments[0] === '(tenant)';
 
     if (!supabaseConfigured && !inAuthGroup) {
@@ -51,12 +50,10 @@ function RootLayoutContent() {
 
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/email-login');
-    } else if (session && !inAppGroup && !inStaffGroup && !inTenantGroup) {
+    } else if (session && !inAppGroup && !inTenantGroup) {
       getAuthenticatedRole().then(({ role }) => {
-        if (role === 'tenant') {
+        if (role === 'tenant' || role === 'staff') {
           router.replace('/(tenant)/dashboard');
-        } else if (role === 'staff') {
-          router.replace('/(staff)/dashboard');
         } else {
           router.replace('/(app)');
         }
