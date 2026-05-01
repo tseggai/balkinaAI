@@ -149,6 +149,26 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
   }
 
+  // Check if user is a tenant owner — delete tenant and all business data first
+  const { data: tenant } = await admin
+    .from('tenants')
+    .select('id')
+    .eq('user_id', user.id)
+    .single();
+
+  if (tenant) {
+    const tenantId = (tenant as { id: string }).id;
+
+    // appointments has ON DELETE RESTRICT on tenant_id, service_id — must delete explicitly
+    await admin.from('appointments').delete().eq('tenant_id', tenantId);
+    // Deleting the tenant row cascades to: services, staff, tenant_locations,
+    // chat_sessions, coupons, reviews, custom_fields, packages, products,
+    // loyalty_programs, location_gallery, ai_nudge_log, and all their children
+    await admin.from('tenants').delete().eq('id', tenantId);
+
+    console.log(`[delete-account] Deleted tenant ${tenantId} and all business data`);
+  }
+
   // Find customer record (check both user_id and id)
   const { data: customer } = await admin
     .from('customers')
@@ -159,8 +179,7 @@ export async function DELETE(request: Request) {
   if (customer) {
     const custId = (customer as { id: string }).id;
 
-    // Delete related data in order (respecting foreign keys)
-    await admin.from('reviews').delete().eq('customer_id', custId);
+    // appointments has ON DELETE RESTRICT on customer_id — must delete explicitly
     await admin.from('appointments').delete().eq('customer_id', custId);
 
     const { data: sessions } = await admin

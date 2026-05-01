@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Image, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '@/lib/supabase';
+import Constants from 'expo-constants';
+import { supabase, supabaseConfigured } from '@/lib/supabase';
 import { pickAndUploadPhoto } from '@/lib/usePhotoUpload';
 import { useTenantPermissions } from '@/lib/tenantPermissions';
 
@@ -20,6 +21,8 @@ interface Category {
   id: string;
   name: string;
 }
+
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
 export default function TenantSettings() {
   const router = useRouter();
@@ -88,6 +91,43 @@ export default function TenantSettings() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: () => supabase.auth.signOut() },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account, your business, all services, staff, bookings, and customer data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Everything',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (!supabaseConfigured) return;
+              const { data: { session } } = await supabase.auth.getSession();
+              if (!session) {
+                Alert.alert('Error', 'Please sign in again to delete your account.');
+                return;
+              }
+              const res = await fetch(`${API_BASE}/api/customers/profile`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${session.access_token}` },
+              });
+              if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                Alert.alert('Error', (data as { error?: string }).error || 'Failed to delete account.');
+                return;
+              }
+              await supabase.auth.signOut();
+              Alert.alert('Account Deleted', 'Your account and all business data have been permanently deleted.');
+            } catch {
+              Alert.alert('Error', 'Network error. Please try again.');
+            }
+          },
+        },
+      ],
+    );
   };
 
   if (loading) {
@@ -192,7 +232,7 @@ export default function TenantSettings() {
         </TouchableOpacity>
       </View>
 
-      {/* Sign Out */}
+      {/* Sign Out & Delete Account */}
       <View style={[styles.card, { marginTop: 12 }]}>
         <TouchableOpacity style={styles.linkRow} onPress={handleSignOut}>
           <View style={styles.linkRowLeft}>
@@ -200,9 +240,19 @@ export default function TenantSettings() {
             <Text style={[styles.linkRowLabel, { color: '#dc2626' }]}>Sign Out</Text>
           </View>
         </TouchableOpacity>
+        <View style={styles.separator} />
+        <TouchableOpacity style={styles.linkRow} onPress={handleDeleteAccount}>
+          <View style={styles.linkRowLeft}>
+            <Ionicons name="trash-outline" size={20} color="#dc2626" />
+            <View>
+              <Text style={[styles.linkRowLabel, { color: '#dc2626' }]}>Delete Account</Text>
+              <Text style={styles.linkRowSub}>Permanently remove your account and business</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
       </View>
 
-      <Text style={styles.version}>Balkina AI · v1.0.0</Text>
+      <Text style={styles.version}>Balkina AI · v{Constants.expoConfig?.version ?? '1.1.0'}</Text>
     </ScrollView>
   );
 }

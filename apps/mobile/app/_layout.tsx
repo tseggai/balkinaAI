@@ -78,7 +78,6 @@ function RootLayoutContent() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(app)" options={{ headerShown: false }} />
-        <Stack.Screen name="(staff)" options={{ headerShown: false }} />
         <Stack.Screen name="(tenant)" options={{ headerShown: false }} />
       </Stack>
     </>
