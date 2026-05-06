@@ -193,7 +193,10 @@ export async function POST(request: Request) {
     }
 
     // Filter staff by location if location is known
-    if (locationId && eligibleStaff.length > 0) {
+    // Staff passes if: assigned to this location, OR has no location assignments at all
+    // (i.e. available everywhere), OR if only 1 staff is assigned to the service (the tenant
+    // explicitly chose this staff+service combo, so don't filter them out by location)
+    if (locationId && eligibleStaff.length > 1) {
       const eStaffIds = eligibleStaff.map((s) => s.id);
       const [{ data: staffAtLoc }, { data: allStaffLocs }] = await Promise.all([
         supabase.from('staff_locations').select('staff_id').in('staff_id', eStaffIds).eq('location_id', locationId),
@@ -202,7 +205,11 @@ export async function POST(request: Request) {
       const atLocation = new Set(((staffAtLoc ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
       const hasAnyLocation = new Set(((allStaffLocs ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
       // Keep staff assigned to this location OR staff with no location assignments (available everywhere)
-      eligibleStaff = eligibleStaff.filter((s) => atLocation.has(s.id) || !hasAnyLocation.has(s.id));
+      const filtered = eligibleStaff.filter((s) => atLocation.has(s.id) || !hasAnyLocation.has(s.id));
+      // Only apply filter if it doesn't eliminate everyone — prevents misconfigured locations from hiding all staff
+      if (filtered.length > 0) {
+        eligibleStaff = filtered;
+      }
       console.log('[staff-availability] staff after location filter:', eligibleStaff.map(s => s.name), 'locationId:', locationId);
     }
 
@@ -314,7 +321,7 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const schedule = staff.availability_schedule as Record<string, { start: string; end: string } | undefined>;
+      const schedule = staff.availability_schedule as Record<string, { start: string; end: string; enabled?: boolean } | undefined>;
       let dayScheduleStart: string;
       let dayScheduleEnd: string;
 
@@ -323,7 +330,7 @@ export async function POST(request: Request) {
         dayScheduleEnd = staffSpecial.end_time;
       } else {
         const daySchedule = schedule[dayOfWeek];
-        if (!daySchedule?.start || !daySchedule?.end) {
+        if (!daySchedule?.start || !daySchedule?.end || daySchedule.enabled === false) {
           staffDayInfos.push({ staff, worksToday: false, startMinutes: 0, endMinutes: 0 });
           continue;
         }
