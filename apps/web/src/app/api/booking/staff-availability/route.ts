@@ -132,7 +132,6 @@ export async function POST(request: Request) {
     const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null };
     const bufferBefore = svc.buffer_time_before ?? 0;
     const bufferAfter = svc.buffer_time_after ?? 0;
-    const totalSlotMinutes = bufferBefore + svc.duration_minutes + bufferAfter;
 
     // 2-7: Run independent queries in parallel
     const [
@@ -193,10 +192,7 @@ export async function POST(request: Request) {
     }
 
     // Filter staff by location if location is known
-    // Staff passes if: assigned to this location, OR has no location assignments at all
-    // (i.e. available everywhere), OR if only 1 staff is assigned to the service (the tenant
-    // explicitly chose this staff+service combo, so don't filter them out by location)
-    if (locationId && eligibleStaff.length > 1) {
+    if (locationId && eligibleStaff.length > 0) {
       const eStaffIds = eligibleStaff.map((s) => s.id);
       const [{ data: staffAtLoc }, { data: allStaffLocs }] = await Promise.all([
         supabase.from('staff_locations').select('staff_id').in('staff_id', eStaffIds).eq('location_id', locationId),
@@ -205,11 +201,7 @@ export async function POST(request: Request) {
       const atLocation = new Set(((staffAtLoc ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
       const hasAnyLocation = new Set(((allStaffLocs ?? []) as { staff_id: string }[]).map((sl) => sl.staff_id));
       // Keep staff assigned to this location OR staff with no location assignments (available everywhere)
-      const filtered = eligibleStaff.filter((s) => atLocation.has(s.id) || !hasAnyLocation.has(s.id));
-      // Only apply filter if it doesn't eliminate everyone — prevents misconfigured locations from hiding all staff
-      if (filtered.length > 0) {
-        eligibleStaff = filtered;
-      }
+      eligibleStaff = eligibleStaff.filter((s) => atLocation.has(s.id) || !hasAnyLocation.has(s.id));
       console.log('[staff-availability] staff after location filter:', eligibleStaff.map(s => s.name), 'locationId:', locationId);
     }
 
@@ -390,7 +382,11 @@ export async function POST(request: Request) {
       const staffSlots: { time: string; iso: string }[] = [];
       const allSlots: { time: string; iso: string; available: boolean }[] = [];
 
-      for (let minutes = masterStartMinutes; minutes + totalSlotMinutes <= masterEndMinutes; minutes += 30) {
+      // Use service duration (not duration+buffers) for schedule boundary checks.
+      // Buffers prevent back-to-back bookings but shouldn't shrink the bookable window.
+      const serviceDuration = svc.duration_minutes;
+
+      for (let minutes = masterStartMinutes; minutes + serviceDuration <= masterEndMinutes; minutes += 30) {
         const slotHour = Math.floor(minutes / 60);
         const slotMin = minutes % 60;
         const localTimeStr = `${String(slotHour).padStart(2, '0')}:${String(slotMin).padStart(2, '0')}`;
@@ -400,8 +396,8 @@ export async function POST(request: Request) {
         const slotEndUtc = new Date(slotStartUtc.getTime() + svc.duration_minutes * 60000);
         const bufferEndUtc = new Date(slotEndUtc.getTime() + bufferAfter * 60000);
 
-        // Staff is available only if they work today AND slot is within their schedule AND no booking conflict
-        const inSchedule = worksToday && minutes >= staffStart && minutes + totalSlotMinutes <= staffEnd;
+        // Staff is available only if they work today AND the service fits within their schedule
+        const inSchedule = worksToday && minutes >= staffStart && minutes + serviceDuration <= staffEnd;
 
         const hasConflict = inSchedule && appointments.some((appt) => {
           if (appt.staff_id !== staff.id) return false;
