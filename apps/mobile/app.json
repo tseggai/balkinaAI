@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.tseggaid.balkinaai",
+      "buildNumber": "2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Balkina AI uses your location to find nearby businesses.",
@@ -79,6 +80,7 @@
         "backgroundColor": "#6B7FC4"
       },
       "package": "com.tseggaid.balkinaai",
+      "versionCode": 2,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",

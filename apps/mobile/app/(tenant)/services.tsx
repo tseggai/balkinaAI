@@ -15,6 +15,7 @@ interface Service {
   description: string | null;
   image_url: string | null;
   visibility: string;
+  staff_selection_enabled?: boolean;
   location_ids: string[];
   extras: Extra[];
 }
@@ -44,6 +45,7 @@ export default function TenantServices() {
   const [extraMaxQty, setExtraMaxQty] = useState('1');
   const [extraUnitLabel, setExtraUnitLabel] = useState('');
   const [editingExtraIdx, setEditingExtraIdx] = useState<number | null>(null);
+  const [formStaffSelection, setFormStaffSelection] = useState(true);
 
   const getToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -73,14 +75,14 @@ export default function TenantServices() {
   const openAdd = () => {
     setEditing(null);
     setFormName(''); setFormPrice(''); setFormDuration('60'); setFormDesc(''); setFormImageUrl(null);
-    setFormLocIds([]); setFormExtras([]); setShowAddExtra(false);
+    setFormLocIds([]); setFormExtras([]); setShowAddExtra(false); setFormStaffSelection(true);
     setModalVisible(true);
   };
 
   const openEdit = (svc: Service) => {
     setEditing(svc);
     setFormName(svc.name); setFormPrice(String(svc.price)); setFormDuration(String(svc.duration_minutes)); setFormDesc(svc.description ?? ''); setFormImageUrl(svc.image_url);
-    setFormLocIds(svc.location_ids); setFormExtras(svc.extras); setShowAddExtra(false);
+    setFormLocIds(svc.location_ids); setFormExtras(svc.extras); setShowAddExtra(false); setFormStaffSelection(svc.staff_selection_enabled ?? true);
     setModalVisible(true);
   };
 
@@ -132,6 +134,7 @@ export default function TenantServices() {
         duration_minutes: parseInt(formDuration) || 60,
         description: formDesc.trim() || null,
         image_url: formImageUrl,
+        staff_selection_enabled: formStaffSelection,
         location_ids: formLocIds, extras: formExtras,
       };
       if (editing) body.id = editing.id;
@@ -225,6 +228,15 @@ export default function TenantServices() {
               <TextInput style={[styles.input, { flex: 1 }]} value={formDuration} onChangeText={setFormDuration} placeholder="Duration (min)" placeholderTextColor="#9ca3af" keyboardType="number-pad" />
             </View>
             <TextInput style={[styles.input, { minHeight: 60, textAlignVertical: 'top' }]} value={formDesc} onChangeText={setFormDesc} placeholder="Description (optional)" placeholderTextColor="#9ca3af" multiline />
+
+            {/* Staff selection toggle */}
+            <TouchableOpacity style={styles.checkRow} onPress={() => setFormStaffSelection(!formStaffSelection)}>
+              <Ionicons name={formStaffSelection ? 'checkbox' : 'square-outline'} size={22} color={formStaffSelection ? '#6B7FC4' : '#d1d5db'} />
+              <Text style={styles.checkLabel}>Allow customers to choose staff</Text>
+            </TouchableOpacity>
+            {!formStaffSelection && (
+              <Text style={{ fontSize: 12, color: '#9ca3af', marginLeft: 30, marginTop: -4, marginBottom: 8 }}>Customers see available times only. You assign staff later.</Text>
+            )}
 
             {/* Location assignment */}
             {locations.length > 0 && (

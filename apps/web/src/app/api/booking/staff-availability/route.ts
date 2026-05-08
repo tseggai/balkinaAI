@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     // 1. Get service details including buffer times
     const { data: service, error: svcErr } = await supabase
       .from('services')
-      .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after')
+      .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after, staff_selection_enabled')
       .eq('id', serviceId)
       .single();
 
@@ -129,10 +129,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Service not found' }, { status: 404, headers: CORS_HEADERS });
     }
 
-    const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null };
+    const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null; staff_selection_enabled: boolean };
     const bufferBefore = svc.buffer_time_before ?? 0;
     const bufferAfter = svc.buffer_time_after ?? 0;
-    const totalSlotMinutes = bufferBefore + svc.duration_minutes + bufferAfter;
 
     // 2-7: Run independent queries in parallel
     const [
@@ -314,7 +313,7 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const schedule = staff.availability_schedule as Record<string, { start: string; end: string } | undefined>;
+      const schedule = staff.availability_schedule as Record<string, { start: string; end: string; enabled?: boolean } | undefined>;
       let dayScheduleStart: string;
       let dayScheduleEnd: string;
 
@@ -323,7 +322,7 @@ export async function POST(request: Request) {
         dayScheduleEnd = staffSpecial.end_time;
       } else {
         const daySchedule = schedule[dayOfWeek];
-        if (!daySchedule?.start || !daySchedule?.end) {
+        if (!daySchedule?.start || !daySchedule?.end || daySchedule.enabled === false) {
           staffDayInfos.push({ staff, worksToday: false, startMinutes: 0, endMinutes: 0 });
           continue;
         }
@@ -383,7 +382,11 @@ export async function POST(request: Request) {
       const staffSlots: { time: string; iso: string }[] = [];
       const allSlots: { time: string; iso: string; available: boolean }[] = [];
 
-      for (let minutes = masterStartMinutes; minutes + totalSlotMinutes <= masterEndMinutes; minutes += 30) {
+      // Use service duration (not duration+buffers) for schedule boundary checks.
+      // Buffers prevent back-to-back bookings but shouldn't shrink the bookable window.
+      const serviceDuration = svc.duration_minutes;
+
+      for (let minutes = masterStartMinutes; minutes + serviceDuration <= masterEndMinutes; minutes += 30) {
         const slotHour = Math.floor(minutes / 60);
         const slotMin = minutes % 60;
         const localTimeStr = `${String(slotHour).padStart(2, '0')}:${String(slotMin).padStart(2, '0')}`;
@@ -393,8 +396,8 @@ export async function POST(request: Request) {
         const slotEndUtc = new Date(slotStartUtc.getTime() + svc.duration_minutes * 60000);
         const bufferEndUtc = new Date(slotEndUtc.getTime() + bufferAfter * 60000);
 
-        // Staff is available only if they work today AND slot is within their schedule AND no booking conflict
-        const inSchedule = worksToday && minutes >= staffStart && minutes + totalSlotMinutes <= staffEnd;
+        // Staff is available only if they work today AND the service fits within their schedule
+        const inSchedule = worksToday && minutes >= staffStart && minutes + serviceDuration <= staffEnd;
 
         const hasConflict = inSchedule && appointments.some((appt) => {
           if (appt.staff_id !== staff.id) return false;
@@ -446,6 +449,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       date,
       service_duration_minutes: svc.duration_minutes,
+      staff_selection_enabled: svc.staff_selection_enabled,
       staff: staffWithSlots,
       anyone_slots: anyoneSlots,
       address,

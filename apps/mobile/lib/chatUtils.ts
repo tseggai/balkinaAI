@@ -128,6 +128,7 @@ export interface StaffWithSlotsData {
   type: 'staff_with_slots';
   items: Array<StaffCardData & { slots: TimeSlotData[]; all_slots?: TimeSlotData[] }>;
   anyone_slots?: Array<TimeSlotData>;
+  staff_selection_enabled?: boolean;
 }
 
 export interface BookingOptionsData {

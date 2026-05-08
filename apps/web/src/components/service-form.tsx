@@ -96,6 +96,7 @@ interface Service {
   capacity: number;
   hide_price: boolean;
   hide_duration: boolean;
+  staff_selection_enabled: boolean;
   visibility: string;
   min_booking_lead_time: number;
   max_booking_days_ahead: number;
@@ -205,6 +206,7 @@ export function ServiceForm({
   const [customDuration, setCustomDuration] = useState(service?.custom_duration ?? false);
   const [capacity, setCapacity] = useState(String(service?.capacity ?? 1));
   const [hidePrice, setHidePrice] = useState(service?.hide_price ?? false);
+  const [staffSelectionEnabled, setStaffSelectionEnabled] = useState(service?.staff_selection_enabled ?? true);
   const [hideDuration, setHideDuration] = useState(service?.hide_duration ?? false);
   const [isRecurring, setIsRecurring] = useState(service?.is_recurring ?? false);
 
@@ -308,6 +310,7 @@ export function ServiceForm({
     capacity,
     hidePrice,
     hideDuration,
+    staffSelectionEnabled,
     isRecurring,
     selectedStaff,
     timesheetEnabled,
@@ -443,6 +446,7 @@ export function ServiceForm({
       capacity: Number(capacity),
       hide_price: hidePrice,
       hide_duration: hideDuration,
+      staff_selection_enabled: staffSelectionEnabled,
       visibility,
       min_booking_lead_time: Number(minBookingLeadTime),
       max_booking_days_ahead: maxDaysEnabled ? Number(maxBookingDaysAhead) : 0,
@@ -805,6 +809,20 @@ export function ServiceForm({
             </label>
           </div>
 
+          {/* Staff selection toggle */}
+          <div>
+            <div className="flex items-center">
+              <label className="relative inline-flex cursor-pointer items-center gap-2">
+                <input type="checkbox" checked={staffSelectionEnabled} onChange={(e) => setStaffSelectionEnabled(e.target.checked)} className="peer sr-only" />
+                <div className="peer relative h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:left-[calc(100%-2px)] peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                <span className="text-sm font-medium text-gray-700">Allow customers to choose staff</span>
+              </label>
+            </div>
+            {!staffSelectionEnabled && (
+              <p className="mt-1 ml-11 text-xs text-gray-500">Customers will see available times only. You assign staff from the appointments page.</p>
+            )}
+          </div>
+
           {/* Row 10: Hide duration on the booking page */}
           <div className="flex items-center">
             <label className="relative inline-flex cursor-pointer items-center gap-2">
@@ -1093,6 +1111,20 @@ export function ServiceForm({
             <div className="peer relative h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:left-[calc(100%-2px)] peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
             <span className="text-sm font-medium text-gray-700">Hide price on the booking page</span>
           </label>
+        </div>
+
+        {/* Staff selection toggle */}
+        <div>
+          <div className="flex items-center">
+            <label className="relative inline-flex cursor-pointer items-center gap-2">
+              <input type="checkbox" checked={staffSelectionEnabled} onChange={(e) => setStaffSelectionEnabled(e.target.checked)} className="peer sr-only" />
+              <div className="peer relative h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:left-[calc(100%-2px)] peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+              <span className="text-sm font-medium text-gray-700">Allow customers to choose staff</span>
+            </label>
+          </div>
+          {!staffSelectionEnabled && (
+            <p className="mt-1 ml-11 text-xs text-gray-500">Customers will see available times only. You assign staff from the appointments page.</p>
+          )}
         </div>
 
         {/* Row 10: Hide duration on the booking page */}

@@ -19,22 +19,31 @@ try {
 } catch {}
 
 function TenantTabs() {
-  const { canManageSettings } = useTenantPermissions();
+  const perms = useTenantPermissions();
 
   useEffect(() => {
-    if (!supabaseConfigured) return;
+    if (!supabaseConfigured || perms.loading) return;
     (async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        registerPushToken({
-          recipientType: 'customer',
-          recipientId: session.user.id,
-          accessToken: session.access_token,
-        }).catch(() => {});
+
+        if (perms.staffId) {
+          registerPushToken({
+            recipientType: 'staff',
+            recipientId: perms.staffId,
+            accessToken: session.access_token,
+          }).catch(() => {});
+        } else {
+          registerPushToken({
+            recipientType: 'customer',
+            recipientId: session.user.id,
+            accessToken: session.access_token,
+          }).catch(() => {});
+        }
       } catch {}
     })();
-  }, []);
+  }, [perms.loading, perms.staffId]);
 
   return (
     <Tabs

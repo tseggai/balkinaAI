@@ -37,6 +37,15 @@ export async function POST(request: Request) {
       );
     }
 
+    // Block platform admins from registering as tenants
+    const { data: { user: authUser } } = await supabase.auth.admin.getUserById(userId);
+    if (authUser?.app_metadata?.role === 'platform_admin') {
+      return NextResponse.json(
+        { data: null, error: { message: 'Admin accounts cannot register as tenants', code: 'FORBIDDEN' } },
+        { status: 403 }
+      );
+    }
+
     // Create Stripe customer
     let stripeCustomerId: string;
     try {
@@ -90,10 +99,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Set tenant_id in user's app_metadata so the JWT carries it.
-    // This makes get_my_tenant_id() work for RLS on all tenant-scoped tables.
+    // Merge tenant_id into the user's existing app_metadata (preserves other fields like role)
+    const existingMeta = authUser?.app_metadata ?? {};
     await supabase.auth.admin.updateUserById(userId, {
-      app_metadata: { tenant_id: tenant.id },
+      app_metadata: { ...existingMeta, tenant_id: tenant.id },
     });
 
     return NextResponse.json({ data: { tenantId: tenant.id }, error: null });

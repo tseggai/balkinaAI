@@ -417,14 +417,15 @@ const StaffCardRow = React.memo(function StaffCardRow({ items, onTap }: { items:
 // ── Staff With Slots Row (combined card) ─────────────────────────────────────
 
 const StaffWithSlotsRow = React.memo(function StaffWithSlotsRow({ data, onTap }: { data: StaffWithSlotsData; onTap: (msg: string) => void }) {
-  const [selectedIdx, setSelectedIdx] = useState(0);
+  const staffSelectionOff = data.staff_selection_enabled === false;
+  const [selectedIdx, setSelectedIdx] = useState(staffSelectionOff ? -1 : 0);
   // Re-render every 60 seconds so past-time greying stays current
   const [, setTick] = useState(0);
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 60000);
     return () => clearInterval(interval);
   }, []);
-  // -1 means "Anyone" is selected
+  // -1 means "Anyone" / aggregated view
   const isAnyone = selectedIdx === -1;
   const selectedStaff = isAnyone ? null : data.items[selectedIdx];
   // Use all_slots (with available flag) if present, otherwise fall back to slots (all available)
@@ -445,6 +446,7 @@ const StaffWithSlotsRow = React.memo(function StaffWithSlotsRow({ data, onTap }:
 
   return (
     <View style={{ marginTop: 4, marginBottom: 2 }}>
+      {!staffSelectionOff && (
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
         {data.items.map((staff, idx) => {
           // Recalculate slot count for this staff based on current time
@@ -495,6 +497,9 @@ const StaffWithSlotsRow = React.memo(function StaffWithSlotsRow({ data, onTap }:
           </TouchableOpacity>
         ) : null}
       </ScrollView>
+      )}
+      {!staffSelectionOff && <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 6, marginBottom: 2, marginLeft: 4 }}>Select a time</Text>}
+      {staffSelectionOff && <Text style={{ fontSize: 13, color: '#6B7FC4', fontWeight: '600', marginBottom: 4, marginLeft: 4 }}>Available times</Text>}
       {slots.length > 0 ? (
         <View style={combinedStyles.slotsContainer}>
           {slots.map((slot, i) => {
@@ -1518,6 +1523,7 @@ export default function ChatScreen() {
       const data = (await res.json()) as {
         staff: { id: string; name: string; image_url: string | null; available_slots_count: number; slots: { time: string; iso: string }[]; all_slots?: { time: string; iso: string; available: boolean }[] }[];
         anyone_slots: { time: string; iso: string; available: boolean }[];
+        staff_selection_enabled?: boolean;
         address?: string | null;
         message?: string;
       };
@@ -1528,10 +1534,12 @@ export default function ChatScreen() {
         return;
       }
 
-      // Capture address for summary card
-      if (data.address) {
-        setBookingState((prev) => ({ ...prev, address: data.address! }));
-      }
+      // Capture address + staff selection flag for summary card
+      setBookingState((prev) => ({
+        ...prev,
+        ...(data.address ? { address: data.address } : {}),
+        staffSelectionEnabled: data.staff_selection_enabled ?? true,
+      }));
 
       // Build a staff_with_slots card
       const card: StaffWithSlotsData = {
@@ -1546,6 +1554,7 @@ export default function ChatScreen() {
           all_slots: s.all_slots?.map((sl) => ({ time: sl.time, iso: sl.iso, available: sl.available })),
         })),
         anyone_slots: data.anyone_slots.map((sl) => ({ time: sl.time, iso: sl.iso, available: sl.available })),
+        staff_selection_enabled: data.staff_selection_enabled ?? true,
       };
 
       addAssistantMessage(`Here are the available staff and time slots:\n\n[[CARD:${JSON.stringify(card)}]]`);
@@ -1644,7 +1653,7 @@ export default function ChatScreen() {
       package: state.selectedPackage ? `${state.selectedPackage} ($${packagePrice.toFixed(2)})` : undefined,
       extras: extrasDisplay,
       business: state.tenantName ?? 'Unknown',
-      staff: state.staffName ?? 'Anyone',
+      staff: state.staffName ?? (state.staffSelectionEnabled ? 'Anyone' : 'To be assigned'),
       date: formatHumanDate(state.date ?? ''),
       time: state.timeSlot ?? '',
       address: state.address ?? '',
@@ -1976,7 +1985,7 @@ export default function ChatScreen() {
             package: confirmedPkgLabel,
             extras: confirmedExtras,
             business: result.business_name,
-            staff: result.staff_name ?? bookingState.staffName ?? 'Anyone',
+            staff: result.staff_name ?? bookingState.staffName ?? (bookingState.staffSelectionEnabled ? 'Anyone' : 'To be assigned'),
             date: result.date,
             time: result.time,
             address: result.address,

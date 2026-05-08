@@ -14,6 +14,7 @@ export interface BookingState {
   date: string | null; // YYYY-MM-DD
   staffId: string | null;
   staffName: string | null;
+  staffSelectionEnabled: boolean;
   timeSlot: string | null; // display time like "10:00 AM"
   timeSlotIso: string | null; // ISO string
   selectedPackage: string | null;
@@ -37,6 +38,7 @@ export const INITIAL_BOOKING_STATE: BookingState = {
   date: null,
   staffId: null,
   staffName: null,
+  staffSelectionEnabled: true,
   timeSlot: null,
   timeSlotIso: null,
   selectedPackage: null,
