@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     // 1. Get service details including buffer times
     const { data: service, error: svcErr } = await supabase
       .from('services')
-      .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after')
+      .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after, staff_selection_enabled')
       .eq('id', serviceId)
       .single();
 
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Service not found' }, { status: 404, headers: CORS_HEADERS });
     }
 
-    const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null };
+    const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null; staff_selection_enabled: boolean };
     const bufferBefore = svc.buffer_time_before ?? 0;
     const bufferAfter = svc.buffer_time_after ?? 0;
 
@@ -449,6 +449,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       date,
       service_duration_minutes: svc.duration_minutes,
+      staff_selection_enabled: svc.staff_selection_enabled,
       staff: staffWithSlots,
       anyone_slots: anyoneSlots,
       address,

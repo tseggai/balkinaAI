@@ -42,6 +42,7 @@ interface Service {
   capacity: number;
   hide_price: boolean;
   hide_duration: boolean;
+  staff_selection_enabled: boolean;
   visibility: string;
   min_booking_lead_time: number;
   max_booking_days_ahead: number;
