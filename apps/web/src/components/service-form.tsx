@@ -335,7 +335,7 @@ export function ServiceForm({
   }), [
     name, categoryName, description, imageUrl, price, depositEnabled, depositType,
     depositAmount, duration, bufferTime, customDuration, capacity, hidePrice,
-    hideDuration, isRecurring, selectedStaff, timesheetEnabled, timesheet, extras,
+    hideDuration, staffSelectionEnabled, isRecurring, selectedStaff, timesheetEnabled, timesheet, extras,
     visibility, minBookingLeadTime, maxDaysEnabled, maxBookingDaysAhead,
     minExtrasEnabled, minExtras, maxExtrasEnabled, maxExtras,
     limitPerCustomerEnabled, limitPerCustomer, limitPerCustomerInterval,
