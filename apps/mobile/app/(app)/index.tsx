@@ -1541,10 +1541,12 @@ export default function ChatScreen() {
         staffSelectionEnabled: data.staff_selection_enabled ?? true,
       }));
 
+      const staffSelEnabled = data.staff_selection_enabled ?? true;
+
       // Build a staff_with_slots card
       const card: StaffWithSlotsData = {
         type: 'staff_with_slots',
-        items: data.staff.map((s) => ({
+        items: staffSelEnabled ? data.staff.map((s) => ({
           type: 'staff_card' as const,
           id: s.id,
           name: s.name,
@@ -1552,12 +1554,11 @@ export default function ChatScreen() {
           available_slots_count: s.available_slots_count,
           slots: s.slots.map((sl) => ({ time: sl.time, iso: sl.iso })),
           all_slots: s.all_slots?.map((sl) => ({ time: sl.time, iso: sl.iso, available: sl.available })),
-        })),
+        })) : [],
         anyone_slots: data.anyone_slots.map((sl) => ({ time: sl.time, iso: sl.iso, available: sl.available })),
-        staff_selection_enabled: data.staff_selection_enabled ?? true,
+        staff_selection_enabled: staffSelEnabled,
       };
 
-      const staffSelEnabled = data.staff_selection_enabled ?? true;
       addAssistantMessage(`${staffSelEnabled ? 'Here are the available staff and time slots' : 'Here are the available time slots'}:\n\n[[CARD:${JSON.stringify(card)}]]`);
     } catch {
       addAssistantMessage('Connection error while checking availability. Please try again.');
