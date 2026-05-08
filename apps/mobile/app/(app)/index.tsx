@@ -1557,7 +1557,8 @@ export default function ChatScreen() {
         staff_selection_enabled: data.staff_selection_enabled ?? true,
       };
 
-      addAssistantMessage(`Here are the available staff and time slots:\n\n[[CARD:${JSON.stringify(card)}]]`);
+      const staffSelEnabled = data.staff_selection_enabled ?? true;
+      addAssistantMessage(`${staffSelEnabled ? 'Here are the available staff and time slots' : 'Here are the available time slots'}:\n\n[[CARD:${JSON.stringify(card)}]]`);
     } catch {
       addAssistantMessage('Connection error while checking availability. Please try again.');
     }
