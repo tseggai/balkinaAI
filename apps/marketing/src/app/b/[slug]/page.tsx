@@ -123,7 +123,7 @@ export default async function TenantPage({ params }: { params: Promise<{ slug: s
   if (!data) notFound();
 
   const { tenant, services, locations, categories, gallery } = data;
-  const deepLink = `balkina://book/${tenant.id}`;
+  const deepLink = `balkina://?tenant=${tenant.id}`;
   const appStoreUrl = 'https://apps.apple.com/app/balkina-ai/id6742752682';
 
   return (
