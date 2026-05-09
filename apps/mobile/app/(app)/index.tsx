@@ -867,18 +867,27 @@ const RichSummaryCard = React.memo(function RichSummaryCard({ data, onButtonPres
 
 const RichConfirmedCard = React.memo(function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; onButtonPress: (label: string) => void }) {
   const openDirections = () => {
+    let dest: string | null = null;
     if (data.latitude && data.longitude) {
-      const url = Platform.OS === 'ios'
-        ? `maps://maps.apple.com/?daddr=${data.latitude},${data.longitude}`
-        : `https://www.google.com/maps/dir/?api=1&destination=${data.latitude},${data.longitude}`;
-      Linking.openURL(url);
+      dest = `${data.latitude},${data.longitude}`;
     } else if (data.address) {
-      const encoded = encodeURIComponent(data.address);
-      const url = Platform.OS === 'ios'
-        ? `maps://maps.apple.com/?daddr=${encoded}`
-        : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
-      Linking.openURL(url);
+      dest = encodeURIComponent(data.address);
     }
+    if (!dest) return;
+
+    const appleUrl = `maps://maps.apple.com/?daddr=${dest}`;
+    const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
+
+    if (Platform.OS === 'android') {
+      Linking.openURL(googleUrl);
+      return;
+    }
+
+    Alert.alert('Open Directions', 'Choose your maps app', [
+      { text: 'Apple Maps', onPress: () => Linking.openURL(appleUrl) },
+      { text: 'Google Maps', onPress: () => Linking.openURL(googleUrl) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const displayService = data.package || data.service;
