@@ -1846,14 +1846,33 @@ export default function ChatScreen() {
           const dateStr = parseDateLabel(userText);
           addUserMessage(userText);
 
-          // Per-day/week services: date selection = booking time, skip slot step
+          // Per-day/week services: validate day availability, then skip slot step
           if (bookingState.pricingType === 'per_day' || bookingState.pricingType === 'per_week') {
-            const displayDate = new Date(dateStr + 'T12:00:00Z');
-            const timeLabel = displayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-            const slotIso = new Date(dateStr + 'T09:00:00Z').toISOString();
-            const newState = { ...bookingState, date: dateStr, timeSlot: timeLabel, timeSlotIso: slotIso };
+            const newState = { ...bookingState, date: dateStr };
             setBookingState(newState);
-            fetchBookingOptions(newState.tenantId!, newState.serviceId!);
+            setIsLoading(true);
+            try {
+              const res = await fetch(`${API_BASE}/api/booking/staff-availability`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tenantId: newState.tenantId, serviceId: newState.serviceId, date: dateStr, locationId: newState.locationId ?? undefined, userId }),
+              });
+              const data = await res.json() as { staff: unknown[]; anyone_slots?: { available: boolean }[]; message?: string; address?: string | null };
+              if (data.message || !data.anyone_slots?.some((s: { available: boolean }) => s.available)) {
+                addAssistantMessage(data.message || 'No availability on this date. Please try another day.');
+                setIsLoading(false);
+                return true;
+              }
+              if (data.address) setBookingState((prev) => ({ ...prev, address: data.address! }));
+              const displayDate = new Date(dateStr + 'T12:00:00Z');
+              const timeLabel = displayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+              const slotIso = new Date(dateStr + 'T09:00:00Z').toISOString();
+              setBookingState((prev) => ({ ...prev, timeSlot: timeLabel, timeSlotIso: slotIso }));
+              fetchBookingOptions(newState.tenantId!, newState.serviceId!);
+            } catch {
+              addAssistantMessage('Connection error. Please try again.');
+            }
+            setIsLoading(false);
             return true;
           }
 
@@ -1888,12 +1907,31 @@ export default function ChatScreen() {
           addUserMessage(userText);
 
           if (bookingState.pricingType === 'per_day' || bookingState.pricingType === 'per_week') {
-            const displayDate = new Date(dateStr + 'T12:00:00Z');
-            const timeLabel = displayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-            const slotIso = new Date(dateStr + 'T09:00:00Z').toISOString();
-            const newState = { ...bookingState, date: dateStr, timeSlot: timeLabel, timeSlotIso: slotIso };
-            setBookingState(newState);
-            fetchBookingOptions(newState.tenantId!, newState.serviceId!);
+            const newState2 = { ...bookingState, date: dateStr, timeSlot: null, timeSlotIso: null };
+            setBookingState(newState2);
+            setIsLoading(true);
+            try {
+              const res2 = await fetch(`${API_BASE}/api/booking/staff-availability`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tenantId: newState2.tenantId, serviceId: newState2.serviceId, date: dateStr, locationId: newState2.locationId ?? undefined, userId }),
+              });
+              const data2 = await res2.json() as { staff: unknown[]; anyone_slots?: { available: boolean }[]; message?: string; address?: string | null };
+              if (data2.message || !data2.anyone_slots?.some((s: { available: boolean }) => s.available)) {
+                addAssistantMessage(data2.message || 'No availability on this date. Please try another day.');
+                setIsLoading(false);
+                return true;
+              }
+              if (data2.address) setBookingState((prev) => ({ ...prev, address: data2.address! }));
+              const displayDate2 = new Date(dateStr + 'T12:00:00Z');
+              const timeLabel2 = displayDate2.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+              const slotIso2 = new Date(dateStr + 'T09:00:00Z').toISOString();
+              setBookingState((prev) => ({ ...prev, timeSlot: timeLabel2, timeSlotIso: slotIso2 }));
+              fetchBookingOptions(newState2.tenantId!, newState2.serviceId!);
+            } catch {
+              addAssistantMessage('Connection error. Please try again.');
+            }
+            setIsLoading(false);
             return true;
           }
 
