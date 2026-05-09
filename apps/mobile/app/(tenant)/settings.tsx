@@ -37,7 +37,7 @@ export default function TenantSettings() {
   const [formName, setFormName] = useState('');
   const [formOwnerName, setFormOwnerName] = useState('');
   const [formPhone, setFormPhone] = useState('');
-  const [formCategoryId, setFormCategoryId] = useState('');
+  const [formCategoryIds, setFormCategoryIds] = useState<string[]>([]);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
   const fetchTenant = useCallback(async () => {
@@ -56,7 +56,11 @@ export default function TenantSettings() {
         setFormName(td.name);
         setFormOwnerName(td.owner_name ?? '');
         setFormPhone(td.phone ?? '');
-        setFormCategoryId(td.category_id ?? '');
+        const { data: tcLinks } = await supabase
+          .from('tenant_category_links')
+          .select('category_id')
+          .eq('tenant_id', td.id);
+        setFormCategoryIds(((tcLinks ?? []) as { category_id: string }[]).map((l) => l.category_id));
       }
       if (cats) setCategories(cats as Category[]);
     } catch {
@@ -75,8 +79,14 @@ export default function TenantSettings() {
         name: formName.trim(),
         owner_name: formOwnerName.trim() || null,
         phone: formPhone.trim() || null,
-        category_id: formCategoryId || null,
+        category_id: formCategoryIds[0] || null,
       } as never).eq('id', tenant.id);
+      await supabase.from('tenant_category_links').delete().eq('tenant_id', tenant.id);
+      if (formCategoryIds.length > 0) {
+        await supabase.from('tenant_category_links').insert(
+          formCategoryIds.map((cid) => ({ tenant_id: tenant.id, category_id: cid })) as never
+        );
+      }
       setEditMode(false);
       fetchTenant();
     } catch {
@@ -134,7 +144,9 @@ export default function TenantSettings() {
     return <View style={styles.centered}><ActivityIndicator size="large" color="#6B7FC4" /></View>;
   }
 
-  const selectedCatName = categories.find(c => c.id === formCategoryId)?.name ?? 'Not set';
+  const selectedCatNames = formCategoryIds.length > 0
+    ? categories.filter(c => formCategoryIds.includes(c.id)).map(c => c.name).join(', ')
+    : 'Not set';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -175,19 +187,25 @@ export default function TenantSettings() {
             <TextInput style={styles.input} value={formPhone} onChangeText={setFormPhone} placeholder="Phone number" placeholderTextColor="#9ca3af" keyboardType="phone-pad" />
 
             <TouchableOpacity style={styles.input} onPress={() => setShowCategoryPicker(!showCategoryPicker)}>
-              <Text style={{ fontSize: 16, color: formCategoryId ? '#111827' : '#9ca3af' }}>{formCategoryId ? selectedCatName : 'Select category'}</Text>
+              <Text style={{ fontSize: 16, color: formCategoryIds.length > 0 ? '#111827' : '#9ca3af' }} numberOfLines={2}>{formCategoryIds.length > 0 ? selectedCatNames : 'Select categories'}</Text>
             </TouchableOpacity>
             {showCategoryPicker && (
               <View style={styles.pickerList}>
-                {categories.map((cat) => (
-                  <TouchableOpacity
-                    key={cat.id}
-                    style={[styles.pickerItem, formCategoryId === cat.id && styles.pickerItemActive]}
-                    onPress={() => { setFormCategoryId(cat.id); setShowCategoryPicker(false); }}
-                  >
-                    <Text style={[styles.pickerItemText, formCategoryId === cat.id && { color: '#6B7FC4', fontWeight: '600' }]}>{cat.name}</Text>
-                  </TouchableOpacity>
-                ))}
+                {categories.map((cat) => {
+                  const isSelected = formCategoryIds.includes(cat.id);
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[styles.pickerItem, isSelected && styles.pickerItemActive]}
+                      onPress={() => setFormCategoryIds(isSelected ? formCategoryIds.filter(id => id !== cat.id) : [...formCategoryIds, cat.id])}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Ionicons name={isSelected ? 'checkbox' : 'square-outline'} size={20} color={isSelected ? '#6B7FC4' : '#d1d5db'} />
+                        <Text style={[styles.pickerItemText, isSelected && { color: '#6B7FC4', fontWeight: '600' }]}>{cat.name}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
 

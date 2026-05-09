@@ -99,6 +99,11 @@ export async function POST(request: Request) {
       );
     }
 
+    // Create junction table entry for category
+    if (categoryId) {
+      await supabase.from('tenant_category_links').insert({ tenant_id: tenant.id, category_id: categoryId } as never);
+    }
+
     // Merge tenant_id into the user's existing app_metadata (preserves other fields like role)
     const existingMeta = authUser?.app_metadata ?? {};
     await supabase.auth.admin.updateUserById(userId, {
