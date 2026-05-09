@@ -27,7 +27,7 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('profile');
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: '', phone: '', category_id: '' });
+  const [form, setForm] = useState({ name: '', phone: '', category_ids: [] as string[] });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -59,9 +59,14 @@ export default function SettingsPage() {
     const tenantInfo = data as TenantInfo | null;
     if (tenantInfo) {
       setTenant(tenantInfo);
-      const formValues = { name: tenantInfo.name, phone: tenantInfo.phone ?? '', category_id: tenantInfo.category_id ?? '' };
+      const { data: tcLinks } = await supabase
+        .from('tenant_category_links')
+        .select('category_id')
+        .eq('tenant_id', tenantInfo.id);
+      const catIds = ((tcLinks ?? []) as { category_id: string }[]).map((l) => l.category_id);
+      const formValues = { name: tenantInfo.name, phone: tenantInfo.phone ?? '', category_ids: catIds };
       setForm(formValues);
-      initialFormValues.current = { ...formValues };
+      initialFormValues.current = { ...formValues, category_ids: [...catIds] };
       setLogoPreview(tenantInfo.logo_url);
     }
     setLoading(false);
@@ -143,12 +148,21 @@ export default function SettingsPage() {
     const supabase = createClient();
     const { error } = await supabase
       .from('tenants')
-      .update({ name: form.name, phone: form.phone || null, category_id: form.category_id || null } as never)
+      .update({ name: form.name, phone: form.phone || null, category_id: form.category_ids[0] || null } as never)
       .eq('id', tenant.id);
+
+    if (!error) {
+      await supabase.from('tenant_category_links').delete().eq('tenant_id', tenant.id);
+      if (form.category_ids.length > 0) {
+        await supabase.from('tenant_category_links').insert(
+          form.category_ids.map((cid) => ({ tenant_id: tenant.id, category_id: cid })) as never
+        );
+      }
+    }
 
     setSaving(false);
     if (error) { setMessage('Failed to save'); return; }
-    initialFormValues.current = { ...form };
+    initialFormValues.current = { ...form, category_ids: [...form.category_ids] };
     setMessage('Settings saved!');
     fetchTenant();
   }
@@ -263,15 +277,18 @@ export default function SettingsPage() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Business Category</label>
-              <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
-                <option value="">Select a category...</option>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Business Categories</label>
+              <div className="space-y-1 rounded-lg border border-gray-300 p-3 max-h-48 overflow-y-auto">
                 {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  <label key={c.id} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.category_ids.includes(c.id)}
+                      onChange={(e) => setForm({ ...form, category_ids: e.target.checked ? [...form.category_ids, c.id] : form.category_ids.filter((id) => id !== c.id) })}
+                      className="rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                    <span className="text-sm text-gray-700">{c.name}</span>
+                  </label>
                 ))}
-              </select>
-              <p className="mt-1 text-xs text-gray-400">This determines where customers find you when browsing by category.</p>
+              </div>
+              <p className="mt-1 text-xs text-gray-400">Select all categories where customers can discover your business.</p>
             </div>
             {message && <p className={`text-sm ${message.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}>{message}</p>}
             <button type="submit" disabled={!isDirty || saving}

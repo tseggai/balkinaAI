@@ -61,19 +61,33 @@ export async function POST(request: Request) {
 
     // ── Category path (fastest — direct DB filter) ──────────────────────
     if (categoryId) {
+      // Find tenants linked to this category via junction table
+      const { data: linkedTenants } = await supabase
+        .from('tenant_category_links')
+        .select('tenant_id')
+        .eq('category_id', categoryId);
+      const linkedIds = ((linkedTenants ?? []) as { tenant_id: string }[]).map((t) => t.tenant_id);
+
+      if (linkedIds.length === 0) {
+        return Response.json({ businesses: [], total_count: 0, has_more: false }, { headers: CORS_HEADERS });
+      }
+
       const { data: tenants, error } = await supabase
         .from('tenants')
-        .select('id, name, logo_url, avg_rating, review_count, categories!inner(name)')
+        .select('id, name, logo_url, avg_rating, review_count')
         .eq('status', 'active')
-        .eq('category_id', categoryId);
+        .in('id', linkedIds);
 
       if (error) {
         return Response.json({ error: error.message }, { status: 500, headers: CORS_HEADERS });
       }
 
-      const businesses = (tenants ?? []).map((t: { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; categories: { name: string } | { name: string }[] | null }) => {
-        const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
-        return { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: cat, avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0 };
+      // Get category name for display
+      const { data: catRow } = await supabase.from('categories').select('name').eq('id', categoryId).single();
+      const catName = (catRow as { name: string } | null)?.name ?? null;
+
+      const businesses = (tenants ?? []).map((t: { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null }) => {
+        return { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: catName, avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0 };
       });
 
       const bizIds = businesses.map((b) => b.id);
