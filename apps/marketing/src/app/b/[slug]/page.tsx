@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import Link from 'next/link';
 
 function getSupabase() {
@@ -123,7 +122,7 @@ export default async function TenantPage({ params }: { params: Promise<{ slug: s
   if (!data) notFound();
 
   const { tenant, services, locations, categories, gallery } = data;
-  const deepLink = `balkina://book/${tenant.id}`;
+  const deepLink = `balkina://?tenant=${tenant.id}`;
   const appStoreUrl = 'https://apps.apple.com/app/balkina-ai/id6742752682';
 
   return (
@@ -131,7 +130,7 @@ export default async function TenantPage({ params }: { params: Promise<{ slug: s
       {/* Hero */}
       <div className="text-center">
         {tenant.logo_url ? (
-          <Image src={tenant.logo_url} alt={tenant.name} width={88} height={88} className="mx-auto rounded-2xl object-cover" />
+          <img src={tenant.logo_url} alt={tenant.name} width={88} height={88} className="mx-auto rounded-2xl object-cover" />
         ) : (
           <div className="mx-auto flex h-22 w-22 items-center justify-center rounded-2xl bg-brand-500 text-3xl font-bold text-white" style={{ width: 88, height: 88 }}>
             {tenant.name.charAt(0)}
