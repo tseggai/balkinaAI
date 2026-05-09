@@ -16,6 +16,7 @@ interface TenantInfo {
   stripe_customer_id: string | null;
   subscription_plan_id: string | null;
   category_id: string | null;
+  slug: string | null;
 }
 
 interface Category {
@@ -44,7 +45,7 @@ export default function SettingsPage() {
     const [{ data }, { data: cats }] = await Promise.all([
       supabase
         .from('tenants')
-        .select('id, name, owner_name, email, phone, logo_url, stripe_customer_id, subscription_plan_id, category_id')
+        .select('id, name, owner_name, email, phone, logo_url, stripe_customer_id, subscription_plan_id, category_id, slug')
         .eq('user_id', user.id)
         .single(),
       supabase
@@ -290,6 +291,17 @@ export default function SettingsPage() {
               </div>
               <p className="mt-1 text-xs text-gray-400">Select all categories where customers can discover your business.</p>
             </div>
+            {tenant?.slug && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Your Booking Link</label>
+              <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                <span className="flex-1 text-sm text-brand-600 truncate">balkina.ai/b/{tenant.slug}</span>
+                <button type="button" onClick={() => { navigator.clipboard.writeText(`https://balkina.ai/b/${tenant.slug}`); setMessage('Link copied!'); }}
+                  className="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700">Copy</button>
+              </div>
+              <p className="mt-1 text-xs text-gray-400">Share this link with your clients to let them book directly.</p>
+            </div>
+            )}
             {message && <p className={`text-sm ${message.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}>{message}</p>}
             <button type="submit" disabled={!isDirty || saving}
               style={{ opacity: (!isDirty || saving) ? 0.5 : 1 }}

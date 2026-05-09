@@ -1,9 +1,17 @@
 import { useEffect } from 'react';
+import { Linking } from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
 import { registerPushToken } from '@/lib/registerPushToken';
+import { setPendingDeepLinkTenant } from '@/lib/deepLink';
+
+function handleDeepLinkUrl(url: string | null) {
+  if (!url) return;
+  const match = url.match(/balkina:\/\/book\/([a-f0-9-]+)/i);
+  if (match?.[1]) setPendingDeepLinkTenant(match[1]);
+}
 
 // Configure notification handler for foreground notifications
 try {
@@ -22,6 +30,12 @@ try {
 
 export default function AppTabsLayout() {
   const router = useRouter();
+
+  useEffect(() => {
+    Linking.getInitialURL().then(handleDeepLinkUrl);
+    const sub = Linking.addEventListener('url', ({ url }) => handleDeepLinkUrl(url));
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (!supabaseConfigured) {
