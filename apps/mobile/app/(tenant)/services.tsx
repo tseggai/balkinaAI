@@ -16,6 +16,7 @@ interface Service {
   image_url: string | null;
   visibility: string;
   staff_selection_enabled?: boolean;
+  pricing_type?: string;
   location_ids: string[];
   extras: Extra[];
 }
@@ -46,6 +47,7 @@ export default function TenantServices() {
   const [extraUnitLabel, setExtraUnitLabel] = useState('');
   const [editingExtraIdx, setEditingExtraIdx] = useState<number | null>(null);
   const [formStaffSelection, setFormStaffSelection] = useState(true);
+  const [formPricingType, setFormPricingType] = useState('per_service');
 
   const getToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -75,14 +77,14 @@ export default function TenantServices() {
   const openAdd = () => {
     setEditing(null);
     setFormName(''); setFormPrice(''); setFormDuration('60'); setFormDesc(''); setFormImageUrl(null);
-    setFormLocIds([]); setFormExtras([]); setShowAddExtra(false); setFormStaffSelection(true);
+    setFormLocIds([]); setFormExtras([]); setShowAddExtra(false); setFormStaffSelection(true); setFormPricingType('per_service');
     setModalVisible(true);
   };
 
   const openEdit = (svc: Service) => {
     setEditing(svc);
     setFormName(svc.name); setFormPrice(String(svc.price)); setFormDuration(String(svc.duration_minutes)); setFormDesc(svc.description ?? ''); setFormImageUrl(svc.image_url);
-    setFormLocIds(svc.location_ids); setFormExtras(svc.extras); setShowAddExtra(false); setFormStaffSelection(svc.staff_selection_enabled ?? true);
+    setFormLocIds(svc.location_ids); setFormExtras(svc.extras); setShowAddExtra(false); setFormStaffSelection(svc.staff_selection_enabled ?? true); setFormPricingType(svc.pricing_type ?? 'per_service');
     setModalVisible(true);
   };
 
@@ -135,6 +137,7 @@ export default function TenantServices() {
         description: formDesc.trim() || null,
         image_url: formImageUrl,
         staff_selection_enabled: formStaffSelection,
+        pricing_type: formPricingType,
         location_ids: formLocIds, extras: formExtras,
       };
       if (editing) body.id = editing.id;
@@ -228,6 +231,16 @@ export default function TenantServices() {
               <TextInput style={[styles.input, { flex: 1 }]} value={formDuration} onChangeText={setFormDuration} placeholder="Duration (min)" placeholderTextColor="#9ca3af" keyboardType="number-pad" />
             </View>
             <TextInput style={[styles.input, { minHeight: 60, textAlignVertical: 'top' }]} value={formDesc} onChangeText={setFormDesc} placeholder="Description (optional)" placeholderTextColor="#9ca3af" multiline />
+
+            {/* Pricing type */}
+            <Text style={styles.sectionLabel}>Pricing Type</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              {([['per_service', 'Per Service'], ['per_day', 'Per Day'], ['per_week', 'Per Week']] as const).map(([val, label]) => (
+                <TouchableOpacity key={val} onPress={() => setFormPricingType(val)} style={{ flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: formPricingType === val ? '#6B7FC4' : '#f3f4f6', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: formPricingType === val ? '#fff' : '#6b7280' }}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             {/* Staff selection toggle */}
             <TouchableOpacity style={styles.checkRow} onPress={() => setFormStaffSelection(!formStaffSelection)}>

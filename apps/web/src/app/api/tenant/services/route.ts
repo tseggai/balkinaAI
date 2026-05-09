@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS });
 
   const [{ data: services }, { data: svcLocs }, { data: extras }, { data: locations }] = await Promise.all([
-    ctx.admin.from('services').select('id, name, price, duration_minutes, description, image_url, visibility, deposit_enabled, deposit_amount, deposit_type, staff_selection_enabled').eq('tenant_id', ctx.tenantId).order('name'),
+    ctx.admin.from('services').select('id, name, price, duration_minutes, description, image_url, visibility, deposit_enabled, deposit_amount, deposit_type, staff_selection_enabled, pricing_type').eq('tenant_id', ctx.tenantId).order('name'),
     ctx.admin.from('service_locations').select('service_id, location_id'),
     ctx.admin.from('service_extras').select('id, service_id, name, price, duration_minutes, type, max_quantity, unit_label'),
     ctx.admin.from('tenant_locations').select('id, name').eq('tenant_id', ctx.tenantId),
@@ -57,6 +57,7 @@ export async function POST(request: Request) {
       image_url: body.image_url || null,
       visibility: 'public',
       staff_selection_enabled: body.staff_selection_enabled ?? true,
+      pricing_type: body.pricing_type || 'per_service',
     } as never)
     .select('id')
     .single();
@@ -93,7 +94,7 @@ export async function PATCH(request: Request) {
   if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400, headers: CORS_HEADERS });
 
   const updates: Record<string, unknown> = {};
-  for (const key of ['name', 'price', 'duration_minutes', 'description', 'image_url', 'visibility', 'deposit_enabled', 'deposit_amount', 'deposit_type', 'staff_selection_enabled']) {
+  for (const key of ['name', 'price', 'duration_minutes', 'description', 'image_url', 'visibility', 'deposit_enabled', 'deposit_amount', 'deposit_type', 'staff_selection_enabled', 'pricing_type']) {
     if (body[key] !== undefined) updates[key] = body[key];
   }
 

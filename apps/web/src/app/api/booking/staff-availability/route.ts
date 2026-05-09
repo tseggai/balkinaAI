@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     // 1. Get service details including buffer times
     const { data: service, error: svcErr } = await supabase
       .from('services')
-      .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after, staff_selection_enabled')
+      .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after, staff_selection_enabled, pricing_type')
       .eq('id', serviceId)
       .single();
 
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Service not found' }, { status: 404, headers: CORS_HEADERS });
     }
 
-    const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null; staff_selection_enabled: boolean };
+    const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null; staff_selection_enabled: boolean; pricing_type: string };
     const bufferBefore = svc.buffer_time_before ?? 0;
     const bufferAfter = svc.buffer_time_after ?? 0;
 
@@ -378,59 +378,86 @@ export async function POST(request: Request) {
     // anyone_slots: each time slot is available if ANY staff can take it
     const anyoneSlotsMap = new Map<string, { time: string; iso: string; available: boolean }>();
 
+    const pricingType = svc.pricing_type ?? 'per_service';
+
     for (const { staff, worksToday, startMinutes: staffStart, endMinutes: staffEnd } of staffDayInfos) {
       const staffSlots: { time: string; iso: string }[] = [];
       const allSlots: { time: string; iso: string; available: boolean }[] = [];
 
-      // Use service duration (not duration+buffers) for schedule boundary checks.
-      // Buffers prevent back-to-back bookings but shouldn't shrink the bookable window.
-      const serviceDuration = svc.duration_minutes;
-
-      for (let minutes = masterStartMinutes; minutes + serviceDuration <= masterEndMinutes; minutes += 30) {
-        const slotHour = Math.floor(minutes / 60);
-        const slotMin = minutes % 60;
-        const localTimeStr = `${String(slotHour).padStart(2, '0')}:${String(slotMin).padStart(2, '0')}`;
-
-        const bufferStartUtc = localTimeToUTC(date, localTimeStr, timezone);
-        const slotStartUtc = new Date(bufferStartUtc.getTime() + bufferBefore * 60000);
-        const slotEndUtc = new Date(slotStartUtc.getTime() + svc.duration_minutes * 60000);
-        const bufferEndUtc = new Date(slotEndUtc.getTime() + bufferAfter * 60000);
-
-        // Staff is available only if they work today AND the service fits within their schedule
-        const inSchedule = worksToday && minutes >= staffStart && minutes + serviceDuration <= staffEnd;
-
-        const hasConflict = inSchedule && appointments.some((appt) => {
+      if (pricingType === 'per_day' || pricingType === 'per_week') {
+        // Day/week rate: one slot representing the full day
+        const slotStartUtc = localTimeToUTC(date, `${String(Math.floor(staffStart / 60)).padStart(2, '0')}:${String(staffStart % 60).padStart(2, '0')}`, timezone);
+        const isPast = slotStartUtc.getTime() < Date.now() + 15 * 60000;
+        const hasConflict = worksToday && appointments.some((appt) => {
           if (appt.staff_id !== staff.id) return false;
           const apptStart = new Date(appt.start_time).getTime();
           const apptEnd = new Date(appt.end_time).getTime();
-          return bufferStartUtc.getTime() < apptEnd && bufferEndUtc.getTime() > apptStart;
+          const dayStartMs = slotStartUtc.getTime();
+          const dayEndMs = localTimeToUTC(date, `${String(Math.floor(staffEnd / 60)).padStart(2, '0')}:${String(staffEnd % 60).padStart(2, '0')}`, timezone).getTime();
+          return dayStartMs < apptEnd && dayEndMs > apptStart;
         });
-
-        // Skip slots that are less than 15 minutes from now
-        const nowPlus15 = Date.now() + 15 * 60000;
-        const isPast = slotStartUtc.getTime() < nowPlus15;
-
-        const available = inSchedule && !hasConflict && !isPast;
-
-        const serviceStartMinutes = minutes + bufferBefore;
-        const displayHour = Math.floor(serviceStartMinutes / 60);
-        const displayMin = serviceStartMinutes % 60;
-        const ampm = displayHour >= 12 ? 'PM' : 'AM';
-        const displayHour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour;
-        const localDisplay = `${displayHour12}:${String(displayMin).padStart(2, '0')} ${ampm}`;
+        const available = worksToday && !hasConflict && !isPast;
+        const displayDate = new Date(date + 'T12:00:00Z');
+        const localDisplay = pricingType === 'per_day'
+          ? displayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+          : `Week of ${displayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 
         allSlots.push({ time: localDisplay, iso: slotStartUtc.toISOString(), available });
+        if (available) staffSlots.push({ time: localDisplay, iso: slotStartUtc.toISOString() });
 
-        if (available) {
-          staffSlots.push({ time: localDisplay, iso: slotStartUtc.toISOString() });
-        }
-
-        // Update anyone map — available if ANY staff can take this slot
         const existing = anyoneSlotsMap.get(localDisplay);
         if (!existing) {
           anyoneSlotsMap.set(localDisplay, { time: localDisplay, iso: slotStartUtc.toISOString(), available });
         } else if (available && !existing.available) {
           anyoneSlotsMap.set(localDisplay, { time: localDisplay, iso: slotStartUtc.toISOString(), available: true });
+        }
+      } else {
+        // Per-service: 30-min increment slots
+        const serviceDuration = svc.duration_minutes;
+
+        for (let minutes = masterStartMinutes; minutes + serviceDuration <= masterEndMinutes; minutes += 30) {
+          const slotHour = Math.floor(minutes / 60);
+          const slotMin = minutes % 60;
+          const localTimeStr = `${String(slotHour).padStart(2, '0')}:${String(slotMin).padStart(2, '0')}`;
+
+          const bufferStartUtc = localTimeToUTC(date, localTimeStr, timezone);
+          const slotStartUtc = new Date(bufferStartUtc.getTime() + bufferBefore * 60000);
+          const slotEndUtc = new Date(slotStartUtc.getTime() + svc.duration_minutes * 60000);
+          const bufferEndUtc = new Date(slotEndUtc.getTime() + bufferAfter * 60000);
+
+          const inSchedule = worksToday && minutes >= staffStart && minutes + serviceDuration <= staffEnd;
+
+          const hasConflict = inSchedule && appointments.some((appt) => {
+            if (appt.staff_id !== staff.id) return false;
+            const apptStart = new Date(appt.start_time).getTime();
+            const apptEnd = new Date(appt.end_time).getTime();
+            return bufferStartUtc.getTime() < apptEnd && bufferEndUtc.getTime() > apptStart;
+          });
+
+          const nowPlus15 = Date.now() + 15 * 60000;
+          const isPast = slotStartUtc.getTime() < nowPlus15;
+
+          const available = inSchedule && !hasConflict && !isPast;
+
+          const serviceStartMinutes = minutes + bufferBefore;
+          const displayHour = Math.floor(serviceStartMinutes / 60);
+          const displayMin = serviceStartMinutes % 60;
+          const ampm = displayHour >= 12 ? 'PM' : 'AM';
+          const displayHour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour;
+          const localDisplay = `${displayHour12}:${String(displayMin).padStart(2, '0')} ${ampm}`;
+
+          allSlots.push({ time: localDisplay, iso: slotStartUtc.toISOString(), available });
+
+          if (available) {
+            staffSlots.push({ time: localDisplay, iso: slotStartUtc.toISOString() });
+          }
+
+          const existing = anyoneSlotsMap.get(localDisplay);
+          if (!existing) {
+            anyoneSlotsMap.set(localDisplay, { time: localDisplay, iso: slotStartUtc.toISOString(), available });
+          } else if (available && !existing.available) {
+            anyoneSlotsMap.set(localDisplay, { time: localDisplay, iso: slotStartUtc.toISOString(), available: true });
+          }
         }
       }
 
@@ -450,6 +477,7 @@ export async function POST(request: Request) {
       date,
       service_duration_minutes: svc.duration_minutes,
       staff_selection_enabled: svc.staff_selection_enabled,
+      pricing_type: svc.pricing_type ?? 'per_service',
       staff: staffWithSlots,
       anyone_slots: anyoneSlots,
       address,
