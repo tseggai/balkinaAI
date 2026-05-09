@@ -444,6 +444,30 @@ const StaffWithSlotsRow = React.memo(function StaffWithSlotsRow({ data, onTap }:
   // Update available_slots_count based on current time (not stale server data)
   const availableCount = slots.filter((s) => s.available !== false).length;
 
+  // Check if ANY staff has available slots
+  const totalAvailableAcrossAllStaff = data.items.reduce((sum, staff) => {
+    const sSlots = staff.all_slots ?? staff.slots?.map((s) => ({ ...s, available: true })) ?? [];
+    return sum + sSlots.filter((s) => {
+      if (s.available === false) return false;
+      if (s.iso && new Date(s.iso).getTime() < nowMs) return false;
+      return true;
+    }).length;
+  }, 0);
+  const anyoneAvailable = (data.anyone_slots ?? []).some((s) => {
+    if (s.available === false) return false;
+    if (s.iso && new Date(s.iso).getTime() < nowMs) return false;
+    return true;
+  });
+  const noAvailability = totalAvailableAcrossAllStaff === 0 && !anyoneAvailable;
+
+  if (noAvailability) {
+    return (
+      <View style={{ marginTop: 4, marginBottom: 2, backgroundColor: '#fff', borderRadius: 12, padding: 20, alignItems: 'center', borderWidth: 1, borderColor: '#f3f4f6' }}>
+        <Text style={{ fontSize: 14, color: '#9ca3af' }}>No availability on this date. Try another day.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={{ marginTop: 4, marginBottom: 2 }}>
       {!staffSelectionOff && (
@@ -1717,7 +1741,7 @@ export default function ChatScreen() {
           const allSvcs: typeof lastDisplayedServices.current = [];
           for (const biz of data.businesses) {
             for (const svc of biz.all_services ?? []) {
-              allSvcs.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled ?? false, deposit_amount: svc.deposit_amount ?? null, tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id });
+              allSvcs.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled ?? false, deposit_amount: svc.deposit_amount ?? null, pricing_type: svc.pricing_type ?? 'per_service', tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id });
             }
           }
           lastDisplayedServices.current = allSvcs;
@@ -1725,7 +1749,7 @@ export default function ChatScreen() {
           // Build business_with_services card
           const card = {
             type: 'business_with_services',
-            items: data.businesses.map((b: { id: string; name: string; image_url?: string; distance_mi?: number; estimated_drive_minutes?: number; category?: string; avg_rating?: number; review_count?: number; closest_location_id?: string; gallery_photos?: { id: string; image_url: string; caption?: string | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; image_url?: string | null }[] }) => ({
+            items: data.businesses.map((b: { id: string; name: string; image_url?: string; distance_mi?: number; estimated_drive_minutes?: number; category?: string; avg_rating?: number; review_count?: number; closest_location_id?: string; gallery_photos?: { id: string; image_url: string; caption?: string | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; image_url?: string | null; pricing_type?: string }[] }) => ({
               id: b.id,
               name: b.name,
               image_url: b.image_url,
@@ -1738,7 +1762,7 @@ export default function ChatScreen() {
               gallery_photos: b.gallery_photos ?? [],
               services: (b.all_services ?? []).map((s) => ({
                 id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
-                deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, image_url: s.image_url,
+                deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, image_url: s.image_url, pricing_type: s.pricing_type,
               })),
             })),
           };
