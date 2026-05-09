@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     // 1. Get service details including buffer times
     const { data: service, error: svcErr } = await supabase
       .from('services')
-      .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after, staff_selection_enabled, pricing_type')
+      .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after, staff_selection_enabled, pricing_type, timesheet')
       .eq('id', serviceId)
       .single();
 
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Service not found' }, { status: 404, headers: CORS_HEADERS });
     }
 
-    const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null; staff_selection_enabled: boolean; pricing_type: string };
+    const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null; staff_selection_enabled: boolean; pricing_type: string; timesheet: Record<string, { enabled: boolean; start: string; end: string }> | null };
     const bufferBefore = svc.buffer_time_before ?? 0;
     const bufferAfter = svc.buffer_time_after ?? 0;
 
@@ -289,6 +289,20 @@ export async function POST(request: Request) {
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const dayOfWeek = dayNames[new Date(date).getDay()] as string;
 
+    // Check service timesheet — if the service has a timesheet and this day is disabled, return empty
+    if (svc.timesheet) {
+      const svcDay = svc.timesheet[dayOfWeek];
+      if (svcDay && svcDay.enabled === false) {
+        return NextResponse.json({
+          staff: [],
+          slots: [],
+          date,
+          service_duration_minutes: svc.duration_minutes,
+          message: 'This service is not available on this day.',
+        }, { headers: CORS_HEADERS });
+      }
+    }
+
     // Pre-compute each staff's effective schedule for the day
     interface StaffDayInfo {
       staff: typeof eligibleStaff[number];
@@ -333,6 +347,15 @@ export async function POST(request: Request) {
       if (serviceSpecialDay?.start_time && serviceSpecialDay?.end_time) {
         if (serviceSpecialDay.start_time > dayScheduleStart) dayScheduleStart = serviceSpecialDay.start_time;
         if (serviceSpecialDay.end_time < dayScheduleEnd) dayScheduleEnd = serviceSpecialDay.end_time;
+      }
+
+      // Narrow by service timesheet hours if set
+      if (svc.timesheet) {
+        const svcDay = svc.timesheet[dayOfWeek];
+        if (svcDay?.enabled && svcDay.start && svcDay.end) {
+          if (svcDay.start > dayScheduleStart) dayScheduleStart = svcDay.start;
+          if (svcDay.end < dayScheduleEnd) dayScheduleEnd = svcDay.end;
+        }
       }
 
       const startParts = dayScheduleStart.split(':').map(Number);
