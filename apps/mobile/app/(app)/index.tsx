@@ -2712,20 +2712,29 @@ export default function ChatScreen() {
                 style={fullScreenConfirmStyles.directionsBtn}
                 onPress={() => {
                   const data = confirmationModal;
+                  let dest: string | null = null;
                   if (data.latitude && data.longitude) {
-                    const url = Platform.OS === 'ios'
-                      ? `maps://maps.apple.com/?daddr=${data.latitude},${data.longitude}`
-                      : `https://www.google.com/maps/dir/?api=1&destination=${data.latitude},${data.longitude}`;
-                    Linking.openURL(url);
+                    dest = `${data.latitude},${data.longitude}`;
                   } else if (data.address) {
-                    const encoded = encodeURIComponent(data.address);
-                    const url = Platform.OS === 'ios'
-                      ? `maps://maps.apple.com/?daddr=${encoded}`
-                      : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
-                    Linking.openURL(url);
+                    dest = encodeURIComponent(data.address);
                   }
-                  setConfirmationModal(null);
-                  resetConversation();
+                  if (!dest) return;
+
+                  const appleUrl = `maps://maps.apple.com/?daddr=${dest}`;
+                  const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
+
+                  if (Platform.OS === 'android') {
+                    Linking.openURL(googleUrl);
+                    setConfirmationModal(null);
+                    resetConversation();
+                    return;
+                  }
+
+                  Alert.alert('Open Directions', 'Choose your maps app', [
+                    { text: 'Apple Maps', onPress: () => { Linking.openURL(appleUrl); setConfirmationModal(null); resetConversation(); } },
+                    { text: 'Google Maps', onPress: () => { Linking.openURL(googleUrl); setConfirmationModal(null); resetConversation(); } },
+                    { text: 'Cancel', style: 'cancel' },
+                  ]);
                 }}
               >
                 <Ionicons name="navigate-outline" size={18} color="#6B7FC4" style={{ marginRight: 8 }} />
