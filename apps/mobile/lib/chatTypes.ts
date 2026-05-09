@@ -15,6 +15,7 @@ export interface BookingState {
   staffId: string | null;
   staffName: string | null;
   staffSelectionEnabled: boolean;
+  pricingType: string;
   timeSlot: string | null; // display time like "10:00 AM"
   timeSlotIso: string | null; // ISO string
   selectedPackage: string | null;
@@ -39,6 +40,7 @@ export const INITIAL_BOOKING_STATE: BookingState = {
   staffId: null,
   staffName: null,
   staffSelectionEnabled: true,
+  pricingType: 'per_service',
   timeSlot: null,
   timeSlotIso: null,
   selectedPackage: null,

@@ -1351,7 +1351,7 @@ export default function ChatScreen() {
   const [paymentModal, setPaymentModal] = useState<{ appointmentId: string; depositAmount?: number; pendingCard?: ConfirmedCardData } | null>(null);
   const [galleryModal, setGalleryModal] = useState<{ photos: GalleryPhoto[]; initialIndex: number } | null>(null);
   // Track recently displayed service cards so we can match taps to IDs
-  const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; tenantId?: string; tenantName?: string; locationId?: string }[]>([]);
+  const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; pricing_type?: string; tenantId?: string; tenantName?: string; locationId?: string }[]>([]);
   // Stores structured tool data from SSE for deterministic rendering
   const pendingToolData = useRef<{ tool: string; data: Record<string, unknown> } | null>(null);
   // Stores last booking options so we can look up package/extras prices
@@ -1657,7 +1657,7 @@ export default function ChatScreen() {
       business: state.tenantName ?? 'Unknown',
       staff: state.staffName ?? (state.staffSelectionEnabled ? 'Anyone' : 'To be assigned'),
       date: formatHumanDate(state.date ?? ''),
-      time: state.timeSlot ?? '',
+      time: (state.pricingType === 'per_day' || state.pricingType === 'per_week') ? 'Full day' : (state.timeSlot ?? ''),
       address: state.address ?? '',
       subtotal,
       extras_total: extrasTotal,
@@ -1780,6 +1780,7 @@ export default function ChatScreen() {
             depositEnabled: matchedService.deposit_enabled,
             depositAmount: matchedService.deposit_amount ?? null,
             depositType: matchedService.deposit_type ?? null,
+            pricingType: matchedService.pricing_type ?? 'per_service',
           };
           setBookingState(newState);
           // Show date picker locally — no GPT call needed
@@ -1810,9 +1811,21 @@ export default function ChatScreen() {
         const dateButtons = getAllDateLabels();
         if (dateButtons.includes(userText)) {
           const dateStr = parseDateLabel(userText);
+          addUserMessage(userText);
+
+          // Per-day/week services: date selection = booking time, skip slot step
+          if (bookingState.pricingType === 'per_day' || bookingState.pricingType === 'per_week') {
+            const displayDate = new Date(dateStr + 'T12:00:00Z');
+            const timeLabel = displayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const slotIso = new Date(dateStr + 'T09:00:00Z').toISOString();
+            const newState = { ...bookingState, date: dateStr, timeSlot: timeLabel, timeSlotIso: slotIso };
+            setBookingState(newState);
+            fetchBookingOptions(newState.tenantId!, newState.serviceId!);
+            return true;
+          }
+
           const newState = { ...bookingState, date: dateStr };
           setBookingState(newState);
-          addUserMessage(userText);
           fetchStaffAvailability(newState.tenantId!, newState.serviceId!, dateStr, newState.locationId);
           return true;
         }
@@ -1836,12 +1849,23 @@ export default function ChatScreen() {
           addAssistantMessage(`Choose a date:\n\n${buttonMarkup}`);
           return true;
         }
-        const dateButtons = getAllDateLabels();
-        if (dateButtons.includes(userText)) {
+        const dateButtons2 = getAllDateLabels();
+        if (dateButtons2.includes(userText)) {
           const dateStr = parseDateLabel(userText);
+          addUserMessage(userText);
+
+          if (bookingState.pricingType === 'per_day' || bookingState.pricingType === 'per_week') {
+            const displayDate = new Date(dateStr + 'T12:00:00Z');
+            const timeLabel = displayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const slotIso = new Date(dateStr + 'T09:00:00Z').toISOString();
+            const newState = { ...bookingState, date: dateStr, timeSlot: timeLabel, timeSlotIso: slotIso };
+            setBookingState(newState);
+            fetchBookingOptions(newState.tenantId!, newState.serviceId!);
+            return true;
+          }
+
           const newState = { ...bookingState, date: dateStr };
           setBookingState(newState);
-          addUserMessage(userText);
           fetchStaffAvailability(newState.tenantId!, newState.serviceId!, dateStr, newState.locationId);
           return true;
         }
