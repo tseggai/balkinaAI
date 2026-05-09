@@ -29,6 +29,7 @@ import * as Location from 'expo-location';
 import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
+import { consumePendingDeepLinkTenant } from '@/lib/deepLink';
 import {
   getDateButtons,
   getNextWeekDays,
@@ -1399,6 +1400,48 @@ export default function ChatScreen() {
     setBookingState(INITIAL_BOOKING_STATE);
     lastDisplayedServices.current = [];
   }, []);
+
+  // Handle deep link: balkina://book/{tenantId}
+  useEffect(() => {
+    const tenantId = consumePendingDeepLinkTenant();
+    if (!tenantId) return;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/booking/businesses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tenantId }),
+        });
+        const data = await res.json();
+        const biz = data?.businesses?.[0];
+        if (biz) {
+          const svcs = biz.all_services ?? [];
+          lastDisplayedServices.current = svcs.map((s: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; pricing_type?: string }) => ({
+            id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
+            deposit_enabled: s.deposit_enabled ?? false, deposit_amount: s.deposit_amount ?? null,
+            pricing_type: s.pricing_type ?? 'per_service',
+            tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id,
+          }));
+          const card = {
+            type: 'business_with_services',
+            items: [{
+              id: biz.id, name: biz.name, image_url: biz.image_url,
+              distance_mi: biz.distance_mi, drive_minutes: biz.estimated_drive_minutes,
+              category: biz.category, avg_rating: biz.avg_rating, review_count: biz.review_count,
+              closest_location_id: biz.closest_location_id, gallery_photos: biz.gallery_photos ?? [],
+              services: svcs.map((s: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; image_url?: string | null; pricing_type?: string }) => ({
+                id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
+                deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, image_url: s.image_url, pricing_type: s.pricing_type,
+              })),
+            }],
+          };
+          addAssistantMessage(`Here's ${biz.name}:\n\n[[CARD:${JSON.stringify(card)}]]`);
+        }
+      } catch { /* ignore */ }
+      setIsLoading(false);
+    })();
+  }, [addAssistantMessage]);
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
