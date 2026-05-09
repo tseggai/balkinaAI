@@ -215,8 +215,8 @@ const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap }: { it
           </View>
           <View style={richCardStyles.serviceInfo}>
             <Text style={richCardStyles.serviceName} numberOfLines={2}>{svc.name}</Text>
-            <Text style={richCardStyles.servicePrice}>${svc.price}</Text>
-            <Text style={richCardStyles.serviceDuration}>{svc.duration_minutes} min</Text>
+            <Text style={richCardStyles.servicePrice}>${svc.price}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : ''}</Text>
+            <Text style={richCardStyles.serviceDuration}>{svc.pricing_type === 'per_day' ? 'Full day' : svc.pricing_type === 'per_week' ? 'Full week' : `${svc.duration_minutes} min`}</Text>
             {svc.deposit_enabled && svc.deposit_amount ? (
               <View style={richCardStyles.depositBadge}>
                 <Text style={richCardStyles.depositText}>
@@ -354,8 +354,8 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
                   <View style={{ flex: 1 }}>
                     <Text style={[combinedStyles.serviceCardLgName, isSelected && combinedStyles.serviceCardLgNameSelected]} numberOfLines={1}>{svc.name}</Text>
                     <View style={combinedStyles.serviceCardLgRow}>
-                      <Text style={[combinedStyles.serviceCardLgPrice, isSelected && combinedStyles.serviceCardLgPriceSelected]}>${svc.price}</Text>
-                      <Text style={[combinedStyles.serviceCardLgDuration, isSelected && combinedStyles.serviceCardLgDurationSelected]}>{svc.duration_minutes} min</Text>
+                      <Text style={[combinedStyles.serviceCardLgPrice, isSelected && combinedStyles.serviceCardLgPriceSelected]}>${svc.price}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : ''}</Text>
+                      <Text style={[combinedStyles.serviceCardLgDuration, isSelected && combinedStyles.serviceCardLgDurationSelected]}>{svc.pricing_type === 'per_day' ? 'Full day' : svc.pricing_type === 'per_week' ? 'Full week' : `${svc.duration_minutes} min`}</Text>
                     </View>
                     {svc.deposit_enabled && svc.deposit_amount ? (
                       <Text style={combinedStyles.serviceCardLgDepositText}>

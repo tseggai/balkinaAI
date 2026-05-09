@@ -43,6 +43,7 @@ interface Service {
   hide_price: boolean;
   hide_duration: boolean;
   staff_selection_enabled: boolean;
+  pricing_type: string;
   visibility: string;
   min_booking_lead_time: number;
   max_booking_days_ahead: number;

@@ -31,6 +31,7 @@ export interface ServiceCardData {
   deposit_enabled: boolean;
   deposit_amount?: number;
   deposit_type?: 'fixed' | 'percentage';
+  pricing_type?: string;
 }
 
 export interface StaffCardData {

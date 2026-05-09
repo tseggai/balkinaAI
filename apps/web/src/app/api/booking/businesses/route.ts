@@ -82,16 +82,16 @@ export async function POST(request: Request) {
       const [{ data: locs }, { data: svcs }, { data: galleryRows }] = bizIds.length > 0
         ? await Promise.all([
             supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', bizIds),
-            supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url').in('tenant_id', bizIds).eq('visibility', 'public'),
+            supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, pricing_type').in('tenant_id', bizIds).eq('visibility', 'public'),
             supabase.from('location_gallery').select('tenant_id, id, image_url, caption').in('tenant_id', bizIds).order('sort_order', { ascending: true }).limit(50),
           ])
         : [{ data: [] }, { data: [] }, { data: [] }];
 
       // Build service map per tenant
-      const svcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]>();
-      for (const svc of (svcs ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]) {
+      const svcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null; pricing_type: string }[]>();
+      for (const svc of (svcs ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null; pricing_type: string | null }[]) {
         const existing = svcMap.get(svc.tenant_id) ?? [];
-        existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url });
+        existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url, pricing_type: svc.pricing_type ?? 'per_service' });
         svcMap.set(svc.tenant_id, existing);
       }
 
@@ -199,15 +199,15 @@ export async function POST(request: Request) {
       const [{ data: locs }, { data: svcs }, { data: galleryRows2 }] = bizIds.length > 0
         ? await Promise.all([
             supabase.from('tenant_locations').select('id, tenant_id, latitude, longitude').in('tenant_id', bizIds),
-            supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url').in('tenant_id', bizIds).eq('visibility', 'public'),
+            supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, pricing_type').in('tenant_id', bizIds).eq('visibility', 'public'),
             supabase.from('location_gallery').select('tenant_id, id, image_url, caption').in('tenant_id', bizIds).order('sort_order', { ascending: true }).limit(50),
           ])
         : [{ data: [] }, { data: [] }, { data: [] }];
 
       const svcMap = new Map<string, unknown[]>();
-      for (const svc of (svcs ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]) {
+      for (const svc of (svcs ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null; pricing_type: string | null }[]) {
         const existing = svcMap.get(svc.tenant_id) ?? [];
-        existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url });
+        existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url, pricing_type: svc.pricing_type ?? 'per_service' });
         svcMap.set(svc.tenant_id, existing);
       }
 

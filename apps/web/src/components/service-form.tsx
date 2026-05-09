@@ -97,6 +97,7 @@ interface Service {
   hide_price: boolean;
   hide_duration: boolean;
   staff_selection_enabled: boolean;
+  pricing_type: string;
   visibility: string;
   min_booking_lead_time: number;
   max_booking_days_ahead: number;
@@ -207,6 +208,7 @@ export function ServiceForm({
   const [capacity, setCapacity] = useState(String(service?.capacity ?? 1));
   const [hidePrice, setHidePrice] = useState(service?.hide_price ?? false);
   const [staffSelectionEnabled, setStaffSelectionEnabled] = useState(service?.staff_selection_enabled ?? true);
+  const [pricingType, setPricingType] = useState(service?.pricing_type ?? 'per_service');
   const [hideDuration, setHideDuration] = useState(service?.hide_duration ?? false);
   const [isRecurring, setIsRecurring] = useState(service?.is_recurring ?? false);
 
@@ -335,7 +337,7 @@ export function ServiceForm({
   }), [
     name, categoryName, description, imageUrl, price, depositEnabled, depositType,
     depositAmount, duration, bufferTime, customDuration, capacity, hidePrice,
-    hideDuration, staffSelectionEnabled, isRecurring, selectedStaff, timesheetEnabled, timesheet, extras,
+    hideDuration, staffSelectionEnabled, pricingType, isRecurring, selectedStaff, timesheetEnabled, timesheet, extras,
     visibility, minBookingLeadTime, maxDaysEnabled, maxBookingDaysAhead,
     minExtrasEnabled, minExtras, maxExtrasEnabled, maxExtras,
     limitPerCustomerEnabled, limitPerCustomer, limitPerCustomerInterval,
@@ -447,6 +449,7 @@ export function ServiceForm({
       hide_price: hidePrice,
       hide_duration: hideDuration,
       staff_selection_enabled: staffSelectionEnabled,
+      pricing_type: pricingType,
       visibility,
       min_booking_lead_time: Number(minBookingLeadTime),
       max_booking_days_ahead: maxDaysEnabled ? Number(maxBookingDaysAhead) : 0,
@@ -689,6 +692,16 @@ export function ServiceForm({
                 ))}
               </HoverSelect>
             </div>
+          </div>
+
+          {/* Pricing type */}
+          <div>
+            <span className="text-xs text-gray-400">Pricing Type</span>
+            <HoverSelect value={pricingType} onChange={setPricingType} displayValue={pricingType === 'per_day' ? 'Per Day' : pricingType === 'per_week' ? 'Per Week' : 'Per Service'}>
+              <option value="per_service">Per Service</option>
+              <option value="per_day">Per Day</option>
+              <option value="per_week">Per Week</option>
+            </HoverSelect>
           </div>
 
           {/* Row 5: Enable Deposit (only when payments are enabled for this tenant) */}
@@ -997,6 +1010,16 @@ export function ServiceForm({
                 {opt.label}
               </option>
             ))}
+          </select>
+        </div>
+
+        {/* Pricing type */}
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Pricing Type</label>
+          <select value={pricingType} onChange={(e) => setPricingType(e.target.value)} className={selectClass}>
+            <option value="per_service">Per Service</option>
+            <option value="per_day">Per Day</option>
+            <option value="per_week">Per Week</option>
           </select>
         </div>
 

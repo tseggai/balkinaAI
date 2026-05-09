@@ -83,6 +83,7 @@ export async function POST(request: Request) {
       booking_limit_per_slot_interval: body.booking_limit_per_slot_interval || null,
       timesheet: body.timesheet || null,
       staff_selection_enabled: body.staff_selection_enabled ?? true,
+      pricing_type: body.pricing_type || 'per_service',
     } as never)
     .select()
     .single();
@@ -153,6 +154,7 @@ export async function PATCH(request: Request) {
     'booking_limit_per_slot', 'booking_limit_per_slot_interval',
     'timesheet',
     'staff_selection_enabled',
+    'pricing_type',
   ];
 
   for (const col of serviceColumns) {
