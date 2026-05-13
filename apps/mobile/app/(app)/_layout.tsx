@@ -31,7 +31,6 @@ export default function AppTabsLayout() {
   const router = useRouter();
 
   useEffect(() => {
-    Linking.getInitialURL().then(handleDeepLinkUrl);
     const sub = Linking.addEventListener('url', ({ url }) => handleDeepLinkUrl(url));
     return () => sub.remove();
   }, []);

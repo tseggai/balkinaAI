@@ -7,6 +7,7 @@ import { ImageUpload } from '@/components/image-upload';
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const INTERVAL_OPTIONS = ['hour', 'day', 'week', 'month'];
+const CURRENCY_OPTIONS = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'CHF', 'RSD'];
 
 const TIMEZONE_OPTIONS = [
   'Pacific/Midway', 'Pacific/Honolulu', 'America/Anchorage', 'America/Los_Angeles',
@@ -44,6 +45,7 @@ interface Location {
   latitude: number | null;
   longitude: number | null;
   timezone: string;
+  currency: string;
   phone: string | null;
   description: string | null;
   image_url: string | null;
@@ -86,6 +88,7 @@ export default function LocationsPage() {
   const [postalCode, setPostalCode] = useState('');
   const [country, setCountry] = useState('');
   const [timezone, setTimezone] = useState('');
+  const [currency, setCurrency] = useState('USD');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [bookingLimitEnabled, setBookingLimitEnabled] = useState(false);
@@ -211,6 +214,7 @@ export default function LocationsPage() {
     setPostalCode('');
     setCountry('');
     setTimezone('');
+    setCurrency('USD');
     setLat(null);
     setLng(null);
     setPhone('');
@@ -236,6 +240,7 @@ export default function LocationsPage() {
     setPostalCode(loc.postal_code ?? '');
     setCountry(loc.country ?? '');
     setTimezone(loc.timezone ?? '');
+    setCurrency((loc as unknown as { currency?: string }).currency ?? 'USD');
     setLat(loc.latitude);
     setLng(loc.longitude);
     setPhone(loc.phone ?? '');
@@ -255,6 +260,7 @@ export default function LocationsPage() {
       postalCode: loc.postal_code ?? '',
       country: loc.country ?? '',
       timezone: loc.timezone ?? '',
+      currency: (loc as unknown as { currency?: string }).currency ?? 'USD',
       lat: loc.latitude,
       lng: loc.longitude,
       phone: loc.phone ?? '',
@@ -312,6 +318,7 @@ export default function LocationsPage() {
       postal_code: postalCode || null,
       country: country || null,
       timezone: timezone || 'UTC',
+      currency,
       latitude: lat ?? null,
       longitude: lng ?? null,
       phone: phone || null,
@@ -356,7 +363,7 @@ export default function LocationsPage() {
     }
     initialFormValues.current = {
       name, address, streetAddress, addressLine2, city, state, postalCode, country,
-      timezone, lat, lng, phone, description, imageUrl,
+      timezone, currency, lat, lng, phone, description, imageUrl,
       bookingLimitEnabled, bookingLimitCapacity, bookingLimitInterval,
     };
   }
@@ -364,7 +371,7 @@ export default function LocationsPage() {
   // Dirty-state tracking
   const currentLocationValues = {
     name, address, streetAddress, addressLine2, city, state, postalCode, country,
-    timezone, lat, lng, phone, description, imageUrl,
+    timezone, currency, lat, lng, phone, description, imageUrl,
     bookingLimitEnabled, bookingLimitCapacity, bookingLimitInterval,
   };
   const isDirty = galleryChanged || JSON.stringify(currentLocationValues) !== JSON.stringify(initialFormValues.current);
@@ -684,6 +691,34 @@ export default function LocationsPage() {
                     <option value="">Select timezone</option>
                     {TIMEZONE_OPTIONS.map((tz) => (
                       <option key={tz} value={tz}>{tz}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Currency */}
+              <div>
+                {isEdit ? (
+                  <div>
+                    <span className="text-xs text-gray-400">Currency</span>
+                    <select
+                      value={currency}
+                      onChange={(e) => setCurrency(e.target.value)}
+                      className={editInputClass}
+                    >
+                      {CURRENCY_OPTIONS.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className={addInputClass}
+                  >
+                    {CURRENCY_OPTIONS.map((c) => (
+                      <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
                 )}

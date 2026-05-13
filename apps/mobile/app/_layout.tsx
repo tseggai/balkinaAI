@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, Linking } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { SafeStripeProvider } from '@/lib/stripe';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured, getAuthenticatedRole } from '@/lib/supabase';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { parseTenantFromUrl, setPendingDeepLinkTenant } from '@/lib/deepLink';
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 
@@ -13,6 +14,13 @@ function RootLayoutContent() {
   const [initialized, setInitialized] = useState(false);
   const segments = useSegments();
   const router = useRouter();
+
+  useEffect(() => {
+    Linking.getInitialURL().then((url) => {
+      const tenantId = parseTenantFromUrl(url);
+      if (tenantId) setPendingDeepLinkTenant(tenantId);
+    });
+  }, []);
 
   useEffect(() => {
     if (!supabaseConfigured) {
