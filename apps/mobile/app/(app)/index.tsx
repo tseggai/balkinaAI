@@ -29,7 +29,7 @@ import * as Location from 'expo-location';
 import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
-import { consumePendingDeepLinkTenant } from '@/lib/deepLink';
+import { consumePendingDeepLinkTenant, parseTenantFromUrl } from '@/lib/deepLink';
 import { formatPrice, currencySymbol } from '@/lib/currency';
 import {
   getDateButtons,
@@ -1402,11 +1402,16 @@ export default function ChatScreen() {
     lastDisplayedServices.current = [];
   }, []);
 
-  // Handle deep link: balkina://book/{tenantId}
+  // Handle deep link: balkina://?tenant=UUID
   useEffect(() => {
-    const tenantId = consumePendingDeepLinkTenant();
-    if (!tenantId) return;
+    let cancelled = false;
     (async () => {
+      let tenantId = consumePendingDeepLinkTenant();
+      if (!tenantId) {
+        const url = await Linking.getInitialURL();
+        tenantId = parseTenantFromUrl(url);
+      }
+      if (!tenantId || cancelled) return;
       setIsLoading(true);
       try {
         const res = await fetch(`${API_BASE}/api/booking/businesses`, {
@@ -1442,6 +1447,7 @@ export default function ChatScreen() {
       } catch { /* ignore */ }
       setIsLoading(false);
     })();
+    return () => { cancelled = true; };
   }, [addAssistantMessage]);
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);

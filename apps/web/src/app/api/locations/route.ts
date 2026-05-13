@@ -57,6 +57,7 @@ export async function POST(request: Request) {
       latitude,
       longitude,
       timezone: body.timezone ?? 'UTC',
+      currency: body.currency ?? 'USD',
       phone: body.phone ?? null,
       description: body.description ?? null,
       image_url: body.image_url ?? null,
