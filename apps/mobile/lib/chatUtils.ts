@@ -78,6 +78,7 @@ export interface SummaryCardData {
   total: number;
   deposit_required?: number;
   points_to_earn: number;
+  currency?: string;
 }
 
 export interface ConfirmedCardData {

@@ -9,7 +9,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await ctx.admin
     .from('tenant_locations')
-    .select('id, name, address, street_address, city, state, country, postal_code, latitude, longitude, timezone, phone, description, image_url')
+    .select('id, name, address, street_address, city, state, country, postal_code, latitude, longitude, timezone, currency, phone, description, image_url')
     .eq('tenant_id', ctx.tenantId)
     .order('name');
 
@@ -55,6 +55,7 @@ export async function POST(request: Request) {
       latitude: body.latitude || null,
       longitude: body.longitude || null,
       timezone: body.timezone || 'Europe/Podgorica',
+      currency: body.currency || 'USD',
       phone: body.phone || null,
       description: body.description || null,
     } as never)
@@ -72,7 +73,7 @@ export async function PATCH(request: Request) {
   const body = await request.json();
   if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400, headers: CORS_HEADERS });
 
-  const allowed = ['name', 'address', 'street_address', 'city', 'state', 'country', 'postal_code', 'latitude', 'longitude', 'timezone', 'phone', 'description', 'image_url'];
+  const allowed = ['name', 'address', 'street_address', 'city', 'state', 'country', 'postal_code', 'latitude', 'longitude', 'timezone', 'currency', 'phone', 'description', 'image_url'];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];

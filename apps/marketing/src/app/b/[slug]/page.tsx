@@ -31,6 +31,7 @@ interface ServiceData {
 interface LocationData {
   name: string;
   address: string | null;
+  currency?: string;
 }
 
 interface CategoryData {
@@ -53,7 +54,7 @@ async function getTenantBySlug(slug: string) {
 
   const [{ data: services }, { data: locations }, { data: catLinks }, { data: gallery }] = await Promise.all([
     supabase.from('services').select('id, name, price, duration_minutes, image_url, pricing_type').eq('tenant_id', t.id).eq('visibility', 'public').order('name'),
-    supabase.from('tenant_locations').select('name, address').eq('tenant_id', t.id),
+    supabase.from('tenant_locations').select('name, address, currency').eq('tenant_id', t.id),
     supabase.from('tenant_category_links').select('category_id, categories(name)').eq('tenant_id', t.id),
     supabase.from('location_gallery').select('image_url').eq('tenant_id', t.id).order('sort_order').limit(6),
   ]);
@@ -67,6 +68,7 @@ async function getTenantBySlug(slug: string) {
     services: (services ?? []) as ServiceData[],
     locations: (locations ?? []) as LocationData[],
     categories,
+    currency: ((locations ?? [])[0] as LocationData | undefined)?.currency ?? 'USD',
     gallery: ((gallery ?? []) as { image_url: string }[]).map((g) => g.image_url),
   };
 }
@@ -99,9 +101,12 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-function formatPrice(price: number, pricingType: string | null) {
+const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', CAD: 'CA$', AUD: 'A$', CHF: 'CHF', JPY: '¥', RSD: 'RSD' };
+
+function formatPrice(price: number, pricingType: string | null, currency?: string) {
+  const sym = CURRENCY_SYMBOLS[currency ?? 'USD'] ?? '$';
   const suffix = pricingType === 'per_day' ? '/day' : pricingType === 'per_week' ? '/week' : '';
-  return `$${price.toFixed(price % 1 === 0 ? 0 : 2)}${suffix}`;
+  return `${sym}${price.toFixed(price % 1 === 0 ? 0 : 2)}${suffix}`;
 }
 
 function formatDuration(minutes: number, pricingType: string | null) {
@@ -121,7 +126,7 @@ export default async function TenantPage({ params }: { params: Promise<{ slug: s
 
   if (!data) notFound();
 
-  const { tenant, services, locations, categories, gallery } = data;
+  const { tenant, services, locations, categories, currency, gallery } = data;
   const deepLink = `balkina://?tenant=${tenant.id}`;
   const appStoreUrl = 'https://apps.apple.com/app/balkina-ai/id6742752682';
 
@@ -183,7 +188,7 @@ export default async function TenantPage({ params }: { params: Promise<{ slug: s
                   <p className="text-sm font-medium text-gray-900 truncate">{svc.name}</p>
                   <p className="text-xs text-gray-500">{formatDuration(svc.duration_minutes, svc.pricing_type)}</p>
                 </div>
-                <p className="text-sm font-semibold text-brand-600">{formatPrice(svc.price, svc.pricing_type)}</p>
+                <p className="text-sm font-semibold text-brand-600">{formatPrice(svc.price, svc.pricing_type, currency)}</p>
               </div>
             ))}
           </div>
