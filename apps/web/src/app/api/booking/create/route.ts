@@ -165,9 +165,9 @@ export async function POST(request: Request) {
       // 5. Location (includes timezone, address, coordinates)
       // Use the specific location from the booking flow if provided, otherwise first location
       requestedLocationId
-        ? supabase.from('tenant_locations').select('id, address, latitude, longitude, timezone')
+        ? supabase.from('tenant_locations').select('id, address, latitude, longitude, timezone, currency')
             .eq('id', requestedLocationId).limit(1)
-        : supabase.from('tenant_locations').select('id, address, latitude, longitude, timezone')
+        : supabase.from('tenant_locations').select('id, address, latitude, longitude, timezone, currency')
             .eq('tenant_id', tenantId).limit(1),
 
       // 6. Staff — prefer service_staff assignment over random tenant staff
@@ -223,7 +223,7 @@ export async function POST(request: Request) {
     const customerId = customerResult.id;
 
     // Unpack location
-    const loc = (locationResult.data as { id: string; address: string; latitude: number | null; longitude: number | null; timezone: string }[] | null)?.[0];
+    const loc = (locationResult.data as { id: string; address: string; latitude: number | null; longitude: number | null; timezone: string; currency?: string }[] | null)?.[0];
     const locationId = loc?.id ?? null;
     const tz = loc?.timezone || 'America/Los_Angeles';
 
@@ -368,7 +368,7 @@ export async function POST(request: Request) {
 
         const paymentIntent = await stripeClient.paymentIntents.create({
           amount: depositAmountCents,
-          currency: 'usd',
+          currency: (loc?.currency ?? 'USD').toLowerCase(),
           automatic_payment_methods: { enabled: true },
           transfer_data: { destination: tenantStripeAccountId },
           application_fee_amount: platformFeeCents,

@@ -154,12 +154,12 @@ export async function POST(request: Request) {
       locationId
         ? supabase
             .from('tenant_locations')
-            .select('timezone, address')
+            .select('timezone, address, currency')
             .eq('id', locationId)
             .single()
         : supabase
             .from('tenant_locations')
-            .select('timezone, address')
+            .select('timezone, address, currency')
             .eq('tenant_id', tenantId)
             .limit(1)
             .single(),
@@ -218,7 +218,7 @@ export async function POST(request: Request) {
       }, { headers: CORS_HEADERS });
     }
 
-    const locationData = timezoneResult.data as { timezone: string; address: string | null } | null;
+    const locationData = timezoneResult.data as { timezone: string; address: string | null; currency: string | null } | null;
     const timezone = locationData?.timezone || 'UTC';
     const address = locationData?.address || null;
     const staffIds = eligibleStaff.map((s) => s.id);
@@ -504,6 +504,7 @@ export async function POST(request: Request) {
       staff: staffWithSlots,
       anyone_slots: anyoneSlots,
       address,
+      currency: locationData?.currency ?? 'USD',
       customer_appointments: customerApptResult.length > 0 ? customerApptResult : undefined,
     }, { headers: CORS_HEADERS });
   } catch (err) {

@@ -31,10 +31,11 @@ export async function POST(request: Request) {
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
       .select(`
-        id, customer_id, tenant_id, service_id, total_price,
+        id, customer_id, tenant_id, service_id, total_price, location_id,
         deposit_paid, deposit_amount_paid, stripe_payment_intent_id,
         services(name, deposit_enabled, deposit_type, deposit_amount, price),
-        tenants(name, stripe_account_id, payments_enabled)
+        tenants(name, stripe_account_id, payments_enabled),
+        tenant_locations(currency)
       `)
       .eq('id', appointmentId)
       .single();
@@ -53,12 +54,15 @@ export async function POST(request: Request) {
       stripe_payment_intent_id: string | null;
       services: { name: string; deposit_enabled: boolean; deposit_type: string | null; deposit_amount: number | null; price: number }[] | { name: string; deposit_enabled: boolean; deposit_type: string | null; deposit_amount: number | null; price: number } | null;
       tenants: { name: string; stripe_account_id: string | null; payments_enabled: boolean }[] | { name: string; stripe_account_id: string | null; payments_enabled: boolean } | null;
+      tenant_locations: { currency: string } | { currency: string }[] | null;
     };
     const appt = {
       ...raw,
       services: Array.isArray(raw.services) ? raw.services[0] ?? null : raw.services,
       tenants: Array.isArray(raw.tenants) ? raw.tenants[0] ?? null : raw.tenants,
+      tenant_locations: Array.isArray(raw.tenant_locations) ? raw.tenant_locations[0] ?? null : raw.tenant_locations,
     };
+    const locationCurrency = (appt.tenant_locations?.currency ?? 'USD').toLowerCase();
 
     if (appt.deposit_paid) {
       return NextResponse.json({ error: 'Deposit already paid' }, { status: 400 });
@@ -97,7 +101,7 @@ export async function POST(request: Request) {
 
     const paymentIntent = await getStripe().paymentIntents.create({
       amount: depositAmountCents,
-      currency: 'usd',
+      currency: locationCurrency,
       automatic_payment_methods: { enabled: true },
       transfer_data: {
         destination: appt.tenants.stripe_account_id,

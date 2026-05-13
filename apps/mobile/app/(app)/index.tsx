@@ -30,6 +30,7 @@ import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
 import { consumePendingDeepLinkTenant } from '@/lib/deepLink';
+import { formatPrice, currencySymbol } from '@/lib/currency';
 import {
   getDateButtons,
   getNextWeekDays,
@@ -814,30 +815,30 @@ const RichSummaryCard = React.memo(function RichSummaryCard({ data, onButtonPres
 
       <View style={richCardStyles.summaryRow}>
         <Text style={richCardStyles.summaryRowLabel}>Subtotal</Text>
-        <Text style={richCardStyles.summaryRowValue}>${data.subtotal.toFixed(2)}</Text>
+        <Text style={richCardStyles.summaryRowValue}>{formatPrice(data.subtotal, data.currency)}</Text>
       </View>
       {data.extras_total > 0 ? (
         <View style={richCardStyles.summaryRow}>
           <Text style={richCardStyles.summaryRowLabel}>Extras</Text>
-          <Text style={richCardStyles.summaryRowValue}>+${data.extras_total.toFixed(2)}</Text>
+          <Text style={richCardStyles.summaryRowValue}>+{formatPrice(data.extras_total, data.currency)}</Text>
         </View>
       ) : null}
       {data.package_discount > 0 ? (
         <View style={richCardStyles.summaryRow}>
           <Text style={richCardStyles.summaryRowLabel}>Package discount</Text>
-          <Text style={[richCardStyles.summaryRowValue, { color: '#16a34a' }]}>-${data.package_discount.toFixed(2)}</Text>
+          <Text style={[richCardStyles.summaryRowValue, { color: '#16a34a' }]}>-{formatPrice(data.package_discount, data.currency)}</Text>
         </View>
       ) : null}
       {data.coupon_discount > 0 ? (
         <View style={richCardStyles.summaryRow}>
           <Text style={richCardStyles.summaryRowLabel}>Coupon</Text>
-          <Text style={[richCardStyles.summaryRowValue, { color: '#16a34a' }]}>-${data.coupon_discount.toFixed(2)}</Text>
+          <Text style={[richCardStyles.summaryRowValue, { color: '#16a34a' }]}>-{formatPrice(data.coupon_discount, data.currency)}</Text>
         </View>
       ) : null}
       {data.loyalty_discount > 0 ? (
         <View style={richCardStyles.summaryRow}>
           <Text style={richCardStyles.summaryRowLabel}>Loyalty</Text>
-          <Text style={[richCardStyles.summaryRowValue, { color: '#16a34a' }]}>-${data.loyalty_discount.toFixed(2)}</Text>
+          <Text style={[richCardStyles.summaryRowValue, { color: '#16a34a' }]}>-{formatPrice(data.loyalty_discount, data.currency)}</Text>
         </View>
       ) : null}
 
@@ -845,7 +846,7 @@ const RichSummaryCard = React.memo(function RichSummaryCard({ data, onButtonPres
 
       <View style={richCardStyles.summaryRow}>
         <Text style={richCardStyles.summaryTotal}>Total</Text>
-        <Text style={richCardStyles.summaryTotal}>${data.total.toFixed(2)}</Text>
+        <Text style={richCardStyles.summaryTotal}>{formatPrice(data.total, data.currency)}</Text>
       </View>
       {data.deposit_required != null && data.deposit_required > 0 ? (
         <Text style={richCardStyles.summaryDeposit}>Deposit required: ${data.deposit_required.toFixed(2)}</Text>
@@ -1616,6 +1617,7 @@ export default function ChatScreen() {
         ...prev,
         ...(data.address ? { address: data.address } : {}),
         staffSelectionEnabled: data.staff_selection_enabled ?? true,
+        currency: data.currency ?? 'USD',
       }));
 
       const staffSelEnabled = data.staff_selection_enabled ?? true;
@@ -1748,6 +1750,7 @@ export default function ChatScreen() {
           : state.depositAmount)
         : undefined,
       points_to_earn: 0,
+      currency: state.currency,
     };
     addAssistantMessage(`Here's your booking summary:\n\n[[CARD:${JSON.stringify(card)}]]`);
   }, [addAssistantMessage]);

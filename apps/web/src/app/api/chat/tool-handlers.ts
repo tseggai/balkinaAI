@@ -1557,11 +1557,11 @@ export async function handleBookAppointment(
     // 5. Location (+ timezone for time parsing and response formatting)
     (async () => {
       if (locationId) {
-        const { data } = await supabase.from('tenant_locations').select('id, address, timezone').eq('id', locationId).single();
+        const { data } = await supabase.from('tenant_locations').select('id, address, timezone, currency').eq('id', locationId).single();
         const loc = data as { id: string; address: string; timezone: string } | null;
         return { id: loc?.id ?? locationId, address: loc?.address ?? null, timezone: loc?.timezone ?? 'UTC' };
       }
-      const { data } = await supabase.from('tenant_locations').select('id, address, timezone').eq('tenant_id', tenantId).limit(1);
+      const { data } = await supabase.from('tenant_locations').select('id, address, timezone, currency').eq('tenant_id', tenantId).limit(1);
       const loc = (data as { id: string; address: string; timezone: string }[] | null)?.[0];
       return { id: loc?.id ?? null, address: loc?.address ?? null, timezone: loc?.timezone ?? 'UTC' };
     })(),
@@ -1601,6 +1601,7 @@ export async function handleBookAppointment(
   // Unpack location & timezone
   const finalLocationId = locationResult.id;
   const bookingTimezone = locationResult.timezone;
+  const bookingCurrency = ((locationResult as { currency?: string }).currency ?? 'USD').toLowerCase();
   const locationAddress = locationResult.address;
 
   // Unpack staff
@@ -1676,7 +1677,7 @@ export async function handleBookAppointment(
 
       const paymentIntent = await stripeClient.paymentIntents.create({
         amount: depositAmountCents,
-        currency: 'usd',
+        currency: bookingCurrency,
         automatic_payment_methods: { enabled: true },
         transfer_data: { destination: tenantStripeAccountId },
         application_fee_amount: platformFeeCents,

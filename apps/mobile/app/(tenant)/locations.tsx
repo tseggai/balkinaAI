@@ -15,6 +15,7 @@ interface Location {
   country: string | null;
   phone: string | null;
   timezone: string;
+  currency: string;
   image_url: string | null;
   gallery_count: number;
 }
@@ -36,6 +37,7 @@ export default function TenantLocations() {
   const [formLat, setFormLat] = useState<number | null>(null);
   const [formLng, setFormLng] = useState<number | null>(null);
   const [formTimezone, setFormTimezone] = useState('');
+  const [formCurrency, setFormCurrency] = useState('USD');
   const [geocoding, setGeocoding] = useState(false);
   const [locationImageUrl, setLocationImageUrl] = useState<string | null>(null);
   const [galleryPhotos, setGalleryPhotos] = useState<{ id: string; image_url: string }[]>([]);
@@ -66,14 +68,14 @@ export default function TenantLocations() {
   const openAdd = () => {
     setEditing(null);
     setFormName(''); setFormAddress(''); setFormCity(''); setFormState(''); setFormCountry(''); setFormPhone('');
-    setFormLat(null); setFormLng(null); setFormTimezone('');
+    setFormLat(null); setFormLng(null); setFormTimezone(''); setFormCurrency('USD');
     setLocationImageUrl(null); setGalleryPhotos([]);
     setModalVisible(true);
   };
 
   const openEdit = (loc: Location) => {
     setEditing(loc);
-    setFormName(loc.name); setFormAddress(loc.address); setFormCity(loc.city ?? ''); setFormState(loc.state ?? ''); setFormCountry(loc.country ?? ''); setFormPhone(loc.phone ?? '');
+    setFormName(loc.name); setFormAddress(loc.address); setFormCity(loc.city ?? ''); setFormState(loc.state ?? ''); setFormCountry(loc.country ?? ''); setFormPhone(loc.phone ?? ''); setFormCurrency(loc.currency ?? 'USD');
     setLocationImageUrl(loc.image_url);
     setGalleryPhotos([]);
     fetchGallery(loc.id);
@@ -188,6 +190,7 @@ export default function TenantLocations() {
         country: formCountry.trim() || null, phone: formPhone.trim() || null,
         latitude: formLat, longitude: formLng,
         timezone: formTimezone || null,
+        currency: formCurrency,
       };
       if (editing) body.id = editing.id;
 
@@ -285,6 +288,16 @@ export default function TenantLocations() {
             </View>
             <TextInput style={styles.input} value={formCountry} onChangeText={setFormCountry} placeholder="Country" placeholderTextColor="#9ca3af" />
             <TextInput style={styles.input} value={formPhone} onChangeText={setFormPhone} placeholder="Phone number" placeholderTextColor="#9ca3af" keyboardType="phone-pad" />
+
+            {/* Currency */}
+            <Text style={styles.sectionLabel}>Currency</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              {(['USD', 'EUR', 'GBP', 'CHF', 'RSD'] as const).map((c) => (
+                <TouchableOpacity key={c} onPress={() => setFormCurrency(c)} style={{ flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: formCurrency === c ? '#6B7FC4' : '#f3f4f6', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: formCurrency === c ? '#fff' : '#6b7280' }}>{c}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             {/* Location Photo */}
             <Text style={styles.sectionLabel}>Location Photo</Text>

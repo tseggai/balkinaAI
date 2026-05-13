@@ -23,6 +23,7 @@ export interface BookingState {
   extrasTotal: number;
   packagePrice: number;
   address: string | null;
+  currency: string;
 }
 
 export const INITIAL_BOOKING_STATE: BookingState = {
@@ -48,4 +49,5 @@ export const INITIAL_BOOKING_STATE: BookingState = {
   extrasTotal: 0,
   packagePrice: 0,
   address: null,
+  currency: 'USD',
 };
