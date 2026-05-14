@@ -12,6 +12,7 @@ const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ??
 function RootLayoutContent() {
   const [session, setSession] = useState<Session | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [deepLinkReady, setDeepLinkReady] = useState(false);
   const segments = useSegments();
   const router = useRouter();
 
@@ -19,6 +20,8 @@ function RootLayoutContent() {
     Linking.getInitialURL().then((url) => {
       const tenantId = parseTenantFromUrl(url);
       if (tenantId) setPendingDeepLinkTenant(tenantId);
+    }).finally(() => {
+      setDeepLinkReady(true);
     });
   }, []);
 
@@ -45,7 +48,7 @@ function RootLayoutContent() {
   }, []);
 
   useEffect(() => {
-    if (!initialized) return;
+    if (!initialized || !deepLinkReady) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inAppGroup = segments[0] === '(app)';
@@ -69,7 +72,7 @@ function RootLayoutContent() {
         router.replace('/(app)');
       });
     }
-  }, [session, initialized, segments, router]);
+  }, [session, initialized, deepLinkReady, segments, router]);
 
   if (!initialized) {
     return (
