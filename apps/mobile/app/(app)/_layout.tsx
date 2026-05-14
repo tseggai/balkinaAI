@@ -8,7 +8,6 @@ import { registerPushToken } from '@/lib/registerPushToken';
 import { setPendingDeepLinkTenant, parseTenantFromUrl } from '@/lib/deepLink';
 
 function handleDeepLinkUrl(url: string | null) {
-  console.log('[app-layout] handleDeepLinkUrl:', url);
   const tenantId = parseTenantFromUrl(url);
   if (tenantId) setPendingDeepLinkTenant(tenantId);
 }

@@ -17,15 +17,10 @@ function RootLayoutContent() {
   const router = useRouter();
 
   useEffect(() => {
-    console.log('[root-layout] calling Linking.getInitialURL()...');
     Linking.getInitialURL().then((url) => {
-      console.log('[root-layout] getInitialURL resolved:', url);
       const tenantId = parseTenantFromUrl(url);
       if (tenantId) setPendingDeepLinkTenant(tenantId);
-    }).catch((err) => {
-      console.log('[root-layout] getInitialURL error:', err);
     }).finally(() => {
-      console.log('[root-layout] deepLinkReady = true');
       setDeepLinkReady(true);
     });
   }, []);
@@ -53,7 +48,6 @@ function RootLayoutContent() {
   }, []);
 
   useEffect(() => {
-    console.log('[root-layout] routing check — initialized:', initialized, 'deepLinkReady:', deepLinkReady, 'session:', !!session, 'segments:', segments);
     if (!initialized || !deepLinkReady) return;
 
     const inAuthGroup = segments[0] === '(auth)';
@@ -61,26 +55,20 @@ function RootLayoutContent() {
     const inTenantGroup = segments[0] === '(tenant)';
 
     if (!supabaseConfigured && !inAuthGroup) {
-      console.log('[root-layout] routing to auth (no supabase config)');
       router.replace('/(auth)/email-login');
       return;
     }
 
     if (!session && !inAuthGroup) {
-      console.log('[root-layout] routing to auth (no session)');
       router.replace('/(auth)/email-login');
     } else if (session && !inAppGroup && !inTenantGroup) {
-      console.log('[root-layout] routing to app/tenant...');
       getAuthenticatedRole().then(({ role }) => {
         if (role === 'tenant' || role === 'staff') {
-          console.log('[root-layout] routing to /(tenant)/dashboard');
           router.replace('/(tenant)/dashboard');
         } else {
-          console.log('[root-layout] routing to /(app)');
           router.replace('/(app)');
         }
       }).catch(() => {
-        console.log('[root-layout] role check failed, routing to /(app)');
         router.replace('/(app)');
       });
     }

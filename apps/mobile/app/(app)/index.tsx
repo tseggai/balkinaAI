@@ -1518,17 +1518,14 @@ export default function ChatScreen() {
 
   // Handle deep link: balkina://?tenant=UUID
   const loadDeepLinkTenant = useCallback(async (tenantId: string) => {
-    console.log('[chat] loadDeepLinkTenant called with:', tenantId);
     setIsLoading(true);
     try {
-      console.log('[chat] fetching business for tenant:', tenantId);
       const res = await fetch(`${API_BASE}/api/booking/businesses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenantId }),
       });
       const data = await res.json();
-      console.log('[chat] business API response:', res.status, 'businesses:', data?.businesses?.length ?? 0);
       const biz = data?.businesses?.[0];
       if (biz) {
         const svcs = biz.all_services ?? [];
@@ -1553,25 +1550,17 @@ export default function ChatScreen() {
         };
         addAssistantMessage(`Here's ${biz.name}:\n\n[[CARD:${JSON.stringify(card)}]]`);
       }
-    } catch (err) { console.log('[chat] loadDeepLinkTenant error:', err); }
+    } catch { /* ignore */ }
     setIsLoading(false);
   }, [addAssistantMessage]);
 
   useEffect(() => {
-    console.log('[chat] mount — checking consumePendingDeepLinkTenant...');
     const tenantId = consumePendingDeepLinkTenant();
-    if (tenantId) {
-      console.log('[chat] found pending tenant on mount:', tenantId);
-      loadDeepLinkTenant(tenantId);
-    } else {
-      console.log('[chat] no pending tenant on mount');
-    }
+    if (tenantId) loadDeepLinkTenant(tenantId);
   }, [loadDeepLinkTenant]);
 
   useEffect(() => {
-    console.log('[chat] setting up URL event listener for warm start');
     const sub = Linking.addEventListener('url', ({ url }) => {
-      console.log('[chat] URL event received:', url);
       const tenantId = parseTenantFromUrl(url);
       if (tenantId) loadDeepLinkTenant(tenantId);
     });
