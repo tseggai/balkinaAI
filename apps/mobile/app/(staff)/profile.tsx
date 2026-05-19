@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as Clipboard from 'expo-clipboard';
 import { supabase, getAuthenticatedRole } from '@/lib/supabase';
 import type { StaffInfo } from '@/lib/supabase';
 
@@ -261,6 +262,14 @@ export default function StaffProfile() {
           </View>
         </View>
 
+        {/* Calendar Sync */}
+        {staffInfo && (
+          <>
+            <Text style={styles.sectionTitle}>Calendar Sync</Text>
+            <CalendarSyncSection staffId={staffInfo.id} getToken={getToken} />
+          </>
+        )}
+
         {/* Switch to customer */}
         <View style={[styles.card, { marginTop: 24 }]}>
           <TouchableOpacity style={styles.cardRow} onPress={() => router.replace('/(app)')} activeOpacity={0.6}>
@@ -302,6 +311,427 @@ export default function StaffProfile() {
     </View>
   );
 }
+
+// ── Calendar Sync Section ───────────────────────────────────────────────────
+
+interface ExternalCalendar {
+  id: string;
+  name: string;
+  ical_url: string;
+  last_synced_at: string | null;
+  last_error: string | null;
+  is_active: boolean;
+}
+
+function CalendarSyncSection({
+  staffId,
+  getToken,
+}: {
+  staffId: string;
+  getToken: () => Promise<string | null>;
+}) {
+  const [feedToken, setFeedToken] = useState('');
+  const [calendars, setCalendars] = useState<ExternalCalendar[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [addName, setAddName] = useState('');
+  const [addUrl, setAddUrl] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const token = await getToken();
+    if (!token) { setLoading(false); return; }
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/tenant/staff-calendars?staffId=${staffId}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const json = await res.json();
+      if (json.data) {
+        setFeedToken(json.data.feedToken ?? '');
+        setCalendars(json.data.calendars ?? []);
+      }
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [staffId, getToken]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const feedUrl = feedToken ? `${API_BASE}/api/calendar/${feedToken}` : '';
+
+  const copyFeedUrl = async () => {
+    if (!feedUrl) return;
+    await Clipboard.setStringAsync(feedUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleAdd = async () => {
+    if (!addUrl.trim()) return;
+    setAdding(true);
+    setError('');
+    const token = await getToken();
+    if (!token) { setAdding(false); return; }
+    try {
+      const res = await fetch(`${API_BASE}/api/tenant/staff-calendars`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          staffId,
+          name: addName.trim() || 'External Calendar',
+          icalUrl: addUrl.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? 'Failed to add calendar');
+      } else {
+        setAddName('');
+        setAddUrl('');
+        setShowAddForm(false);
+        fetchData();
+      }
+    } catch {
+      setError('Network error');
+    }
+    setAdding(false);
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    Alert.alert('Remove Calendar', `Remove "${name}" from synced calendars?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          const token = await getToken();
+          if (!token) return;
+          try {
+            await fetch(`${API_BASE}/api/tenant/staff-calendars?id=${id}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            fetchData();
+          } catch { /* ignore */ }
+        },
+      },
+    ]);
+  };
+
+  if (loading) {
+    return (
+      <View style={calStyles.loadingContainer}>
+        <ActivityIndicator size="small" color="#6B7FC4" />
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      {/* Export Calendar */}
+      <View style={styles.card}>
+        <View style={[styles.cardRow, styles.cardRowBorder]}>
+          <View style={styles.cardRowLeft}>
+            <View style={[styles.iconCircle, { backgroundColor: '#DCFCE7' }]}>
+              <Ionicons name="share-outline" size={18} color="#16A34A" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardRowLabel}>Export Calendar</Text>
+              <Text style={styles.cardRowSub}>Copy this URL into Google Calendar, Outlook, or Apple Calendar</Text>
+            </View>
+          </View>
+        </View>
+        {feedUrl ? (
+          <View style={calStyles.feedRow}>
+            <Text style={calStyles.feedUrl} numberOfLines={1} ellipsizeMode="middle">
+              {feedUrl}
+            </Text>
+            <TouchableOpacity
+              style={calStyles.copyButton}
+              onPress={copyFeedUrl}
+              activeOpacity={0.6}
+            >
+              <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={16} color="#fff" />
+              <Text style={calStyles.copyButtonText}>{copied ? 'Copied' : 'Copy'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={calStyles.feedRow}>
+            <Text style={calStyles.noFeedText}>Feed URL will appear once calendar sync is enabled</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Import Calendars */}
+      <View style={[styles.card, { marginTop: 12 }]}>
+        <View style={[styles.cardRow, calendars.length > 0 || showAddForm ? styles.cardRowBorder : undefined]}>
+          <View style={styles.cardRowLeft}>
+            <View style={[styles.iconCircle, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="download-outline" size={18} color="#D97706" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardRowLabel}>Import Calendars</Text>
+              <Text style={styles.cardRowSub}>Busy times from external calendars will block bookings</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Existing calendars */}
+        {calendars.map((cal, idx) => (
+          <View
+            key={cal.id}
+            style={[
+              calStyles.calendarItem,
+              idx < calendars.length - 1 || showAddForm ? calStyles.calendarItemBorder : undefined,
+            ]}
+          >
+            <View style={calStyles.calendarInfo}>
+              <Text style={calStyles.calendarName}>{cal.name}</Text>
+              <Text style={calStyles.calendarUrl} numberOfLines={1} ellipsizeMode="middle">
+                {cal.ical_url}
+              </Text>
+              <View style={calStyles.syncStatusRow}>
+                <View
+                  style={[
+                    calStyles.syncDot,
+                    { backgroundColor: cal.last_error ? '#EF4444' : cal.last_synced_at ? '#22C55E' : '#9CA3AF' },
+                  ]}
+                />
+                <Text style={calStyles.syncStatusText}>
+                  {cal.last_error
+                    ? `Error: ${cal.last_error}`
+                    : cal.last_synced_at
+                      ? `Synced ${new Date(cal.last_synced_at).toLocaleDateString()}`
+                      : 'Not synced yet'}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={calStyles.deleteButton}
+              onPress={() => handleDelete(cal.id, cal.name)}
+              activeOpacity={0.6}
+            >
+              <Ionicons name="trash-outline" size={16} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        {/* Add Calendar form */}
+        {showAddForm ? (
+          <View style={calStyles.addForm}>
+            <TextInput
+              style={calStyles.addInput}
+              value={addName}
+              onChangeText={setAddName}
+              placeholder="Calendar name (optional)"
+              placeholderTextColor="#c9cdd4"
+              autoCapitalize="words"
+            />
+            <TextInput
+              style={calStyles.addInput}
+              value={addUrl}
+              onChangeText={(text) => { setAddUrl(text); setError(''); }}
+              placeholder="iCal URL (https://...)"
+              placeholderTextColor="#c9cdd4"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+            {error ? <Text style={calStyles.errorText}>{error}</Text> : null}
+            <View style={calStyles.addFormButtons}>
+              <TouchableOpacity
+                style={calStyles.cancelFormButton}
+                onPress={() => { setShowAddForm(false); setAddName(''); setAddUrl(''); setError(''); }}
+                activeOpacity={0.6}
+              >
+                <Text style={calStyles.cancelFormButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[calStyles.addSubmitButton, (!addUrl.trim() || adding) && calStyles.addSubmitDisabled]}
+                onPress={handleAdd}
+                disabled={!addUrl.trim() || adding}
+                activeOpacity={0.6}
+              >
+                {adding ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={calStyles.addSubmitButtonText}>Add Calendar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={calStyles.addButton}
+            onPress={() => setShowAddForm(true)}
+            activeOpacity={0.6}
+          >
+            <Ionicons name="add-circle-outline" size={18} color="#6B7FC4" />
+            <Text style={calStyles.addButtonText}>Add Calendar</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const calStyles = StyleSheet.create({
+  loadingContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  feedRow: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  feedUrl: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    color: '#6b7280',
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  noFeedText: {
+    fontSize: 13,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#6B7FC4',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  copyButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  calendarItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  calendarItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  calendarInfo: {
+    flex: 1,
+  },
+  calendarName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  calendarUrl: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 2,
+  },
+  syncStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 4,
+  },
+  syncDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  syncStatusText: {
+    fontSize: 11,
+    color: '#9ca3af',
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    backgroundColor: '#FFF5F5',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  addButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7FC4',
+  },
+  addForm: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  addInput: {
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#f9fafb',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#EF4444',
+  },
+  addFormButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 2,
+  },
+  cancelFormButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  cancelFormButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  addSubmitButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#6B7FC4',
+  },
+  addSubmitDisabled: {
+    opacity: 0.5,
+  },
+  addSubmitButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+});
 
 // ── Edit Staff Profile Modal ─────────────────────────────────────────────────
 

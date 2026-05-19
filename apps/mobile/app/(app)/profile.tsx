@@ -320,6 +320,19 @@ function SettingsModal({
   onClose: () => void;
   onDeleteAccount: () => void;
 }) {
+  const [dangerZoneExpanded, setDangerZoneExpanded] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setDangerZoneExpanded(false);
+      setDeleteConfirmText('');
+    }
+  }, [visible]);
+
+  const isDeleteEnabled = deleteConfirmText.trim().toUpperCase() === 'DELETE';
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.modalContainer}>
@@ -390,17 +403,68 @@ function SettingsModal({
             </TouchableOpacity>
           </View>
 
-          {/* Account Management */}
-          <Text style={styles.sectionTitle}>Account</Text>
+          {/* Danger Zone — collapsible */}
+          <Text style={styles.sectionTitle}>Danger Zone</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.cardRow} onPress={onDeleteAccount} activeOpacity={0.6}>
+            <TouchableOpacity
+              style={styles.cardRow}
+              onPress={() => setDangerZoneExpanded(!dangerZoneExpanded)}
+              activeOpacity={0.6}
+            >
               <View style={styles.cardRowLeft}>
-                <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2' }]}>
-                  <Ionicons name="trash-outline" size={18} color="#dc2626" />
+                <View style={[styles.iconCircle, { backgroundColor: '#FEF2F2' }]}>
+                  <Ionicons name="warning-outline" size={18} color="#dc2626" />
                 </View>
-                <Text style={[styles.cardRowLabel, { color: '#dc2626' }]}>Delete Account</Text>
+                <View>
+                  <Text style={[styles.cardRowLabel, { color: '#dc2626' }]}>Delete Account</Text>
+                  <Text style={styles.cardRowSub}>Permanently remove your account and data</Text>
+                </View>
               </View>
+              <Ionicons
+                name={dangerZoneExpanded ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color="#d1d5db"
+              />
             </TouchableOpacity>
+
+            {dangerZoneExpanded && (
+              <View style={styles.dangerZoneContent}>
+                <Text style={styles.dangerZoneWarning}>
+                  This action is irreversible. All your bookings, profile data, and preferences will be permanently deleted.
+                </Text>
+                <Text style={styles.dangerZonePrompt}>
+                  Type <Text style={styles.dangerZoneDeleteWord}>DELETE</Text> to confirm:
+                </Text>
+                <TextInput
+                  style={styles.dangerZoneInput}
+                  value={deleteConfirmText}
+                  onChangeText={setDeleteConfirmText}
+                  placeholder="Type DELETE here"
+                  placeholderTextColor="#d1d5db"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.dangerZoneButton,
+                    !isDeleteEnabled && styles.dangerZoneButtonDisabled,
+                  ]}
+                  onPress={onDeleteAccount}
+                  disabled={!isDeleteEnabled}
+                  activeOpacity={0.6}
+                >
+                  <Ionicons name="trash-outline" size={16} color={isDeleteEnabled ? '#fff' : '#f9a8a8'} />
+                  <Text
+                    style={[
+                      styles.dangerZoneButtonText,
+                      !isDeleteEnabled && styles.dangerZoneButtonTextDisabled,
+                    ]}
+                  >
+                    Delete My Account
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </ScrollView>
       </View>
@@ -717,4 +781,15 @@ const styles = StyleSheet.create({
   genderOptionSelected: { backgroundColor: '#EEF0FB' },
   genderOptionText: { fontSize: 15, color: '#374151' },
   genderOptionTextSelected: { color: '#6B7FC4', fontWeight: '600' },
+
+  // Danger Zone
+  dangerZoneContent: { paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#FEE2E2' },
+  dangerZoneWarning: { fontSize: 13, color: '#6b7280', lineHeight: 18, marginTop: 12, marginBottom: 12 },
+  dangerZonePrompt: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  dangerZoneDeleteWord: { color: '#dc2626', fontWeight: '700' },
+  dangerZoneInput: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#FCA5A5', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: '#111827', marginBottom: 12 },
+  dangerZoneButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#dc2626', borderRadius: 10, paddingVertical: 12 },
+  dangerZoneButtonDisabled: { backgroundColor: '#FEE2E2' },
+  dangerZoneButtonText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  dangerZoneButtonTextDisabled: { color: '#f9a8a8' },
 });
