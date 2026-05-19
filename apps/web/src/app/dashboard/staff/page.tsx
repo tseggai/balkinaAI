@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { ImageUpload } from '@/components/image-upload';
+import { CalendarSyncTab } from '@/components/calendar-sync-tab';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const INTERVAL_OPTIONS = ['hour', 'day', 'week', 'month'];
 
-type TabKey = 'details' | 'schedule' | 'special-days' | 'holidays' | 'booking-limiter';
+type TabKey = 'details' | 'schedule' | 'special-days' | 'holidays' | 'booking-limiter' | 'calendars';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'details', label: 'Details' },
@@ -16,6 +17,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'special-days', label: 'Special Days' },
   { key: 'holidays', label: 'Holidays' },
   { key: 'booking-limiter', label: 'Booking Limiter' },
+  { key: 'calendars', label: 'Calendar Sync' },
 ];
 
 // ── Interfaces ─────────────────────────────────────────────────────────────────
@@ -1337,6 +1339,8 @@ export default function StaffPage() {
         return renderHolidaysTab();
       case 'booking-limiter':
         return renderBookingLimiterTab();
+      case 'calendars':
+        return editing ? <CalendarSyncTab staffId={editing.id} /> : null;
     }
   }
 
