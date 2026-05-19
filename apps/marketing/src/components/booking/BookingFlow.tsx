@@ -108,6 +108,26 @@ export default function BookingFlow({ tenantId, tenantName, services, locations,
 
   return (
     <div className="mt-8">
+      {/* Location context — always visible when multiple locations */}
+      {hasMultipleLocations && step !== 'confirmed' && (
+        step === 'services' ? (
+          <LocationSelector
+            locations={locations}
+            selectedId={locationId}
+            onSelect={(id) => { setLocationId(id); setService(null); }}
+          />
+        ) : (
+          <div className="mb-4 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
+            <svg className="h-4 w-4 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0115 0z" />
+            </svg>
+            <span className="flex-1 text-sm font-medium text-gray-700">{selectedLocation?.name}</span>
+            <button onClick={() => { setStep('services'); setService(null); }} className="text-xs text-brand-600 hover:underline">Change</button>
+          </div>
+        )
+      )}
+
       {step !== 'services' && step !== 'confirmed' && (
         <button onClick={goBack} className="mb-4 flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
@@ -116,16 +136,7 @@ export default function BookingFlow({ tenantId, tenantName, services, locations,
       )}
 
       {step === 'services' && (
-        <>
-          {hasMultipleLocations && (
-            <LocationSelector
-              locations={locations}
-              selectedId={locationId}
-              onSelect={(id) => { setLocationId(id); setService(null); }}
-            />
-          )}
-          <ServiceList services={filteredServices} currency={locationCurrency} onSelect={selectService} />
-        </>
+        <ServiceList services={filteredServices} currency={locationCurrency} onSelect={selectService} />
       )}
       {step === 'datetime' && service && (
         <DateTimePicker

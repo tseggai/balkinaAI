@@ -49,23 +49,28 @@ export async function fetchStaffAvailability(params: {
   locationId?: string;
 }): Promise<AvailabilityResponse | { error: string }> {
   try {
-    const res = await fetch(`${API_BASE}/api/booking/staff-availability`, {
+    const url = `${API_BASE}/api/booking/staff-availability`;
+    const payload = {
+      tenantId: params.tenantId,
+      serviceId: params.serviceId,
+      date: params.date,
+      locationId: params.locationId,
+    };
+    console.log('[booking-api] POST', url, payload);
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tenantId: params.tenantId,
-        serviceId: params.serviceId,
-        date: params.date,
-        locationId: params.locationId,
-      }),
+      body: JSON.stringify(payload),
     });
+    const data = await res.json().catch(() => ({}));
+    console.log('[booking-api] response', res.status, data);
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      return { error: data.error || 'Failed to load availability' };
+      return { error: (data as { error?: string }).error || `API error ${res.status}` };
     }
-    return await res.json();
-  } catch {
-    return { error: 'Network error. Please try again.' };
+    return data as AvailabilityResponse;
+  } catch (err) {
+    console.error('[booking-api] fetch error', err);
+    return { error: `Network error: ${err instanceof Error ? err.message : 'unknown'}` };
   }
 }
 
