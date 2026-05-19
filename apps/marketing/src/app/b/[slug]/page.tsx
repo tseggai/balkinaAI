@@ -54,16 +54,24 @@ async function getTenantBySlug(slug: string) {
 
   const t = tenant as TenantData;
 
-  const [{ data: services }, { data: locations }, { data: catLinks }, { data: gallery }] = await Promise.all([
+  const [{ data: services }, { data: locations }, { data: catLinks }, { data: gallery }, { data: svcLocs }] = await Promise.all([
     supabase.from('services').select('id, name, price, duration_minutes, image_url, pricing_type').eq('tenant_id', t.id).eq('visibility', 'public').order('name'),
     supabase.from('tenant_locations').select('id, name, address, currency').eq('tenant_id', t.id),
     supabase.from('tenant_category_links').select('category_id, categories(name)').eq('tenant_id', t.id),
     supabase.from('location_gallery').select('image_url').eq('tenant_id', t.id).order('sort_order').limit(6),
+    supabase.from('service_locations').select('service_id, location_id').eq('tenant_id', t.id),
   ]);
 
   const categories = ((catLinks ?? []) as unknown as { category_id: string; categories: CategoryData | null }[])
     .map((cl) => cl.categories?.name)
     .filter(Boolean) as string[];
+
+  const serviceLocationMap: Record<string, string[]> = {};
+  for (const sl of (svcLocs ?? []) as { service_id: string; location_id: string }[]) {
+    const arr = serviceLocationMap[sl.service_id] ?? [];
+    arr.push(sl.location_id);
+    serviceLocationMap[sl.service_id] = arr;
+  }
 
   return {
     tenant: t,
@@ -72,6 +80,7 @@ async function getTenantBySlug(slug: string) {
     categories,
     currency: ((locations ?? [])[0] as LocationData | undefined)?.currency ?? 'USD',
     gallery: ((gallery ?? []) as { image_url: string }[]).map((g) => g.image_url),
+    serviceLocationMap,
   };
 }
 
@@ -109,7 +118,7 @@ export default async function TenantPage({ params }: { params: Promise<{ slug: s
 
   if (!data) notFound();
 
-  const { tenant, services, locations, categories, currency, gallery } = data;
+  const { tenant, services, locations, categories, currency, gallery, serviceLocationMap } = data;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
@@ -151,30 +160,10 @@ export default async function TenantPage({ params }: { params: Promise<{ slug: s
           services={services}
           locations={locations}
           currency={currency}
+          serviceLocationMap={serviceLocationMap}
         />
       ) : (
         <p className="mt-8 text-center text-sm text-gray-400">No services available at this time.</p>
-      )}
-
-      {/* Locations */}
-      {locations.length > 0 && (
-        <div className="mt-10">
-          <h2 className="text-lg font-semibold text-gray-900">Locations</h2>
-          <div className="mt-3 space-y-2">
-            {locations.map((loc) => (
-              <div key={loc.id} className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
-                <svg className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0115 0z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{loc.name}</p>
-                  {loc.address && <p className="text-xs text-gray-500">{loc.address}</p>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       )}
 
       {/* Footer */}

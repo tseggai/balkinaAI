@@ -36,6 +36,7 @@ interface Props {
   services: ServiceData[];
   locations: LocationData[];
   currency: string;
+  serviceLocationMap: Record<string, string[]>;
 }
 
 type Step = 'services' | 'datetime' | 'summary' | 'confirmed';
@@ -54,7 +55,7 @@ interface BookingResult {
   paymentUrl?: string;
 }
 
-export default function BookingFlow({ tenantId, tenantName, services, locations, currency }: Props) {
+export default function BookingFlow({ tenantId, tenantName, services, locations, currency, serviceLocationMap }: Props) {
   const [step, setStep] = useState<Step>('services');
   const [service, setService] = useState<ServiceData | null>(null);
   const [staffId, setStaffId] = useState<string | null>(null);
@@ -62,8 +63,19 @@ export default function BookingFlow({ tenantId, tenantName, services, locations,
   const [date, setDate] = useState('');
   const [timeSlot, setTimeSlot] = useState('');
   const [timeSlotIso, setTimeSlotIso] = useState('');
-  const [locationId] = useState(locations[0]?.id ?? '');
+  const [locationId, setLocationId] = useState(locations[0]?.id ?? '');
   const [result, setResult] = useState<BookingResult | null>(null);
+
+  const hasMultipleLocations = locations.length > 1;
+  const selectedLocation = locations.find((l) => l.id === locationId) ?? locations[0];
+  const locationCurrency = selectedLocation?.currency ?? currency;
+
+  const filteredServices = hasMultipleLocations
+    ? services.filter((s) => {
+        const locs = serviceLocationMap[s.id];
+        return !locs || locs.length === 0 || locs.includes(locationId);
+      })
+    : services;
 
   const selectService = (s: ServiceData) => {
     setService(s);
@@ -104,14 +116,23 @@ export default function BookingFlow({ tenantId, tenantName, services, locations,
       )}
 
       {step === 'services' && (
-        <ServiceList services={services} currency={currency} onSelect={selectService} />
+        <>
+          {hasMultipleLocations && (
+            <LocationSelector
+              locations={locations}
+              selectedId={locationId}
+              onSelect={(id) => { setLocationId(id); setService(null); }}
+            />
+          )}
+          <ServiceList services={filteredServices} currency={locationCurrency} onSelect={selectService} />
+        </>
       )}
       {step === 'datetime' && service && (
         <DateTimePicker
           tenantId={tenantId}
           service={service}
           locationId={locationId}
-          currency={currency}
+          currency={locationCurrency}
           date={date}
           onDateChange={setDate}
           onSelectTime={selectTime}
@@ -128,15 +149,56 @@ export default function BookingFlow({ tenantId, tenantName, services, locations,
           timeSlot={timeSlot}
           timeSlotIso={timeSlotIso}
           locationId={locationId}
-          currency={currency}
-          address={locations[0]?.address ?? ''}
+          currency={locationCurrency}
+          address={selectedLocation?.address ?? ''}
           onConfirmed={(r) => { setResult(r); setStep('confirmed'); }}
           onConflict={() => setStep('datetime')}
         />
       )}
       {step === 'confirmed' && result && (
-        <Confirmation result={result} currency={currency} onBookAnother={reset} />
+        <Confirmation result={result} currency={locationCurrency} onBookAnother={reset} />
       )}
+    </div>
+  );
+}
+
+// ─── Location Selector ─────────────────────────────────────────────────────────
+
+function LocationSelector({ locations, selectedId, onSelect }: {
+  locations: LocationData[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="mb-5">
+      <h2 className="text-lg font-semibold text-gray-900">Select a location</h2>
+      <div className="mt-3 space-y-2">
+        {locations.map((loc) => (
+          <button
+            key={loc.id}
+            onClick={() => onSelect(loc.id)}
+            className={`flex w-full items-start gap-3 rounded-xl border-2 px-4 py-3 text-left transition-colors ${
+              selectedId === loc.id
+                ? 'border-brand-500 bg-brand-50'
+                : 'border-gray-200 bg-white hover:border-gray-300'
+            }`}
+          >
+            <svg className={`mt-0.5 h-5 w-5 flex-shrink-0 ${selectedId === loc.id ? 'text-brand-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0115 0z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900">{loc.name}</p>
+              {loc.address && <p className="text-xs text-gray-500 truncate">{loc.address}</p>}
+            </div>
+            {selectedId === loc.id && (
+              <svg className="h-5 w-5 flex-shrink-0 text-brand-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+              </svg>
+            )}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
