@@ -228,7 +228,7 @@ export async function POST(request: Request) {
     const dayStartUtc = localTimeToUTC(date, '00:00', timezone).toISOString();
     const dayEndUtc = localTimeToUTC(date, '23:59', timezone).toISOString();
 
-    const [staffSpecialResult, holidayResult, existingApptsResult, customerApptResult] = await Promise.all([
+    const [staffSpecialResult, holidayResult, existingApptsResult, customerApptResult, externalEventsResult] = await Promise.all([
       supabase
         .from('staff_special_days')
         .select('staff_id, is_day_off, start_time, end_time, breaks')
@@ -275,6 +275,12 @@ export async function POST(request: Request) {
           business_name: a.tenants?.name ?? 'Unknown',
         }));
       })(),
+      supabase
+        .from('external_calendar_events')
+        .select('staff_id, start_time, end_time')
+        .in('staff_id', staffIds)
+        .gte('end_time', dayStartUtc)
+        .lte('start_time', dayEndUtc),
     ]);
 
     const staffSpecialMap = new Map<string, { is_day_off: boolean; start_time: string | null; end_time: string | null; breaks: unknown }>();
@@ -283,7 +289,11 @@ export async function POST(request: Request) {
     }
 
     const holidayStaffIds = new Set(((holidayResult.data ?? []) as { staff_id: string }[]).map((h) => h.staff_id));
-    const appointments = (existingApptsResult.data ?? []) as { staff_id: string | null; start_time: string; end_time: string }[];
+    const externalEvents = (externalEventsResult.data ?? []) as { staff_id: string; start_time: string; end_time: string }[];
+    const appointments = [
+      ...((existingApptsResult.data ?? []) as { staff_id: string | null; start_time: string; end_time: string }[]),
+      ...externalEvents.map((e) => ({ staff_id: e.staff_id as string | null, start_time: e.start_time, end_time: e.end_time })),
+    ];
 
     // 7. Generate available slots
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
