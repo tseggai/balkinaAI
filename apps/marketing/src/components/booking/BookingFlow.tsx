@@ -297,6 +297,8 @@ function DateTimePicker({ tenantId, service, locationId, currency, date, onDateC
     ? availability?.staff.find((s) => s.id === selectedStaff)?.name ?? 'Staff'
     : 'Anyone';
 
+  const isDayOrWeek = service.pricing_type === 'per_day' || service.pricing_type === 'per_week';
+
   return (
     <div>
       {/* Service summary */}
@@ -354,9 +356,36 @@ function DateTimePicker({ tenantId, service, locationId, currency, date, onDateC
         </div>
       )}
 
-      {/* Time slots */}
+      {/* Time slots or day/week booking */}
       <div className="mt-5">
-        <h3 className="text-sm font-semibold text-gray-700">Pick a time</h3>
+        {isDayOrWeek ? (
+          <>
+            <h3 className="text-sm font-semibold text-gray-700">
+              {service.pricing_type === 'per_day' ? 'Book this day' : 'Book this week'}
+            </h3>
+            {loading ? (
+              <div className="mt-3 h-12 w-40 animate-pulse rounded-lg bg-gray-100" />
+            ) : error ? (
+              <p className="mt-3 text-sm text-red-500">{error}</p>
+            ) : activeSlots.length === 0 || !activeSlots.some((s) => 'available' in s ? s.available : true) ? (
+              <p className="mt-3 text-sm text-gray-400">Not available for this date.</p>
+            ) : (
+              <button
+                onClick={() => {
+                  const slot = activeSlots.find((s) => 'available' in s ? s.available : true);
+                  if (slot) onSelectTime(selectedStaff, activeStaffName, formatHumanDate(selectedDate), slot.iso);
+                }}
+                className="mt-3 rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
+              >
+                {service.pricing_type === 'per_day'
+                  ? `Book ${formatHumanDate(selectedDate)}`
+                  : `Book week of ${formatHumanDate(selectedDate)}`}
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <h3 className="text-sm font-semibold text-gray-700">Pick a time</h3>
         {loading ? (
           <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
             {Array.from({ length: 9 }).map((_, i) => (
@@ -387,6 +416,8 @@ function DateTimePicker({ tenantId, service, locationId, currency, date, onDateC
               );
             })}
           </div>
+        )}
+          </>
         )}
       </div>
     </div>
