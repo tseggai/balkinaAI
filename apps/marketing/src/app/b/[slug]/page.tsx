@@ -54,13 +54,17 @@ async function getTenantBySlug(slug: string) {
 
   const t = tenant as TenantData;
 
-  const [{ data: services }, { data: locations }, { data: catLinks }, { data: gallery }, { data: svcLocs }] = await Promise.all([
+  const [{ data: services }, { data: locations }, { data: catLinks }, { data: gallery }] = await Promise.all([
     supabase.from('services').select('id, name, price, duration_minutes, image_url, pricing_type').eq('tenant_id', t.id).eq('visibility', 'public').order('name'),
     supabase.from('tenant_locations').select('id, name, address, currency').eq('tenant_id', t.id),
     supabase.from('tenant_category_links').select('category_id, categories(name)').eq('tenant_id', t.id),
     supabase.from('location_gallery').select('image_url').eq('tenant_id', t.id).order('sort_order').limit(6),
-    supabase.from('service_locations').select('service_id, location_id').eq('tenant_id', t.id),
   ]);
+
+  const serviceIds = ((services ?? []) as { id: string }[]).map(s => s.id);
+  const { data: svcLocs } = serviceIds.length > 0
+    ? await supabase.from('service_locations').select('service_id, location_id').in('service_id', serviceIds)
+    : { data: [] };
 
   const categories = ((catLinks ?? []) as unknown as { category_id: string; categories: CategoryData | null }[])
     .map((cl) => cl.categories?.name)
