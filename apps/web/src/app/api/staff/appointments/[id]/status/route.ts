@@ -8,6 +8,7 @@ import {
   notifyBookingCancelledByTenant,
   notifyDepositPaymentRequired,
 } from '@/lib/notifications/booking-events';
+import { pushEventToGoogleCalendar, deleteGoogleCalendarEvent } from '@/lib/google-calendar';
 
 function getBearerToken(request: Request): string | null {
   const auth = request.headers.get('authorization') ?? '';
@@ -178,6 +179,16 @@ export async function PATCH(
     }
   } catch (e) {
     console.error('[staff/status] notification error:', e);
+  }
+
+  try {
+    if (effectiveStatus === 'confirmed' || effectiveStatus === 'approved') {
+      await pushEventToGoogleCalendar(params.id);
+    } else if (newStatus === 'cancelled' || newStatus === 'no_show') {
+      await deleteGoogleCalendarEvent(params.id);
+    }
+  } catch (e) {
+    console.error('[staff/status] google calendar error:', e);
   }
 
   return NextResponse.json({ data: updated, error: null });

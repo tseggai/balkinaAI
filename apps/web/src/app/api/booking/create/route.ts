@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { notifyBookingConfirmed, notifyBookingSubmitted, notifyStaffNewBooking } from '@/lib/notifications/booking-events';
+import { pushEventToGoogleCalendar } from '@/lib/google-calendar';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -412,6 +413,11 @@ export async function POST(request: Request) {
       }
     } catch (e) {
       console.error('[booking/create] notification error:', e);
+    }
+
+    // 8c. Push to staff's Google Calendar (non-blocking)
+    if (!requiresApproval) {
+      pushEventToGoogleCalendar(apptId).catch(() => {});
     }
 
     // 9. Format response with local times (timezone already available)

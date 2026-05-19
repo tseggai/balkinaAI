@@ -1,10 +1,13 @@
-import { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Linking } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Linking, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { supabase } from '@/lib/supabase';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [socialLoading, setSocialLoading] = useState(false);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -13,6 +16,31 @@ export default function WelcomeScreen() {
       useNativeDriver: true,
     }).start();
   }, [fadeAnim]);
+
+  const handleAppleSignIn = async () => {
+    try {
+      setSocialLoading(true);
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) throw new Error('No identity token');
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+      if (error) throw error;
+    } catch (err: unknown) {
+      const e = err as { code?: string; message?: string };
+      if (e.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Sign in failed', e.message ?? 'Please try again');
+      }
+    } finally {
+      setSocialLoading(false);
+    }
+  };
 
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
@@ -26,6 +54,16 @@ export default function WelcomeScreen() {
       </View>
 
       <View style={styles.buttons}>
+        {Platform.OS === 'ios' && (
+          <TouchableOpacity
+            style={styles.btnApple}
+            onPress={handleAppleSignIn}
+            disabled={socialLoading}
+          >
+            <Text style={styles.btnAppleText}> Continue with Apple</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={styles.btnPrimary}
           onPress={() => router.push('/(auth)/email-login')}
@@ -67,6 +105,17 @@ const styles = StyleSheet.create({
   },
   buttons: {
     gap: 12,
+  },
+  btnApple: {
+    backgroundColor: '#000',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  btnAppleText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   btnPrimary: {
     backgroundColor: '#6B7FC4',

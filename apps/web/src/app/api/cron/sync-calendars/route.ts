@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server';
+import { fetchGoogleCalendarEvents } from '@/lib/google-calendar';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -155,5 +156,57 @@ export async function GET(request: Request) {
     }
   }
 
-  return Response.json({ synced, errors, total: calendars.length });
+  // Phase 2: Sync Google Calendar connections
+  let gcalSynced = 0;
+  let gcalErrors = 0;
+
+  const { data: gcalConns } = await supabase
+    .from('staff_google_calendar_connections')
+    .select('id, staff_id, access_token, refresh_token, token_expires_at, calendar_id')
+    .eq('is_active', true);
+
+  for (const conn of (gcalConns ?? []) as { id: string; staff_id: string; access_token: string; refresh_token: string; token_expires_at: string; calendar_id: string }[]) {
+    try {
+      const events = await fetchGoogleCalendarEvents(conn, windowStart, windowEnd);
+
+      const { data: existing } = await supabase
+        .from('external_calendar_events')
+        .select('uid')
+        .eq('external_calendar_id', conn.id);
+
+      const existingUids = new Set(((existing ?? []) as { uid: string }[]).map((e) => e.uid));
+      const newUids = new Set(events.map((e) => e.uid));
+
+      const toDelete = [...existingUids].filter((uid) => !newUids.has(uid));
+      if (toDelete.length > 0) {
+        await supabase
+          .from('external_calendar_events')
+          .delete()
+          .eq('external_calendar_id', conn.id)
+          .in('uid', toDelete);
+      }
+
+      for (const event of events) {
+        await supabase
+          .from('external_calendar_events')
+          .upsert({
+            external_calendar_id: conn.id,
+            staff_id: conn.staff_id,
+            uid: event.uid,
+            start_time: event.start.toISOString(),
+            end_time: event.end.toISOString(),
+            summary: event.summary,
+          } as never, { onConflict: 'external_calendar_id,uid' });
+      }
+
+      gcalSynced++;
+    } catch {
+      gcalErrors++;
+    }
+  }
+
+  return Response.json({
+    ical: { synced, errors, total: calendars.length },
+    google: { synced: gcalSynced, errors: gcalErrors, total: (gcalConns ?? []).length },
+  });
 }
