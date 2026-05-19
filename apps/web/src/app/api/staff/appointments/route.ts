@@ -84,7 +84,7 @@ export async function GET(request: Request) {
   // Map to StaffAppointment shape
   const appointments = ((data ?? []) as Record<string, unknown>[]).map((row) => {
     const svc = row.services as { name: string; duration_minutes: number } | null;
-    const cust = row.customers as { display_name: string | null; phone: string | null; no_show_count?: number } | null;
+    const cust = row.customers as { display_name: string | null; phone: string | null; email: string | null; no_show_count?: number } | null;
     const loc = row.tenant_locations as { name: string } | null;
     return {
       id: row.id,
@@ -92,7 +92,8 @@ export async function GET(request: Request) {
       service_id: row.service_id,
       staff_id: row.staff_id,
       customer_name: cust?.display_name ?? 'Guest',
-      customer_phone: cust?.phone ?? null,
+      customer_phone: cust?.phone || null,
+      customer_email: cust?.email || null,
       customer_no_show_count: cust?.no_show_count ?? 0,
       service_name: svc?.name ?? 'Service',
       service_duration: svc?.duration_minutes ?? 0,
