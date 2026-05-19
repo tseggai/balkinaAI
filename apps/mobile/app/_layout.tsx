@@ -53,6 +53,7 @@ function RootLayoutContent() {
     const inAuthGroup = segments[0] === '(auth)';
     const inAppGroup = segments[0] === '(app)';
     const inTenantGroup = segments[0] === '(tenant)';
+    const inStaffGroup = segments[0] === '(staff)';
 
     if (!supabaseConfigured && !inAuthGroup) {
       router.replace('/(auth)/email-login');
@@ -61,10 +62,12 @@ function RootLayoutContent() {
 
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/email-login');
-    } else if (session && !inAppGroup && !inTenantGroup) {
+    } else if (session && !inAppGroup && !inTenantGroup && !inStaffGroup) {
       getAuthenticatedRole().then(({ role }) => {
-        if (role === 'tenant' || role === 'staff') {
+        if (role === 'tenant') {
           router.replace('/(tenant)/dashboard');
+        } else if (role === 'staff') {
+          router.replace('/(staff)/dashboard');
         } else {
           router.replace('/(app)');
         }
@@ -90,6 +93,7 @@ function RootLayoutContent() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(app)" options={{ headerShown: false }} />
         <Stack.Screen name="(tenant)" options={{ headerShown: false }} />
+        <Stack.Screen name="(staff)" options={{ headerShown: false }} />
       </Stack>
     </>
   );
