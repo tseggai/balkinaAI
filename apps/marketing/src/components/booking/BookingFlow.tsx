@@ -595,7 +595,7 @@ function Summary({ tenantId, tenantName, service, staffId, staffName, date, time
         />
         <input
           type="email"
-          placeholder="Email (optional)"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
