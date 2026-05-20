@@ -24,6 +24,7 @@ interface StaffAppointment {
   staff_id: string;
   customer_name: string;
   customer_phone: string | null;
+  customer_email: string | null;
   customer_no_show_count: number;
   service_name: string;
   service_duration: number;
@@ -365,38 +366,52 @@ export default function StaffAppointments() {
 
         {isExpanded && (
           <View style={styles.expandedSection}>
-            {item.customer_phone && <Text style={styles.detailText}>Phone: {item.customer_phone}</Text>}
-            {item.location_name && <Text style={styles.detailText}>Location: {item.location_name}</Text>}
-            {item.notes && <Text style={styles.detailText}>Notes: {item.notes}</Text>}
+            {item.customer_phone ? <Text style={styles.detailText}>Phone: {item.customer_phone}</Text> : null}
+            {item.customer_email ? <Text style={styles.detailText}>Email: {item.customer_email}</Text> : null}
+            {item.location_name ? <Text style={styles.detailText}>Location: {item.location_name}</Text> : null}
+            {item.notes ? <Text style={styles.detailText}>Notes: {item.notes}</Text> : null}
             <Text style={styles.detailText}>Price: ${(item.total_price ?? 0).toFixed(2)}</Text>
 
-            {item.customer_phone && (
+            {(item.customer_phone || item.customer_email) && (
               <View style={styles.contactRow}>
-                <TouchableOpacity
-                  style={styles.contactBtn}
-                  onPress={() => Linking.openURL(`tel:${item.customer_phone}`)}
-                >
-                  <Ionicons name="call-outline" size={16} color="#6B7FC4" />
-                  <Text style={styles.contactBtnText}>Call</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.contactBtn}
-                  onPress={() => Linking.openURL(`sms:${item.customer_phone}`)}
-                >
-                  <Ionicons name="chatbubble-outline" size={16} color="#6B7FC4" />
-                  <Text style={styles.contactBtnText}>Message</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.contactBtn}
-                  onPress={() => {
-                    const cleaned = item.customer_phone!.replace(/[^0-9+]/g, '');
-                    const waNumber = cleaned.startsWith('+') ? cleaned.slice(1) : cleaned;
-                    Linking.openURL(`https://wa.me/${waNumber}`);
-                  }}
-                >
-                  <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-                  <Text style={styles.contactBtnText}>WhatsApp</Text>
-                </TouchableOpacity>
+                {item.customer_phone ? (
+                  <>
+                    <TouchableOpacity
+                      style={styles.contactBtn}
+                      onPress={() => Linking.openURL(`tel:${item.customer_phone}`)}
+                    >
+                      <Ionicons name="call-outline" size={16} color="#6B7FC4" />
+                      <Text style={styles.contactBtnText}>Call</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.contactBtn}
+                      onPress={() => Linking.openURL(`sms:${item.customer_phone}`)}
+                    >
+                      <Ionicons name="chatbubble-outline" size={16} color="#6B7FC4" />
+                      <Text style={styles.contactBtnText}>Text</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.contactBtn}
+                      onPress={() => {
+                        const cleaned = (item.customer_phone ?? '').replace(/[^0-9+]/g, '');
+                        const waNumber = cleaned.startsWith('+') ? cleaned.slice(1) : cleaned;
+                        Linking.openURL(`https://wa.me/${waNumber}`);
+                      }}
+                    >
+                      <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                      <Text style={styles.contactBtnText}>WhatsApp</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : null}
+                {item.customer_email ? (
+                  <TouchableOpacity
+                    style={styles.contactBtn}
+                    onPress={() => Linking.openURL(`mailto:${item.customer_email}`)}
+                  >
+                    <Ionicons name="mail-outline" size={16} color="#6B7FC4" />
+                    <Text style={styles.contactBtnText}>Email</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             )}
 
