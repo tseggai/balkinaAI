@@ -3,6 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Linking, Pla
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_CLIENT_ID_WEB = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB ?? '';
+const GOOGLE_CLIENT_ID_IOS = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS ?? '';
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -16,6 +23,30 @@ export default function WelcomeScreen() {
       useNativeDriver: true,
     }).start();
   }, [fadeAnim]);
+
+  const [, , googlePromptAsync] = Google.useAuthRequest({
+    iosClientId: GOOGLE_CLIENT_ID_IOS,
+    webClientId: GOOGLE_CLIENT_ID_WEB,
+  });
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setSocialLoading(true);
+      const result = await googlePromptAsync();
+      if (result?.type === 'success' && result.authentication?.idToken) {
+        const { error } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: result.authentication.idToken,
+        });
+        if (error) throw error;
+      }
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      Alert.alert('Sign in failed', e.message ?? 'Please try again');
+    } finally {
+      setSocialLoading(false);
+    }
+  };
 
   const handleAppleSignIn = async () => {
     try {
@@ -63,6 +94,14 @@ export default function WelcomeScreen() {
             <Text style={styles.btnAppleText}> Continue with Apple</Text>
           </TouchableOpacity>
         )}
+
+        <TouchableOpacity
+          style={styles.btnGoogle}
+          onPress={handleGoogleSignIn}
+          disabled={socialLoading}
+        >
+          <Text style={styles.btnGoogleText}>G  Continue with Google</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.btnPrimary}
@@ -114,6 +153,19 @@ const styles = StyleSheet.create({
   },
   btnAppleText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  btnGoogle: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  btnGoogleText: {
+    color: '#374151',
     fontSize: 16,
     fontWeight: '600',
   },
