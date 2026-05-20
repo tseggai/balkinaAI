@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Image, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { CalendarSyncModal } from '@/components/CalendarSyncModal';
 import Constants from 'expo-constants';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
 import { pickAndUploadPhoto } from '@/lib/usePhotoUpload';
@@ -32,6 +33,8 @@ export default function TenantSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [calSyncVisible, setCalSyncVisible] = useState(false);
+  const [ownerStaffId, setOwnerStaffId] = useState<string | null>(null);
 
   // Form
   const [formName, setFormName] = useState('');
@@ -47,10 +50,12 @@ export default function TenantSettings() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [{ data: t }, { data: cats }] = await Promise.all([
+      const [{ data: t }, { data: cats }, { data: staffRec }] = await Promise.all([
         supabase.from('tenants').select('id, name, owner_name, email, phone, logo_url, category_id').eq('user_id', user.id).single(),
         supabase.from('categories').select('id, name').is('parent_id', null).order('display_order'),
+        supabase.from('staff').select('id').eq('user_id', user.id).limit(1).maybeSingle(),
       ]);
+      if (staffRec) setOwnerStaffId((staffRec as { id: string }).id);
 
       if (t) {
         const td = t as TenantData;
@@ -219,6 +224,34 @@ export default function TenantSettings() {
           </View>
         )}
       </View>
+
+      {/* Calendar Sync */}
+      {ownerStaffId && (
+        <>
+          <Text style={styles.sectionTitle}>Calendar Sync</Text>
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.linkRow} onPress={() => setCalSyncVisible(true)}>
+              <View style={styles.linkRowLeft}>
+                <Ionicons name="calendar-outline" size={20} color="#6B7FC4" />
+                <View>
+                  <Text style={styles.linkRowLabel}>Manage Calendar Sync</Text>
+                  <Text style={{ fontSize: 12, color: '#9ca3af' }}>Google Calendar, export, import iCal</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+            </TouchableOpacity>
+          </View>
+          <CalendarSyncModal
+            staffId={ownerStaffId}
+            getToken={async () => {
+              const { data: { session } } = await supabase.auth.getSession();
+              return session?.access_token ?? null;
+            }}
+            visible={calSyncVisible}
+            onClose={() => setCalSyncVisible(false)}
+          />
+        </>
+      )}
 
       {/* Legal */}
       <Text style={styles.sectionTitle}>Legal</Text>

@@ -1,10 +1,32 @@
 import { NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import { getTenantContext, CORS_HEADERS } from '../auth';
+
+function getBearerToken(request: Request): string | null {
+  const auth = request.headers.get('authorization') ?? '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7);
+  return null;
+}
+
+async function getGcalContext(request: Request) {
+  const ctx = await getTenantContext(request);
+  if (ctx) return { tenantId: ctx.tenantId, admin: ctx.admin };
+
+  const token = getBearerToken(request);
+  if (!token) return null;
+  const admin = createAdminClient();
+  const { data: { user } } = await admin.auth.getUser(token);
+  if (!user) return null;
+  const { data: staff } = await admin.from('staff').select('id, tenant_id').eq('user_id', user.id).single();
+  if (!staff) return null;
+  const s = staff as { id: string; tenant_id: string };
+  return { tenantId: s.tenant_id, admin, staffOnly: s.id };
+}
 
 export async function OPTIONS() { return new Response(null, { headers: CORS_HEADERS }); }
 
 export async function GET(request: Request) {
-  const ctx = await getTenantContext(request);
+  const ctx = await getGcalContext(request);
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS });
 
   const { searchParams } = new URL(request.url);
@@ -22,7 +44,7 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const ctx = await getTenantContext(request);
+  const ctx = await getGcalContext(request);
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS });
 
   const { searchParams } = new URL(request.url);

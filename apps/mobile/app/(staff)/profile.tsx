@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
+import { CalendarSyncModal } from '@/components/CalendarSyncModal';
 import {
   View,
   Text,
@@ -46,6 +47,7 @@ export default function StaffProfile() {
   const [notifyPush, setNotifyPush] = useState(true);
   const [togglingNotif, setTogglingNotif] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [calSyncVisible, setCalSyncVisible] = useState(false);
 
   const getToken = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -266,7 +268,19 @@ export default function StaffProfile() {
         {staffInfo && (
           <>
             <Text style={styles.sectionTitle}>Calendar Sync</Text>
-            <CalendarSyncSection staffId={staffInfo.id} getToken={getToken} />
+            <View style={styles.card}>
+              <TouchableOpacity style={styles.settingsRow} onPress={() => setCalSyncVisible(true)}>
+                <View style={[styles.settingsIconBg, { backgroundColor: '#e8f0fe' }]}>
+                  <Ionicons name="calendar-outline" size={18} color="#6B7FC4" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.settingsLabel}>Manage Calendar Sync</Text>
+                  <Text style={styles.settingsDesc}>Google Calendar, export, import iCal</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+              </TouchableOpacity>
+            </View>
+            <CalendarSyncModal staffId={staffInfo.id} getToken={getToken} visible={calSyncVisible} onClose={() => setCalSyncVisible(false)} />
           </>
         )}
 
