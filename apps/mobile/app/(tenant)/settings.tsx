@@ -39,6 +39,8 @@ export default function TenantSettings() {
   const [formPhone, setFormPhone] = useState('');
   const [formCategoryIds, setFormCategoryIds] = useState<string[]>([]);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [dangerZoneExpanded, setDangerZoneExpanded] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const fetchTenant = useCallback(async () => {
     try {
@@ -148,6 +150,8 @@ export default function TenantSettings() {
     ? categories.filter(c => formCategoryIds.includes(c.id)).map(c => c.name).join(', ')
     : 'Not set';
 
+  const isDeleteEnabled = deleteConfirmText.trim().toUpperCase() === 'DELETE';
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Business Profile */}
@@ -250,7 +254,7 @@ export default function TenantSettings() {
         </TouchableOpacity>
       </View>
 
-      {/* Sign Out & Delete Account */}
+      {/* Sign Out */}
       <View style={[styles.card, { marginTop: 12 }]}>
         <TouchableOpacity style={styles.linkRow} onPress={handleSignOut}>
           <View style={styles.linkRowLeft}>
@@ -258,16 +262,71 @@ export default function TenantSettings() {
             <Text style={[styles.linkRowLabel, { color: '#dc2626' }]}>Sign Out</Text>
           </View>
         </TouchableOpacity>
-        <View style={styles.separator} />
-        <TouchableOpacity style={styles.linkRow} onPress={handleDeleteAccount}>
+      </View>
+
+      {/* Danger Zone — collapsible */}
+      <Text style={styles.sectionTitle}>Danger Zone</Text>
+      <View style={styles.card}>
+        <TouchableOpacity
+          style={styles.linkRow}
+          onPress={() => {
+            setDangerZoneExpanded(!dangerZoneExpanded);
+            if (dangerZoneExpanded) setDeleteConfirmText('');
+          }}
+          activeOpacity={0.6}
+        >
           <View style={styles.linkRowLeft}>
-            <Ionicons name="trash-outline" size={20} color="#dc2626" />
+            <Ionicons name="warning-outline" size={20} color="#dc2626" />
             <View>
               <Text style={[styles.linkRowLabel, { color: '#dc2626' }]}>Delete Account</Text>
               <Text style={styles.linkRowSub}>Permanently remove your account and business</Text>
             </View>
           </View>
+          <Ionicons
+            name={dangerZoneExpanded ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color="#d1d5db"
+          />
         </TouchableOpacity>
+
+        {dangerZoneExpanded && (
+          <View style={styles.dangerZoneContent}>
+            <Text style={styles.dangerZoneWarning}>
+              This action is irreversible. Your account, business, all services, staff, bookings, and customer data will be permanently deleted.
+            </Text>
+            <Text style={styles.dangerZonePrompt}>
+              Type <Text style={styles.dangerZoneDeleteWord}>DELETE</Text> to confirm:
+            </Text>
+            <TextInput
+              style={styles.dangerZoneInput}
+              value={deleteConfirmText}
+              onChangeText={setDeleteConfirmText}
+              placeholder="Type DELETE here"
+              placeholderTextColor="#d1d5db"
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={[
+                styles.dangerZoneButton,
+                !isDeleteEnabled && styles.dangerZoneButtonDisabled,
+              ]}
+              onPress={handleDeleteAccount}
+              disabled={!isDeleteEnabled}
+              activeOpacity={0.6}
+            >
+              <Ionicons name="trash-outline" size={16} color={isDeleteEnabled ? '#fff' : '#f9a8a8'} />
+              <Text
+                style={[
+                  styles.dangerZoneButtonText,
+                  !isDeleteEnabled && styles.dangerZoneButtonTextDisabled,
+                ]}
+              >
+                Delete My Account
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <Text style={styles.version}>Balkina AI · v{Constants.expoConfig?.version ?? '1.1.0'}</Text>
@@ -301,4 +360,15 @@ const styles = StyleSheet.create({
   linkRowSub: { fontSize: 12, color: '#9ca3af', marginTop: 1 },
   separator: { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 16 },
   version: { textAlign: 'center', fontSize: 12, color: '#d1d5db', marginTop: 24 },
+
+  // Danger Zone
+  dangerZoneContent: { paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#FEE2E2' },
+  dangerZoneWarning: { fontSize: 13, color: '#6b7280', lineHeight: 18, marginTop: 12, marginBottom: 12 },
+  dangerZonePrompt: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  dangerZoneDeleteWord: { color: '#dc2626', fontWeight: '700' },
+  dangerZoneInput: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#FCA5A5', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, color: '#111827', marginBottom: 12 },
+  dangerZoneButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#dc2626', borderRadius: 12, paddingVertical: 14 },
+  dangerZoneButtonDisabled: { backgroundColor: '#FEE2E2' },
+  dangerZoneButtonText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  dangerZoneButtonTextDisabled: { color: '#f9a8a8' },
 });

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
@@ -24,6 +25,7 @@ export default function EmailLoginScreen() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [isStaffInvite, setIsStaffInvite] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
@@ -147,6 +149,31 @@ export default function EmailLoginScreen() {
     }
   }
 
+  async function handleAppleSignIn() {
+    try {
+      setSocialLoading(true);
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) throw new Error('No identity token');
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+      if (error) throw error;
+    } catch (err: unknown) {
+      const e = err as { code?: string; message?: string };
+      if (e.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Sign in failed', e.message ?? 'Please try again');
+      }
+    } finally {
+      setSocialLoading(false);
+    }
+  }
+
   async function handleForgotPassword() {
     if (!email.trim()) {
       Alert.alert('Enter your email', 'Please type your email address above, then tap "Forgot password?" again.');
@@ -219,6 +246,25 @@ export default function EmailLoginScreen() {
               ? 'Sign up to start booking appointments.'
               : 'Sign in with your email and password.'}
         </Text>
+
+        {/* Apple Sign-In — iOS only, not for staff invite flow */}
+        {Platform.OS === 'ios' && !isStaffInvite && (
+          <>
+            <TouchableOpacity
+              style={[styles.btnApple, socialLoading && styles.btnDisabled]}
+              onPress={handleAppleSignIn}
+              disabled={socialLoading || loading}
+            >
+              <Text style={styles.btnAppleText}> Continue with Apple</Text>
+            </TouchableOpacity>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+          </>
+        )}
 
         {/* Staff invite code field */}
         {isStaffInvite && (
@@ -435,5 +481,31 @@ const styles = StyleSheet.create({
   termsLink: {
     color: '#6B7FC4',
     textDecorationLine: 'underline' as const,
+  },
+  btnApple: {
+    backgroundColor: '#000',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  btnAppleText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 18,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 14,
+    color: '#9ca3af',
   },
 });
