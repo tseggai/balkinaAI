@@ -269,15 +269,17 @@ export default function StaffProfile() {
           <>
             <Text style={styles.sectionTitle}>Calendar Sync</Text>
             <View style={styles.card}>
-              <TouchableOpacity style={styles.settingsRow} onPress={() => setCalSyncVisible(true)}>
-                <View style={[styles.settingsIconBg, { backgroundColor: '#e8f0fe' }]}>
-                  <Ionicons name="calendar-outline" size={18} color="#6B7FC4" />
+              <TouchableOpacity style={styles.cardRow} onPress={() => setCalSyncVisible(true)}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#e8f0fe', justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="calendar-outline" size={18} color="#6B7FC4" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }}>Manage Calendar Sync</Text>
+                    <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 1 }}>Google Calendar, export, import iCal</Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.settingsLabel}>Manage Calendar Sync</Text>
-                  <Text style={styles.settingsDesc}>Google Calendar, export, import iCal</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+                <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
               </TouchableOpacity>
             </View>
             <CalendarSyncModal staffId={staffInfo.id} getToken={getToken} visible={calSyncVisible} onClose={() => setCalSyncVisible(false)} />
