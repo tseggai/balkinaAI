@@ -15,8 +15,14 @@ import {
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
+const GOOGLE_CLIENT_ID_WEB = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB ?? '';
+const GOOGLE_CLIENT_ID_IOS = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS ?? '';
 
 export default function EmailLoginScreen() {
   const router = useRouter();
@@ -149,6 +155,42 @@ export default function EmailLoginScreen() {
     }
   }
 
+  const [, googleResponse, googlePromptAsync] = Google.useAuthRequest({
+    iosClientId: GOOGLE_CLIENT_ID_IOS,
+    webClientId: GOOGLE_CLIENT_ID_WEB,
+  });
+
+  useState(() => {
+    if (googleResponse?.type === 'success' && googleResponse.authentication?.idToken) {
+      setSocialLoading(true);
+      supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: googleResponse.authentication.idToken,
+      }).then(({ error }) => {
+        if (error) Alert.alert('Sign in failed', error.message);
+      }).finally(() => setSocialLoading(false));
+    }
+  });
+
+  async function handleGoogleSignIn() {
+    try {
+      setSocialLoading(true);
+      const result = await googlePromptAsync();
+      if (result?.type === 'success' && result.authentication?.idToken) {
+        const { error } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: result.authentication.idToken,
+        });
+        if (error) throw error;
+      }
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      Alert.alert('Sign in failed', e.message ?? 'Please try again');
+    } finally {
+      setSocialLoading(false);
+    }
+  }
+
   async function handleAppleSignIn() {
     try {
       setSocialLoading(true);
@@ -247,15 +289,25 @@ export default function EmailLoginScreen() {
               : 'Sign in with your email and password.'}
         </Text>
 
-        {/* Apple Sign-In — iOS only, not for staff invite flow */}
-        {Platform.OS === 'ios' && !isStaffInvite && (
+        {/* Social Sign-In — not for staff invite flow */}
+        {!isStaffInvite && (
           <>
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[styles.btnApple, socialLoading && styles.btnDisabled]}
+                onPress={handleAppleSignIn}
+                disabled={socialLoading || loading}
+              >
+                <Text style={styles.btnAppleText}> Continue with Apple</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
-              style={[styles.btnApple, socialLoading && styles.btnDisabled]}
-              onPress={handleAppleSignIn}
+              style={[styles.btnGoogle, socialLoading && styles.btnDisabled]}
+              onPress={handleGoogleSignIn}
               disabled={socialLoading || loading}
             >
-              <Text style={styles.btnAppleText}> Continue with Apple</Text>
+              <Text style={styles.btnGoogleText}>G  Continue with Google</Text>
             </TouchableOpacity>
 
             <View style={styles.divider}>
@@ -444,6 +496,20 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     marginTop: 8,
+  },
+  btnGoogle: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  btnGoogleText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
   },
   btnDisabled: {
     opacity: 0.6,
