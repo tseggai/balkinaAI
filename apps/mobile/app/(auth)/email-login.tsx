@@ -15,14 +15,9 @@ import {
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
-
-WebBrowser.maybeCompleteAuthSession();
+import { useGoogleAuth, googleAvailable, handleGoogleResult } from '@/lib/googleAuth';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
-const GOOGLE_CLIENT_ID_WEB = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB ?? '';
-const GOOGLE_CLIENT_ID_IOS = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS ?? '';
 
 export default function EmailLoginScreen() {
   const router = useRouter();
@@ -155,34 +150,17 @@ export default function EmailLoginScreen() {
     }
   }
 
-  const [, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    iosClientId: GOOGLE_CLIENT_ID_IOS,
-    webClientId: GOOGLE_CLIENT_ID_WEB,
-  });
-
-  useState(() => {
-    if (googleResponse?.type === 'success' && googleResponse.authentication?.idToken) {
-      setSocialLoading(true);
-      supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: googleResponse.authentication.idToken,
-      }).then(({ error }) => {
-        if (error) Alert.alert('Sign in failed', error.message);
-      }).finally(() => setSocialLoading(false));
-    }
-  });
+  const { promptAsync: googlePromptAsync } = useGoogleAuth();
 
   async function handleGoogleSignIn() {
+    if (!googlePromptAsync) {
+      Alert.alert('Not available', 'Google Sign-In requires a development build.');
+      return;
+    }
     try {
       setSocialLoading(true);
       const result = await googlePromptAsync();
-      if (result?.type === 'success' && result.authentication?.idToken) {
-        const { error } = await supabase.auth.signInWithIdToken({
-          provider: 'google',
-          token: result.authentication.idToken,
-        });
-        if (error) throw error;
-      }
+      await handleGoogleResult(result, supabase.auth.signInWithIdToken.bind(supabase.auth));
     } catch (err: unknown) {
       const e = err as { message?: string };
       Alert.alert('Sign in failed', e.message ?? 'Please try again');
