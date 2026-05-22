@@ -43,6 +43,7 @@ export function CalendarSyncModal({ staffId, getToken, visible, onClose }: Props
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showIcal, setShowIcal] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -71,15 +72,13 @@ export function CalendarSyncModal({ staffId, getToken, visible, onClose }: Props
   }, [staffId, getToken]);
 
   useEffect(() => {
-    if (visible) fetchData();
+    if (visible) { fetchData(); setShowIcal(false); }
   }, [visible, fetchData]);
 
   const feedUrl = feedToken ? `${API_BASE}/api/calendar/${feedToken}` : '';
 
-  const handleCopy = async () => {
-    if (Clipboard?.setStringAsync) {
-      await Clipboard.setStringAsync(feedUrl);
-    }
+  const handleCopy = async (text: string) => {
+    if (Clipboard?.setStringAsync) await Clipboard.setStringAsync(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -119,8 +118,7 @@ export function CalendarSyncModal({ staffId, getToken, visible, onClose }: Props
           const token = await getToken();
           if (!token) return;
           await fetch(`${API_BASE}/api/tenant/staff-calendars?id=${id}`, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` },
+            method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
           });
           fetchData();
         },
@@ -140,8 +138,7 @@ export function CalendarSyncModal({ staffId, getToken, visible, onClose }: Props
           const token = await getToken();
           if (!token) return;
           await fetch(`${API_BASE}/api/tenant/google-calendar?staffId=${staffId}`, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` },
+            method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
           });
           setGoogleConn(null);
         },
@@ -153,9 +150,9 @@ export function CalendarSyncModal({ staffId, getToken, visible, onClose }: Props
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={s.container}>
         <View style={s.header}>
-          <Text style={s.headerTitle}>Calendar Sync</Text>
-          <TouchableOpacity onPress={onClose} style={s.closeBtn}>
-            <Ionicons name="close" size={24} color="#6b7280" />
+          <Text style={s.headerTitle}>{showIcal ? 'iCal Calendars' : 'Calendar Sync'}</Text>
+          <TouchableOpacity onPress={showIcal ? () => setShowIcal(false) : onClose} style={s.closeBtn}>
+            <Ionicons name={showIcal ? 'arrow-back' : 'close'} size={24} color="#6b7280" />
           </TouchableOpacity>
         </View>
 
@@ -163,50 +160,35 @@ export function CalendarSyncModal({ staffId, getToken, visible, onClose }: Props
           <View style={s.loadingContainer}>
             <ActivityIndicator size="large" color="#6B7FC4" />
           </View>
-        ) : (
+        ) : showIcal ? (
           <ScrollView style={s.scrollContent} contentContainerStyle={s.scrollInner}>
-            {/* Google Calendar */}
-            <View style={s.section}>
-              <View style={s.sectionHeader}>
-                <View style={[s.iconBg, { backgroundColor: '#e8f5e9' }]}>
-                  <Ionicons name="logo-google" size={18} color="#4285F4" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.sectionTitle}>Google Calendar</Text>
-                  <Text style={s.sectionDesc}>Real-time two-way sync. Bookings push automatically.</Text>
-                </View>
-              </View>
-              {googleConn ? (
-                <View style={s.connectedRow}>
-                  <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
-                  <Text style={s.connectedEmail}>{googleConn.google_email}</Text>
-                  <TouchableOpacity onPress={handleDisconnectGoogle}>
-                    <Text style={s.disconnectText}>Disconnect</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity style={s.connectBtn} onPress={handleConnectGoogle}>
-                  <Text style={s.connectBtnText}>Connect Google Calendar</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Export Calendar */}
+            {/* Export section */}
             <View style={s.section}>
               <View style={s.sectionHeader}>
                 <View style={[s.iconBg, { backgroundColor: '#e8f0fe' }]}>
                   <Ionicons name="share-outline" size={18} color="#6B7FC4" />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.sectionTitle}>Export Calendar</Text>
-                  <Text style={s.sectionDesc}>Copy this URL into Outlook, Apple Calendar, or any iCal app.</Text>
-                </View>
+                <Text style={s.sectionTitle}>Export Your Balkina Calendar</Text>
+              </View>
+              <Text style={s.instructions}>
+                Copy this URL and paste it into your calendar app to see your Balkina bookings. Here's how:
+              </Text>
+              <View style={s.stepList}>
+                <Text style={s.stepText}>
+                  <Text style={s.bold}>Google Calendar:</Text> Settings → "Other calendars" → "From URL" → paste the URL
+                </Text>
+                <Text style={s.stepText}>
+                  <Text style={s.bold}>Apple Calendar:</Text> File → New Calendar Subscription → paste the URL
+                </Text>
+                <Text style={s.stepText}>
+                  <Text style={s.bold}>Outlook:</Text> Add calendar → Subscribe from web → paste the URL
+                </Text>
               </View>
               {feedUrl ? (
-                <View style={s.feedUrlRow}>
-                  <Text style={s.feedUrl} numberOfLines={1}>{feedUrl}</Text>
-                  <TouchableOpacity style={s.copyBtn} onPress={handleCopy}>
-                    <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={16} color="#fff" />
+                <View style={s.urlRow}>
+                  <Text style={s.urlText} numberOfLines={1}>{feedUrl}</Text>
+                  <TouchableOpacity style={s.copyBtn} onPress={() => handleCopy(feedUrl)}>
+                    <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={14} color="#fff" />
                     <Text style={s.copyBtnText}>{copied ? 'Copied' : 'Copy'}</Text>
                   </TouchableOpacity>
                 </View>
@@ -215,17 +197,35 @@ export function CalendarSyncModal({ staffId, getToken, visible, onClose }: Props
               )}
             </View>
 
-            {/* Import Calendars */}
+            {/* Import section */}
             <View style={s.section}>
               <View style={s.sectionHeader}>
                 <View style={[s.iconBg, { backgroundColor: '#fef9c3' }]}>
                   <Ionicons name="download-outline" size={18} color="#ca8a04" />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.sectionTitle}>Import iCal Calendars</Text>
-                  <Text style={s.sectionDesc}>Add URLs from Airbnb, Calendly, etc. Syncs every 15 min.</Text>
-                </View>
+                <Text style={s.sectionTitle}>Import External Calendars</Text>
               </View>
+              <Text style={s.instructions}>
+                Add iCal feed URLs from other platforms to block those busy times. Here's where to find them:
+              </Text>
+              <View style={s.stepList}>
+                <Text style={s.stepText}>
+                  <Text style={s.bold}>Google Calendar:</Text> Settings → click your calendar → "Secret address in iCal format" → copy
+                </Text>
+                <Text style={s.stepText}>
+                  <Text style={s.bold}>Apple Calendar:</Text> Right-click calendar → Sharing Settings → enable Public Calendar → copy URL
+                </Text>
+                <Text style={s.stepText}>
+                  <Text style={s.bold}>Outlook:</Text> Settings → Calendar → Shared calendars → Publish a calendar → copy ICS link
+                </Text>
+                <Text style={s.stepText}>
+                  <Text style={s.bold}>Airbnb:</Text> Calendar → Availability → scroll to "Connect calendars" → copy the export link
+                </Text>
+                <Text style={s.stepText}>
+                  <Text style={s.bold}>Calendly:</Text> Account → Calendar sync → copy iCal feed link
+                </Text>
+              </View>
+              <Text style={s.syncNote}>Syncs every 15 minutes. Busy times will block bookings for this staff member.</Text>
 
               {calendars.map((cal) => (
                 <View key={cal.id} style={s.calRow}>
@@ -235,7 +235,7 @@ export function CalendarSyncModal({ staffId, getToken, visible, onClose }: Props
                       {cal.last_synced_at
                         ? `Synced ${new Date(cal.last_synced_at).toLocaleDateString()}`
                         : 'Not synced yet'}
-                      {cal.last_error ? ` — Error` : ''}
+                      {cal.last_error ? ' — Error' : ''}
                     </Text>
                   </View>
                   <TouchableOpacity onPress={() => handleDeleteCalendar(cal.id, cal.name)}>
@@ -246,7 +246,7 @@ export function CalendarSyncModal({ staffId, getToken, visible, onClose }: Props
 
               {showAddForm ? (
                 <View style={s.addForm}>
-                  <TextInput style={s.input} placeholder="Calendar name" value={addName} onChangeText={setAddName} placeholderTextColor="#9ca3af" />
+                  <TextInput style={s.input} placeholder="Calendar name (e.g. Airbnb)" value={addName} onChangeText={setAddName} placeholderTextColor="#9ca3af" />
                   <TextInput style={s.input} placeholder="iCal URL (https://...)" value={addUrl} onChangeText={setAddUrl} placeholderTextColor="#9ca3af" autoCapitalize="none" keyboardType="url" />
                   {error ? <Text style={s.errorText}>{error}</Text> : null}
                   <View style={s.addFormButtons}>
@@ -266,6 +266,48 @@ export function CalendarSyncModal({ staffId, getToken, visible, onClose }: Props
               )}
             </View>
           </ScrollView>
+        ) : (
+          <ScrollView style={s.scrollContent} contentContainerStyle={s.scrollInner}>
+            {/* Google Calendar option */}
+            <TouchableOpacity
+              style={s.optionCard}
+              onPress={googleConn ? handleDisconnectGoogle : handleConnectGoogle}
+            >
+              <View style={[s.iconBg, { backgroundColor: '#e8f5e9' }]}>
+                <Ionicons name="logo-google" size={20} color="#4285F4" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.optionTitle}>Google Calendar</Text>
+                <Text style={s.optionDesc}>
+                  {googleConn
+                    ? `Connected — ${googleConn.google_email}`
+                    : 'Real-time two-way sync. Bookings push automatically.'}
+                </Text>
+              </View>
+              {googleConn ? (
+                <View style={s.connectedBadge}>
+                  <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
+                </View>
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
+              )}
+            </TouchableOpacity>
+
+            {/* iCal option */}
+            <TouchableOpacity style={s.optionCard} onPress={() => setShowIcal(true)}>
+              <View style={[s.iconBg, { backgroundColor: '#e8f0fe' }]}>
+                <Ionicons name="calendar-outline" size={20} color="#6B7FC4" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.optionTitle}>iCal Calendars</Text>
+                <Text style={s.optionDesc}>
+                  Export to Outlook/Apple Calendar. Import from Airbnb, Calendly, etc.
+                  {calendars.length > 0 ? ` (${calendars.length} connected)` : ''}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
+            </TouchableOpacity>
+          </ScrollView>
         )}
       </SafeAreaView>
     </Modal>
@@ -280,21 +322,29 @@ const s = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollContent: { flex: 1 },
   scrollInner: { padding: 16, gap: 16 },
+
+  optionCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#fff', borderRadius: 14, padding: 16 },
+  optionTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
+  optionDesc: { fontSize: 12, color: '#6b7280', marginTop: 2, lineHeight: 16 },
+  connectedBadge: { padding: 4 },
+
   section: { backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 12 },
-  sectionHeader: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  sectionHeader: { flexDirection: 'row', gap: 12, alignItems: 'center' },
   iconBg: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  sectionDesc: { fontSize: 12, color: '#6b7280', marginTop: 2 },
-  connectedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f0fdf4', borderRadius: 10, padding: 12 },
-  connectedEmail: { flex: 1, fontSize: 13, fontWeight: '600', color: '#111827' },
-  disconnectText: { fontSize: 12, fontWeight: '600', color: '#ef4444' },
-  connectBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  connectBtnText: { fontSize: 14, fontWeight: '600', color: '#374151' },
-  feedUrlRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  feedUrl: { flex: 1, fontSize: 12, fontFamily: 'monospace', color: '#6b7280', backgroundColor: '#f3f4f6', paddingHorizontal: 10, paddingVertical: 10, borderRadius: 8 },
-  copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#6B7FC4', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
-  copyBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
+
+  instructions: { fontSize: 13, color: '#6b7280', lineHeight: 18 },
+  stepList: { gap: 8, backgroundColor: '#f9fafb', borderRadius: 10, padding: 12 },
+  stepText: { fontSize: 12, color: '#374151', lineHeight: 18 },
+  bold: { fontWeight: '700' },
+  syncNote: { fontSize: 11, color: '#9ca3af', fontStyle: 'italic' },
+
+  urlRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  urlText: { flex: 1, fontSize: 11, fontFamily: 'monospace', color: '#6b7280', backgroundColor: '#f3f4f6', paddingHorizontal: 10, paddingVertical: 10, borderRadius: 8 },
+  copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#6B7FC4', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8 },
+  copyBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   emptyText: { fontSize: 12, color: '#9ca3af', fontStyle: 'italic' },
+
   calRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#f9fafb', borderRadius: 10, padding: 12 },
   calName: { fontSize: 13, fontWeight: '600', color: '#111827' },
   calStatus: { fontSize: 11, color: '#9ca3af', marginTop: 2 },

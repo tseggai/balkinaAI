@@ -227,59 +227,48 @@ export default function TenantSettings() {
         )}
       </View>
 
-      {/* Calendar Sync */}
-      {ownerStaffId && (
-        <>
-          <Text style={styles.sectionTitle}>Calendar Sync</Text>
-          <View style={styles.card}>
+      {/* App Settings */}
+      <Text style={styles.sectionTitle}>App Settings</Text>
+      <View style={styles.card}>
+        {/* Calendar Sync */}
+        {ownerStaffId && (
+          <>
             <TouchableOpacity style={styles.linkRow} onPress={() => setCalSyncVisible(true)}>
               <View style={styles.linkRowLeft}>
                 <Ionicons name="calendar-outline" size={20} color="#6B7FC4" />
-                <View>
-                  <Text style={styles.linkRowLabel}>Manage Calendar Sync</Text>
-                  <Text style={{ fontSize: 12, color: '#9ca3af' }}>Google Calendar, export, import iCal</Text>
-                </View>
+                <Text style={styles.linkRowLabel}>Calendar Sync</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
             </TouchableOpacity>
-          </View>
-          <CalendarSyncModal
-            staffId={ownerStaffId}
-            getToken={async () => {
-              const { data: { session } } = await supabase.auth.getSession();
-              return session?.access_token ?? null;
-            }}
-            visible={calSyncVisible}
-            onClose={() => setCalSyncVisible(false)}
-          />
-        </>
-      )}
-
-      {/* OTA Distribution */}
-      <Text style={styles.sectionTitle}>OTA Distribution</Text>
-      <View style={styles.card}>
+            <View style={styles.separator} />
+            <CalendarSyncModal
+              staffId={ownerStaffId}
+              getToken={async () => {
+                const { data: { session } } = await supabase.auth.getSession();
+                return session?.access_token ?? null;
+              }}
+              visible={calSyncVisible}
+              onClose={() => setCalSyncVisible(false)}
+            />
+          </>
+        )}
+        {/* Bokun Integration */}
         <TouchableOpacity style={styles.linkRow} onPress={() => setBokunVisible(true)}>
           <View style={styles.linkRowLeft}>
             <Ionicons name="globe-outline" size={20} color="#6B7FC4" />
-            <View>
-              <Text style={styles.linkRowLabel}>Bokun Integration</Text>
-              <Text style={{ fontSize: 12, color: '#9ca3af' }}>Sync bookings from Viator, GetYourGuide, Airbnb</Text>
-            </View>
+            <Text style={styles.linkRowLabel}>Bokun Integration</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
         </TouchableOpacity>
-      </View>
-      {tenant && (
-        <BokunIntegrationModal
-          tenantId={tenant.id}
-          visible={bokunVisible}
-          onClose={() => setBokunVisible(false)}
-        />
-      )}
-
-      {/* Legal */}
-      <Text style={styles.sectionTitle}>Legal</Text>
-      <View style={styles.card}>
+        <View style={styles.separator} />
+        {tenant && (
+          <BokunIntegrationModal
+            tenantId={tenant.id}
+            visible={bokunVisible}
+            onClose={() => setBokunVisible(false)}
+          />
+        )}
+        {/* Terms */}
         <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://balkina.ai/terms')}>
           <View style={styles.linkRowLeft}>
             <Ionicons name="document-text-outline" size={20} color="#6b7280" />
@@ -288,6 +277,7 @@ export default function TenantSettings() {
           <Ionicons name="open-outline" size={16} color="#d1d5db" />
         </TouchableOpacity>
         <View style={styles.separator} />
+        {/* Privacy */}
         <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://balkina.ai/privacy')}>
           <View style={styles.linkRowLeft}>
             <Ionicons name="shield-checkmark-outline" size={20} color="#6b7280" />
@@ -295,6 +285,50 @@ export default function TenantSettings() {
           </View>
           <Ionicons name="open-outline" size={16} color="#d1d5db" />
         </TouchableOpacity>
+        <View style={styles.separator} />
+        {/* Delete Account */}
+        <TouchableOpacity
+          style={styles.linkRow}
+          onPress={() => {
+            setDangerZoneExpanded(!dangerZoneExpanded);
+            if (dangerZoneExpanded) setDeleteConfirmText('');
+          }}
+          activeOpacity={0.6}
+        >
+          <View style={styles.linkRowLeft}>
+            <Ionicons name="warning-outline" size={20} color="#dc2626" />
+            <Text style={[styles.linkRowLabel, { color: '#dc2626' }]}>Delete Account</Text>
+          </View>
+          <Ionicons name={dangerZoneExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#d1d5db" />
+        </TouchableOpacity>
+        {dangerZoneExpanded && (
+          <View style={styles.dangerZoneContent}>
+            <Text style={styles.dangerZoneWarning}>
+              This action is irreversible. Your account, business, all services, staff, bookings, and customer data will be permanently deleted.
+            </Text>
+            <Text style={styles.dangerZonePrompt}>
+              Type <Text style={styles.dangerZoneDeleteWord}>DELETE</Text> to confirm:
+            </Text>
+            <TextInput
+              style={styles.dangerZoneInput}
+              value={deleteConfirmText}
+              onChangeText={setDeleteConfirmText}
+              placeholder="Type DELETE here"
+              placeholderTextColor="#d1d5db"
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={[styles.dangerZoneButton, !isDeleteEnabled && styles.dangerZoneButtonDisabled]}
+              onPress={isDeleteEnabled ? handleDeleteAccount : undefined}
+              disabled={!isDeleteEnabled}
+            >
+              <Text style={isDeleteEnabled ? styles.dangerZoneButtonText : styles.dangerZoneButtonTextDisabled}>
+                Delete My Account
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Switch Role */}
@@ -319,71 +353,6 @@ export default function TenantSettings() {
             <Text style={[styles.linkRowLabel, { color: '#dc2626' }]}>Sign Out</Text>
           </View>
         </TouchableOpacity>
-      </View>
-
-      {/* Danger Zone — collapsible */}
-      <Text style={styles.sectionTitle}>Danger Zone</Text>
-      <View style={styles.card}>
-        <TouchableOpacity
-          style={styles.linkRow}
-          onPress={() => {
-            setDangerZoneExpanded(!dangerZoneExpanded);
-            if (dangerZoneExpanded) setDeleteConfirmText('');
-          }}
-          activeOpacity={0.6}
-        >
-          <View style={styles.linkRowLeft}>
-            <Ionicons name="warning-outline" size={20} color="#dc2626" />
-            <View>
-              <Text style={[styles.linkRowLabel, { color: '#dc2626' }]}>Delete Account</Text>
-              <Text style={styles.linkRowSub}>Permanently remove your account and business</Text>
-            </View>
-          </View>
-          <Ionicons
-            name={dangerZoneExpanded ? 'chevron-up' : 'chevron-down'}
-            size={18}
-            color="#d1d5db"
-          />
-        </TouchableOpacity>
-
-        {dangerZoneExpanded && (
-          <View style={styles.dangerZoneContent}>
-            <Text style={styles.dangerZoneWarning}>
-              This action is irreversible. Your account, business, all services, staff, bookings, and customer data will be permanently deleted.
-            </Text>
-            <Text style={styles.dangerZonePrompt}>
-              Type <Text style={styles.dangerZoneDeleteWord}>DELETE</Text> to confirm:
-            </Text>
-            <TextInput
-              style={styles.dangerZoneInput}
-              value={deleteConfirmText}
-              onChangeText={setDeleteConfirmText}
-              placeholder="Type DELETE here"
-              placeholderTextColor="#d1d5db"
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              style={[
-                styles.dangerZoneButton,
-                !isDeleteEnabled && styles.dangerZoneButtonDisabled,
-              ]}
-              onPress={handleDeleteAccount}
-              disabled={!isDeleteEnabled}
-              activeOpacity={0.6}
-            >
-              <Ionicons name="trash-outline" size={16} color={isDeleteEnabled ? '#fff' : '#f9a8a8'} />
-              <Text
-                style={[
-                  styles.dangerZoneButtonText,
-                  !isDeleteEnabled && styles.dangerZoneButtonTextDisabled,
-                ]}
-              >
-                Delete My Account
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
 
       <Text style={styles.version}>Balkina AI · v{Constants.expoConfig?.version ?? '1.1.0'}</Text>
