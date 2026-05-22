@@ -253,6 +253,21 @@ export default function TenantSettings() {
         </>
       )}
 
+      {/* OTA Distribution */}
+      <Text style={styles.sectionTitle}>OTA Distribution</Text>
+      <View style={styles.card}>
+        <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://app.balkina.ai/dashboard/settings')}>
+          <View style={styles.linkRowLeft}>
+            <Ionicons name="globe-outline" size={20} color="#6B7FC4" />
+            <View>
+              <Text style={styles.linkRowLabel}>Bokun Integration</Text>
+              <Text style={{ fontSize: 12, color: '#9ca3af' }}>Sync bookings from Viator, GetYourGuide, Airbnb</Text>
+            </View>
+          </View>
+          <Ionicons name="open-outline" size={16} color="#d1d5db" />
+        </TouchableOpacity>
+      </View>
+
       {/* Legal */}
       <Text style={styles.sectionTitle}>Legal</Text>
       <View style={styles.card}>

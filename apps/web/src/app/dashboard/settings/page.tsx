@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 
-type Tab = 'profile' | 'billing' | 'notifications' | 'widget';
+type Tab = 'profile' | 'billing' | 'notifications' | 'widget' | 'integrations';
 
 interface TenantInfo {
   id: string;
@@ -190,6 +190,7 @@ export default function SettingsPage() {
     { key: 'billing', label: 'Billing' },
     { key: 'notifications', label: 'Notifications' },
     { key: 'widget', label: 'Chat Widget' },
+    { key: 'integrations', label: 'Integrations' },
   ];
 
   return (
@@ -346,6 +347,10 @@ export default function SettingsPage() {
           <WidgetEmbed tenantId={tenant.id} tenantName={tenant.name} />
         )}
 
+        {tab === 'integrations' && tenant && (
+          <BokunIntegration tenantId={tenant.id} />
+        )}
+
       </div>
     </div>
   );
@@ -444,6 +449,176 @@ function NotifToggle({ label, defaultChecked }: { label: string; defaultChecked:
         }`} />
       </button>
     </label>
+  );
+}
+
+function BokunIntegration({ tenantId }: { tenantId: string }) {
+  const [vendorId, setVendorId] = useState('');
+  const [savedVendorId, setSavedVendorId] = useState('');
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const webhookUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/webhooks/bokun`
+    : 'https://app.balkina.ai/api/webhooks/bokun';
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('tenants')
+        .select('bokun_vendor_id')
+        .eq('id', tenantId)
+        .single();
+      const t = data as { bokun_vendor_id: string | null } | null;
+      if (t?.bokun_vendor_id) {
+        setVendorId(t.bokun_vendor_id);
+        setSavedVendorId(t.bokun_vendor_id);
+        setEnabled(true);
+      }
+      setLoading(false);
+    })();
+  }, [tenantId]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const supabase = createClient();
+    await supabase
+      .from('tenants')
+      .update({ bokun_vendor_id: enabled ? vendorId.trim() || null : null } as never)
+      .eq('id', tenantId);
+    setSavedVendorId(enabled ? vendorId.trim() : '');
+    setSaving(false);
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (loading) return <div className="text-sm text-gray-500">Loading...</div>;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-sm font-medium text-gray-900">OTA Distribution via Bokun</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          Connect your Bokun account to sync bookings from Viator, GetYourGuide, Airbnb Experiences, and other OTAs.
+          Bookings made on these platforms will automatically appear in your Balkina dashboard.
+        </p>
+      </div>
+
+      {/* Enable toggle */}
+      <label className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+        <div>
+          <span className="text-sm font-medium text-gray-900">Enable Bokun Integration</span>
+          <p className="text-xs text-gray-500 mt-0.5">Receive OTA bookings in Balkina</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          onClick={() => setEnabled(!enabled)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-brand-600' : 'bg-gray-200'}`}
+        >
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+        </button>
+      </label>
+
+      {enabled && (
+        <>
+          {/* Vendor ID */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Bokun Vendor ID
+            </label>
+            <p className="text-xs text-gray-500 mt-0.5 mb-2">
+              Find this in your Bokun dashboard — it&apos;s the number next to your company name (e.g. &quot;My Business (140057)&quot;).
+            </p>
+            <input
+              type="text"
+              value={vendorId}
+              onChange={(e) => setVendorId(e.target.value)}
+              placeholder="e.g. 140057"
+              className="w-full max-w-xs rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+          </div>
+
+          {/* Save button */}
+          <button
+            onClick={handleSave}
+            disabled={saving || vendorId.trim() === savedVendorId}
+            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+
+          {/* Webhook URL + setup instructions */}
+          {savedVendorId && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900">Setup Instructions</h4>
+                <p className="mt-1 text-xs text-gray-600">Complete these steps in your Bokun dashboard:</p>
+              </div>
+
+              <div className="space-y-3 text-sm text-gray-700">
+                <div className="flex gap-3">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white flex-shrink-0">1</span>
+                  <div>
+                    <p className="font-medium">Create your products in Bokun</p>
+                    <p className="text-xs text-gray-500">Make sure the product names match your Balkina service names exactly.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white flex-shrink-0">2</span>
+                  <div>
+                    <p className="font-medium">Connect OTA sales channels</p>
+                    <p className="text-xs text-gray-500">In Bokun, go to Marketplace → OTAs and connect Viator, GetYourGuide, etc.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white flex-shrink-0">3</span>
+                  <div>
+                    <p className="font-medium">Add the Balkina webhook</p>
+                    <p className="text-xs text-gray-500">
+                      Go to Settings → Connections → Integrated systems → Add → HTTP Booking notification.
+                      Paste this URL and check all three notification boxes:
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={webhookUrl}
+                        className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-mono text-gray-600"
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                      />
+                      <button
+                        onClick={handleCopy}
+                        className="rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700"
+                      >
+                        {copied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+                <p className="text-xs text-green-800">
+                  <strong>That&apos;s it!</strong> Once configured, any booking made on Viator, GetYourGuide, or other connected OTAs will automatically appear in your Balkina appointments.
+                  Cancellations sync automatically too.
+                </p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
