@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CalendarSyncModal } from '@/components/CalendarSyncModal';
+import { BokunIntegrationModal } from '@/components/BokunIntegrationModal';
 import Constants from 'expo-constants';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
 import { pickAndUploadPhoto } from '@/lib/usePhotoUpload';
@@ -34,6 +35,7 @@ export default function TenantSettings() {
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [calSyncVisible, setCalSyncVisible] = useState(false);
+  const [bokunVisible, setBokunVisible] = useState(false);
   const [ownerStaffId, setOwnerStaffId] = useState<string | null>(null);
 
   // Form
@@ -256,7 +258,7 @@ export default function TenantSettings() {
       {/* OTA Distribution */}
       <Text style={styles.sectionTitle}>OTA Distribution</Text>
       <View style={styles.card}>
-        <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://app.balkina.ai/dashboard/settings')}>
+        <TouchableOpacity style={styles.linkRow} onPress={() => setBokunVisible(true)}>
           <View style={styles.linkRowLeft}>
             <Ionicons name="globe-outline" size={20} color="#6B7FC4" />
             <View>
@@ -264,9 +266,16 @@ export default function TenantSettings() {
               <Text style={{ fontSize: 12, color: '#9ca3af' }}>Sync bookings from Viator, GetYourGuide, Airbnb</Text>
             </View>
           </View>
-          <Ionicons name="open-outline" size={16} color="#d1d5db" />
+          <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
         </TouchableOpacity>
       </View>
+      {tenant && (
+        <BokunIntegrationModal
+          tenantId={tenant.id}
+          visible={bokunVisible}
+          onClose={() => setBokunVisible(false)}
+        />
+      )}
 
       {/* Legal */}
       <Text style={styles.sectionTitle}>Legal</Text>
