@@ -233,10 +233,12 @@ export default function TenantSettings() {
       <View style={[styles.card, { marginTop: 20 }]}>
         <TouchableOpacity style={styles.linkRow} onPress={() => setAccountSettingsVisible(true)}>
           <View style={styles.linkRowLeft}>
-            <Ionicons name="settings-outline" size={20} color="#6B7FC4" />
+            <View style={[styles.iconCircle, { backgroundColor: '#F3F4F6' }]}>
+              <Ionicons name="settings-outline" size={18} color="#6b7280" />
+            </View>
             <Text style={styles.linkRowLabel}>Account Settings</Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+          <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
         </TouchableOpacity>
       </View>
 
@@ -244,21 +246,28 @@ export default function TenantSettings() {
       <View style={[styles.card, { marginTop: 12 }]}>
         <TouchableOpacity style={styles.linkRow} onPress={() => setIntegrationsVisible(true)}>
           <View style={styles.linkRowLeft}>
-            <Ionicons name="extension-puzzle-outline" size={20} color="#6B7FC4" />
+            <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
+              <Ionicons name="extension-puzzle-outline" size={18} color="#6B7FC4" />
+            </View>
             <Text style={styles.linkRowLabel}>Integrations</Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+          <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
         </TouchableOpacity>
       </View>
 
       {/* Switch Role */}
-      <View style={[styles.card, { marginTop: 12 }]}>
+      <View style={[styles.card, { marginTop: 24 }]}>
         <TouchableOpacity style={styles.linkRow} onPress={() => router.replace('/(app)')}>
           <View style={styles.linkRowLeft}>
-            <Ionicons name="swap-horizontal-outline" size={20} color="#6B7FC4" />
-            <Text style={styles.linkRowLabel}>Switch to Customer</Text>
+            <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
+              <Ionicons name="swap-horizontal-outline" size={18} color="#6B7FC4" />
+            </View>
+            <View>
+              <Text style={styles.linkRowLabel}>Switch to Customer</Text>
+              <Text style={styles.linkRowSub}>Book services as a customer</Text>
+            </View>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+          <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
         </TouchableOpacity>
       </View>
 
@@ -266,7 +275,9 @@ export default function TenantSettings() {
       <View style={[styles.card, { marginTop: 12 }]}>
         <TouchableOpacity style={styles.linkRow} onPress={handleSignOut}>
           <View style={styles.linkRowLeft}>
-            <Ionicons name="log-out-outline" size={20} color="#dc2626" />
+            <View style={[styles.iconCircle, { backgroundColor: '#FEF2F2' }]}>
+              <Ionicons name="log-out-outline" size={18} color="#dc2626" />
+            </View>
             <Text style={[styles.linkRowLabel, { color: '#dc2626' }]}>Sign Out</Text>
           </View>
         </TouchableOpacity>
@@ -288,7 +299,9 @@ export default function TenantSettings() {
             <View style={styles.card}>
               <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://balkina.ai/terms')}>
                 <View style={styles.linkRowLeft}>
-                  <Ionicons name="document-text-outline" size={20} color="#6b7280" />
+                  <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
+                    <Ionicons name="document-text-outline" size={18} color="#6B7FC4" />
+                  </View>
                   <Text style={styles.linkRowLabel}>Terms of Service</Text>
                 </View>
                 <Ionicons name="open-outline" size={16} color="#d1d5db" />
@@ -297,7 +310,9 @@ export default function TenantSettings() {
             <View style={styles.card}>
               <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://balkina.ai/privacy')}>
                 <View style={styles.linkRowLeft}>
-                  <Ionicons name="shield-checkmark-outline" size={20} color="#6b7280" />
+                  <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
+                    <Ionicons name="shield-checkmark-outline" size={18} color="#6B7FC4" />
+                  </View>
                   <Text style={styles.linkRowLabel}>Privacy Policy</Text>
                 </View>
                 <Ionicons name="open-outline" size={16} color="#d1d5db" />
@@ -309,7 +324,9 @@ export default function TenantSettings() {
                 onPress={() => { setDangerZoneExpanded(!dangerZoneExpanded); if (dangerZoneExpanded) setDeleteConfirmText(''); }}
               >
                 <View style={styles.linkRowLeft}>
-                  <Ionicons name="warning-outline" size={20} color="#dc2626" />
+                  <View style={[styles.iconCircle, { backgroundColor: '#FEF2F2' }]}>
+                    <Ionicons name="warning-outline" size={18} color="#dc2626" />
+                  </View>
                   <Text style={[styles.linkRowLabel, { color: '#dc2626' }]}>Delete Account</Text>
                 </View>
                 <Ionicons name={dangerZoneExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#d1d5db" />
@@ -344,26 +361,30 @@ export default function TenantSettings() {
               <View style={styles.card}>
                 <TouchableOpacity style={styles.linkRow} onPress={() => { setIntegrationsVisible(false); setTimeout(() => setCalSyncVisible(true), 300); }}>
                   <View style={styles.linkRowLeft}>
-                    <Ionicons name="calendar-outline" size={20} color="#6B7FC4" />
+                    <View style={[styles.iconCircle, { backgroundColor: '#E8F5E9' }]}>
+                      <Ionicons name="calendar-outline" size={18} color="#16a34a" />
+                    </View>
                     <View>
                       <Text style={styles.linkRowLabel}>Calendar Sync</Text>
                       <Text style={styles.linkRowSub}>Google Calendar, iCal export/import</Text>
                     </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+                  <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
                 </TouchableOpacity>
               </View>
             )}
             <View style={styles.card}>
               <TouchableOpacity style={styles.linkRow} onPress={() => { setIntegrationsVisible(false); setTimeout(() => setBokunVisible(true), 300); }}>
                 <View style={styles.linkRowLeft}>
-                  <Ionicons name="globe-outline" size={20} color="#6B7FC4" />
+                  <View style={[styles.iconCircle, { backgroundColor: '#FEF3C7' }]}>
+                    <Ionicons name="globe-outline" size={18} color="#D97706" />
+                  </View>
                   <View>
                     <Text style={styles.linkRowLabel}>Bokun Integration</Text>
                     <Text style={styles.linkRowSub}>Sync bookings from Viator, GetYourGuide, Airbnb</Text>
                   </View>
                 </View>
-                <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+                <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -395,7 +416,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   content: { padding: 16, paddingBottom: 40 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
-  card: { backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#f3f4f6' },
+  card: { marginHorizontal: 0, backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#f3f4f6' },
   profileHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
   logo: { width: 52, height: 52, borderRadius: 12 },
   logoPlaceholder: { width: 52, height: 52, borderRadius: 12, backgroundColor: '#6B7FC4', justifyContent: 'center', alignItems: 'center' },
@@ -415,6 +436,7 @@ const styles = StyleSheet.create({
   linkRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   linkRowLabel: { fontSize: 15, fontWeight: '500', color: '#111827' },
   linkRowSub: { fontSize: 12, color: '#9ca3af', marginTop: 1 },
+  iconCircle: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   separator: { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 16 },
   version: { textAlign: 'center', fontSize: 12, color: '#d1d5db', marginTop: 24 },
 
