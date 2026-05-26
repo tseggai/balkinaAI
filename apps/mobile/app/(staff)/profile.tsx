@@ -18,7 +18,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import * as Clipboard from 'expo-clipboard';
+
+let Clipboard: { setStringAsync?: (s: string) => Promise<void> } | null = null;
+try { Clipboard = require('expo-clipboard'); } catch {}
+
 import { supabase, getAuthenticatedRole } from '@/lib/supabase';
 import type { StaffInfo } from '@/lib/supabase';
 
