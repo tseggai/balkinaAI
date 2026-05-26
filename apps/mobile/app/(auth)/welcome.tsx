@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Linking, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import * as AppleAuthentication from 'expo-apple-authentication';
 import { useGoogleAuth, handleGoogleResult } from '@/lib/googleAuth';
+
+let AppleAuthentication: { signInAsync?: (opts: unknown) => Promise<{ identityToken?: string | null }>; AppleAuthenticationScope?: { FULL_NAME: number; EMAIL: number } } | null = null;
+try { AppleAuthentication = require('expo-apple-authentication'); } catch {}
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -38,12 +40,16 @@ export default function WelcomeScreen() {
   };
 
   const handleAppleSignIn = async () => {
+    if (!AppleAuthentication?.signInAsync) {
+      Alert.alert('Not available', 'Apple Sign-In requires a development build.');
+      return;
+    }
     try {
       setSocialLoading(true);
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          AppleAuthentication.AppleAuthenticationScope?.FULL_NAME ?? 0,
+          AppleAuthentication.AppleAuthenticationScope?.EMAIL ?? 1,
         ],
       });
       if (!credential.identityToken) throw new Error('No identity token');
