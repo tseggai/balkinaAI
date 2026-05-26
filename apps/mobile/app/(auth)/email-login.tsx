@@ -14,8 +14,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import * as AppleAuthentication from 'expo-apple-authentication';
 import { useGoogleAuth, googleAvailable, handleGoogleResult } from '@/lib/googleAuth';
+
+let AppleAuthentication: { signInAsync?: (opts: unknown) => Promise<{ identityToken?: string | null }>; AppleAuthenticationScope?: { FULL_NAME: number; EMAIL: number } } | null = null;
+try { AppleAuthentication = require('expo-apple-authentication'); } catch {}
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
 
@@ -170,12 +172,16 @@ export default function EmailLoginScreen() {
   }
 
   async function handleAppleSignIn() {
+    if (!AppleAuthentication?.signInAsync) {
+      Alert.alert('Not available', 'Apple Sign-In requires a development build.');
+      return;
+    }
     try {
       setSocialLoading(true);
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          AppleAuthentication.AppleAuthenticationScope?.FULL_NAME ?? 0,
+          AppleAuthentication.AppleAuthenticationScope?.EMAIL ?? 1,
         ],
       });
       if (!credential.identityToken) throw new Error('No identity token');
