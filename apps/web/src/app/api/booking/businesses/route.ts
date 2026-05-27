@@ -140,6 +140,7 @@ export async function POST(request: Request) {
           const existing = locMap.get(loc.tenant_id);
           if (!existing || dist < existing.dist) {
             locMap.set(loc.tenant_id, { locationId: loc.id, lat: loc.latitude, lng: loc.longitude, dist });
+            currencyMap.set(loc.tenant_id, loc.currency ?? 'USD');
           }
         }
       }
@@ -261,6 +262,7 @@ export async function POST(request: Request) {
           const existing = locMap.get(loc.tenant_id);
           if (!existing || dist < existing.dist) {
             locMap.set(loc.tenant_id, { locationId: loc.id, dist });
+            currencyMap2.set(loc.tenant_id, loc.currency ?? 'USD');
           }
         }
       }
