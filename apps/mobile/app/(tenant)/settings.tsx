@@ -31,6 +31,7 @@ export default function TenantSettings() {
   const perms = useTenantPermissions();
   const [tenant, setTenant] = useState<TenantData | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -45,6 +46,10 @@ export default function TenantSettings() {
   const [formOwnerName, setFormOwnerName] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formCategoryIds, setFormCategoryIds] = useState<string[]>([]);
+  const [formSubcategoryId, setFormSubcategoryId] = useState<string | null>(null);
+  const [formCustomSubcategory, setFormCustomSubcategory] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [showSubcategoryPicker, setShowSubcategoryPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [dangerZoneExpanded, setDangerZoneExpanded] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -54,12 +59,14 @@ export default function TenantSettings() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [{ data: t }, { data: cats }, { data: staffRec }] = await Promise.all([
-        supabase.from('tenants').select('id, name, owner_name, email, phone, logo_url, category_id').eq('user_id', user.id).single(),
+      const [{ data: t }, { data: cats }, { data: staffRec }, { data: allSubcats }] = await Promise.all([
+        supabase.from('tenants').select('id, name, owner_name, email, phone, logo_url, category_id, description').eq('user_id', user.id).single(),
         supabase.from('categories').select('id, name').is('parent_id', null).order('display_order'),
         supabase.from('staff').select('id').eq('user_id', user.id).limit(1).maybeSingle(),
+        supabase.from('categories').select('id, name, parent_id').not('parent_id', 'is', null).order('display_order'),
       ]);
       if (staffRec) setOwnerStaffId((staffRec as { id: string }).id);
+      if (allSubcats) setSubcategories(allSubcats as unknown as Category[]);
 
       if (t) {
         const td = t as TenantData;
@@ -67,11 +74,15 @@ export default function TenantSettings() {
         setFormName(td.name);
         setFormOwnerName(td.owner_name ?? '');
         setFormPhone(td.phone ?? '');
+        setFormDescription((t as unknown as { description?: string }).description ?? '');
         const { data: tcLinks } = await supabase
           .from('tenant_category_links')
           .select('category_id')
           .eq('tenant_id', td.id);
-        setFormCategoryIds(((tcLinks ?? []) as { category_id: string }[]).map((l) => l.category_id));
+        const allLinkedIds = ((tcLinks ?? []) as { category_id: string }[]).map((l) => l.category_id);
+        setFormCategoryIds(allLinkedIds);
+        const subcatId = allLinkedIds.find((id) => (allSubcats ?? []).some((sc: { id: string }) => sc.id === id));
+        if (subcatId) setFormSubcategoryId(subcatId);
       }
       if (cats) setCategories(cats as Category[]);
     } catch {
@@ -86,16 +97,31 @@ export default function TenantSettings() {
     if (!tenant || !formName.trim()) return;
     setSaving(true);
     try {
+      let subcatId = formSubcategoryId;
+      if (formCustomSubcategory.trim() && !subcatId) {
+        const parentId = formCategoryIds.find((id) => categories.some((c) => c.id === id));
+        if (parentId) {
+          const slug = formCustomSubcategory.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          const { data: newCat } = await supabase.from('categories').insert({
+            parent_id: parentId, name: formCustomSubcategory.trim(), slug, display_order: 99,
+          } as never).select('id').single();
+          if (newCat) subcatId = (newCat as { id: string }).id;
+        }
+      }
+
       await supabase.from('tenants').update({
         name: formName.trim(),
         owner_name: formOwnerName.trim() || null,
         phone: formPhone.trim() || null,
+        description: formDescription.trim() || null,
         category_id: formCategoryIds[0] || null,
       } as never).eq('id', tenant.id);
       await supabase.from('tenant_category_links').delete().eq('tenant_id', tenant.id);
-      if (formCategoryIds.length > 0) {
+      const allCatIds = [...formCategoryIds];
+      if (subcatId && !allCatIds.includes(subcatId)) allCatIds.push(subcatId);
+      if (allCatIds.length > 0) {
         await supabase.from('tenant_category_links').insert(
-          formCategoryIds.map((cid) => ({ tenant_id: tenant.id, category_id: cid })) as never
+          allCatIds.map((cid) => ({ tenant_id: tenant.id, category_id: cid })) as never
         );
       }
       setEditMode(false);
@@ -221,6 +247,63 @@ export default function TenantSettings() {
                 })}
               </View>
             )}
+
+            {/* Subcategory Picker */}
+            {formCategoryIds.length > 0 && (() => {
+              const parentId = formCategoryIds.find((id) => categories.some((c) => c.id === id));
+              const filtered = parentId ? subcategories.filter((sc) => (sc as unknown as { parent_id: string }).parent_id === parentId) : [];
+              return filtered.length > 0 ? (
+                <>
+                  <TouchableOpacity style={styles.input} onPress={() => setShowSubcategoryPicker(!showSubcategoryPicker)}>
+                    <Text style={{ fontSize: 16, color: formSubcategoryId || formCustomSubcategory ? '#111827' : '#9ca3af' }}>
+                      {formSubcategoryId === 'OTHER' ? formCustomSubcategory || 'Type your business type' : formSubcategoryId ? filtered.find((sc) => sc.id === formSubcategoryId)?.name ?? 'Select business type' : 'Select business type (e.g. Barbershop)'}
+                    </Text>
+                  </TouchableOpacity>
+                  {showSubcategoryPicker && (
+                    <View style={styles.pickerList}>
+                      {filtered.map((sc) => {
+                        const isSelected = formSubcategoryId === sc.id;
+                        return (
+                          <TouchableOpacity
+                            key={sc.id}
+                            style={[styles.pickerItem, isSelected && styles.pickerItemActive]}
+                            onPress={() => { setFormSubcategoryId(sc.id); setFormCustomSubcategory(''); setShowSubcategoryPicker(false); }}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                              <Ionicons name={isSelected ? 'radio-button-on' : 'radio-button-off'} size={20} color={isSelected ? '#6B7FC4' : '#d1d5db'} />
+                              <Text style={[styles.pickerItemText, isSelected && { color: '#6B7FC4', fontWeight: '600' }]}>{sc.name}</Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                      <TouchableOpacity
+                        style={[styles.pickerItem, formSubcategoryId === 'OTHER' && styles.pickerItemActive]}
+                        onPress={() => { setFormSubcategoryId('OTHER'); setShowSubcategoryPicker(false); }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <Ionicons name={formSubcategoryId === 'OTHER' ? 'radio-button-on' : 'radio-button-off'} size={20} color={formSubcategoryId === 'OTHER' ? '#6B7FC4' : '#d1d5db'} />
+                          <Text style={[styles.pickerItemText, formSubcategoryId === 'OTHER' && { color: '#6B7FC4', fontWeight: '600' }]}>Other (type your own)</Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {formSubcategoryId === 'OTHER' && (
+                    <TextInput style={styles.input} value={formCustomSubcategory} onChangeText={setFormCustomSubcategory} placeholder="e.g. Wellness Center" placeholderTextColor="#9ca3af" />
+                  )}
+                </>
+              ) : null;
+            })()}
+
+            {/* Description */}
+            <TextInput
+              style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 14 }]}
+              value={formDescription}
+              onChangeText={setFormDescription}
+              placeholder="Short description (e.g. We do men's and women's haircuts)"
+              placeholderTextColor="#9ca3af"
+              multiline
+              numberOfLines={3}
+            />
 
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
               <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Changes'}</Text>
