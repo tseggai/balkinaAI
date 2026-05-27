@@ -117,6 +117,7 @@ interface LocationOption {
   id: string;
   name: string;
   address: string;
+  currency?: string;
 }
 
 interface StaffOption {
@@ -269,6 +270,13 @@ export function ServiceForm({
   const [selectedLocations, setSelectedLocations] = useState<string[]>(
     service?.service_locations ?? []
   );
+
+  const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', CAD: 'CA$', AUD: 'A$', CHF: 'CHF', JPY: '¥', RSD: 'RSD' };
+  const currencySymbol = (() => {
+    const selLoc = allLocations.find((l) => selectedLocations.includes(l.id));
+    const code = selLoc?.currency ?? allLocations[0]?.currency ?? 'USD';
+    return CURRENCY_SYMBOLS[code] ?? '$';
+  })();
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
 
   // --- Recurring state ---
@@ -678,7 +686,7 @@ export function ServiceForm({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <span className="text-xs text-gray-400">Price</span>
-              <HoverInput type="number" required min="0" step="0.01" value={price} onChange={setPrice} placeholder="0.00" prefix="$" />
+              <HoverInput type="number" required min="0" step="0.01" value={price} onChange={setPrice} placeholder="0.00" prefix={currencySymbol} />
             </div>
             <div>
               <span className="text-xs text-gray-400">Capacity</span>
@@ -992,7 +1000,7 @@ export function ServiceForm({
         {/* Row 4: Price + Capacity (50% each) */}
         <div className="grid grid-cols-2 gap-3">
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">{currencySymbol}</span>
             <input
               type="number"
               required
@@ -1043,7 +1051,7 @@ export function ServiceForm({
               </select>
               <div className="relative">
                 {depositType === 'fixed' && (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">{currencySymbol}</span>
                 )}
                 <input
                   type="number"
