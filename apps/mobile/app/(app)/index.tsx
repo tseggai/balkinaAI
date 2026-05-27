@@ -182,6 +182,9 @@ const BusinessCardRow = React.memo(function BusinessCardRow({ items, onTap }: { 
           </View>
           <View style={richCardStyles.businessInfo}>
             <Text style={richCardStyles.businessName} numberOfLines={2}>{biz.name}</Text>
+            {biz.category ? (
+              <Text style={{ fontSize: 11, color: '#6B7FC4', fontWeight: '600', marginTop: 1 }}>{biz.category}</Text>
+            ) : null}
             {biz.avg_rating ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                 <Text style={{ color: '#f59e0b', fontSize: 12 }}>{'★'.repeat(Math.round(biz.avg_rating))}</Text>
@@ -218,14 +221,14 @@ const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap }: { it
           </View>
           <View style={richCardStyles.serviceInfo}>
             <Text style={richCardStyles.serviceName} numberOfLines={2}>{svc.name}</Text>
-            <Text style={richCardStyles.servicePrice}>${svc.price}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : ''}</Text>
+            <Text style={richCardStyles.servicePrice}>{formatPrice(svc.price, svc.currency ?? 'USD')}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : ''}</Text>
             <Text style={richCardStyles.serviceDuration}>{svc.pricing_type === 'per_day' ? 'Full day' : svc.pricing_type === 'per_week' ? 'Full week' : `${svc.duration_minutes} min`}</Text>
             {svc.deposit_enabled && svc.deposit_amount ? (
               <View style={richCardStyles.depositBadge}>
                 <Text style={richCardStyles.depositText}>
                   {svc.deposit_type === 'percentage'
-                    ? `$${(svc.price * svc.deposit_amount / 100).toFixed(2)} deposit`
-                    : `$${svc.deposit_amount} deposit`}
+                    ? `${formatPrice(svc.price * svc.deposit_amount / 100, svc.currency ?? 'USD')} deposit`
+                    : `${formatPrice(svc.deposit_amount, svc.currency ?? 'USD')} deposit`}
                 </Text>
               </View>
             ) : null}
@@ -318,6 +321,9 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
               </TouchableOpacity>
               <View style={richCardStyles.businessInfo}>
                 <Text style={richCardStyles.businessName} numberOfLines={2}>{biz.name}</Text>
+                {biz.category ? (
+                  <Text style={{ fontSize: 11, color: '#6B7FC4', fontWeight: '600', marginTop: 1 }}>{biz.category}</Text>
+                ) : null}
                 {biz.avg_rating ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                     <Text style={{ color: '#f59e0b', fontSize: 12 }}>{'★'.repeat(Math.round(biz.avg_rating))}</Text>
@@ -357,14 +363,14 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
                   <View style={{ flex: 1 }}>
                     <Text style={[combinedStyles.serviceCardLgName, isSelected && combinedStyles.serviceCardLgNameSelected]} numberOfLines={1}>{svc.name}</Text>
                     <View style={combinedStyles.serviceCardLgRow}>
-                      <Text style={[combinedStyles.serviceCardLgPrice, isSelected && combinedStyles.serviceCardLgPriceSelected]}>${svc.price}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : ''}</Text>
+                      <Text style={[combinedStyles.serviceCardLgPrice, isSelected && combinedStyles.serviceCardLgPriceSelected]}>{formatPrice(svc.price, svc.currency ?? 'USD')}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : ''}</Text>
                       <Text style={[combinedStyles.serviceCardLgDuration, isSelected && combinedStyles.serviceCardLgDurationSelected]}>{svc.pricing_type === 'per_day' ? 'Full day' : svc.pricing_type === 'per_week' ? 'Full week' : `${svc.duration_minutes} min`}</Text>
                     </View>
                     {svc.deposit_enabled && svc.deposit_amount ? (
                       <Text style={combinedStyles.serviceCardLgDepositText}>
                         {svc.deposit_type === 'percentage'
-                          ? `($${(svc.price * svc.deposit_amount / 100).toFixed(2)} deposit)`
-                          : `($${svc.deposit_amount} deposit)`}
+                          ? `(${formatPrice(svc.price * svc.deposit_amount / 100, svc.currency ?? 'USD')} deposit)`
+                          : `(${formatPrice(svc.deposit_amount, svc.currency ?? 'USD')} deposit)`}
                       </Text>
                     ) : null}
                   </View>
@@ -587,7 +593,7 @@ const PackageCardRow = React.memo(function PackageCardRow({ items, onTap }: { it
               <Text style={richCardStyles.packageSessions}>{pkg.sessions_remaining} sessions left</Text>
             ) : (
               <>
-                <Text style={richCardStyles.packagePrice}>${pkg.price}</Text>
+                <Text style={richCardStyles.packagePrice}>{formatPrice(pkg.price, pkg.currency ?? 'USD')}</Text>
                 {pkg.service_names && pkg.service_names.length > 0 ? (
                   <Text style={richCardStyles.packageCount} numberOfLines={2}>{pkg.service_names.join(', ')}</Text>
                 ) : (
@@ -654,7 +660,7 @@ function ExtrasGridComponent({ data, onSubmit }: { data: ExtrasGridData; onSubmi
                 {extra.name}
               </Text>
               <Text style={[richCardStyles.extrasChipDetail, isSelected && richCardStyles.extrasChipDetailSelected]}>
-                +${extra.price} · +{extra.duration_minutes}min
+                +{formatPrice(extra.price, extra.currency ?? 'USD')} · +{extra.duration_minutes}min
               </Text>
             </TouchableOpacity>
           );
@@ -739,7 +745,7 @@ function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData;
                   {pkg.customer_owned && pkg.sessions_remaining != null ? (
                     <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>{pkg.sessions_remaining} left</Text>
                   ) : (
-                    <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>${pkg.price}</Text>
+                    <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>{formatPrice(pkg.price, pkg.currency ?? 'USD')}</Text>
                   )}
                   {pkg.service_names && pkg.service_names.length > 0 ? (
                     <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]} numberOfLines={2}>{pkg.service_names.join(', ')}</Text>
@@ -769,7 +775,7 @@ function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData;
                 >
                   <Text style={[combinedStyles.packageChipName, isSelected && combinedStyles.packageChipNameSelected]}>{extra.name}</Text>
                   <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>
-                    +${extra.price}{isItem && extra.unit_label ? `/${extra.unit_label}` : ''}{!isItem ? ` · +${extra.duration_minutes}min` : ''}
+                    +{formatPrice(extra.price, extra.currency ?? 'USD')}{isItem && extra.unit_label ? `/${extra.unit_label}` : ''}{!isItem ? ` · +${extra.duration_minutes}min` : ''}
                   </Text>
                   {isItem && maxQty > 1 && isSelected && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
@@ -849,7 +855,7 @@ const RichSummaryCard = React.memo(function RichSummaryCard({ data, onButtonPres
         <Text style={richCardStyles.summaryTotal}>{formatPrice(data.total, data.currency)}</Text>
       </View>
       {data.deposit_required != null && data.deposit_required > 0 ? (
-        <Text style={richCardStyles.summaryDeposit}>Deposit required: ${data.deposit_required.toFixed(2)}</Text>
+        <Text style={richCardStyles.summaryDeposit}>Deposit required: {formatPrice(data.deposit_required, data.currency)}</Text>
       ) : null}
       {data.points_to_earn > 0 ? (
         <Text style={richCardStyles.summaryPoints}>⭐ +{data.points_to_earn} pts</Text>
@@ -945,7 +951,7 @@ const RichConfirmedCard = React.memo(function RichConfirmedCard({ data, onButton
         </View>
         <View style={richCardStyles.confirmedRow}>
           <Text style={richCardStyles.confirmedLabel}>Total:</Text>
-          <Text style={richCardStyles.confirmedValue}>${data.total.toFixed(2)}</Text>
+          <Text style={richCardStyles.confirmedValue}>{formatPrice(data.total, data.currency)}</Text>
         </View>
       </View>
 
@@ -960,7 +966,7 @@ const RichConfirmedCard = React.memo(function RichConfirmedCard({ data, onButton
         <View style={richCardStyles.confirmedRow}>
           <Text style={richCardStyles.confirmedLabel}>Deposit:</Text>
           <Text style={[richCardStyles.confirmedValue, { color: data.deposit_paid ? '#16a34a' : '#dc2626' }]}>
-            ${data.deposit_amount.toFixed(2)} {data.deposit_paid ? '(Paid)' : '(Due)'}
+            {formatPrice(data.deposit_amount, data.currency)} {data.deposit_paid ? '(Paid)' : '(Due)'}
           </Text>
         </View>
       ) : null}
@@ -975,7 +981,7 @@ const RichConfirmedCard = React.memo(function RichConfirmedCard({ data, onButton
           onPress={() => onButtonPress(`pay_deposit:${data.appointmentId}:${data.deposit_amount ?? 0}`)}
           activeOpacity={0.7}
         >
-          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Pay Deposit (${data.deposit_amount?.toFixed(2)})</Text>
+          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Pay Deposit ({formatPrice(data.deposit_amount ?? 0, data.currency)})</Text>
         </TouchableOpacity>
       ) : null}
 
@@ -1733,14 +1739,14 @@ export default function ChatScreen() {
     // Build extras display with prices
     const extrasDisplay = state.selectedExtras.map((name) => {
       const extra = lastBookingOptions.current?.extras.find((e) => e.name === name);
-      return extra ? `${name} (+$${extra.price.toFixed(2)})` : name;
+      return extra ? `${name} (+${formatPrice(extra.price, state.currency)})` : name;
     });
 
 
     const card: SummaryCardData = {
       type: 'summary_card',
       service: state.serviceName ?? 'Unknown',
-      package: state.selectedPackage ? `${state.selectedPackage} ($${packagePrice.toFixed(2)})` : undefined,
+      package: state.selectedPackage ? `${state.selectedPackage} (${formatPrice(packagePrice, state.currency)})` : undefined,
       extras: extrasDisplay,
       business: state.tenantName ?? 'Unknown',
       staff: state.staffName ?? (state.staffSelectionEnabled ? 'Anyone' : 'To be assigned'),
@@ -2124,10 +2130,10 @@ export default function ChatScreen() {
           // Build extras display with prices for confirmation
           const confirmedExtras = bookingState.selectedExtras.map((name) => {
             const extra = lastBookingOptions.current?.extras.find((e) => e.name === name);
-            return extra ? `${name} (+$${extra.price.toFixed(2)})` : name;
+            return extra ? `${name} (+${formatPrice(extra.price, bookingState.currency)})` : name;
           });
           const confirmedPkgLabel = bookingState.selectedPackage && bookingState.packagePrice > 0
-            ? `${bookingState.selectedPackage} ($${bookingState.packagePrice.toFixed(2)})`
+            ? `${bookingState.selectedPackage} (${formatPrice(bookingState.packagePrice, bookingState.currency)})`
             : bookingState.selectedPackage ?? undefined;
 
           const confirmedCard: ConfirmedCardData = {
@@ -2707,7 +2713,7 @@ export default function ChatScreen() {
                   <View style={fullScreenConfirmStyles.detailRow}>
                     <Ionicons name="cash-outline" size={18} color="#6B7FC4" />
                     <Text style={fullScreenConfirmStyles.detailLabel}>Total</Text>
-                    <Text style={[fullScreenConfirmStyles.detailValue, { fontWeight: '700', fontSize: 18 }]}>${confirmationModal.total.toFixed(2)}</Text>
+                    <Text style={[fullScreenConfirmStyles.detailValue, { fontWeight: '700', fontSize: 18 }]}>{formatPrice(confirmationModal.total, confirmationModal.currency)}</Text>
                   </View>
                   {confirmationModal.address ? (
                     <View style={fullScreenConfirmStyles.detailRow}>
@@ -2721,7 +2727,7 @@ export default function ChatScreen() {
                       <Ionicons name="card-outline" size={18} color="#6B7FC4" />
                       <Text style={fullScreenConfirmStyles.detailLabel}>Deposit</Text>
                       <Text style={[fullScreenConfirmStyles.detailValue, { color: confirmationModal.deposit_paid ? '#059669' : '#dc2626', fontWeight: '600' }]}>
-                        ${confirmationModal.deposit_amount.toFixed(2)} {confirmationModal.deposit_paid ? '(Paid)' : '(Due)'}
+                        {formatPrice(confirmationModal.deposit_amount, confirmationModal.currency)} {confirmationModal.deposit_paid ? '(Paid)' : '(Due)'}
                       </Text>
                     </View>
                   ) : null}
@@ -2751,7 +2757,7 @@ export default function ChatScreen() {
                 }}
               >
                 <Ionicons name="card-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
-                <Text style={fullScreenConfirmStyles.doneBtnText}>Pay Deposit (${confirmationModal.deposit_amount?.toFixed(2)})</Text>
+                <Text style={fullScreenConfirmStyles.doneBtnText}>Pay Deposit ({formatPrice(confirmationModal.deposit_amount ?? 0, confirmationModal.currency)})</Text>
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity
