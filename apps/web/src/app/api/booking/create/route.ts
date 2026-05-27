@@ -294,16 +294,22 @@ export async function POST(request: Request) {
     const basePrice = packagePrice > 0 ? packagePrice : svc.price;
     const finalTotal = basePrice + extrasTotal;
 
-    // 6b. Check for conflicting appointments (same staff, overlapping time, not cancelled)
-    if (finalStaffId) {
-      const { data: conflicts } = await supabase
+    // 6b. Check for conflicting appointments (overlapping time, not cancelled)
+    {
+      let conflictQuery = supabase
         .from('appointments')
         .select('id')
-        .eq('staff_id', finalStaffId)
+        .eq('tenant_id', tenantId)
         .in('status', ['pending', 'confirmed', 'approved'])
         .lt('start_time', end.toISOString())
         .gt('end_time', start.toISOString())
         .limit(1);
+      if (finalStaffId) {
+        conflictQuery = conflictQuery.eq('staff_id', finalStaffId);
+      } else if (serviceId) {
+        conflictQuery = conflictQuery.eq('service_id', serviceId);
+      }
+      const { data: conflicts } = await conflictQuery;
       if (conflicts && conflicts.length > 0) {
         return NextResponse.json(
           { error: 'This time slot was just booked. Please go back and choose a different time.' },

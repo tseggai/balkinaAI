@@ -1628,6 +1628,13 @@ export default function ChatScreen() {
         return;
       }
 
+      const anyoneAvailable = (data.anyone_slots ?? []).some((s: { available: boolean }) => s.available);
+      if (!anyoneAvailable && (data.anyone_slots ?? []).length > 0) {
+        addAssistantMessage('This service is not available on this day. Please try a different date.');
+        setIsLoading(false);
+        return;
+      }
+
       // Capture address + staff selection flag for summary card
       setBookingState((prev) => ({
         ...prev,
