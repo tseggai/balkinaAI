@@ -74,7 +74,7 @@ export async function POST(request: Request) {
 
       const { data: tenants, error } = await supabase
         .from('tenants')
-        .select('id, name, logo_url, avg_rating, review_count')
+        .select('id, name, logo_url, avg_rating, review_count, description')
         .eq('status', 'active')
         .in('id', linkedIds);
 
@@ -86,11 +86,27 @@ export async function POST(request: Request) {
       const { data: catRow } = await supabase.from('categories').select('name').eq('id', categoryId).single();
       const catName = (catRow as { name: string } | null)?.name ?? null;
 
-      const businesses = (tenants ?? []).map((t: { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null }) => {
-        return { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: catName, avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0 };
+      const businesses = (tenants ?? []).map((t: { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; description: string | null }) => {
+        return { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: catName, avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0, description: t.description ?? undefined };
       });
 
       const bizIds = businesses.map((b) => b.id);
+
+      // Fetch subcategories for businesses
+      const subcatMap = new Map<string, string>();
+      if (bizIds.length > 0) {
+        const { data: subcatRows } = await supabase
+          .from('tenant_category_links')
+          .select('tenant_id, categories!inner(name, parent_id)')
+          .in('tenant_id', bizIds)
+          .not('categories.parent_id', 'is', null);
+        for (const row of (subcatRows ?? []) as { tenant_id: string; categories: { name: string; parent_id: string } | { name: string; parent_id: string }[] }[]) {
+          const cat = Array.isArray(row.categories) ? row.categories[0] : row.categories;
+          if (cat?.name && !subcatMap.has(row.tenant_id)) {
+            subcatMap.set(row.tenant_id, cat.name);
+          }
+        }
+      }
 
       // Fetch locations, services, and gallery photos in parallel
       const [{ data: locs }, { data: svcs }, { data: galleryRows }] = bizIds.length > 0
@@ -139,6 +155,7 @@ export async function POST(request: Request) {
         const distKm = closest && closest.dist < 9999 ? Math.round(closest.dist * 10) / 10 : undefined;
         return {
           ...b,
+          subcategory: subcatMap.get(b.id) ?? undefined,
           all_services: svcMap.get(b.id) ?? [],
           gallery_photos: galleryMap.get(b.id) ?? [],
           closest_location_id: closest?.locationId,
@@ -180,7 +197,7 @@ export async function POST(request: Request) {
       // Find tenants matching by name or service
       const { data: byName } = await supabase
         .from('tenants')
-        .select('id, name, logo_url, avg_rating, review_count, categories(name)')
+        .select('id, name, logo_url, avg_rating, review_count, description, categories(name)')
         .eq('status', 'active')
         .ilike('name', `%${searchTerm}%`)
         .limit(limit);
@@ -197,12 +214,12 @@ export async function POST(request: Request) {
 
       // Fetch full tenant data for service matches not in name results
       const missingIds = allIds.filter((id) => !nameIds.has(id));
-      let allTenants = (byName ?? []) as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; categories: { name: string } | { name: string }[] | null }[];
+      let allTenants = (byName ?? []) as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; description: string | null; categories: { name: string } | { name: string }[] | null }[];
 
       if (missingIds.length > 0) {
         const { data: extra } = await supabase
           .from('tenants')
-          .select('id, name, logo_url, avg_rating, review_count, categories(name)')
+          .select('id, name, logo_url, avg_rating, review_count, description, categories(name)')
           .eq('status', 'active')
           .in('id', missingIds);
         if (extra) allTenants = [...allTenants, ...(extra as typeof allTenants)];
@@ -247,6 +264,22 @@ export async function POST(request: Request) {
         galleryMap2.set(g.tenant_id, existing);
       }
 
+      // Fetch subcategories for query path businesses
+      const subcatMap2 = new Map<string, string>();
+      if (bizIds.length > 0) {
+        const { data: subcatRows2 } = await supabase
+          .from('tenant_category_links')
+          .select('tenant_id, categories!inner(name, parent_id)')
+          .in('tenant_id', bizIds)
+          .not('categories.parent_id', 'is', null);
+        for (const row of (subcatRows2 ?? []) as { tenant_id: string; categories: { name: string; parent_id: string } | { name: string; parent_id: string }[] }[]) {
+          const cat = Array.isArray(row.categories) ? row.categories[0] : row.categories;
+          if (cat?.name && !subcatMap2.has(row.tenant_id)) {
+            subcatMap2.set(row.tenant_id, cat.name);
+          }
+        }
+      }
+
       let results = allTenants.map((t) => {
         const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
         const closest = locMap.get(t.id);
@@ -256,6 +289,8 @@ export async function POST(request: Request) {
           name: t.name,
           image_url: t.logo_url ?? undefined,
           category: cat,
+          subcategory: subcatMap2.get(t.id) ?? undefined,
+          description: t.description ?? undefined,
           avg_rating: t.avg_rating ?? undefined,
           review_count: t.review_count ?? 0,
           all_services: svcMap.get(t.id) ?? [],
