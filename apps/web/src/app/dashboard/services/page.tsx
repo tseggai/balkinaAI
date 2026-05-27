@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { ServiceForm } from '@/components/service-form';
+import { useCurrency } from '@/components/currency-context';
 import { useSupabase } from '@/lib/supabase/client';
 
 // ---------------------------------------------------------------------------
@@ -573,7 +574,7 @@ function DiagramServiceCard({
 export default function ServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cs, setCs] = useState('$');
+  const { symbol: cs } = useCurrency();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [search, setSearch] = useState('');
@@ -592,16 +593,9 @@ export default function ServicesPage() {
   }, [supabase]);
 
   const fetchServices = useCallback(async () => {
-    const [svcRes, locRes] = await Promise.all([
-      fetch('/api/services'),
-      fetch('/api/locations'),
-    ]);
-    const svcJson = await svcRes.json();
-    setServices(svcJson.data ?? []);
-    const locJson = await locRes.json();
-    const locs = (locJson.data ?? []) as { currency?: string }[];
-    const SYM: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', CAD: 'CA$', AUD: 'A$', CHF: 'CHF', JPY: '¥', RSD: 'RSD' };
-    if (locs[0]?.currency) setCs(SYM[locs[0].currency] ?? '$');
+    const res = await fetch('/api/services');
+    const json = await res.json();
+    setServices(json.data ?? []);
     setLoading(false);
   }, []);
 

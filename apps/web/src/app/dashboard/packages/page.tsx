@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { ImageUpload } from '@/components/image-upload';
 import { BulkActionBar } from '@/components/bulk-action-bar';
+import { useCurrency } from '@/components/currency-context';
 
 interface PackageService {
   id?: string;
@@ -34,6 +35,7 @@ export default function PackagesPage() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [services, setServices] = useState<ServiceOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const { symbol: cs } = useCurrency();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Package | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -303,7 +305,7 @@ export default function PackagesPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{pkg.name}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">${pkg.price.toFixed(2)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{cs}{pkg.price.toFixed(2)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                       {pkg.expiration_value ? `${pkg.expiration_value} ${pkg.expiration_unit}` : 'No expiration'}
                     </td>
@@ -373,7 +375,7 @@ export default function PackagesPage() {
                       step="0.01"
                       value={form.price}
                       onChange={(e) => setForm({ ...form, price: e.target.value })}
-                      placeholder="Price ($)"
+                      placeholder="Price ({cs})"
                       className="w-full h-[46px] rounded-[.3rem] border border-[#f1f1f1] bg-[#f9fafb] px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                   </div>
@@ -527,8 +529,8 @@ export default function PackagesPage() {
                     <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Name *" className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400">Price ($)</label>
-                    <input type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="Price ($)" className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3" />
+                    <label className="text-xs text-gray-400">Price ({cs})</label>
+                    <input type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="Price ({cs})" className="w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3" />
                   </div>
                 </div>
                 {/* Services */}

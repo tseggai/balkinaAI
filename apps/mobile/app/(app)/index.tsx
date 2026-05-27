@@ -1551,7 +1551,7 @@ export default function ChatScreen() {
             closest_location_id: biz.closest_location_id, currency: biz.currency ?? 'USD', gallery_photos: biz.gallery_photos ?? [],
             services: svcs.map((s: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; image_url?: string | null; pricing_type?: string }) => ({
               id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
-              deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, image_url: s.image_url, pricing_type: s.pricing_type, currency: biz.currency ?? 'USD',
+              deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, deposit_type: s.deposit_type, image_url: s.image_url, pricing_type: s.pricing_type, currency: biz.currency ?? 'USD',
             })),
           }],
         };
@@ -1844,7 +1844,7 @@ export default function ChatScreen() {
               gallery_photos: b.gallery_photos ?? [],
               services: (b.all_services ?? []).map((s) => ({
                 id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
-                deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, image_url: s.image_url, pricing_type: s.pricing_type, currency: b.currency ?? 'USD',
+                deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, deposit_type: s.deposit_type, image_url: s.image_url, pricing_type: s.pricing_type, currency: b.currency ?? 'USD',
               })),
             })),
           };

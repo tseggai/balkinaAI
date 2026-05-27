@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { Sidebar } from '@/components/sidebar';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
+import { CurrencyProvider } from '@/components/currency-context';
 
 /**
  * Client wrapper around the dashboard layout that manages mobile sidebar
@@ -66,7 +67,7 @@ export function DashboardShell({
           <img src="/assets/Balkina_logo_color.png" alt="Balkina AI" className="h-6 w-auto" />
         </header>
 
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto"><CurrencyProvider>{children}</CurrencyProvider></main>
       </div>
     </div>
   );
