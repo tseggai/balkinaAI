@@ -1242,7 +1242,7 @@ const MessageBubble = React.memo(function MessageBubble({
       style={[
         bubbleStyles.wrapper,
         bubbleStyles.wrapperAssistant,
-        hasCards && { maxWidth: '100%', gap: 10 },
+        hasCards && { maxWidth: '100%', width: '100%', gap: 10, alignItems: 'stretch' as const },
         { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
       ]}
     >

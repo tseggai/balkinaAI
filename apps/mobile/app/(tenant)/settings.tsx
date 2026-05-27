@@ -216,13 +216,8 @@ export default function TenantSettings() {
           </View>
           <TouchableOpacity onPress={() => {
             if (editMode) {
-              // Closing edit mode without saving — reset form to current tenant values
-              if (tenant) {
-                setFormName(tenant.name);
-                setFormOwnerName(tenant.owner_name ?? '');
-                setFormPhone(tenant.phone ?? '');
-                setFormDescription((tenant as unknown as { description?: string }).description ?? '');
-              }
+              // Closing edit mode without saving — reset all form values from DB
+              fetchTenant();
               setFormCustomSubcategory('');
               setShowCategoryPicker(false);
               setShowSubcategoryPicker(false);
