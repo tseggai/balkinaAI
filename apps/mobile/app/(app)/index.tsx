@@ -1051,10 +1051,10 @@ const richCardStyles = StyleSheet.create({
   extrasChipNameSelected: { color: '#4338ca' },
   extrasChipDetail: { fontSize: 12, color: '#9ca3af', marginTop: 4 },
   extrasChipDetailSelected: { color: '#6B7FC4' },
-  extrasDoneBtn: { backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 10 },
+  extrasDoneBtn: { backgroundColor: '#6B7FC4', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 10, width: '100%', alignSelf: 'stretch' },
   extrasDoneBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   // Summary card
-  summaryCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
+  summaryCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1, width: '100%', alignSelf: 'stretch' },
   summaryLabel: { fontSize: 14, color: '#374151', marginBottom: 4 },
   summaryBold: { fontWeight: '700' },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
@@ -1242,7 +1242,7 @@ const MessageBubble = React.memo(function MessageBubble({
       style={[
         bubbleStyles.wrapper,
         bubbleStyles.wrapperAssistant,
-        hasCards && { maxWidth: '100%', gap: 10 },
+        hasCards && { maxWidth: '100%', width: '100%', gap: 10, alignItems: 'stretch' as const },
         { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
       ]}
     >
