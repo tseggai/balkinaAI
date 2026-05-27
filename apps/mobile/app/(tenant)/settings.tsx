@@ -214,7 +214,21 @@ export default function TenantSettings() {
             <Text style={styles.businessName}>{tenant?.name}</Text>
             {tenant?.email && <Text style={styles.businessEmail}>{tenant.email}</Text>}
           </View>
-          <TouchableOpacity onPress={() => setEditMode(!editMode)}>
+          <TouchableOpacity onPress={() => {
+            if (editMode) {
+              // Closing edit mode without saving — reset form to current tenant values
+              if (tenant) {
+                setFormName(tenant.name);
+                setFormOwnerName(tenant.owner_name ?? '');
+                setFormPhone(tenant.phone ?? '');
+                setFormDescription((tenant as unknown as { description?: string }).description ?? '');
+              }
+              setFormCustomSubcategory('');
+              setShowCategoryPicker(false);
+              setShowSubcategoryPicker(false);
+            }
+            setEditMode(!editMode);
+          }}>
             <Ionicons name={editMode ? 'close' : 'create-outline'} size={22} color="#6B7FC4" />
           </TouchableOpacity>
         </View>
@@ -250,8 +264,8 @@ export default function TenantSettings() {
 
             {/* Subcategory Picker */}
             {formCategoryIds.length > 0 && (() => {
-              const parentId = formCategoryIds.find((id) => categories.some((c) => c.id === id));
-              const filtered = parentId ? subcategories.filter((sc) => (sc as unknown as { parent_id: string }).parent_id === parentId) : [];
+              const parentIds = formCategoryIds.filter((id) => categories.some((c) => c.id === id));
+              const filtered = subcategories.filter((sc) => parentIds.includes((sc as unknown as { parent_id: string }).parent_id));
               return filtered.length > 0 ? (
                 <>
                   <TouchableOpacity style={styles.input} onPress={() => setShowSubcategoryPicker(!showSubcategoryPicker)}>
