@@ -182,17 +182,16 @@ const BusinessCardRow = React.memo(function BusinessCardRow({ items, onTap }: { 
           </View>
           <View style={richCardStyles.businessInfo}>
             <Text style={richCardStyles.businessName} numberOfLines={2}>{biz.name}</Text>
-            {biz.category ? (
-              <Text style={{ fontSize: 11, color: '#6B7FC4', fontWeight: '600', marginTop: 1 }}>{biz.category}</Text>
-            ) : null}
             {biz.avg_rating ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                 <Text style={{ color: '#f59e0b', fontSize: 12 }}>{'★'.repeat(Math.round(biz.avg_rating))}</Text>
                 <Text style={{ color: '#9ca3af', fontSize: 11, marginLeft: 3 }}>{biz.avg_rating} ({biz.review_count ?? 0})</Text>
               </View>
             ) : null}
-            <Text style={richCardStyles.businessDistance}>{biz.distance_mi} mi</Text>
-            <Text style={richCardStyles.businessDrive}>{biz.drive_minutes} min drive</Text>
+            <Text style={richCardStyles.businessDistance}>{biz.distance_mi} mi  ({biz.drive_minutes} min drive)</Text>
+            {biz.subcategory ? (
+              <Text style={{ fontSize: 11, color: '#6B7FC4', fontWeight: '600', marginTop: 2 }}>{biz.subcategory}</Text>
+            ) : null}
           </View>
         </TouchableOpacity>
       ))}
@@ -321,17 +320,19 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
               </TouchableOpacity>
               <View style={richCardStyles.businessInfo}>
                 <Text style={richCardStyles.businessName} numberOfLines={2}>{biz.name}</Text>
-                {biz.category ? (
-                  <Text style={{ fontSize: 11, color: '#6B7FC4', fontWeight: '600', marginTop: 1 }}>{biz.category}</Text>
-                ) : null}
                 {biz.avg_rating ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                     <Text style={{ color: '#f59e0b', fontSize: 12 }}>{'★'.repeat(Math.round(biz.avg_rating))}</Text>
                     <Text style={{ color: '#9ca3af', fontSize: 11, marginLeft: 3 }}>{biz.avg_rating} ({biz.review_count ?? 0})</Text>
                   </View>
                 ) : null}
-                <Text style={richCardStyles.businessDistance}>{biz.distance_mi} mi</Text>
-                <Text style={richCardStyles.businessDrive}>{biz.drive_minutes} min drive</Text>
+                <Text style={richCardStyles.businessDistance}>{biz.distance_mi} mi  ({biz.drive_minutes} min drive)</Text>
+                {biz.subcategory ? (
+                  <Text style={{ fontSize: 11, color: '#6B7FC4', fontWeight: '600', marginTop: 2 }}>{biz.subcategory}</Text>
+                ) : null}
+                {biz.description ? (
+                  <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }} numberOfLines={2}>{biz.description}</Text>
+                ) : null}
               </View>
             </TouchableOpacity>
           )}
