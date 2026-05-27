@@ -271,11 +271,11 @@ export function ServiceForm({
     service?.service_locations ?? []
   );
 
-  const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', CAD: 'CA$', AUD: 'A$', CHF: 'CHF', JPY: '¥', RSD: 'RSD' };
   const currencySymbol = (() => {
+    const SYM: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', CAD: 'CA$', AUD: 'A$', CHF: 'CHF', JPY: '¥', RSD: 'RSD' };
     const selLoc = allLocations.find((l) => selectedLocations.includes(l.id));
     const code = selLoc?.currency ?? allLocations[0]?.currency ?? 'USD';
-    return CURRENCY_SYMBOLS[code] ?? '$';
+    return SYM[code] ?? '$';
   })();
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
 
@@ -1182,7 +1182,7 @@ export function ServiceForm({
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Label</th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Duration (min)</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Price ($)</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Price ({currencySymbol})</th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Deposit</th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Type</th>
                   <th className="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500" />
@@ -1420,7 +1420,7 @@ export function ServiceForm({
             {/* Header */}
             <div className="grid grid-cols-[1fr_100px_100px_40px] gap-2 px-1">
               <span className="text-xs font-medium uppercase text-gray-500">Name</span>
-              <span className="text-xs font-medium uppercase text-gray-500">Price ($)</span>
+              <span className="text-xs font-medium uppercase text-gray-500">Price ({currencySymbol})</span>
               <span className="text-xs font-medium uppercase text-gray-500">Duration (min)</span>
               <span />
             </div>
