@@ -249,11 +249,13 @@ function DiagramView({
   onEdit,
   onDuplicate,
   onDelete,
+  cs = '$',
 }: {
   services: Service[];
   onEdit: (s: Service) => void;
   onDuplicate: (s: Service) => void;
   onDelete: (id: string) => void;
+  cs?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -438,6 +440,7 @@ function DiagramView({
                                 onEdit={() => onEdit(s)}
                                 onDuplicate={() => onDuplicate(s)}
                                 onDelete={() => onDelete(s.id)}
+                                cs={cs}
                               />
                             ))}
                           </div>
@@ -456,6 +459,7 @@ function DiagramView({
                           onEdit={() => onEdit(s)}
                           onDuplicate={() => onDuplicate(s)}
                           onDelete={() => onDelete(s.id)}
+                          cs={cs}
                         />
                       ))
                     )}
@@ -485,11 +489,13 @@ function DiagramServiceCard({
   onEdit,
   onDuplicate,
   onDelete,
+  cs = '$',
 }: {
   service: Service;
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  cs?: string;
 }) {
   return (
     <div className="group relative w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
@@ -532,7 +538,7 @@ function DiagramServiceCard({
 
       {/* Price & Duration */}
       <div className="mt-1.5 flex items-center gap-3 text-xs text-gray-500">
-        <span className="font-medium text-gray-700">${service.price.toFixed(2)}</span>
+        <span className="font-medium text-gray-700">{cs}{service.price.toFixed(2)}</span>
         <span>{service.duration_minutes} min</span>
       </div>
 
@@ -567,6 +573,7 @@ function DiagramServiceCard({
 export default function ServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cs, setCs] = useState('$');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [search, setSearch] = useState('');
@@ -585,9 +592,16 @@ export default function ServicesPage() {
   }, [supabase]);
 
   const fetchServices = useCallback(async () => {
-    const res = await fetch('/api/services');
-    const json = await res.json();
-    setServices(json.data ?? []);
+    const [svcRes, locRes] = await Promise.all([
+      fetch('/api/services'),
+      fetch('/api/locations'),
+    ]);
+    const svcJson = await svcRes.json();
+    setServices(svcJson.data ?? []);
+    const locJson = await locRes.json();
+    const locs = (locJson.data ?? []) as { currency?: string }[];
+    const SYM: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', CAD: 'CA$', AUD: 'A$', CHF: 'CHF', JPY: '¥', RSD: 'RSD' };
+    if (locs[0]?.currency) setCs(SYM[locs[0].currency] ?? '$');
     setLoading(false);
   }, []);
 
@@ -879,7 +893,7 @@ export default function ServicesPage() {
                         {s.service_subcategory || '\u2014'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
-                        ${s.price.toFixed(2)}
+                        {cs}{s.price.toFixed(2)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                         {s.duration_minutes} min
@@ -911,6 +925,7 @@ export default function ServicesPage() {
             onEdit={handleEdit}
             onDuplicate={handleDuplicate}
             onDelete={handleDelete}
+            cs={cs}
           />
         )}
       </div>

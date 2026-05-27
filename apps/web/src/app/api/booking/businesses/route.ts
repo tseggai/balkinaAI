@@ -125,21 +125,17 @@ export async function POST(request: Request) {
         svcMap.set(svc.tenant_id, existing);
       }
 
-      // Build location map + find closest per tenant + currency map
-      const locMap = new Map<string, { locationId: string; lat: number; lng: number; dist: number }>();
-      const currencyMap = new Map<string, string>();
+      // Build location map + find closest per tenant
+      const locMap = new Map<string, { locationId: string; lat: number; lng: number; dist: number; currency: string }>();
       for (const loc of (locs ?? []) as { id: string; tenant_id: string; latitude: number | null; longitude: number | null; currency?: string }[]) {
-        if (!currencyMap.has(loc.tenant_id)) {
-          currencyMap.set(loc.tenant_id, loc.currency ?? 'USD');
-        }
         if (!locMap.has(loc.tenant_id)) {
-          locMap.set(loc.tenant_id, { locationId: loc.id, lat: loc.latitude ?? 0, lng: loc.longitude ?? 0, dist: 9999 });
+          locMap.set(loc.tenant_id, { locationId: loc.id, lat: loc.latitude ?? 0, lng: loc.longitude ?? 0, dist: 9999, currency: loc.currency ?? 'USD' });
         }
         if (latitude && longitude && loc.latitude && loc.longitude) {
           const dist = haversineKm(latitude, longitude, loc.latitude, loc.longitude);
           const existing = locMap.get(loc.tenant_id);
           if (!existing || dist < existing.dist) {
-            locMap.set(loc.tenant_id, { locationId: loc.id, lat: loc.latitude, lng: loc.longitude, dist });
+            locMap.set(loc.tenant_id, { locationId: loc.id, lat: loc.latitude, lng: loc.longitude, dist, currency: loc.currency ?? 'USD' });
           }
         }
       }
@@ -160,7 +156,7 @@ export async function POST(request: Request) {
         return {
           ...b,
           subcategory: subcatMap.get(b.id) ?? undefined,
-          currency: currencyMap.get(b.id) ?? 'USD',
+          currency: closest?.currency ?? 'USD',
           all_services: svcMap.get(b.id) ?? [],
           gallery_photos: galleryMap.get(b.id) ?? [],
           closest_location_id: closest?.locationId,
@@ -247,20 +243,16 @@ export async function POST(request: Request) {
         svcMap.set(svc.tenant_id, existing);
       }
 
-      const locMap = new Map<string, { locationId: string; dist: number }>();
-      const currencyMap2 = new Map<string, string>();
+      const locMap = new Map<string, { locationId: string; dist: number; currency: string }>();
       for (const loc of (locs ?? []) as { id: string; tenant_id: string; latitude: number | null; longitude: number | null; currency?: string }[]) {
-        if (!currencyMap2.has(loc.tenant_id)) {
-          currencyMap2.set(loc.tenant_id, loc.currency ?? 'USD');
-        }
         if (!locMap.has(loc.tenant_id)) {
-          locMap.set(loc.tenant_id, { locationId: loc.id, dist: 9999 });
+          locMap.set(loc.tenant_id, { locationId: loc.id, dist: 9999, currency: loc.currency ?? 'USD' });
         }
         if (latitude && longitude && loc.latitude && loc.longitude) {
           const dist = haversineKm(latitude, longitude, loc.latitude, loc.longitude);
           const existing = locMap.get(loc.tenant_id);
           if (!existing || dist < existing.dist) {
-            locMap.set(loc.tenant_id, { locationId: loc.id, dist });
+            locMap.set(loc.tenant_id, { locationId: loc.id, dist, currency: loc.currency ?? 'USD' });
           }
         }
       }
@@ -299,7 +291,7 @@ export async function POST(request: Request) {
           image_url: t.logo_url ?? undefined,
           category: cat,
           subcategory: subcatMap2.get(t.id) ?? undefined,
-          currency: currencyMap2.get(t.id) ?? 'USD',
+          currency: locMap.get(t.id)?.currency ?? 'USD',
           description: t.description ?? undefined,
           avg_rating: t.avg_rating ?? undefined,
           review_count: t.review_count ?? 0,
