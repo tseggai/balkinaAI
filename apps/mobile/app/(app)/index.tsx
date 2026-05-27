@@ -1547,11 +1547,11 @@ export default function ChatScreen() {
           items: [{
             id: biz.id, name: biz.name, image_url: biz.image_url,
             distance_mi: biz.distance_mi, drive_minutes: biz.estimated_drive_minutes,
-            category: biz.category, avg_rating: biz.avg_rating, review_count: biz.review_count,
-            closest_location_id: biz.closest_location_id, gallery_photos: biz.gallery_photos ?? [],
+            category: biz.category, subcategory: biz.subcategory, description: biz.description, avg_rating: biz.avg_rating, review_count: biz.review_count,
+            closest_location_id: biz.closest_location_id, currency: biz.currency ?? 'USD', gallery_photos: biz.gallery_photos ?? [],
             services: svcs.map((s: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; image_url?: string | null; pricing_type?: string }) => ({
               id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
-              deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, image_url: s.image_url, pricing_type: s.pricing_type,
+              deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, image_url: s.image_url, pricing_type: s.pricing_type, currency: biz.currency ?? 'USD',
             })),
           }],
         };
@@ -1821,20 +1821,23 @@ export default function ChatScreen() {
           // Build business_with_services card
           const card = {
             type: 'business_with_services',
-            items: data.businesses.map((b: { id: string; name: string; image_url?: string; distance_mi?: number; estimated_drive_minutes?: number; category?: string; avg_rating?: number; review_count?: number; closest_location_id?: string; gallery_photos?: { id: string; image_url: string; caption?: string | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; image_url?: string | null; pricing_type?: string }[] }) => ({
+            items: data.businesses.map((b: { id: string; name: string; image_url?: string; distance_mi?: number; estimated_drive_minutes?: number; category?: string; subcategory?: string; description?: string; currency?: string; avg_rating?: number; review_count?: number; closest_location_id?: string; gallery_photos?: { id: string; image_url: string; caption?: string | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; image_url?: string | null; pricing_type?: string }[] }) => ({
               id: b.id,
               name: b.name,
               image_url: b.image_url,
               distance_mi: b.distance_mi,
               drive_minutes: b.estimated_drive_minutes,
               category: b.category,
+              subcategory: b.subcategory,
+              description: b.description,
+              currency: b.currency ?? 'USD',
               avg_rating: b.avg_rating,
               review_count: b.review_count,
               closest_location_id: b.closest_location_id,
               gallery_photos: b.gallery_photos ?? [],
               services: (b.all_services ?? []).map((s) => ({
                 id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
-                deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, image_url: s.image_url, pricing_type: s.pricing_type,
+                deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, image_url: s.image_url, pricing_type: s.pricing_type, currency: b.currency ?? 'USD',
               })),
             })),
           };

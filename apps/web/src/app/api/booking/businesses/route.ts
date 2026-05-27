@@ -111,7 +111,7 @@ export async function POST(request: Request) {
       // Fetch locations, services, and gallery photos in parallel
       const [{ data: locs }, { data: svcs }, { data: galleryRows }] = bizIds.length > 0
         ? await Promise.all([
-            supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', bizIds),
+            supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude, currency').in('tenant_id', bizIds),
             supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, pricing_type').in('tenant_id', bizIds).eq('visibility', 'public'),
             supabase.from('location_gallery').select('tenant_id, id, image_url, caption').in('tenant_id', bizIds).order('sort_order', { ascending: true }).limit(50),
           ])
@@ -125,9 +125,13 @@ export async function POST(request: Request) {
         svcMap.set(svc.tenant_id, existing);
       }
 
-      // Build location map + find closest per tenant
+      // Build location map + find closest per tenant + currency map
       const locMap = new Map<string, { locationId: string; lat: number; lng: number; dist: number }>();
-      for (const loc of (locs ?? []) as { id: string; tenant_id: string; latitude: number | null; longitude: number | null }[]) {
+      const currencyMap = new Map<string, string>();
+      for (const loc of (locs ?? []) as { id: string; tenant_id: string; latitude: number | null; longitude: number | null; currency?: string }[]) {
+        if (!currencyMap.has(loc.tenant_id)) {
+          currencyMap.set(loc.tenant_id, loc.currency ?? 'USD');
+        }
         if (!locMap.has(loc.tenant_id)) {
           locMap.set(loc.tenant_id, { locationId: loc.id, lat: loc.latitude ?? 0, lng: loc.longitude ?? 0, dist: 9999 });
         }
@@ -156,6 +160,7 @@ export async function POST(request: Request) {
         return {
           ...b,
           subcategory: subcatMap.get(b.id) ?? undefined,
+          currency: currencyMap.get(b.id) ?? 'USD',
           all_services: svcMap.get(b.id) ?? [],
           gallery_photos: galleryMap.get(b.id) ?? [],
           closest_location_id: closest?.locationId,
@@ -229,7 +234,7 @@ export async function POST(request: Request) {
       const bizIds = allTenants.map((t) => t.id);
       const [{ data: locs }, { data: svcs }, { data: galleryRows2 }] = bizIds.length > 0
         ? await Promise.all([
-            supabase.from('tenant_locations').select('id, tenant_id, latitude, longitude').in('tenant_id', bizIds),
+            supabase.from('tenant_locations').select('id, tenant_id, latitude, longitude, currency').in('tenant_id', bizIds),
             supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, pricing_type').in('tenant_id', bizIds).eq('visibility', 'public'),
             supabase.from('location_gallery').select('tenant_id, id, image_url, caption').in('tenant_id', bizIds).order('sort_order', { ascending: true }).limit(50),
           ])
@@ -243,7 +248,11 @@ export async function POST(request: Request) {
       }
 
       const locMap = new Map<string, { locationId: string; dist: number }>();
-      for (const loc of (locs ?? []) as { id: string; tenant_id: string; latitude: number | null; longitude: number | null }[]) {
+      const currencyMap2 = new Map<string, string>();
+      for (const loc of (locs ?? []) as { id: string; tenant_id: string; latitude: number | null; longitude: number | null; currency?: string }[]) {
+        if (!currencyMap2.has(loc.tenant_id)) {
+          currencyMap2.set(loc.tenant_id, loc.currency ?? 'USD');
+        }
         if (!locMap.has(loc.tenant_id)) {
           locMap.set(loc.tenant_id, { locationId: loc.id, dist: 9999 });
         }
@@ -290,6 +299,7 @@ export async function POST(request: Request) {
           image_url: t.logo_url ?? undefined,
           category: cat,
           subcategory: subcatMap2.get(t.id) ?? undefined,
+          currency: currencyMap2.get(t.id) ?? 'USD',
           description: t.description ?? undefined,
           avg_rating: t.avg_rating ?? undefined,
           review_count: t.review_count ?? 0,
