@@ -98,11 +98,19 @@ export async function POST(request: Request) {
       service_extras: { id: string; name: string; price: number; duration_minutes: number; type?: string; max_quantity?: number; unit_label?: string | null }[];
     };
 
+    const { data: loc } = await supabase
+      .from('tenant_locations')
+      .select('currency')
+      .eq('tenant_id', tenantId)
+      .limit(1)
+      .maybeSingle();
+
     return NextResponse.json({
       service: serviceResult.data,
       packages: packagesResult.data ?? [],
       customer_packages: customerPackagesResult.data ?? [],
       extras: serviceData.service_extras ?? [],
+      currency: (loc as { currency?: string } | null)?.currency ?? 'USD',
     }, { headers: CORS_HEADERS });
   } catch (err) {
     console.error('[booking/options] error:', err);
