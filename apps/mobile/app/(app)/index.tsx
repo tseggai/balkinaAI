@@ -202,7 +202,9 @@ const BusinessCardRow = React.memo(function BusinessCardRow({ items, onTap }: { 
 // ── Service Card Row ─────────────────────────────────────────────────────────
 
 const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap, currency: currencyProp }: { items: ServiceCardData[]; onTap: (name: string) => void; currency?: string }) {
-  const cc = (items[0] as { currency?: string })?.currency ?? currencyProp ?? 'USD';
+  const cardCurrency = (items[0] as { currency?: string })?.currency;
+  const cc = cardCurrency ?? currencyProp ?? 'USD';
+  console.log('[ServiceCardRow] cardCurrency:', cardCurrency, 'currencyProp:', currencyProp, 'using:', cc, 'items[0]:', JSON.stringify(items[0]).slice(0, 100));
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2, flexGrow: 0 }}>
       {items.map((svc) => (
@@ -242,7 +244,9 @@ const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap, curren
 // ── Business With Services Row (combined card) ──────────────────────────────
 
 const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ data, onTap, onGalleryOpen, currency: currencyProp }: { data: BusinessWithServicesData; onTap: (msg: string) => void; onGalleryOpen?: (photos: GalleryPhoto[]) => void; currency?: string }) {
-  const cc = (data.items[0] as { currency?: string })?.currency ?? currencyProp ?? 'USD';
+  const cardCurrency = (data.items[0] as { currency?: string })?.currency;
+  const cc = cardCurrency ?? currencyProp ?? 'USD';
+  console.log('[BusinessWithServicesRow] cardCurrency:', cardCurrency, 'currencyProp:', currencyProp, 'using:', cc);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [selectedSvcId, setSelectedSvcId] = useState<string | null>(null);
   const selectedBiz = data.items[selectedIdx];
@@ -1837,6 +1841,8 @@ export default function ChatScreen() {
             }
           }
           lastDisplayedServices.current = allSvcs;
+          console.log('[businesses-api] stored services currencies:', allSvcs.map(s => `${s.name}:${s.currency}`).join(', '));
+          console.log('[businesses-api] biz currencies:', data.businesses.map((b: { name: string; currency?: string }) => `${b.name}:${b.currency}`).join(', '));
 
           // Build business_with_services card
           const card = {
@@ -1902,6 +1908,7 @@ export default function ChatScreen() {
             pricingType: matchedService.pricing_type ?? 'per_service',
             currency: matchedService.currency ?? bookingState.currency ?? 'USD',
           };
+          console.log('[service-select] matchedService.currency:', matchedService.currency, 'bookingState.currency:', bookingState.currency, 'newState.currency:', newState.currency);
           setBookingState(newState);
           // Show date picker locally — no GPT call needed
           showDatePicker();
