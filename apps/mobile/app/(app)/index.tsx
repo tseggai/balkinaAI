@@ -1670,7 +1670,7 @@ export default function ChatScreen() {
   }, [userId, userCoords, addAssistantMessage]);
 
   // Fetch packages + extras from direct API
-  const fetchBookingOptions = useCallback(async (tenantId: string, serviceId: string) => {
+  const fetchBookingOptions = useCallback(async (tenantId: string, serviceId: string, currency?: string) => {
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/booking/options`, {
@@ -1690,7 +1690,7 @@ export default function ChatScreen() {
         currency?: string;
       };
 
-      const optionsCurrency = data.currency ?? bookingState.currency ?? 'USD';
+      const optionsCurrency = data.currency ?? currency ?? bookingState.currency ?? 'USD';
 
       const hasPackages = data.packages.length > 0 || data.customer_packages.length > 0;
       const hasExtras = data.extras.length > 0;
@@ -1946,7 +1946,7 @@ export default function ChatScreen() {
               const timeLabel = displayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
               const slotIso = new Date(dateStr + 'T09:00:00Z').toISOString();
               setBookingState((prev) => ({ ...prev, timeSlot: timeLabel, timeSlotIso: slotIso }));
-              fetchBookingOptions(newState.tenantId!, newState.serviceId!);
+              fetchBookingOptions(newState.tenantId!, newState.serviceId!, newState.currency);
             } catch {
               addAssistantMessage('Connection error. Please try again.');
             }
@@ -2005,7 +2005,7 @@ export default function ChatScreen() {
               const timeLabel2 = displayDate2.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
               const slotIso2 = new Date(dateStr + 'T09:00:00Z').toISOString();
               setBookingState((prev) => ({ ...prev, timeSlot: timeLabel2, timeSlotIso: slotIso2 }));
-              fetchBookingOptions(newState2.tenantId!, newState2.serviceId!);
+              fetchBookingOptions(newState2.tenantId!, newState2.serviceId!, newState2.currency);
             } catch {
               addAssistantMessage('Connection error. Please try again.');
             }
@@ -2038,7 +2038,7 @@ export default function ChatScreen() {
           addUserMessage(cleanText);
 
           // Fetch booking options (packages + extras)
-          const result = await fetchBookingOptions(newState.tenantId!, newState.serviceId!);
+          const result = await fetchBookingOptions(newState.tenantId!, newState.serviceId!, newState.currency);
           if (result === 'skip') {
             // No packages or extras — show summary directly
             showSummaryCard(newState);
