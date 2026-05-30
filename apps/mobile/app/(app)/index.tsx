@@ -1549,6 +1549,7 @@ export default function ChatScreen() {
           currency: biz.currency ?? 'USD',
           tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id,
         }));
+        if (biz.currency) setBookingState((prev) => ({ ...prev, currency: biz.currency }));
         const card = {
           type: 'business_with_services',
           items: [{
@@ -1835,6 +1836,10 @@ export default function ChatScreen() {
             }
           }
           lastDisplayedServices.current = allSvcs;
+
+          // Set currency from the first business for immediate display
+          const firstBizCurrency = data.businesses[0]?.currency;
+          if (firstBizCurrency) setBookingState((prev) => ({ ...prev, currency: firstBizCurrency }));
 
           // Build business_with_services card
           const card = {
