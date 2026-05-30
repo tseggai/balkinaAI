@@ -201,7 +201,8 @@ const BusinessCardRow = React.memo(function BusinessCardRow({ items, onTap }: { 
 
 // ── Service Card Row ─────────────────────────────────────────────────────────
 
-const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap, currency: cc = 'USD' }: { items: ServiceCardData[]; onTap: (name: string) => void; currency?: string }) {
+const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap, currency: currencyProp }: { items: ServiceCardData[]; onTap: (name: string) => void; currency?: string }) {
+  const cc = (items[0] as unknown as { currency?: string })?.currency ?? currencyProp ?? 'USD';
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2, flexGrow: 0 }}>
       {items.map((svc) => (
@@ -240,7 +241,8 @@ const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap, curren
 
 // ── Business With Services Row (combined card) ──────────────────────────────
 
-const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ data, onTap, onGalleryOpen, currency: cc = 'USD' }: { data: BusinessWithServicesData; onTap: (msg: string) => void; onGalleryOpen?: (photos: GalleryPhoto[]) => void; currency?: string }) {
+const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ data, onTap, onGalleryOpen, currency: currencyProp }: { data: BusinessWithServicesData; onTap: (msg: string) => void; onGalleryOpen?: (photos: GalleryPhoto[]) => void; currency?: string }) {
+  const cc = (data.items[0] as unknown as { currency?: string })?.currency ?? currencyProp ?? 'USD';
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [selectedSvcId, setSelectedSvcId] = useState<string | null>(null);
   const selectedBiz = data.items[selectedIdx];
