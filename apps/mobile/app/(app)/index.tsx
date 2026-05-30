@@ -1399,7 +1399,7 @@ export default function ChatScreen() {
   const [paymentModal, setPaymentModal] = useState<{ appointmentId: string; depositAmount?: number; pendingCard?: ConfirmedCardData } | null>(null);
   const [galleryModal, setGalleryModal] = useState<{ photos: GalleryPhoto[]; initialIndex: number } | null>(null);
   // Track recently displayed service cards so we can match taps to IDs
-  const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; pricing_type?: string; tenantId?: string; tenantName?: string; locationId?: string }[]>([]);
+  const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; pricing_type?: string; currency?: string; tenantId?: string; tenantName?: string; locationId?: string }[]>([]);
   // Stores structured tool data from SSE for deterministic rendering
   const pendingToolData = useRef<{ tool: string; data: Record<string, unknown> } | null>(null);
   // Stores last booking options so we can look up package/extras prices
@@ -1546,6 +1546,7 @@ export default function ChatScreen() {
           deposit_enabled: s.deposit_enabled ?? false, deposit_amount: s.deposit_amount ?? null,
           deposit_type: (s.deposit_type as 'fixed' | 'percentage' | undefined) ?? undefined,
           pricing_type: s.pricing_type ?? 'per_service',
+          currency: biz.currency ?? 'USD',
           tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id,
         }));
         const card = {
@@ -1830,7 +1831,7 @@ export default function ChatScreen() {
           const allSvcs: typeof lastDisplayedServices.current = [];
           for (const biz of data.businesses) {
             for (const svc of biz.all_services ?? []) {
-              allSvcs.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled ?? false, deposit_amount: svc.deposit_amount ?? null, deposit_type: (svc.deposit_type as 'fixed' | 'percentage' | undefined) ?? undefined, pricing_type: svc.pricing_type ?? 'per_service', tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id });
+              allSvcs.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled ?? false, deposit_amount: svc.deposit_amount ?? null, deposit_type: (svc.deposit_type as 'fixed' | 'percentage' | undefined) ?? undefined, pricing_type: svc.pricing_type ?? 'per_service', currency: biz.currency ?? 'USD', tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id });
             }
           }
           lastDisplayedServices.current = allSvcs;
@@ -1897,6 +1898,7 @@ export default function ChatScreen() {
             depositAmount: matchedService.deposit_amount ?? null,
             depositType: matchedService.deposit_type ?? null,
             pricingType: matchedService.pricing_type ?? 'per_service',
+            currency: matchedService.currency ?? bookingState.currency ?? 'USD',
           };
           setBookingState(newState);
           // Show date picker locally — no GPT call needed
