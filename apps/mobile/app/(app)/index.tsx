@@ -201,7 +201,7 @@ const BusinessCardRow = React.memo(function BusinessCardRow({ items, onTap }: { 
 
 // ── Service Card Row ─────────────────────────────────────────────────────────
 
-const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap }: { items: ServiceCardData[]; onTap: (name: string) => void }) {
+const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap, currency: cc = 'USD' }: { items: ServiceCardData[]; onTap: (name: string) => void; currency?: string }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2, flexGrow: 0 }}>
       {items.map((svc) => (
@@ -220,14 +220,14 @@ const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap }: { it
           </View>
           <View style={richCardStyles.serviceInfo}>
             <Text style={richCardStyles.serviceName} numberOfLines={2}>{svc.name}</Text>
-            <Text style={richCardStyles.servicePrice}>{formatPrice(svc.price, svc.currency ?? 'USD')}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : ''}</Text>
+            <Text style={richCardStyles.servicePrice}>{formatPrice(svc.price, cc)}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : ''}</Text>
             <Text style={richCardStyles.serviceDuration}>{svc.pricing_type === 'per_day' ? 'Full day' : svc.pricing_type === 'per_week' ? 'Full week' : `${svc.duration_minutes} min`}</Text>
             {svc.deposit_enabled && svc.deposit_amount ? (
               <View style={richCardStyles.depositBadge}>
                 <Text style={richCardStyles.depositText}>
                   {svc.deposit_type === 'percentage'
-                    ? `${formatPrice(svc.price * svc.deposit_amount / 100, svc.currency ?? 'USD')} deposit`
-                    : `${formatPrice(svc.deposit_amount, svc.currency ?? 'USD')} deposit`}
+                    ? `${formatPrice(svc.price * svc.deposit_amount / 100, cc)} deposit`
+                    : `${formatPrice(svc.deposit_amount, cc)} deposit`}
                 </Text>
               </View>
             ) : null}
@@ -240,7 +240,7 @@ const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap }: { it
 
 // ── Business With Services Row (combined card) ──────────────────────────────
 
-const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ data, onTap, onGalleryOpen }: { data: BusinessWithServicesData; onTap: (msg: string) => void; onGalleryOpen?: (photos: GalleryPhoto[]) => void }) {
+const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ data, onTap, onGalleryOpen, currency: cc = 'USD' }: { data: BusinessWithServicesData; onTap: (msg: string) => void; onGalleryOpen?: (photos: GalleryPhoto[]) => void; currency?: string }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [selectedSvcId, setSelectedSvcId] = useState<string | null>(null);
   const selectedBiz = data.items[selectedIdx];
@@ -364,14 +364,14 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
                   <View style={{ flex: 1 }}>
                     <Text style={[combinedStyles.serviceCardLgName, isSelected && combinedStyles.serviceCardLgNameSelected]} numberOfLines={1}>{svc.name}</Text>
                     <View style={combinedStyles.serviceCardLgRow}>
-                      <Text style={[combinedStyles.serviceCardLgPrice, isSelected && combinedStyles.serviceCardLgPriceSelected]}>{formatPrice(svc.price, svc.currency ?? 'USD')}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : ''}</Text>
+                      <Text style={[combinedStyles.serviceCardLgPrice, isSelected && combinedStyles.serviceCardLgPriceSelected]}>{formatPrice(svc.price, cc)}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : ''}</Text>
                       <Text style={[combinedStyles.serviceCardLgDuration, isSelected && combinedStyles.serviceCardLgDurationSelected]}>{svc.pricing_type === 'per_day' ? 'Full day' : svc.pricing_type === 'per_week' ? 'Full week' : `${svc.duration_minutes} min`}</Text>
                     </View>
                     {svc.deposit_enabled && svc.deposit_amount ? (
                       <Text style={combinedStyles.serviceCardLgDepositText}>
                         {svc.deposit_type === 'percentage'
-                          ? `(${formatPrice(svc.price * svc.deposit_amount / 100, svc.currency ?? 'USD')} deposit)`
-                          : `(${formatPrice(svc.deposit_amount, svc.currency ?? 'USD')} deposit)`}
+                          ? `(${formatPrice(svc.price * svc.deposit_amount / 100, cc)} deposit)`
+                          : `(${formatPrice(svc.deposit_amount, cc)} deposit)`}
                       </Text>
                     ) : null}
                   </View>
@@ -566,7 +566,7 @@ const StaffWithSlotsRow = React.memo(function StaffWithSlotsRow({ data, onTap }:
 
 // ── Package Card Row ─────────────────────────────────────────────────────────
 
-const PackageCardRow = React.memo(function PackageCardRow({ items, onTap }: { items: PackageCardData[]; onTap: (name: string) => void }) {
+const PackageCardRow = React.memo(function PackageCardRow({ items, onTap, currency: cc = 'USD' }: { items: PackageCardData[]; onTap: (name: string) => void; currency?: string }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4, marginBottom: 2, flexGrow: 0 }}>
       {items.map((pkg) => (
@@ -623,7 +623,7 @@ const PackageCardRow = React.memo(function PackageCardRow({ items, onTap }: { it
 
 // ── Extras Grid ──────────────────────────────────────────────────────────────
 
-function ExtrasGridComponent({ data, onSubmit }: { data: ExtrasGridData; onSubmit: (msg: string) => void }) {
+function ExtrasGridComponent({ data, onSubmit, currency: cc = 'USD' }: { data: ExtrasGridData; onSubmit: (msg: string) => void; currency?: string }) {
   console.log('[ExtrasGrid] STANDALONE extras:', data.extras.length, 'names:', data.extras.map(e => e.name));
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -807,7 +807,8 @@ function BookingOptionsComponent({ data, onSubmit, currency: currencyProp }: { d
 
 // ── Summary Card (structured) ────────────────────────────────────────────────
 
-const RichSummaryCard = React.memo(function RichSummaryCard({ data, onButtonPress }: { data: SummaryCardData; onButtonPress: (label: string) => void }) {
+const RichSummaryCard = React.memo(function RichSummaryCard({ data, onButtonPress, currency }: { data: SummaryCardData; onButtonPress: (label: string) => void; currency?: string }) {
+  const cc = currency ?? data.currency ?? 'USD';
   const displayService = data.package || data.service;
   return (
     <View style={richCardStyles.summaryCard}>
@@ -823,30 +824,30 @@ const RichSummaryCard = React.memo(function RichSummaryCard({ data, onButtonPres
 
       <View style={richCardStyles.summaryRow}>
         <Text style={richCardStyles.summaryRowLabel}>Subtotal</Text>
-        <Text style={richCardStyles.summaryRowValue}>{formatPrice(data.subtotal, data.currency)}</Text>
+        <Text style={richCardStyles.summaryRowValue}>{formatPrice(data.subtotal, cc)}</Text>
       </View>
       {data.extras_total > 0 ? (
         <View style={richCardStyles.summaryRow}>
           <Text style={richCardStyles.summaryRowLabel}>Extras</Text>
-          <Text style={richCardStyles.summaryRowValue}>+{formatPrice(data.extras_total, data.currency)}</Text>
+          <Text style={richCardStyles.summaryRowValue}>+{formatPrice(data.extras_total, cc)}</Text>
         </View>
       ) : null}
       {data.package_discount > 0 ? (
         <View style={richCardStyles.summaryRow}>
           <Text style={richCardStyles.summaryRowLabel}>Package discount</Text>
-          <Text style={[richCardStyles.summaryRowValue, { color: '#16a34a' }]}>-{formatPrice(data.package_discount, data.currency)}</Text>
+          <Text style={[richCardStyles.summaryRowValue, { color: '#16a34a' }]}>-{formatPrice(data.package_discount, cc)}</Text>
         </View>
       ) : null}
       {data.coupon_discount > 0 ? (
         <View style={richCardStyles.summaryRow}>
           <Text style={richCardStyles.summaryRowLabel}>Coupon</Text>
-          <Text style={[richCardStyles.summaryRowValue, { color: '#16a34a' }]}>-{formatPrice(data.coupon_discount, data.currency)}</Text>
+          <Text style={[richCardStyles.summaryRowValue, { color: '#16a34a' }]}>-{formatPrice(data.coupon_discount, cc)}</Text>
         </View>
       ) : null}
       {data.loyalty_discount > 0 ? (
         <View style={richCardStyles.summaryRow}>
           <Text style={richCardStyles.summaryRowLabel}>Loyalty</Text>
-          <Text style={[richCardStyles.summaryRowValue, { color: '#16a34a' }]}>-{formatPrice(data.loyalty_discount, data.currency)}</Text>
+          <Text style={[richCardStyles.summaryRowValue, { color: '#16a34a' }]}>-{formatPrice(data.loyalty_discount, cc)}</Text>
         </View>
       ) : null}
 
@@ -854,10 +855,10 @@ const RichSummaryCard = React.memo(function RichSummaryCard({ data, onButtonPres
 
       <View style={richCardStyles.summaryRow}>
         <Text style={richCardStyles.summaryTotal}>Total</Text>
-        <Text style={richCardStyles.summaryTotal}>{formatPrice(data.total, data.currency)}</Text>
+        <Text style={richCardStyles.summaryTotal}>{formatPrice(data.total, cc)}</Text>
       </View>
       {data.deposit_required != null && data.deposit_required > 0 ? (
-        <Text style={richCardStyles.summaryDeposit}>Deposit required: {formatPrice(data.deposit_required, data.currency)}</Text>
+        <Text style={richCardStyles.summaryDeposit}>Deposit required: {formatPrice(data.deposit_required, cc)}</Text>
       ) : null}
       {data.points_to_earn > 0 ? (
         <Text style={richCardStyles.summaryPoints}>⭐ +{data.points_to_earn} pts</Text>
@@ -876,7 +877,8 @@ const RichSummaryCard = React.memo(function RichSummaryCard({ data, onButtonPres
 
 // ── Confirmed Card (structured) ──────────────────────────────────────────────
 
-const RichConfirmedCard = React.memo(function RichConfirmedCard({ data, onButtonPress }: { data: ConfirmedCardData; onButtonPress: (label: string) => void }) {
+const RichConfirmedCard = React.memo(function RichConfirmedCard({ data, onButtonPress, currency }: { data: ConfirmedCardData; onButtonPress: (label: string) => void; currency?: string }) {
+  const cc = currency ?? data.currency ?? 'USD';
   const openDirections = () => {
     let dest: string | null = null;
     if (data.latitude && data.longitude) {
@@ -953,7 +955,7 @@ const RichConfirmedCard = React.memo(function RichConfirmedCard({ data, onButton
         </View>
         <View style={richCardStyles.confirmedRow}>
           <Text style={richCardStyles.confirmedLabel}>Total:</Text>
-          <Text style={richCardStyles.confirmedValue}>{formatPrice(data.total, data.currency)}</Text>
+          <Text style={richCardStyles.confirmedValue}>{formatPrice(data.total, cc)}</Text>
         </View>
       </View>
 
@@ -968,7 +970,7 @@ const RichConfirmedCard = React.memo(function RichConfirmedCard({ data, onButton
         <View style={richCardStyles.confirmedRow}>
           <Text style={richCardStyles.confirmedLabel}>Deposit:</Text>
           <Text style={[richCardStyles.confirmedValue, { color: data.deposit_paid ? '#16a34a' : '#dc2626' }]}>
-            {formatPrice(data.deposit_amount, data.currency)} {data.deposit_paid ? '(Paid)' : '(Due)'}
+            {formatPrice(data.deposit_amount, cc)} {data.deposit_paid ? '(Paid)' : '(Due)'}
           </Text>
         </View>
       ) : null}
@@ -983,7 +985,7 @@ const RichConfirmedCard = React.memo(function RichConfirmedCard({ data, onButton
           onPress={() => onButtonPress(`pay_deposit:${data.appointmentId}:${data.deposit_amount ?? 0}`)}
           activeOpacity={0.7}
         >
-          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Pay Deposit ({formatPrice(data.deposit_amount ?? 0, data.currency)})</Text>
+          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Pay Deposit ({formatPrice(data.deposit_amount ?? 0, cc)})</Text>
         </TouchableOpacity>
       ) : null}
 
@@ -1176,19 +1178,19 @@ function CardRenderer({ card, onButtonPress, onSubmit, onGalleryOpen, currency }
     case 'business_cards':
       return <BusinessCardRow items={card.items} onTap={onButtonPress} />;
     case 'service_cards':
-      return <ServiceCardRow items={card.items} onTap={onButtonPress} />;
+      return <ServiceCardRow items={card.items} onTap={onButtonPress} currency={currency} />;
     case 'staff_cards':
       return <StaffCardRow items={card.items} onTap={onButtonPress} />;
     case 'package_cards':
-      return <PackageCardRow items={card.items} onTap={onButtonPress} />;
+      return <PackageCardRow items={card.items} onTap={onButtonPress} currency={currency} />;
     case 'extras_grid':
-      return <ExtrasGridComponent data={card} onSubmit={onSubmit} />;
+      return <ExtrasGridComponent data={card} onSubmit={onSubmit} currency={currency} />;
     case 'summary_card':
-      return <RichSummaryCard data={card} onButtonPress={onButtonPress} />;
+      return <RichSummaryCard data={card} onButtonPress={onButtonPress} currency={currency} />;
     case 'confirmed_card':
-      return <RichConfirmedCard data={card} onButtonPress={onButtonPress} />;
+      return <RichConfirmedCard data={card} onButtonPress={onButtonPress} currency={currency} />;
     case 'business_with_services':
-      return <BusinessWithServicesRow data={card as BusinessWithServicesData} onTap={onButtonPress} onGalleryOpen={onGalleryOpen} />;
+      return <BusinessWithServicesRow data={card as BusinessWithServicesData} onTap={onButtonPress} onGalleryOpen={onGalleryOpen} currency={currency} />;
     case 'staff_with_slots':
       return <StaffWithSlotsRow data={card as StaffWithSlotsData} onTap={onButtonPress} />;
     case 'booking_options':
