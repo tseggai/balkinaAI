@@ -594,7 +594,7 @@ const PackageCardRow = React.memo(function PackageCardRow({ items, onTap }: { it
               <Text style={richCardStyles.packageSessions}>{pkg.sessions_remaining} sessions left</Text>
             ) : (
               <>
-                <Text style={richCardStyles.packagePrice}>{formatPrice(pkg.price, pkg.currency ?? 'USD')}</Text>
+                <Text style={richCardStyles.packagePrice}>{formatPrice(pkg.price, cc)}</Text>
                 {pkg.service_names && pkg.service_names.length > 0 ? (
                   <Text style={richCardStyles.packageCount} numberOfLines={2}>{pkg.service_names.join(', ')}</Text>
                 ) : (
@@ -661,7 +661,7 @@ function ExtrasGridComponent({ data, onSubmit }: { data: ExtrasGridData; onSubmi
                 {extra.name}
               </Text>
               <Text style={[richCardStyles.extrasChipDetail, isSelected && richCardStyles.extrasChipDetailSelected]}>
-                +{formatPrice(extra.price, extra.currency ?? 'USD')} · +{extra.duration_minutes}min
+                +{formatPrice(extra.price, cc)} · +{extra.duration_minutes}min
               </Text>
             </TouchableOpacity>
           );
@@ -676,7 +676,8 @@ function ExtrasGridComponent({ data, onSubmit }: { data: ExtrasGridData; onSubmi
 
 // ── Booking Options (combined packages + extras) ────────────────────────────
 
-function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData; onSubmit: (msg: string) => void }) {
+function BookingOptionsComponent({ data, onSubmit, currency: currencyProp }: { data: BookingOptionsData; onSubmit: (msg: string) => void; currency?: string }) {
+  const cc = currencyProp ?? 'USD';
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [extraQuantities, setExtraQuantities] = useState<Map<string, number>>(new Map());
 
@@ -746,7 +747,7 @@ function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData;
                   {pkg.customer_owned && pkg.sessions_remaining != null ? (
                     <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>{pkg.sessions_remaining} left</Text>
                   ) : (
-                    <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>{formatPrice(pkg.price, pkg.currency ?? 'USD')}</Text>
+                    <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>{formatPrice(pkg.price, cc)}</Text>
                   )}
                   {pkg.service_names && pkg.service_names.length > 0 ? (
                     <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]} numberOfLines={2}>{pkg.service_names.join(', ')}</Text>
@@ -776,7 +777,7 @@ function BookingOptionsComponent({ data, onSubmit }: { data: BookingOptionsData;
                 >
                   <Text style={[combinedStyles.packageChipName, isSelected && combinedStyles.packageChipNameSelected]}>{extra.name}</Text>
                   <Text style={[combinedStyles.packageChipDetail, isSelected && combinedStyles.packageChipDetailSelected]}>
-                    +{formatPrice(extra.price, extra.currency ?? 'USD')}{isItem && extra.unit_label ? `/${extra.unit_label}` : ''}{!isItem ? ` · +${extra.duration_minutes}min` : ''}
+                    +{formatPrice(extra.price, cc)}{isItem && extra.unit_label ? `/${extra.unit_label}` : ''}{!isItem ? ` · +${extra.duration_minutes}min` : ''}
                   </Text>
                   {isItem && maxQty > 1 && isSelected && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
@@ -1170,7 +1171,7 @@ const actionBtnStyles = StyleSheet.create({
 
 // ── Render a single card segment ─────────────────────────────────────────────
 
-function CardRenderer({ card, onButtonPress, onSubmit, onGalleryOpen }: { card: CardData; onButtonPress: (label: string) => void; onSubmit: (msg: string) => void; onGalleryOpen?: (photos: GalleryPhoto[]) => void }) {
+function CardRenderer({ card, onButtonPress, onSubmit, onGalleryOpen, currency }: { card: CardData; onButtonPress: (label: string) => void; onSubmit: (msg: string) => void; onGalleryOpen?: (photos: GalleryPhoto[]) => void; currency?: string }) {
   switch (card.type) {
     case 'business_cards':
       return <BusinessCardRow items={card.items} onTap={onButtonPress} />;
@@ -1191,7 +1192,7 @@ function CardRenderer({ card, onButtonPress, onSubmit, onGalleryOpen }: { card: 
     case 'staff_with_slots':
       return <StaffWithSlotsRow data={card as StaffWithSlotsData} onTap={onButtonPress} />;
     case 'booking_options':
-      return <BookingOptionsComponent data={card as BookingOptionsData} onSubmit={onSubmit} />;
+      return <BookingOptionsComponent data={card as BookingOptionsData} onSubmit={onSubmit} currency={currency} />;
     default:
       return null;
   }
@@ -1203,10 +1204,12 @@ const MessageBubble = React.memo(function MessageBubble({
   message,
   onButtonPress,
   onGalleryOpen,
+  currency,
 }: {
   message: ChatMessage;
   onButtonPress: (label: string) => void;
   onGalleryOpen?: (photos: GalleryPhoto[]) => void;
+  currency?: string;
 }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(10)).current;
@@ -1258,7 +1261,7 @@ const MessageBubble = React.memo(function MessageBubble({
         // Render segments (text + cards interspersed)
         segments.map((seg, i) => {
           if (seg.kind === 'card' && seg.card) {
-            return <CardRenderer key={`card-${i}`} card={seg.card} onButtonPress={onButtonPress} onSubmit={onButtonPress} onGalleryOpen={onGalleryOpen} />;
+            return <CardRenderer key={`card-${i}`} card={seg.card} onButtonPress={onButtonPress} onSubmit={onButtonPress} onGalleryOpen={onGalleryOpen} currency={currency} />;
           }
           // Text segment — parse for buttons/links
           const { text, buttons, links } = parseMessageContent(seg.text ?? '');
@@ -2620,7 +2623,7 @@ export default function ChatScreen() {
           data={[...messages].reverse()}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <MessageBubble message={item} onButtonPress={handleButtonPress} onGalleryOpen={(photos) => setGalleryModal({ photos, initialIndex: 0 })} />
+            <MessageBubble message={item} onButtonPress={handleButtonPress} onGalleryOpen={(photos) => setGalleryModal({ photos, initialIndex: 0 })} currency={bookingState.currency} />
           )}
           contentContainerStyle={[styles.messagesList, { flexGrow: 1 }]}
           inverted
