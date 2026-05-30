@@ -1536,9 +1536,10 @@ export default function ChatScreen() {
       const biz = data?.businesses?.[0];
       if (biz) {
         const svcs = biz.all_services ?? [];
-        lastDisplayedServices.current = svcs.map((s: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; pricing_type?: string }) => ({
+        lastDisplayedServices.current = svcs.map((s: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; deposit_type?: string | null; pricing_type?: string }) => ({
           id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
           deposit_enabled: s.deposit_enabled ?? false, deposit_amount: s.deposit_amount ?? null,
+          deposit_type: (s.deposit_type as 'fixed' | 'percentage' | undefined) ?? undefined,
           pricing_type: s.pricing_type ?? 'per_service',
           tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id,
         }));
@@ -1686,7 +1687,10 @@ export default function ChatScreen() {
         packages: { id: string; name: string; price?: number; image_url?: string; package_services: { quantity: number; services: { name: string } | null }[] }[];
         customer_packages: { id: string; package: { name: string; price: number } | null; sessions: { sessions_remaining: number; services: { name: string } | null }[] }[];
         extras: { id: string; name: string; price: number; duration_minutes: number; type?: string; max_quantity?: number; unit_label?: string | null }[];
+        currency?: string;
       };
+
+      const optionsCurrency = data.currency ?? bookingState.currency ?? 'USD';
 
       const hasPackages = data.packages.length > 0 || data.customer_packages.length > 0;
       const hasExtras = data.extras.length > 0;
@@ -1704,6 +1708,7 @@ export default function ChatScreen() {
           name: p.name,
           image_url: p.image_url,
           price: (p.price as number) ?? 0,
+          currency: optionsCurrency,
           services_count: p.package_services?.reduce((sum, ps) => sum + ps.quantity, 0) ?? 1,
           service_names: (p.package_services ?? []).map((ps) => ps.services?.name).filter((n): n is string => !!n),
           customer_owned: false,
@@ -1723,7 +1728,7 @@ export default function ChatScreen() {
       const card: BookingOptionsData = {
         type: 'booking_options',
         packages: packageCards,
-        extras: data.extras,
+        extras: data.extras.map((e) => ({ ...e, currency: optionsCurrency })),
       };
       lastBookingOptions.current = card;
 
@@ -1820,7 +1825,7 @@ export default function ChatScreen() {
           const allSvcs: typeof lastDisplayedServices.current = [];
           for (const biz of data.businesses) {
             for (const svc of biz.all_services ?? []) {
-              allSvcs.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled ?? false, deposit_amount: svc.deposit_amount ?? null, pricing_type: svc.pricing_type ?? 'per_service', tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id });
+              allSvcs.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled ?? false, deposit_amount: svc.deposit_amount ?? null, deposit_type: (svc.deposit_type as 'fixed' | 'percentage' | undefined) ?? undefined, pricing_type: svc.pricing_type ?? 'per_service', tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id });
             }
           }
           lastDisplayedServices.current = allSvcs;
@@ -2160,6 +2165,7 @@ export default function ChatScreen() {
             time: result.time,
             address: result.address,
             total: result.total,
+            currency: result.currency ?? bookingState.currency ?? 'USD',
             points_earned: 0,
             latitude: result.latitude,
             longitude: result.longitude,

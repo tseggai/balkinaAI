@@ -446,6 +446,7 @@ export async function POST(request: Request) {
         time: localTime,
         address: loc?.address ?? '',
         total: finalTotal,
+        currency: (loc?.currency ?? 'USD') as string,
         deposit_amount: depositAmount,
         deposit_paid: false,
         payment_url: paymentUrl,
