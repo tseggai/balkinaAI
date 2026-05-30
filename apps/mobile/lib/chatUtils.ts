@@ -16,6 +16,9 @@ export interface BusinessCardData {
   distance_mi: number;
   drive_minutes: number;
   category: string;
+  subcategory?: string;
+  description?: string;
+  currency?: string;
   avg_rating?: number;
   review_count?: number;
   gallery_photos?: GalleryPhoto[];
@@ -32,6 +35,7 @@ export interface ServiceCardData {
   deposit_amount?: number;
   deposit_type?: 'fixed' | 'percentage';
   pricing_type?: string;
+  currency?: string;
 }
 
 export interface StaffCardData {
@@ -102,6 +106,7 @@ export interface ConfirmedCardData {
   deposit_paid?: boolean;
   payment_url?: string;
   payment_required?: boolean;
+  currency?: string;
 }
 
 export interface ServiceChipData {
@@ -113,6 +118,8 @@ export interface ServiceChipData {
   deposit_amount?: number;
   deposit_type?: 'fixed' | 'percentage';
   image_url?: string | null;
+  pricing_type?: string;
+  currency?: string;
 }
 
 export interface BusinessWithServicesData {
