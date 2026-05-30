@@ -48,6 +48,7 @@ export interface PackageCardData {
   name: string;
   image_url?: string;
   price: number;
+  currency?: string;
   services_count: number;
   service_names: string[];
   expiration_label?: string;
@@ -136,7 +137,7 @@ export interface StaffWithSlotsData {
 export interface BookingOptionsData {
   type: 'booking_options';
   packages: PackageCardData[];
-  extras: Array<{ id: string; name: string; price: number; duration_minutes: number; type?: string; max_quantity?: number; unit_label?: string | null }>;
+  extras: Array<{ id: string; name: string; price: number; duration_minutes: number; type?: string; max_quantity?: number; unit_label?: string | null; currency?: string }>;
 }
 
 export type CardData =
