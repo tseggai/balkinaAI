@@ -72,19 +72,33 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && !isPublicPath) {
-    if (!tenant) {
-      return redirectTo('/auth/register');
+    if (!tenant && !pathname.startsWith('/property/')) {
+      // Check if user is a property admin before redirecting to register
+      const { data: propAdmin } = await supabase
+        .from('property_admins')
+        .select('property_id, properties(slug)')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+      if (propAdmin) {
+        const slug = (propAdmin as unknown as { properties: { slug: string } | null })?.properties?.slug;
+        if (slug && !pathname.startsWith('/property/')) {
+          return redirectTo(`/property/${slug}`);
+        }
+      } else {
+        return redirectTo('/auth/register');
+      }
     }
 
     if (
-      tenant.status === 'pending_subscription' &&
+      tenant && tenant.status === 'pending_subscription' &&
       !pathname.startsWith('/onboarding')
     ) {
       return redirectTo('/onboarding/select-plan');
     }
 
     if (
-      tenant.status === 'suspended' &&
+      tenant && tenant.status === 'suspended' &&
       !pathname.startsWith('/billing')
     ) {
       return redirectTo('/billing/reactivate');
