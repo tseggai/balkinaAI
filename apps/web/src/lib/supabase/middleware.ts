@@ -74,15 +74,22 @@ export async function updateSession(request: NextRequest) {
   if (user && !isPublicPath) {
     if (!tenant && !pathname.startsWith('/property/')) {
       // Check if user is a property admin before redirecting to register
-      const { data: propAdmin } = await supabase
+      const { data: propAdmin, error: paErr } = await supabase
         .from('property_admins')
-        .select('property_id, properties(slug)')
+        .select('property_id')
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
+      console.log('[middleware] property admin check:', user.id, propAdmin, paErr?.message);
       if (propAdmin) {
-        const slug = (propAdmin as unknown as { properties: { slug: string } | null })?.properties?.slug;
-        if (slug && !pathname.startsWith('/property/')) {
+        const pid = (propAdmin as { property_id: string }).property_id;
+        const { data: prop } = await supabase
+          .from('properties')
+          .select('slug')
+          .eq('id', pid)
+          .single();
+        const slug = (prop as { slug: string } | null)?.slug;
+        if (slug) {
           return redirectTo(`/property/${slug}`);
         }
       } else {
