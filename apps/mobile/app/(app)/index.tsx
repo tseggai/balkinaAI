@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -1431,6 +1431,37 @@ export default function ChatScreen() {
     fetchCategories();
   }, []);
 
+  // White-label property detection
+  const propertySlug = useMemo(() => {
+    try {
+      const Constants = require('expo-constants').default;
+      return Constants.expoConfig?.extra?.propertySlug as string | undefined;
+    } catch { return undefined; }
+  }, []);
+
+  const [propertyData, setPropertyData] = useState<{
+    name: string; logo_url: string | null; welcome_message: string; primary_color: string;
+    tenants: { id: string; name: string; logo_url: string | null; subcategory: string | null; description: string | null; slug: string | null; avg_rating: number | null; review_count: number | null }[];
+  } | null>(null);
+
+  useEffect(() => {
+    if (!propertySlug) return;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/properties?slug=${propertySlug}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setPropertyData({
+          name: data.property.name,
+          logo_url: data.property.logo_url,
+          welcome_message: data.property.welcome_message ?? 'What would you like to book today?',
+          primary_color: data.property.primary_color ?? '#6B7FC4',
+          tenants: data.tenants ?? [],
+        });
+      } catch { /* ignore */ }
+    })();
+  }, [propertySlug]);
+
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -2561,25 +2592,69 @@ export default function ChatScreen() {
       <SafeAreaView style={styles.container}>
         <View style={[styles.flex, { paddingBottom: kbPadding }]}>
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
-            <View style={{ alignItems: 'center', marginBottom: 24 }}>
-              <BalkinaLogo size="large" />
-              <Text style={styles.subtitle}>What would you like to book today?</Text>
-            </View>
-            {categoriesLoading ? (
-              <ActivityIndicator size="small" color="#6B7FC4" style={{ marginTop: 20 }} />
+            {propertyData ? (
+              /* White-label property landing */
+              <>
+                <View style={{ alignItems: 'center', marginBottom: 24 }}>
+                  {propertyData.logo_url ? (
+                    <Image source={{ uri: propertyData.logo_url }} style={{ width: 100, height: 100, borderRadius: 20 }} />
+                  ) : (
+                    <View style={{ width: 100, height: 100, borderRadius: 20, backgroundColor: propertyData.primary_color, justifyContent: 'center', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 36, fontWeight: '700', color: '#fff' }}>{propertyData.name.charAt(0)}</Text>
+                    </View>
+                  )}
+                  <Text style={[styles.subtitle, { marginTop: 12, fontSize: 20, fontWeight: '700', color: '#111827' }]}>{propertyData.name}</Text>
+                  <Text style={[styles.subtitle, { marginTop: 4 }]}>{propertyData.welcome_message}</Text>
+                </View>
+                <View style={{ width: '100%', gap: 10 }}>
+                  {propertyData.tenants.map((t) => (
+                    <TouchableOpacity
+                      key={t.id}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#f3f4f6' }}
+                      onPress={() => handleButtonPress(`Show me services at ${t.name}`)}
+                      activeOpacity={0.7}
+                    >
+                      {t.logo_url ? (
+                        <Image source={{ uri: t.logo_url }} style={{ width: 44, height: 44, borderRadius: 10 }} />
+                      ) : (
+                        <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: propertyData.primary_color, justifyContent: 'center', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff' }}>{t.name.charAt(0)}</Text>
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }}>{t.name}</Text>
+                        {t.subcategory ? <Text style={{ fontSize: 11, color: propertyData.primary_color, fontWeight: '600', marginTop: 1 }}>{t.subcategory}</Text> : null}
+                        {t.description ? <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }} numberOfLines={1}>{t.description}</Text> : null}
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
             ) : (
-              <View style={landingStyles.categoriesGrid}>
-                {activeCategories.map((cat) => (
-                  <TouchableOpacity
-                    key={cat.id}
-                    style={landingStyles.categoryChip}
-                    onPress={() => handleButtonPress(`Find ${cat.name} businesses near me [category_id:${cat.id}]`)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={landingStyles.categoryChipText}>{cat.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              /* Standard Balkina landing */
+              <>
+                <View style={{ alignItems: 'center', marginBottom: 24 }}>
+                  <BalkinaLogo size="large" />
+                  <Text style={styles.subtitle}>What would you like to book today?</Text>
+                </View>
+                {categoriesLoading ? (
+                  <ActivityIndicator size="small" color="#6B7FC4" style={{ marginTop: 20 }} />
+                ) : (
+                  <View style={landingStyles.categoriesGrid}>
+                    {activeCategories.map((cat) => (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={landingStyles.categoryChip}
+                        onPress={() => handleButtonPress(`Find ${cat.name} businesses near me [category_id:${cat.id}]`)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={landingStyles.categoryChipText}>{cat.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </>
             )}
           </ScrollView>
           <View style={styles.inputBar}>
