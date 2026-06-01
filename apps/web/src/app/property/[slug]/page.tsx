@@ -200,6 +200,9 @@ export default function PropertyDashboard() {
               </div>
             ))}
           </div>
+
+          {/* Invite section */}
+          <InviteSection slug={slug} />
         </div>
       )}
 
@@ -273,11 +276,7 @@ export default function PropertyDashboard() {
 
       {/* Team */}
       {tab === 'team' && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">Team</h2>
-          <p className="mt-2 text-sm text-gray-500">Manage property administrators and their access levels.</p>
-          <p className="mt-4 text-sm text-gray-400">Team management coming soon. Contact support to add team members.</p>
-        </div>
+        <TeamSection slug={slug} />
       )}
 
       {/* Settings */}
@@ -339,6 +338,188 @@ export default function PropertyDashboard() {
         </div>
       )}
     </PropertyDashboardShell>
+  );
+}
+
+function InviteSection({ slug }: { slug: string }) {
+  const [invites, setInvites] = useState<{ id: string; invite_code: string; email: string | null; status: string; created_at: string }[]>([]);
+  const [inviteUrl, setInviteUrl] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [copied, setCopied] = useState('');
+
+  const fetchInvites = useCallback(async () => {
+    const res = await fetch(`/api/property/${slug}/invites`);
+    const json = await res.json();
+    setInvites(json.data ?? []);
+  }, [slug]);
+
+  useEffect(() => { fetchInvites(); }, [fetchInvites]);
+
+  const handleCreate = async () => {
+    setCreating(true);
+    const res = await fetch(`/api/property/${slug}/invites`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: inviteEmail.trim() || undefined }),
+    });
+    const json = await res.json();
+    if (json.inviteUrl) setInviteUrl(json.inviteUrl);
+    setInviteEmail('');
+    setCreating(false);
+    fetchInvites();
+  };
+
+  const handleDelete = async (id: string) => {
+    await fetch(`/api/property/${slug}/invites?id=${id}`, { method: 'DELETE' });
+    fetchInvites();
+  };
+
+  return (
+    <div className="mt-8">
+      <h3 className="text-sm font-semibold text-gray-900">Invite New Tenants</h3>
+      <p className="mt-1 text-xs text-gray-500">Generate an invite link for businesses not yet on Balkina. They sign up and are automatically added to your property.</p>
+      <div className="mt-3 flex gap-2">
+        <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="Email (optional)"
+          className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+        <button onClick={handleCreate} disabled={creating}
+          className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          {creating ? 'Creating...' : 'Generate Invite'}
+        </button>
+      </div>
+      {inviteUrl && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2">
+          <code className="flex-1 text-xs font-mono text-green-700 truncate">{inviteUrl}</code>
+          <button onClick={() => { navigator.clipboard.writeText(inviteUrl); setCopied('invite'); setTimeout(() => setCopied(''), 2000); }}
+            className="rounded bg-green-600 px-2 py-1 text-xs text-white">{copied === 'invite' ? 'Copied!' : 'Copy'}</button>
+        </div>
+      )}
+      {invites.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <p className="text-xs font-medium text-gray-500 uppercase">Sent Invites</p>
+          {invites.map((inv) => (
+            <div key={inv.id} className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+              <div className="flex-1">
+                <p className="text-sm text-gray-700">{inv.email || 'Open invite'}</p>
+                <p className="text-xs text-gray-400">{inv.status} · {new Date(inv.created_at).toLocaleDateString()}</p>
+              </div>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${inv.status === 'accepted' ? 'bg-green-100 text-green-700' : inv.status === 'expired' ? 'bg-gray-100 text-gray-500' : 'bg-yellow-100 text-yellow-700'}`}>
+                {inv.status}
+              </span>
+              {inv.status === 'pending' && (
+                <button onClick={() => handleDelete(inv.id)} className="text-xs text-red-500 hover:underline">Revoke</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TeamSection({ slug }: { slug: string }) {
+  const [team, setTeam] = useState<{ id: string; email: string; role: string; is_self: boolean; created_at: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [addEmail, setAddEmail] = useState('');
+  const [addRole, setAddRole] = useState('manager');
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState('');
+
+  const fetchTeam = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch(`/api/property/${slug}/team`);
+    const json = await res.json();
+    setTeam(json.data ?? []);
+    setLoading(false);
+  }, [slug]);
+
+  useEffect(() => { fetchTeam(); }, [fetchTeam]);
+
+  const handleAdd = async () => {
+    if (!addEmail.trim()) return;
+    setAdding(true);
+    setError('');
+    const res = await fetch(`/api/property/${slug}/team`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: addEmail.trim(), role: addRole }),
+    });
+    const json = await res.json();
+    if (!res.ok) setError(json.error ?? 'Failed');
+    else { setAddEmail(''); fetchTeam(); }
+    setAdding(false);
+  };
+
+  const handleRemove = async (id: string) => {
+    if (!confirm('Remove this team member?')) return;
+    await fetch(`/api/property/${slug}/team?id=${id}`, { method: 'DELETE' });
+    fetchTeam();
+  };
+
+  const handleRoleChange = async (id: string, newRole: string) => {
+    await fetch(`/api/property/${slug}/team`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, role: newRole }),
+    });
+    fetchTeam();
+  };
+
+  if (loading) return <div className="text-center py-10 text-gray-500">Loading team...</div>;
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold text-gray-900">Team</h2>
+      <p className="mt-1 text-sm text-gray-500">Manage property administrators and their access levels.</p>
+
+      {/* Add member */}
+      <div className="mt-4 flex gap-2">
+        <input value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="Email address"
+          className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+        <select value={addRole} onChange={(e) => setAddRole(e.target.value)}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+          <option value="admin">Admin</option>
+          <option value="manager">Manager</option>
+          <option value="viewer">Viewer</option>
+        </select>
+        <button onClick={handleAdd} disabled={adding || !addEmail.trim()}
+          className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          {adding ? 'Adding...' : 'Add'}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
+
+      {/* Role descriptions */}
+      <div className="mt-3 rounded-lg bg-gray-50 p-3 grid grid-cols-3 gap-3 text-xs text-gray-500">
+        <div><strong className="text-gray-700">Admin</strong> — Full access, manage team and branding</div>
+        <div><strong className="text-gray-700">Manager</strong> — Manage tenants, view analytics</div>
+        <div><strong className="text-gray-700">Viewer</strong> — View-only access</div>
+      </div>
+
+      {/* Team list */}
+      <div className="mt-4 space-y-2">
+        {team.map((m) => (
+          <div key={m.id} className="flex items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-600">
+              {m.email.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">{m.email}</p>
+              {m.is_self && <span className="text-xs text-brand-600">You</span>}
+            </div>
+            <select value={m.role} onChange={(e) => handleRoleChange(m.id, e.target.value)} disabled={m.is_self}
+              className="rounded-lg border border-gray-200 px-2 py-1 text-xs disabled:opacity-50">
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="viewer">Viewer</option>
+            </select>
+            {!m.is_self && (
+              <button onClick={() => handleRemove(m.id)} className="text-xs text-red-500 hover:underline">Remove</button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
