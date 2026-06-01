@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 
-async function getTenantId() {
+async function getUploadContext() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data: tenant } = await supabase.from('tenants').select('id').eq('user_id', user.id).single();
-  return (tenant as { id: string } | null)?.id ?? null;
+  const { data: tenant } = await supabase.from('tenants').select('id').eq('user_id', user.id).maybeSingle();
+  if (tenant) return { id: (tenant as { id: string }).id, type: 'tenant' };
+  const { data: propAdmin } = await supabase.from('property_admins').select('property_id').eq('user_id', user.id).maybeSingle();
+  if (propAdmin) return { id: (propAdmin as { property_id: string }).property_id, type: 'property' };
+  return null;
 }
 
 export async function POST(request: Request) {
-  const tenantId = await getTenantId();
-  if (!tenantId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const ctx = await getUploadContext();
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const formData = await request.formData();
   const file = formData.get('file') as File | null;
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
 
   // Generate unique filename
   const ext = file.name.split('.').pop() ?? 'jpg';
-  const filename = `${tenantId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const filename = `${ctx.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);

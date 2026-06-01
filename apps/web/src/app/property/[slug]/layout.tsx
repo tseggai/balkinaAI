@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { PropertyDashboardShell } from '@/components/property-dashboard-shell';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,18 +18,25 @@ export default async function PropertyLayout({
 
   const { data: admin } = await supabase
     .from('property_admins')
-    .select('property_id, role, properties(name, slug)')
+    .select('property_id, role')
     .eq('user_id', user.id)
-    .single();
+    .maybeSingle();
 
   if (!admin) redirect('/auth/login');
 
-  const prop = (admin as unknown as { properties: { name: string; slug: string } | null })?.properties;
-  if (!prop || prop.slug !== slug) redirect('/auth/login');
+  const { data: property } = await supabase
+    .from('properties')
+    .select('name, slug, logo_url, primary_color')
+    .eq('id', (admin as { property_id: string }).property_id)
+    .single();
+
+  if (!property || (property as { slug: string }).slug !== slug) redirect('/auth/login');
+
+  const p = property as { name: string; slug: string; logo_url: string | null; primary_color: string };
 
   return (
-    <PropertyDashboardShell propertyName={prop.name}>
+    <div data-property-name={p.name} data-property-logo={p.logo_url ?? ''} data-property-color={p.primary_color}>
       {children}
-    </PropertyDashboardShell>
+    </div>
   );
 }
