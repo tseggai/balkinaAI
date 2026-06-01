@@ -17,7 +17,7 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { error: authError, data: authData } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -26,6 +26,22 @@ export default function LoginPage() {
         setError(authError.message);
         setLoading(false);
         return;
+      }
+
+      // Check if user is a property admin (no tenant)
+      const { data: propAdmin } = await supabase
+        .from('property_admins')
+        .select('property_id, properties(slug)')
+        .eq('user_id', authData.user?.id ?? '')
+        .limit(1)
+        .maybeSingle();
+
+      if (propAdmin) {
+        const slug = (propAdmin as unknown as { properties: { slug: string } | null })?.properties?.slug;
+        if (slug) {
+          window.location.href = `/property/${slug}`;
+          return;
+        }
       }
 
       // Full page navigation so the browser sends the freshly-set auth
