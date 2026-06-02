@@ -23,6 +23,12 @@ export interface SendEmailParams {
   html: string;
   text?: string;
   replyTo?: string;
+  /**
+   * Optional display name for the sender. The address always stays on the
+   * verified RESEND_FROM_EMAIL domain, but the name can be branded per-property
+   * (e.g. "Porto Montenegro") so white-label invites feel first-party.
+   */
+  fromName?: string;
 }
 
 export interface EmailResult {
@@ -38,12 +44,17 @@ export async function sendEmail({
   html,
   text,
   replyTo,
+  fromName,
 }: SendEmailParams): Promise<EmailResult> {
   const fromEmail = process.env.RESEND_FROM_EMAIL;
   if (!fromEmail) throw new Error('RESEND_FROM_EMAIL not configured');
+  // If a display name is provided, brand the sender while keeping the verified
+  // address. fromEmail may already be "Name <addr>" or a bare address.
+  const bareAddress = fromEmail.includes('<') ? fromEmail.slice(fromEmail.indexOf('<') + 1, fromEmail.indexOf('>')) : fromEmail;
+  const from = fromName ? `${fromName} <${bareAddress}>` : fromEmail;
   const client = getResend();
   const { data, error } = await client.emails.send({
-    from: fromEmail,
+    from,
     to: Array.isArray(to) ? to : [to],
     subject,
     html,
@@ -225,6 +236,51 @@ export async function sendSubscriptionActivatedEmail(params: {
       </ol>
       <p><a href="https://balkina.ai/dashboard">Go to your dashboard &rarr;</a></p>
     `,
+  });
+}
+
+/**
+ * Send a white-label property invite to a prospective business. The email is
+ * branded with the property's name (sender display name + reply-to) so it reads
+ * as coming from the property, and links to the same /join signup form guests
+ * use, pre-tagged with the property's invite code.
+ */
+export async function sendPropertyInviteEmail(params: {
+  email: string;
+  propertyName: string;
+  propertyEmail?: string | null;
+  signupUrl: string;
+}): Promise<EmailResult> {
+  const { email, propertyName, propertyEmail, signupUrl } = params;
+
+  return sendEmail({
+    to: email,
+    fromName: `${propertyName} (via Balkina AI)`,
+    replyTo: propertyEmail || undefined,
+    subject: `${propertyName} invites you to join their booking platform`,
+    html: `
+      <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${propertyName} would like to add your business to their Balkina AI booking platform.</div>
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111;">
+        <h2 style="color:#111;margin-top:0;">You're invited to join ${propertyName}</h2>
+        <p><strong>${propertyName}</strong> uses Balkina AI to let guests discover and book local businesses, and they'd like to add yours.</p>
+        <p>Tell us a little about your business and ${propertyName} will review and approve your listing. It only takes a couple of minutes.</p>
+        <p style="margin:24px 0;">
+          <a href="${signupUrl}" style="display:inline-block;background:#6B7FC4;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Set up your business</a>
+        </p>
+        <p style="color:#52525b;font-size:14px;">Or paste this link into your browser:<br/><a href="${signupUrl}" style="color:#6B7FC4;">${signupUrl}</a></p>
+        <hr style="border:none;border-top:1px solid #e4e4e7;margin:24px 0;" />
+        <p style="color:#a1a1aa;font-size:12px;margin:0;">Sent by ${propertyName} via Balkina AI · AI-powered appointment booking</p>
+      </div>
+    `,
+    text: `You're invited to join ${propertyName}
+
+${propertyName} uses Balkina AI to let guests discover and book local businesses, and they'd like to add yours.
+
+Set up your business: ${signupUrl}
+
+${propertyName} will review and approve your listing.
+
+— Sent by ${propertyName} via Balkina AI`,
   });
 }
 

@@ -4,6 +4,7 @@ export {
   sendBookingConfirmationEmail,
   sendTenantWelcomeEmail,
   sendTenantLoginEmail,
+  sendPropertyInviteEmail,
   sendSubscriptionActivatedEmail,
   sendPaymentFailedEmail,
 } from './email.js';
