@@ -22,6 +22,8 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteProperty, setInviteProperty] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadCategories() {
@@ -30,6 +32,22 @@ export default function RegisterPage() {
       if (json.data) setCategories(json.data);
     }
     loadCategories();
+  }, []);
+
+  // Read the property invite code from the URL (e.g. /auth/register?property_invite=abc123).
+  // Done in an effect against window.location to avoid the useSearchParams() Suspense requirement.
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('property_invite');
+    if (!code) return;
+    setInviteCode(code);
+    (async () => {
+      const res = await fetch(`/api/auth/invite?code=${encodeURIComponent(code)}`);
+      const json = await res.json();
+      if (json.valid) {
+        setInviteProperty(json.propertyName ?? null);
+        if (json.email) setFormData((prev) => ({ ...prev, email: json.email }));
+      }
+    })();
   }, []);
 
   function updateField(field: string, value: string) {
@@ -80,6 +98,7 @@ export default function RegisterPage() {
             email: formData.email,
             phone: formData.phone,
             categoryId: formData.categoryId || null,
+            propertyInvite: inviteCode || undefined,
           }),
         });
       } catch (fetchErr) {
@@ -126,6 +145,12 @@ export default function RegisterPage() {
       <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
         <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
         <p className="mt-1 text-sm text-gray-500">Get started with Balkina AI for your business.</p>
+
+        {inviteProperty && (
+          <div className="mt-4 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700">
+            🎉 You&apos;ve been invited to join <strong>{inviteProperty}</strong>. Your business will be added automatically after signup.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>

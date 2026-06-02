@@ -11,8 +11,9 @@ export async function POST(request: Request) {
       email: string;
       phone?: string;
       categoryId?: string;
+      propertyInvite?: string;
     };
-    const { userId, businessName, ownerName, email, phone, categoryId } = body;
+    const { userId, businessName, ownerName, email, phone, categoryId, propertyInvite } = body;
 
     if (!userId || !businessName || !ownerName || !email) {
       return NextResponse.json(
@@ -102,6 +103,28 @@ export async function POST(request: Request) {
     // Create junction table entry for category
     if (categoryId) {
       await supabase.from('tenant_category_links').insert({ tenant_id: tenant.id, category_id: categoryId } as never);
+    }
+
+    // If signing up via a property invite, auto-link the new tenant to the property
+    if (propertyInvite) {
+      const { data: inviteData } = await supabase
+        .from('property_invites')
+        .select('id, property_id, status, expires_at')
+        .eq('invite_code', propertyInvite)
+        .maybeSingle();
+      const invite = inviteData as { id: string; property_id: string; status: string; expires_at: string } | null;
+
+      if (invite && invite.status === 'pending' && new Date(invite.expires_at) > new Date()) {
+        await supabase.from('property_tenants').insert({
+          property_id: invite.property_id,
+          tenant_id: tenant.id,
+          featured: false,
+        } as never);
+        await supabase.from('property_invites').update({
+          status: 'accepted',
+          accepted_by: tenant.id,
+        } as never).eq('id', invite.id);
+      }
     }
 
     // Merge tenant_id into the user's existing app_metadata (preserves other fields like role)
