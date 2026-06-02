@@ -498,6 +498,7 @@ ${behaviorContext}## Key Rules
 interface ChatRequestBody {
   message: string;
   tenantId?: string;
+  propertyId?: string;
   sessionId: string;
   customerName?: string;
   customerPhone?: string;
@@ -510,7 +511,7 @@ interface ChatRequestBody {
 export async function POST(request: Request) {
   try {
   const body = (await request.json()) as ChatRequestBody;
-  const { message, tenantId, sessionId, customerName, customerPhone, customerEmail, userId, userLatitude, userLongitude } = body;
+  const { message, tenantId, propertyId, sessionId, customerName, customerPhone, customerEmail, userId, userLatitude, userLongitude } = body;
 
   if (!message || !sessionId) {
     return new Response(JSON.stringify({ error: 'message and sessionId are required' }), {
@@ -556,6 +557,32 @@ export async function POST(request: Request) {
     tenantName = tenant.name;
     resolvedTenantId = tenant.id;
     tenantPaymentsEnabled = tenant.payments_enabled ?? false;
+  }
+
+  // 1b. Property scoping (white-label portal discovery mode). When a propertyId
+  // is supplied without a specific tenantId, discovery is restricted to the
+  // businesses that belong to that property.
+  let propertyTenantIds: string[] = [];
+  let propertyContext = '';
+  if (!tenantId && propertyId) {
+    const { data: propRow } = await supabase
+      .from('properties')
+      .select('id, name')
+      .eq('id', propertyId)
+      .eq('is_active', true)
+      .maybeSingle();
+    const prop = propRow as { id: string; name: string } | null;
+    if (prop) {
+      const { data: links } = await supabase
+        .from('property_tenants')
+        .select('tenant_id, tenants(name)')
+        .eq('property_id', prop.id);
+      const rows = (links ?? []) as unknown as { tenant_id: string; tenants: { name: string } | null }[];
+      propertyTenantIds = rows.map((r) => r.tenant_id);
+      const names = rows.map((r) => r.tenants?.name).filter(Boolean) as string[];
+      tenantName = prop.name;
+      propertyContext = `\n\n## Property Context\nYou are the booking concierge for ${prop.name}. ONLY recommend and book businesses that belong to ${prop.name}. When the customer searches, use find_businesses (it is already restricted to this property's businesses). Do not mention or suggest any business outside ${prop.name}.${names.length ? ` The businesses available here are: ${names.join(', ')}.` : ''}`;
+    }
   }
 
   // 2. Get or create chat session
@@ -822,7 +849,7 @@ export async function POST(request: Request) {
     behaviorContext += '\n';
   }
 
-  const systemPrompt = tenantId
+  let systemPrompt = tenantId
     ? buildTenantSystemPrompt(
         tenantName,
         resolvedName,
@@ -844,6 +871,9 @@ export async function POST(request: Request) {
         dateInfo,
         behaviorContext,
       );
+
+  // Restrict discovery to the property's businesses when in portal mode.
+  if (propertyContext) systemPrompt += propertyContext;
 
   // 6. Pre-detect search intent and prefetch businesses in parallel with OpenAI
   const openai = new OpenAI({ apiKey });
@@ -967,6 +997,7 @@ export async function POST(request: Request) {
                   customerEmail: resolvedEmail,
                   chatSessionId: chatSession!.id,
                   userId: userId ?? null,
+                  propertyTenantIds: propertyTenantIds.length ? propertyTenantIds : null,
                 },
                 userLatitude && userLongitude ? { latitude: userLatitude, longitude: userLongitude } : null,
               );

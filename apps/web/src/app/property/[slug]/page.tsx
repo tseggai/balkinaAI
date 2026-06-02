@@ -49,7 +49,7 @@ export default function PropertyDashboard() {
     website: '', address: '', city: '', country: '', custom_domain: '',
   });
 
-  const portalUrl = typeof window !== 'undefined' ? `${window.location.origin.replace('app.', '')}/p/${slug}` : '';
+  const portalUrl = typeof window !== 'undefined' ? `${window.location.origin}/p/${slug}` : '';
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -224,7 +224,7 @@ export default function PropertyDashboard() {
           <div className="mt-4 max-w-xl space-y-6">
             <div className="rounded-lg border border-gray-200 bg-white p-5">
               <h3 className="text-sm font-semibold text-gray-900">Custom Domain</h3>
-              <p className="mt-1 text-xs text-gray-500">Use your own domain for the booking portal instead of balkina.ai/p/{slug}.</p>
+              <p className="mt-1 text-xs text-gray-500">Use your own domain for the booking portal instead of app.balkina.ai/p/{slug}.</p>
               <input value={form.custom_domain} onChange={(e) => setForm({ ...form, custom_domain: e.target.value })} placeholder="book.yourproperty.com"
                 className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
 
@@ -238,7 +238,7 @@ export default function PropertyDashboard() {
                     <div className="ml-4 rounded bg-white border px-3 py-2 font-mono text-xs">
                       <p>Type: <strong>CNAME</strong></p>
                       <p>Name: <strong>{form.custom_domain.split('.')[0]}</strong></p>
-                      <p>Value: <strong>balkina.ai</strong></p>
+                      <p>Value: <strong>app.balkina.ai</strong></p>
                       <p>TTL: <strong>Auto</strong></p>
                     </div>
                     <p>4. Save and wait 5-30 minutes for DNS to propagate.</p>

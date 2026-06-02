@@ -194,11 +194,22 @@ export async function handleFindBusinesses(
   supabase: AdminClient,
   _tenantId: string,
   input: Record<string, unknown>,
+  propertyTenantIds?: string[] | null,
 ): Promise<ToolResult> {
   console.log('[find_businesses] called with params:', JSON.stringify(input));
 
   try {
-    return await handleFindBusinessesInner(supabase, input);
+    const result = await handleFindBusinessesInner(supabase, input);
+    // White-label portal: restrict discovery to the property's businesses.
+    if (propertyTenantIds && propertyTenantIds.length && result.success && result.data) {
+      const allowed = new Set(propertyTenantIds);
+      const data = result.data as { businesses?: { id: string }[]; has_more?: boolean };
+      if (Array.isArray(data.businesses)) {
+        const filtered = data.businesses.filter((b) => allowed.has(b.id));
+        return { ...result, data: { ...data, businesses: filtered, has_more: false } };
+      }
+    }
+    return result;
   } catch (err) {
     console.error('[find_businesses] CRASHED:', err);
     return { success: false, error: `find_businesses failed: ${err instanceof Error ? err.message : String(err)}` };
@@ -2597,13 +2608,13 @@ export async function executeTool(
   toolInput: Record<string, unknown>,
   supabase: AdminClient,
   tenantId: string,
-  sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; customerEmail?: string | null; chatSessionId: string; userId: string | null },
+  sessionInfo: { customerId: string | null; customerName: string | null; customerPhone: string | null; customerEmail?: string | null; chatSessionId: string; userId: string | null; propertyTenantIds?: string[] | null },
   userLocation?: { latitude: number; longitude: number } | null,
 ): Promise<ToolResult> {
   try {
     switch (toolName) {
       case 'find_businesses':
-        return await handleFindBusinesses(supabase, tenantId, toolInput);
+        return await handleFindBusinesses(supabase, tenantId, toolInput, sessionInfo.propertyTenantIds);
       case 'search_services':
       case 'get_services':
         return await handleGetServices(supabase, tenantId, toolInput);
