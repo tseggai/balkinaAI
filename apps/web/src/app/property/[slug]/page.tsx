@@ -49,7 +49,7 @@ export default function PropertyDashboard() {
     website: '', address: '', city: '', country: '', custom_domain: '',
   });
 
-  const portalUrl = typeof window !== 'undefined' ? `${window.location.origin}/p/${slug}` : '';
+  const portalUrl = typeof window !== 'undefined' ? `${window.location.origin.replace('app.', '')}/p/${slug}` : '';
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -103,7 +103,24 @@ export default function PropertyDashboard() {
     if (!confirm('Remove this tenant from the property?')) return;
     await supabase.from('property_tenants').delete().eq('id', linkId);
     fetchData();
+    // Self-heal the per-seat billing quantity after a removal.
+    fetch(`/api/property/${slug}/billing`).catch(() => {});
   };
+
+  // Fast activation after returning from Stripe Checkout.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('billing') !== 'success' || !sp.get('session_id')) return;
+    const sessionId = sp.get('session_id')!;
+    setTab('settings');
+    (async () => {
+      await fetch(`/api/property/${slug}/billing/verify`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      }).catch(() => {});
+      window.history.replaceState({}, '', `/property/${slug}`);
+    })();
+  }, [slug]);
 
   if (loading) return <div className="flex min-h-screen items-center justify-center text-gray-500">Loading...</div>;
   if (!property) return <div className="flex min-h-screen items-center justify-center text-gray-500">Property not found</div>;
@@ -212,6 +229,11 @@ export default function PropertyDashboard() {
         </div>
       )}
 
+      {/* Messages */}
+      {tab === 'messages' && (
+        <MessagesSection slug={slug} tenants={tenants} />
+      )}
+
       {/* Team */}
       {tab === 'team' && (
         <TeamSection slug={slug} />
@@ -224,7 +246,7 @@ export default function PropertyDashboard() {
           <div className="mt-4 max-w-xl space-y-6">
             <div className="rounded-lg border border-gray-200 bg-white p-5">
               <h3 className="text-sm font-semibold text-gray-900">Custom Domain</h3>
-              <p className="mt-1 text-xs text-gray-500">Use your own domain for the booking portal instead of app.balkina.ai/p/{slug}.</p>
+              <p className="mt-1 text-xs text-gray-500">Use your own domain for the booking portal instead of balkina.ai/p/{slug}.</p>
               <input value={form.custom_domain} onChange={(e) => setForm({ ...form, custom_domain: e.target.value })} placeholder="book.yourproperty.com"
                 className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
 
@@ -238,7 +260,7 @@ export default function PropertyDashboard() {
                     <div className="ml-4 rounded bg-white border px-3 py-2 font-mono text-xs">
                       <p>Type: <strong>CNAME</strong></p>
                       <p>Name: <strong>{form.custom_domain.split('.')[0]}</strong></p>
-                      <p>Value: <strong>app.balkina.ai</strong></p>
+                      <p>Value: <strong>balkina.ai</strong></p>
                       <p>TTL: <strong>Auto</strong></p>
                     </div>
                     <p>4. Save and wait 5-30 minutes for DNS to propagate.</p>
@@ -265,13 +287,7 @@ export default function PropertyDashboard() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-gray-200 bg-white p-5">
-              <h3 className="text-sm font-semibold text-gray-900">Subscription</h3>
-              <p className="mt-1 text-xs text-gray-500">Your current plan and billing.</p>
-              <div className="mt-3 inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-600">
-                {property?.tier === 'premium' ? 'Premium' : 'Essentials'}
-              </div>
-            </div>
+            <BillingSection slug={slug} />
           </div>
         </div>
       )}
@@ -519,6 +535,213 @@ function TenantsTab({
               </div>
             )}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface BillingState {
+  tier: string;
+  subscription_status: string;
+  has_subscription: boolean;
+  seats: number;
+  role: string;
+  plans_configured: { essentials: boolean; premium: boolean };
+}
+
+const PLAN_LABELS: Record<string, { name: string; blurb: string }> = {
+  essentials: { name: 'Essentials', blurb: 'Branded booking portal, tenant management, messaging' },
+  premium: { name: 'Premium', blurb: 'Everything in Essentials + custom domain, native app, advanced analytics' },
+};
+
+function BillingSection({ slug }: { slug: string }) {
+  const [state, setState] = useState<BillingState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState('');
+
+  const fetchState = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch(`/api/property/${slug}/billing`);
+    const json = await res.json();
+    if (res.ok) setState(json);
+    setLoading(false);
+  }, [slug]);
+
+  useEffect(() => { fetchState(); }, [fetchState]);
+
+  const subscribe = async (plan: string) => {
+    setBusy(plan);
+    const res = await fetch(`/api/property/${slug}/billing/checkout`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }),
+    });
+    const json = await res.json();
+    setBusy('');
+    if (json.url) window.location.href = json.url;
+    else alert(json.error ?? 'Could not start checkout');
+  };
+
+  const openPortal = async () => {
+    setBusy('portal');
+    const res = await fetch(`/api/property/${slug}/billing/portal`, { method: 'POST' });
+    const json = await res.json();
+    setBusy('');
+    if (json.url) window.location.href = json.url;
+    else alert(json.error ?? 'Could not open billing portal');
+  };
+
+  if (loading) return <div className="rounded-lg border border-gray-200 bg-white p-5 text-sm text-gray-400">Loading subscription…</div>;
+  if (!state) return null;
+
+  const isAdmin = state.role === 'admin';
+  const active = state.subscription_status === 'active';
+  const pastDue = state.subscription_status === 'past_due';
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-5">
+      <h3 className="text-sm font-semibold text-gray-900">Subscription</h3>
+      <p className="mt-1 text-xs text-gray-500">Your Balkina plan and per-business billing.</p>
+
+      <div className="mt-3 flex items-center gap-2">
+        <span className="inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-600">
+          {PLAN_LABELS[state.tier]?.name ?? state.tier}
+        </span>
+        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+          active ? 'bg-green-100 text-green-700' : pastDue ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'
+        }`}>
+          {active ? 'Active' : pastDue ? 'Past due' : 'Not subscribed'}
+        </span>
+        <span className="text-xs text-gray-400">{state.seats} business{state.seats === 1 ? '' : 'es'} billed</span>
+      </div>
+
+      {state.has_subscription ? (
+        <button onClick={openPortal} disabled={!isAdmin || busy === 'portal'}
+          className="mt-4 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          {busy === 'portal' ? 'Opening…' : 'Manage billing'}
+        </button>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {(['essentials', 'premium'] as const).map((plan) => (
+            <div key={plan} className="rounded-lg border border-gray-200 p-4">
+              <p className="text-sm font-semibold text-gray-900">{PLAN_LABELS[plan]?.name ?? plan}</p>
+              <p className="mt-1 text-xs text-gray-500">{PLAN_LABELS[plan]?.blurb ?? ''}</p>
+              <button onClick={() => subscribe(plan)} disabled={!isAdmin || !state.plans_configured[plan] || busy === plan}
+                className="mt-3 w-full rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                {busy === plan ? 'Starting…' : !state.plans_configured[plan] ? 'Coming soon' : `Subscribe + ${state.seats} seats`}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!isAdmin && <p className="mt-3 text-xs text-gray-400">Only property admins can change billing.</p>}
+      {pastDue && isAdmin && <p className="mt-3 text-xs text-orange-600">Your last payment failed — update your card in the billing portal to avoid interruption.</p>}
+    </div>
+  );
+}
+
+interface SentMessage {
+  id: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  recipients_count: number;
+  email_sent_count: number;
+  created_at: string;
+}
+
+function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTenant[] }) {
+  const [history, setHistory] = useState<SentMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [recipient, setRecipient] = useState('all'); // 'all' or a tenant_id
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const fetchHistory = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch(`/api/property/${slug}/messages`);
+    const json = await res.json();
+    setHistory(json.data ?? []);
+    setLoading(false);
+  }, [slug]);
+
+  useEffect(() => { fetchHistory(); }, [fetchHistory]);
+
+  const handleSend = async () => {
+    if (!subject.trim() || !body.trim()) return;
+    const recipientLabel = recipient === 'all' ? `all ${tenants.length} businesses` : tenants.find((t) => t.tenant_id === recipient)?.tenant_name;
+    if (!confirm(`Send "${subject.trim()}" to ${recipientLabel}?`)) return;
+    setSending(true);
+    setResult(null);
+    const res = await fetch(`/api/property/${slug}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject: subject.trim(), body: body.trim(), tenantId: recipient === 'all' ? undefined : recipient }),
+    });
+    const json = await res.json();
+    setSending(false);
+    if (!res.ok) { setResult({ ok: false, message: json.error ?? 'Failed to send' }); return; }
+    setResult({ ok: true, message: json.message ?? 'Sent.' });
+    setSubject(''); setBody('');
+    fetchHistory();
+  };
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold text-gray-900">Messages</h2>
+      <p className="mt-1 text-sm text-gray-500">Email an announcement to all your businesses, or message one directly — sent under your property&apos;s name via Balkina AI.</p>
+
+      {/* Compose */}
+      <div className="mt-4 max-w-2xl space-y-3 rounded-lg border border-gray-200 bg-white p-5">
+        <div>
+          <label className="block text-xs font-medium text-gray-500">Recipient</label>
+          <select value={recipient} onChange={(e) => setRecipient(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+            <option value="all">📣 All businesses ({tenants.length})</option>
+            {tenants.map((t) => (
+              <option key={t.tenant_id} value={t.tenant_id}>{t.tenant_name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500">Subject</label>
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Summer hours & marina event"
+            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500">Message</label>
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={5} placeholder="Write your announcement…"
+            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+        </div>
+        {result && (
+          <div className={`rounded-lg px-3 py-2 text-xs ${result.ok ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>{result.message}</div>
+        )}
+        <button onClick={handleSend} disabled={sending || !subject.trim() || !body.trim()}
+          className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          {sending ? 'Sending…' : recipient === 'all' ? 'Send to all' : 'Send'}
+        </button>
+      </div>
+
+      {/* History */}
+      <h3 className="mt-8 text-sm font-semibold text-gray-900">Sent history</h3>
+      {loading ? (
+        <p className="mt-3 text-sm text-gray-400">Loading…</p>
+      ) : history.length === 0 ? (
+        <p className="mt-3 text-sm text-gray-400">No messages sent yet.</p>
+      ) : (
+        <div className="mt-3 max-w-2xl space-y-2">
+          {history.map((m) => (
+            <div key={m.id} className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-gray-900 truncate">{m.subject}</p>
+                <span className="flex-shrink-0 text-xs text-gray-400">{new Date(m.created_at).toLocaleDateString()}</span>
+              </div>
+              <p className="mt-1 line-clamp-2 text-xs text-gray-500">{m.body}</p>
+              <p className="mt-1.5 text-xs text-gray-400">To {m.recipient} · {m.email_sent_count}/{m.recipients_count} delivered</p>
+            </div>
+          ))}
         </div>
       )}
     </div>

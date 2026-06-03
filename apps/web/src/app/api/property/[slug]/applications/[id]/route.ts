@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPropertyAdmin } from '@/lib/property-admin';
+import { syncPropertySeats } from '@/lib/property-billing';
 import { sendTenantLoginEmail } from '@balkina/notifications';
 
 /**
@@ -69,6 +70,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
         // Already a tenant — just link to the property and mark onboarded.
         await linkTenant(supabase, ctx.propertyId, existingTenant.id);
         await supabase.from('waitlist').update({ status: 'onboarded', updated_at: new Date().toISOString() }).eq('id', id);
+        await syncPropertySeats(ctx.admin, ctx.propertyId);
         return NextResponse.json({ success: true, status: 'linked_existing', message: `${entry.business_name} linked to your property.` });
       }
       await supabase.auth.admin.updateUserById(existing.id, { password: tempPassword });
@@ -172,6 +174,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   // 7. Link tenant to the property + mark application onboarded.
   await linkTenant(supabase, ctx.propertyId, tenantId);
   await supabase.from('waitlist').update({ status: 'onboarded', updated_at: new Date().toISOString() }).eq('id', id);
+  await syncPropertySeats(ctx.admin, ctx.propertyId);
 
   // 8. Email login credentials (best-effort).
   const loginUrl = process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL}/auth/login` : 'https://app.balkina.ai/auth/login';

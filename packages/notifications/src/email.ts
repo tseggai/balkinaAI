@@ -285,6 +285,42 @@ ${propertyName} will review and approve your listing.
 }
 
 /**
+ * Send a message/announcement from a property to one of its tenants. Branded
+ * with the property's name (sender display name + reply-to) so it reads as
+ * coming directly from the property.
+ */
+export async function sendPropertyMessageEmail(params: {
+  to: string;
+  propertyName: string;
+  propertyEmail?: string | null;
+  subject: string;
+  body: string;
+  recipientName?: string | null;
+}): Promise<EmailResult> {
+  const { to, propertyName, propertyEmail, subject, body, recipientName } = params;
+  const safeBody = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br />');
+
+  return sendEmail({
+    to,
+    fromName: `${propertyName} (via Balkina AI)`,
+    replyTo: propertyEmail || undefined,
+    subject,
+    html: `
+      <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${propertyName}: ${subject}</div>
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111;">
+        <p style="margin:0 0 4px 0;font-size:12px;font-weight:600;color:#6B7FC4;text-transform:uppercase;letter-spacing:.04em;">${propertyName}</p>
+        <h2 style="color:#111;margin:0 0 16px 0;">${subject}</h2>
+        ${recipientName ? `<p style="margin:0 0 12px 0;">Hi ${recipientName},</p>` : ''}
+        <div style="font-size:14px;line-height:1.6;color:#333;">${safeBody}</div>
+        <hr style="border:none;border-top:1px solid #e4e4e7;margin:24px 0;" />
+        <p style="color:#a1a1aa;font-size:12px;margin:0;">Sent by ${propertyName} via Balkina AI${propertyEmail ? ` · Reply to reach them at ${propertyEmail}` : ''}</p>
+      </div>
+    `,
+    text: `${propertyName}\n\n${subject}\n\n${recipientName ? `Hi ${recipientName},\n\n` : ''}${body}\n\n— Sent by ${propertyName} via Balkina AI`,
+  });
+}
+
+/**
  * Send payment failure notification email.
  */
 export async function sendPaymentFailedEmail(params: {
