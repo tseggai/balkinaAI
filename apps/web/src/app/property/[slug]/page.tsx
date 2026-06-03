@@ -103,7 +103,24 @@ export default function PropertyDashboard() {
     if (!confirm('Remove this tenant from the property?')) return;
     await supabase.from('property_tenants').delete().eq('id', linkId);
     fetchData();
+    // Self-heal the per-seat billing quantity after a removal.
+    fetch(`/api/property/${slug}/billing`).catch(() => {});
   };
+
+  // Fast activation after returning from Stripe Checkout.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('billing') !== 'success' || !sp.get('session_id')) return;
+    const sessionId = sp.get('session_id')!;
+    setTab('settings');
+    (async () => {
+      await fetch(`/api/property/${slug}/billing/verify`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      }).catch(() => {});
+      window.history.replaceState({}, '', `/property/${slug}`);
+    })();
+  }, [slug]);
 
   if (loading) return <div className="flex min-h-screen items-center justify-center text-gray-500">Loading...</div>;
   if (!property) return <div className="flex min-h-screen items-center justify-center text-gray-500">Property not found</div>;
@@ -270,13 +287,7 @@ export default function PropertyDashboard() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-gray-200 bg-white p-5">
-              <h3 className="text-sm font-semibold text-gray-900">Subscription</h3>
-              <p className="mt-1 text-xs text-gray-500">Your current plan and billing.</p>
-              <div className="mt-3 inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-600">
-                {property?.tier === 'premium' ? 'Premium' : 'Essentials'}
-              </div>
-            </div>
+            <BillingSection slug={slug} />
           </div>
         </div>
       )}
@@ -526,6 +537,105 @@ function TenantsTab({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+interface BillingState {
+  tier: string;
+  subscription_status: string;
+  has_subscription: boolean;
+  seats: number;
+  role: string;
+  plans_configured: { essentials: boolean; premium: boolean };
+}
+
+const PLAN_LABELS: Record<string, { name: string; blurb: string }> = {
+  essentials: { name: 'Essentials', blurb: 'Branded booking portal, tenant management, messaging' },
+  premium: { name: 'Premium', blurb: 'Everything in Essentials + custom domain, native app, advanced analytics' },
+};
+
+function BillingSection({ slug }: { slug: string }) {
+  const [state, setState] = useState<BillingState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState('');
+
+  const fetchState = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch(`/api/property/${slug}/billing`);
+    const json = await res.json();
+    if (res.ok) setState(json);
+    setLoading(false);
+  }, [slug]);
+
+  useEffect(() => { fetchState(); }, [fetchState]);
+
+  const subscribe = async (plan: string) => {
+    setBusy(plan);
+    const res = await fetch(`/api/property/${slug}/billing/checkout`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }),
+    });
+    const json = await res.json();
+    setBusy('');
+    if (json.url) window.location.href = json.url;
+    else alert(json.error ?? 'Could not start checkout');
+  };
+
+  const openPortal = async () => {
+    setBusy('portal');
+    const res = await fetch(`/api/property/${slug}/billing/portal`, { method: 'POST' });
+    const json = await res.json();
+    setBusy('');
+    if (json.url) window.location.href = json.url;
+    else alert(json.error ?? 'Could not open billing portal');
+  };
+
+  if (loading) return <div className="rounded-lg border border-gray-200 bg-white p-5 text-sm text-gray-400">Loading subscription…</div>;
+  if (!state) return null;
+
+  const isAdmin = state.role === 'admin';
+  const active = state.subscription_status === 'active';
+  const pastDue = state.subscription_status === 'past_due';
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-5">
+      <h3 className="text-sm font-semibold text-gray-900">Subscription</h3>
+      <p className="mt-1 text-xs text-gray-500">Your Balkina plan and per-business billing.</p>
+
+      <div className="mt-3 flex items-center gap-2">
+        <span className="inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-600">
+          {PLAN_LABELS[state.tier]?.name ?? state.tier}
+        </span>
+        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+          active ? 'bg-green-100 text-green-700' : pastDue ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'
+        }`}>
+          {active ? 'Active' : pastDue ? 'Past due' : 'Not subscribed'}
+        </span>
+        <span className="text-xs text-gray-400">{state.seats} business{state.seats === 1 ? '' : 'es'} billed</span>
+      </div>
+
+      {state.has_subscription ? (
+        <button onClick={openPortal} disabled={!isAdmin || busy === 'portal'}
+          className="mt-4 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          {busy === 'portal' ? 'Opening…' : 'Manage billing'}
+        </button>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {(['essentials', 'premium'] as const).map((plan) => (
+            <div key={plan} className="rounded-lg border border-gray-200 p-4">
+              <p className="text-sm font-semibold text-gray-900">{PLAN_LABELS[plan]?.name ?? plan}</p>
+              <p className="mt-1 text-xs text-gray-500">{PLAN_LABELS[plan]?.blurb ?? ''}</p>
+              <button onClick={() => subscribe(plan)} disabled={!isAdmin || !state.plans_configured[plan] || busy === plan}
+                className="mt-3 w-full rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                {busy === plan ? 'Starting…' : !state.plans_configured[plan] ? 'Coming soon' : `Subscribe + ${state.seats} seats`}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!isAdmin && <p className="mt-3 text-xs text-gray-400">Only property admins can change billing.</p>}
+      {pastDue && isAdmin && <p className="mt-3 text-xs text-orange-600">Your last payment failed — update your card in the billing portal to avoid interruption.</p>}
     </div>
   );
 }

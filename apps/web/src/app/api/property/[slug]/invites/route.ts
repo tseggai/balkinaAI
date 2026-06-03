@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getPropertyAdmin } from '@/lib/property-admin';
+import { syncPropertySeats } from '@/lib/property-billing';
 import { sendPropertyInviteEmail } from '@balkina/notifications';
 
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
@@ -53,6 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       .from('property_tenants')
       .insert({ property_id: ctx.propertyId, tenant_id: tenant.id, featured: false } as never);
     if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 500 });
+    await syncPropertySeats(ctx.admin, ctx.propertyId);
     return NextResponse.json({ status: 'added', message: `${tenant.name} added to your property.` });
   }
 

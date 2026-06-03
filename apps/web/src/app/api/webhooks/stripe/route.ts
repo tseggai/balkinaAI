@@ -132,6 +132,22 @@ export async function POST(request: Request) {
         break;
       }
 
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted': {
+        // Property subscriptions carry property_id in metadata. Tenant
+        // subscriptions are handled by the separate subscription webhook, so we
+        // only act here when this is a property subscription.
+        const sub = event.data.object as Stripe.Subscription;
+        const propertyId = sub.metadata?.property_id;
+        if (!propertyId) break;
+        const status = event.type === 'customer.subscription.deleted' ? 'canceled' : sub.status;
+        const update: Record<string, unknown> = { subscription_status: status };
+        if (event.type === 'customer.subscription.deleted') update.stripe_subscription_id = null;
+        await supabase.from('properties').update(update as never).eq('id', propertyId);
+        console.log(`[webhooks/stripe] property ${propertyId} subscription ${status}`);
+        break;
+      }
+
       default:
         break;
     }
