@@ -14,10 +14,26 @@ export async function POST(request: Request) {
     const supabase = getSupabase();
     const body = await request.json();
 
-    const { business_name, owner_name, email, phone, category, location, street, city, state, country, postal_code, staff_count, currency, services_description } = body;
+    const { business_name, owner_name, email, phone, category, location, street, city, state, country, postal_code, staff_count, currency, services_description, property_invite } = body;
 
     if (!business_name || !owner_name || !email) {
       return Response.json({ error: 'Business name, owner name, and email are required.' }, { status: 400 });
+    }
+
+    // If this signup came through a property invite link, resolve the code so the
+    // resulting waitlist entry is tagged to the property for owner approval.
+    let propertyId: string | null = null;
+    let propertyInviteId: string | null = null;
+    if (property_invite) {
+      const { data: invite } = await supabase
+        .from('property_invites')
+        .select('id, property_id, status, expires_at')
+        .eq('invite_code', property_invite)
+        .maybeSingle();
+      if (invite && invite.status === 'pending' && new Date(invite.expires_at) > new Date()) {
+        propertyId = invite.property_id;
+        propertyInviteId = invite.id;
+      }
     }
 
     const { error } = await supabase.from('waitlist').insert({
@@ -35,11 +51,19 @@ export async function POST(request: Request) {
       staff_count: staff_count || 1,
       currency: currency || 'EUR',
       services_description: services_description || null,
+      property_id: propertyId,
+      property_invite_id: propertyInviteId,
     });
 
     if (error) {
       console.error('[waitlist] Insert error:', error.message);
       return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
+    }
+
+    // Mark the invite as accepted so the property owner sees it move from
+    // "Invited" to "Pending approval".
+    if (propertyInviteId) {
+      await supabase.from('property_invites').update({ status: 'accepted' }).eq('id', propertyInviteId);
     }
 
     return Response.json({ success: true });

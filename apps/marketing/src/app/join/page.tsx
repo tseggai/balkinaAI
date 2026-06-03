@@ -138,6 +138,28 @@ export default function JoinPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [addressVerified, setAddressVerified] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteProperty, setInviteProperty] = useState<string | null>(null);
+
+  // Pick up a property invite code from the URL (/join?property_invite=CODE).
+  // Read from window.location to avoid the useSearchParams() Suspense requirement.
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('property_invite');
+    if (!code) return;
+    setInviteCode(code);
+    (async () => {
+      try {
+        const res = await fetch(`/api/invite?code=${encodeURIComponent(code)}`);
+        const json = await res.json();
+        if (json.valid) {
+          setInviteProperty(json.propertyName ?? null);
+          if (json.email) setForm((f) => ({ ...f, email: json.email }));
+        }
+      } catch {
+        // Banner is best-effort; the code still passes through on submit.
+      }
+    })();
+  }, []);
 
   const handleLocationSelect = useCallback((addr: ParsedAddress) => {
     setForm((f) => ({
@@ -203,6 +225,7 @@ export default function JoinPage() {
           ...form,
           staff_count: parseInt(form.staff_count) || 1,
           services_description: servicesDescription || null,
+          property_invite: inviteCode || undefined,
         }),
       });
 
@@ -260,6 +283,12 @@ export default function JoinPage() {
             Tell us about your service to join the early access, and we&apos;ll handle the setup.
           </p>
         </div>
+
+        {inviteProperty && (
+          <div className="mt-6 rounded-xl border border-brand-200 bg-brand-50 px-5 py-4 text-center text-sm text-brand-700">
+            🎉 You&apos;ve been invited to join <strong>{inviteProperty}</strong>. Complete the form below and {inviteProperty} will review and approve your listing.
+          </div>
+        )}
 
         {/* Form Card */}
         <form onSubmit={handleSubmit} className="mt-10 space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-lg shadow-gray-100/50 md:p-8">

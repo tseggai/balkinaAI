@@ -49,7 +49,7 @@ export default function PropertyDashboard() {
     website: '', address: '', city: '', country: '', custom_domain: '',
   });
 
-  const portalUrl = typeof window !== 'undefined' ? `${window.location.origin.replace('app.', '')}/p/${slug}` : '';
+  const portalUrl = typeof window !== 'undefined' ? `${window.location.origin}/p/${slug}` : '';
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -224,7 +224,7 @@ export default function PropertyDashboard() {
           <div className="mt-4 max-w-xl space-y-6">
             <div className="rounded-lg border border-gray-200 bg-white p-5">
               <h3 className="text-sm font-semibold text-gray-900">Custom Domain</h3>
-              <p className="mt-1 text-xs text-gray-500">Use your own domain for the booking portal instead of balkina.ai/p/{slug}.</p>
+              <p className="mt-1 text-xs text-gray-500">Use your own domain for the booking portal instead of app.balkina.ai/p/{slug}.</p>
               <input value={form.custom_domain} onChange={(e) => setForm({ ...form, custom_domain: e.target.value })} placeholder="book.yourproperty.com"
                 className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
 
@@ -238,7 +238,7 @@ export default function PropertyDashboard() {
                     <div className="ml-4 rounded bg-white border px-3 py-2 font-mono text-xs">
                       <p>Type: <strong>CNAME</strong></p>
                       <p>Name: <strong>{form.custom_domain.split('.')[0]}</strong></p>
-                      <p>Value: <strong>balkina.ai</strong></p>
+                      <p>Value: <strong>app.balkina.ai</strong></p>
                       <p>TTL: <strong>Auto</strong></p>
                     </div>
                     <p>4. Save and wait 5-30 minutes for DNS to propagate.</p>
@@ -287,19 +287,30 @@ interface Invite {
   created_at: string;
 }
 
+interface Application {
+  id: string;
+  business_name: string;
+  owner_name: string;
+  email: string;
+  phone: string | null;
+  category: string | null;
+  location: string | null;
+  services_description: string | null;
+  status: string;
+  created_at: string;
+}
+
 const STATUS_BADGE: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
-  accepted: 'bg-green-100 text-green-700',
   pending: 'bg-yellow-100 text-yellow-700',
-  expired: 'bg-gray-100 text-gray-500',
+  invited: 'bg-blue-100 text-blue-700',
 };
 
-const FILTERS = ['all', 'active', 'pending', 'accepted', 'expired'] as const;
+const FILTERS = ['all', 'active', 'pending', 'invited'] as const;
 type Filter = (typeof FILTERS)[number];
 
 function TenantsTab({
   slug,
-  propertyId,
   tenants,
   onChange,
   onToggleFeatured,
@@ -312,99 +323,99 @@ function TenantsTab({
   onToggleFeatured: (linkId: string, featured: boolean) => void;
   onRemoveTenant: (linkId: string) => void;
 }) {
-  const supabase = createClient();
   const portalOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
   const [invites, setInvites] = useState<Invite[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
 
-  // Add tenant modal
+  // Single add-or-invite modal
   const [showAdd, setShowAdd] = useState(false);
-  const [addSearch, setAddSearch] = useState('');
-  const [allTenants, setAllTenants] = useState<{ id: string; name: string; logo_url: string | null }[]>([]);
+  const [addEmail, setAddEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Generate invite modal
-  const [showInvite, setShowInvite] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteUrl, setInviteUrl] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const fetchInvites = useCallback(async () => {
-    const res = await fetch(`/api/property/${slug}/invites`);
-    const json = await res.json();
-    setInvites(json.data ?? []);
+  const refresh = useCallback(async () => {
+    const [invRes, appRes] = await Promise.all([
+      fetch(`/api/property/${slug}/invites`),
+      fetch(`/api/property/${slug}/applications`),
+    ]);
+    const invJson = await invRes.json();
+    const appJson = await appRes.json();
+    setInvites(invJson.data ?? []);
+    setApplications(appJson.data ?? []);
   }, [slug]);
 
-  useEffect(() => { fetchInvites(); }, [fetchInvites]);
+  useEffect(() => { refresh(); }, [refresh]);
 
-  const loadAllTenants = async () => {
-    const { data } = await supabase.from('tenants').select('id, name, logo_url').eq('status', 'active').order('name');
-    setAllTenants((data ?? []) as { id: string; name: string; logo_url: string | null }[]);
-  };
+  // Only invites that haven't yet produced an application (status pending).
+  const pendingInvites = invites.filter((i) => i.status === 'pending');
 
-  const openAdd = () => { setShowAdd(true); loadAllTenants(); };
-
-  const addTenantToProperty = async (tenantId: string) => {
-    await supabase.from('property_tenants').insert({ property_id: propertyId, tenant_id: tenantId, display_order: tenants.length } as never);
-    onChange();
-  };
-
-  const handleCreateInvite = async () => {
-    setCreating(true);
+  const handleAddOrInvite = async () => {
+    const email = addEmail.trim();
+    if (!email) return;
+    setSubmitting(true);
+    setResult(null);
     const res = await fetch(`/api/property/${slug}/invites`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: inviteEmail.trim() || undefined }),
+      body: JSON.stringify({ email }),
     });
     const json = await res.json();
-    if (json.inviteUrl) setInviteUrl(json.inviteUrl);
-    setInviteEmail('');
-    setCreating(false);
-    fetchInvites();
+    setSubmitting(false);
+    if (!res.ok) {
+      setResult({ ok: false, message: json.error ?? 'Something went wrong.' });
+      return;
+    }
+    setResult({ ok: true, message: json.message ?? 'Done.' });
+    setAddEmail('');
+    if (json.status === 'added') onChange();
+    refresh();
+  };
+
+  const handleApprove = async (id: string) => {
+    setBusyId(id);
+    const res = await fetch(`/api/property/${slug}/applications/${id}`, { method: 'POST' });
+    const json = await res.json();
+    setBusyId(null);
+    if (!res.ok) { alert(json.error ?? 'Failed to approve'); return; }
+    onChange();
+    refresh();
+  };
+
+  const handleDecline = async (id: string) => {
+    if (!confirm('Decline this application?')) return;
+    setBusyId(id);
+    await fetch(`/api/property/${slug}/applications/${id}`, { method: 'DELETE' });
+    setBusyId(null);
+    refresh();
   };
 
   const handleRevoke = async (id: string) => {
     await fetch(`/api/property/${slug}/invites?id=${id}`, { method: 'DELETE' });
-    fetchInvites();
+    refresh();
   };
 
-  const existingTenantIds = new Set(tenants.map((t) => t.tenant_id));
-  const filteredAdd = allTenants
-    .filter((t) => !existingTenantIds.has(t.id))
-    .filter((t) => !addSearch || t.name.toLowerCase().includes(addSearch.toLowerCase()));
-
-  // Combined, filterable list — linked tenants (active) + invites
   const counts = {
-    all: tenants.length + invites.length,
+    all: tenants.length + applications.length + pendingInvites.length,
     active: tenants.length,
-    pending: invites.filter((i) => i.status === 'pending').length,
-    accepted: invites.filter((i) => i.status === 'accepted').length,
-    expired: invites.filter((i) => i.status === 'expired').length,
+    pending: applications.length,
+    invited: pendingInvites.length,
   };
 
   const showTenants = filter === 'all' || filter === 'active';
-  const visibleTenants = showTenants ? tenants : [];
-  const visibleInvites = filter === 'all'
-    ? invites
-    : filter === 'active'
-      ? []
-      : invites.filter((i) => i.status === filter);
+  const showApplications = filter === 'all' || filter === 'pending';
+  const showInvites = filter === 'all' || filter === 'invited';
 
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-gray-900">Tenants ({tenants.length})</h2>
-        <div className="flex items-center gap-2">
-          <button onClick={openAdd}
-            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
-            + Add Tenant
-          </button>
-          <button onClick={() => { setShowInvite(true); setInviteUrl(''); }}
-            className="rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50">
-            Generate Invite
-          </button>
-        </div>
+        <button onClick={() => { setShowAdd(true); setResult(null); setAddEmail(''); }}
+          className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+          + Add Tenant
+        </button>
       </div>
 
       {/* Filter */}
@@ -414,14 +425,15 @@ function TenantsTab({
             className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${
               filter === f ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}>
-            {f} ({counts[f]})
+            {f === 'pending' ? 'pending approval' : f} ({counts[f]})
           </button>
         ))}
       </div>
 
       {/* Combined list */}
       <div className="mt-4 space-y-2">
-        {visibleTenants.map((t) => (
+        {/* Active tenants */}
+        {showTenants && tenants.map((t) => (
           <div key={t.id} className="flex items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3">
             {t.tenant_logo ? <img src={t.tenant_logo} alt="" className="h-10 w-10 flex-shrink-0 rounded-lg object-cover" /> : <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-200 text-sm font-bold text-gray-500">{t.tenant_name.charAt(0)}</div>}
             <div className="flex-1 min-w-0">
@@ -442,75 +454,68 @@ function TenantsTab({
           </div>
         ))}
 
-        {visibleInvites.map((inv) => (
+        {/* Pending applications (awaiting approval) */}
+        {showApplications && applications.map((a) => (
+          <div key={a.id} className="flex items-center gap-4 rounded-lg border border-yellow-200 bg-yellow-50/40 px-4 py-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-yellow-100 text-sm font-bold text-yellow-700">{a.business_name.charAt(0)}</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{a.business_name}</p>
+              <p className="text-xs text-gray-500 truncate">{a.owner_name} · {a.email}{a.category ? ` · ${a.category}` : ''}</p>
+            </div>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE.pending}`}>pending</span>
+            <button onClick={() => handleApprove(a.id)} disabled={busyId === a.id}
+              className="rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50">
+              {busyId === a.id ? 'Approving...' : 'Approve'}
+            </button>
+            <button onClick={() => handleDecline(a.id)} disabled={busyId === a.id}
+              className="rounded-lg px-3 py-1 text-xs font-medium text-red-500 hover:bg-red-50 disabled:opacity-50">Decline</button>
+          </div>
+        ))}
+
+        {/* Sent invites (awaiting signup) */}
+        {showInvites && pendingInvites.map((inv) => (
           <div key={inv.id} className="flex items-center gap-4 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-3">
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-200 text-base text-gray-400">✉️</div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-700 truncate">{inv.email || 'Open invite'}</p>
               <p className="text-xs text-gray-400">Invited {new Date(inv.created_at).toLocaleDateString()}</p>
             </div>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[inv.status] ?? STATUS_BADGE.pending}`}>{inv.status}</span>
-            {inv.status === 'pending' && (
-              <>
-                <button onClick={() => { navigator.clipboard.writeText(`${portalOrigin}/auth/register?property_invite=${inv.invite_code}`); }}
-                  className="rounded-lg px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">Copy Link</button>
-                <button onClick={() => handleRevoke(inv.id)} className="rounded-lg px-3 py-1 text-xs font-medium text-red-500 hover:bg-red-50">Revoke</button>
-              </>
-            )}
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE.invited}`}>invited</span>
+            <button onClick={() => { navigator.clipboard.writeText(`${(process.env.NEXT_PUBLIC_MARKETING_URL || 'https://balkina.ai')}/join?property_invite=${inv.invite_code}`); }}
+              className="rounded-lg px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">Copy Link</button>
+            <button onClick={() => handleRevoke(inv.id)} className="rounded-lg px-3 py-1 text-xs font-medium text-red-500 hover:bg-red-50">Revoke</button>
           </div>
         ))}
 
-        {visibleTenants.length === 0 && visibleInvites.length === 0 && (
-          <p className="rounded-lg border border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">No {filter === 'all' ? '' : filter} entries yet.</p>
+        {counts[filter] === 0 && (
+          <p className="rounded-lg border border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">Nothing here yet.</p>
         )}
       </div>
 
-      {/* Add Tenant overlay */}
+      {/* Add-or-invite overlay */}
       {showAdd && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowAdd(false)}>
           <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">Add an existing business</h3>
+              <h3 className="text-sm font-semibold text-gray-900">Add a tenant</h3>
               <button onClick={() => setShowAdd(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
-            <input value={addSearch} onChange={(e) => setAddSearch(e.target.value)} placeholder="Search businesses..." autoFocus
-              className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-            <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
-              {filteredAdd.slice(0, 30).map((t) => (
-                <button key={t.id} onClick={() => addTenantToProperty(t.id)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-50">
-                  {t.logo_url ? <img src={t.logo_url} alt="" className="h-8 w-8 rounded-lg object-cover" /> : <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-200 text-xs font-bold text-gray-500">{t.name.charAt(0)}</div>}
-                  <span className="text-gray-700">{t.name}</span>
-                </button>
-              ))}
-              {filteredAdd.length === 0 && <p className="py-4 text-center text-xs text-gray-400">No businesses found</p>}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Generate Invite overlay */}
-      {showInvite && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowInvite(false)}>
-          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">Invite a new business</h3>
-              <button onClick={() => setShowInvite(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <p className="mt-1 text-xs text-gray-500">Generate an invite link for a business not yet on Balkina. They sign up and are automatically added to your property.</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Enter the business&apos;s email. If they&apos;re already on Balkina, they&apos;ll be added instantly.
+              Otherwise we&apos;ll email them an invite to set up their business — and you&apos;ll approve it before it goes live.
+            </p>
             <div className="mt-3 flex gap-2">
-              <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="Email (optional)"
+              <input value={addEmail} onChange={(e) => setAddEmail(e.target.value)} type="email" placeholder="business@email.com" autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAddOrInvite(); }}
                 className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-              <button onClick={handleCreateInvite} disabled={creating}
+              <button onClick={handleAddOrInvite} disabled={submitting || !addEmail.trim()}
                 className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-                {creating ? 'Creating...' : 'Generate'}
+                {submitting ? '...' : 'Add'}
               </button>
             </div>
-            {inviteUrl && (
-              <div className="mt-3 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2">
-                <code className="flex-1 truncate font-mono text-xs text-green-700">{inviteUrl}</code>
-                <button onClick={() => { navigator.clipboard.writeText(inviteUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-                  className="rounded bg-green-600 px-2 py-1 text-xs text-white">{copied ? 'Copied!' : 'Copy'}</button>
+            {result && (
+              <div className={`mt-3 rounded-lg px-3 py-2 text-xs ${result.ok ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                {result.message}
               </div>
             )}
           </div>
