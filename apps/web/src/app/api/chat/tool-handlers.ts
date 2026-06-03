@@ -199,21 +199,95 @@ export async function handleFindBusinesses(
   console.log('[find_businesses] called with params:', JSON.stringify(input));
 
   try {
-    const result = await handleFindBusinessesInner(supabase, input);
-    // White-label portal: restrict discovery to the property's businesses.
-    if (propertyTenantIds && propertyTenantIds.length && result.success && result.data) {
-      const allowed = new Set(propertyTenantIds);
-      const data = result.data as { businesses?: { id: string }[]; has_more?: boolean };
-      if (Array.isArray(data.businesses)) {
-        const filtered = data.businesses.filter((b) => allowed.has(b.id));
-        return { ...result, data: { ...data, businesses: filtered, has_more: false } };
-      }
+    // White-label portal: discovery is restricted to the property's businesses.
+    // We scope the query itself (not a post-filter) so pagination/limits apply
+    // within the property's set instead of the global tenant pool.
+    if (propertyTenantIds && propertyTenantIds.length) {
+      return await handlePropertyFindBusinesses(supabase, propertyTenantIds, input);
     }
-    return result;
+    return await handleFindBusinessesInner(supabase, input);
   } catch (err) {
     console.error('[find_businesses] CRASHED:', err);
     return { success: false, error: `find_businesses failed: ${err instanceof Error ? err.message : String(err)}` };
   }
+}
+
+interface PortalService { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }
+interface PortalLocation { id: string; name: string; address: string; latitude: number | null; longitude: number | null }
+
+/**
+ * Property-scoped discovery for the white-label portal. Returns only the
+ * property's active businesses, optionally narrowed by a search term or
+ * category, with their public services and locations attached. Never returns
+ * empty when the property has businesses (falls back to the full set).
+ */
+async function handlePropertyFindBusinesses(
+  supabase: AdminClient,
+  ids: string[],
+  input: Record<string, unknown>,
+): Promise<ToolResult> {
+  const offset = (input.offset as number) || 0;
+  const limit = (input.limit as number) || 12;
+  const term = (((input.service_type as string) || (input.query as string) || '')).trim().toLowerCase();
+  const categoryId = ((input.category_id as string) || '').trim();
+  const words = term.split(/\s+/).filter((w) => w.length >= 2);
+
+  let tq = supabase
+    .from('tenants')
+    .select('id, name, logo_url, avg_rating, review_count, category_id, categories(name)')
+    .in('id', ids)
+    .eq('status', 'active');
+  if (categoryId) tq = tq.eq('category_id', categoryId);
+  const { data: tRows, error: tErr } = await tq;
+  if (tErr) return { success: false, error: tErr.message };
+
+  type T = { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; category_id: string | null; categories: { name: string } | { name: string }[] | null };
+  const tenants = (tRows ?? []) as unknown as T[];
+  const tenantIds = tenants.map((t) => t.id);
+
+  const [{ data: svcRows }, { data: locRows }] = tenantIds.length
+    ? await Promise.all([
+        supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url').in('tenant_id', tenantIds).eq('visibility', 'public'),
+        supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', tenantIds),
+      ])
+    : [{ data: [] }, { data: [] }];
+
+  const svcByTenant = new Map<string, PortalService[]>();
+  for (const s of (svcRows ?? []) as (PortalService & { tenant_id: string })[]) {
+    const arr = svcByTenant.get(s.tenant_id) ?? [];
+    arr.push({ id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes, deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, deposit_type: s.deposit_type, image_url: s.image_url });
+    svcByTenant.set(s.tenant_id, arr);
+  }
+  const locByTenant = new Map<string, PortalLocation[]>();
+  for (const l of (locRows ?? []) as (PortalLocation & { tenant_id: string })[]) {
+    const arr = locByTenant.get(l.tenant_id) ?? [];
+    arr.push({ id: l.id, name: l.name, address: l.address, latitude: l.latitude, longitude: l.longitude });
+    locByTenant.set(l.tenant_id, arr);
+  }
+
+  let businesses = tenants.map((t) => {
+    const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
+    const svcs = svcByTenant.get(t.id) ?? [];
+    const locs = locByTenant.get(t.id) ?? [];
+    return {
+      id: t.id, name: t.name, image_url: t.logo_url ?? undefined,
+      category: cat, business_category: cat,
+      avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0,
+      all_services: svcs, locations: locs, closest_location_id: locs[0]?.id,
+    };
+  });
+
+  if (term) {
+    const haystack = (b: typeof businesses[number]) =>
+      `${b.name} ${b.category ?? ''} ${b.all_services.map((s) => s.name).join(' ')}`.toLowerCase();
+    const matched = businesses.filter((b) => { const h = haystack(b); return h.includes(term) || words.some((w) => h.includes(w)); });
+    if (matched.length) businesses = matched; // never go empty for a valid property
+  }
+
+  const totalCount = businesses.length;
+  const paged = businesses.slice(offset, offset + limit);
+  console.log(`[find_businesses] property-scoped: ${paged.length}/${totalCount} businesses`);
+  return { success: true, data: { businesses: paged, total_count: totalCount, offset, limit, has_more: offset + limit < totalCount } };
 }
 
 async function handleFindBusinessesInner(

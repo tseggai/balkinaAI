@@ -272,12 +272,19 @@ function MessageContent({ content, isStreaming, isUser, brand, onAction }: {
   }
 
   // Split into ordered segments of text and cards.
+  // While streaming, drop a trailing unterminated [[CARD:… fragment so partial
+  // card JSON never flashes as raw text before it finishes arriving.
+  let working = content;
+  if (isStreaming) {
+    const lastOpen = working.lastIndexOf('[[CARD:');
+    if (lastOpen !== -1 && working.indexOf(']]', lastOpen) === -1) working = working.slice(0, lastOpen);
+  }
   const segments: ({ kind: 'text'; value: string } | { kind: 'card'; card: AnyCard })[] = [];
   let lastIndex = 0;
   let m: RegExpExecArray | null;
   CARD_REGEX.lastIndex = 0;
-  while ((m = CARD_REGEX.exec(content)) !== null) {
-    if (m.index > lastIndex) segments.push({ kind: 'text', value: content.slice(lastIndex, m.index) });
+  while ((m = CARD_REGEX.exec(working)) !== null) {
+    if (m.index > lastIndex) segments.push({ kind: 'text', value: working.slice(lastIndex, m.index) });
     try {
       segments.push({ kind: 'card', card: JSON.parse(m[1]!) as AnyCard });
     } catch {
@@ -285,7 +292,7 @@ function MessageContent({ content, isStreaming, isUser, brand, onAction }: {
     }
     lastIndex = m.index + m[0].length;
   }
-  if (lastIndex < content.length) segments.push({ kind: 'text', value: content.slice(lastIndex) });
+  if (lastIndex < working.length) segments.push({ kind: 'text', value: working.slice(lastIndex) });
 
   return (
     <div className="space-y-2">
