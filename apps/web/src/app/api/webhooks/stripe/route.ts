@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
+import { PROPERTY_SEAT_PRICE_ID } from '@/lib/stripe';
 import Stripe from 'stripe';
 
 function getStripe() {
@@ -132,17 +133,35 @@ export async function POST(request: Request) {
         break;
       }
 
+      case 'customer.subscription.created': {
+        // A property subscription was created (self-serve checkout OR a custom
+        // deal set up in the Stripe Dashboard with metadata.property_id). Tenant
+        // subscriptions carry no property_id and are handled elsewhere.
+        const sub = event.data.object as Stripe.Subscription;
+        const propertyId = sub.metadata?.property_id;
+        if (!propertyId) break;
+        const seatItem = sub.items.data.find((i) => i.price.id === PROPERTY_SEAT_PRICE_ID);
+        const update: Record<string, unknown> = {
+          stripe_subscription_id: sub.id,
+          subscription_status: sub.status,
+          stripe_seat_item_id: seatItem?.id ?? null,
+          seats: seatItem?.quantity ?? 0,
+        };
+        if (sub.metadata?.plan) update.tier = sub.metadata.plan;
+        await supabase.from('properties').update(update as never).eq('id', propertyId);
+        console.log(`[webhooks/stripe] property ${propertyId} subscription created (${sub.status})`);
+        break;
+      }
+
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
-        // Property subscriptions carry property_id in metadata. Tenant
-        // subscriptions are handled by the separate subscription webhook, so we
-        // only act here when this is a property subscription.
         const sub = event.data.object as Stripe.Subscription;
         const propertyId = sub.metadata?.property_id;
         if (!propertyId) break;
         const status = event.type === 'customer.subscription.deleted' ? 'canceled' : sub.status;
         const update: Record<string, unknown> = { subscription_status: status };
         if (event.type === 'customer.subscription.deleted') update.stripe_subscription_id = null;
+        if (event.type === 'customer.subscription.updated' && sub.metadata?.plan) update.tier = sub.metadata.plan;
         await supabase.from('properties').update(update as never).eq('id', propertyId);
         console.log(`[webhooks/stripe] property ${propertyId} subscription ${status}`);
         break;

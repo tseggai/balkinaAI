@@ -553,6 +553,7 @@ interface BillingState {
 const PLAN_LABELS: Record<string, { name: string; blurb: string }> = {
   essentials: { name: 'Essentials', blurb: 'Branded booking portal, tenant management, messaging' },
   premium: { name: 'Premium', blurb: 'Everything in Essentials + custom domain, native app, advanced analytics' },
+  custom: { name: 'Custom', blurb: 'A tailored plan managed by Balkina' },
 };
 
 function BillingSection({ slug }: { slug: string }) {
@@ -596,6 +597,7 @@ function BillingSection({ slug }: { slug: string }) {
   const isAdmin = state.role === 'admin';
   const active = state.subscription_status === 'active';
   const pastDue = state.subscription_status === 'past_due';
+  const isCustom = state.tier === 'custom';
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-5">
@@ -614,7 +616,17 @@ function BillingSection({ slug }: { slug: string }) {
         <span className="text-xs text-gray-400">{state.seats} business{state.seats === 1 ? '' : 'es'} billed</span>
       </div>
 
-      {state.has_subscription ? (
+      {isCustom ? (
+        <div className="mt-4">
+          <p className="text-xs text-gray-500">This is a tailored plan managed by Balkina. Contact your account manager to make changes.</p>
+          {state.has_subscription && (
+            <button onClick={openPortal} disabled={!isAdmin || busy === 'portal'}
+              className="mt-3 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+              {busy === 'portal' ? 'Opening…' : 'Manage billing'}
+            </button>
+          )}
+        </div>
+      ) : state.has_subscription ? (
         <button onClick={openPortal} disabled={!isAdmin || busy === 'portal'}
           className="mt-4 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
           {busy === 'portal' ? 'Opening…' : 'Manage billing'}
