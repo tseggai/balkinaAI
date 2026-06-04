@@ -546,6 +546,7 @@ interface BillingState {
   subscription_status: string;
   has_subscription: boolean;
   seats: number;
+  seat_billing: boolean;
   role: string;
   plans_configured: { essentials: boolean; premium: boolean };
 }
@@ -613,7 +614,7 @@ function BillingSection({ slug }: { slug: string }) {
         }`}>
           {active ? 'Active' : pastDue ? 'Past due' : 'Not subscribed'}
         </span>
-        <span className="text-xs text-gray-400">{state.seats} business{state.seats === 1 ? '' : 'es'} billed</span>
+        <span className="text-xs text-gray-400">{state.seats} business{state.seats === 1 ? '' : 'es'}{state.seat_billing ? ' billed' : ''}</span>
       </div>
 
       {isCustom ? (
@@ -639,7 +640,7 @@ function BillingSection({ slug }: { slug: string }) {
               <p className="mt-1 text-xs text-gray-500">{PLAN_LABELS[plan]?.blurb ?? ''}</p>
               <button onClick={() => subscribe(plan)} disabled={!isAdmin || !state.plans_configured[plan] || busy === plan}
                 className="mt-3 w-full rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-                {busy === plan ? 'Starting…' : !state.plans_configured[plan] ? 'Coming soon' : `Subscribe + ${state.seats} seats`}
+                {busy === plan ? 'Starting…' : !state.plans_configured[plan] ? 'Coming soon' : state.seat_billing ? `Subscribe + ${state.seats} seats` : 'Subscribe'}
               </button>
             </div>
           ))}
