@@ -28,6 +28,21 @@ export const PROPERTY_PLAN_PRICE_IDS = {
 
 export const PROPERTY_SEAT_PRICE_ID = process.env.STRIPE_PRICE_ID_PROPERTY_SEAT ?? '';
 
+// Businesses included in each plan before per-seat overage kicks in.
+export const PROPERTY_PLAN_INCLUDED_SEATS: Record<string, number> = {
+  essentials: Number(process.env.PROPERTY_INCLUDED_SEATS_ESSENTIALS ?? '5'),
+  premium: Number(process.env.PROPERTY_INCLUDED_SEATS_PREMIUM ?? '20'),
+};
+
+export function includedSeatsForTier(tier: string): number {
+  return PROPERTY_PLAN_INCLUDED_SEATS[tier] ?? 0;
+}
+
+/** Businesses billed as per-seat overage = total beyond the plan's included allowance. */
+export function billableSeats(tier: string, totalBusinesses: number): number {
+  return Math.max(0, totalBusinesses - includedSeatsForTier(tier));
+}
+
 export type PlanKey = keyof typeof PLAN_PRICE_IDS;
 export type AddonKey = keyof typeof ADDON_PRICE_IDS;
 export type PropertyPlanKey = keyof typeof PROPERTY_PLAN_PRICE_IDS;

@@ -141,11 +141,15 @@ export async function POST(request: Request) {
         const propertyId = sub.metadata?.property_id;
         if (!propertyId) break;
         const seatItem = sub.items.data.find((i) => i.price.id === PROPERTY_SEAT_PRICE_ID);
+        const { count: totalBusinesses } = await supabase
+          .from('property_tenants')
+          .select('id', { count: 'exact', head: true })
+          .eq('property_id', propertyId);
         const update: Record<string, unknown> = {
           stripe_subscription_id: sub.id,
           subscription_status: sub.status,
           stripe_seat_item_id: seatItem?.id ?? null,
-          seats: seatItem?.quantity ?? 0,
+          seats: totalBusinesses ?? 0,
         };
         if (sub.metadata?.plan) update.tier = sub.metadata.plan;
         await supabase.from('properties').update(update as never).eq('id', propertyId);

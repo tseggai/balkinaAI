@@ -547,6 +547,8 @@ interface BillingState {
   has_subscription: boolean;
   seats: number;
   seat_billing: boolean;
+  included_seats: number;
+  plan_included_seats: Record<string, number>;
   role: string;
   plans_configured: { essentials: boolean; premium: boolean };
 }
@@ -614,8 +616,15 @@ function BillingSection({ slug }: { slug: string }) {
         }`}>
           {active ? 'Active' : pastDue ? 'Past due' : 'Not subscribed'}
         </span>
-        <span className="text-xs text-gray-400">{state.seats} business{state.seats === 1 ? '' : 'es'}{state.seat_billing ? ' billed' : ''}</span>
+        <span className="text-xs text-gray-400">{state.seats} business{state.seats === 1 ? '' : 'es'}</span>
       </div>
+
+      {state.seat_billing && !isCustom && (
+        <p className="mt-2 text-xs text-gray-400">
+          {PLAN_LABELS[state.tier]?.name ?? state.tier} includes {state.included_seats} business{state.included_seats === 1 ? '' : 'es'}
+          {state.seats > state.included_seats ? ` · ${state.seats - state.included_seats} billed as extra` : ' · within allowance'}
+        </p>
+      )}
 
       {isCustom ? (
         <div className="mt-4">
@@ -634,16 +643,23 @@ function BillingSection({ slug }: { slug: string }) {
         </button>
       ) : (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {(['essentials', 'premium'] as const).map((plan) => (
-            <div key={plan} className="rounded-lg border border-gray-200 p-4">
-              <p className="text-sm font-semibold text-gray-900">{PLAN_LABELS[plan]?.name ?? plan}</p>
-              <p className="mt-1 text-xs text-gray-500">{PLAN_LABELS[plan]?.blurb ?? ''}</p>
-              <button onClick={() => subscribe(plan)} disabled={!isAdmin || !state.plans_configured[plan] || busy === plan}
-                className="mt-3 w-full rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-                {busy === plan ? 'Starting…' : !state.plans_configured[plan] ? 'Coming soon' : state.seat_billing ? `Subscribe + ${state.seats} seats` : 'Subscribe'}
-              </button>
-            </div>
-          ))}
+          {(['essentials', 'premium'] as const).map((plan) => {
+            const included = state.plan_included_seats[plan] ?? 0;
+            const overage = state.seat_billing ? Math.max(0, state.seats - included) : 0;
+            return (
+              <div key={plan} className="rounded-lg border border-gray-200 p-4">
+                <p className="text-sm font-semibold text-gray-900">{PLAN_LABELS[plan]?.name ?? plan}</p>
+                <p className="mt-1 text-xs text-gray-500">{PLAN_LABELS[plan]?.blurb ?? ''}</p>
+                {state.seat_billing && (
+                  <p className="mt-1 text-xs text-gray-400">Includes {included} business{included === 1 ? '' : 'es'}, then per-business after that.</p>
+                )}
+                <button onClick={() => subscribe(plan)} disabled={!isAdmin || !state.plans_configured[plan] || busy === plan}
+                  className="mt-3 w-full rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                  {busy === plan ? 'Starting…' : !state.plans_configured[plan] ? 'Coming soon' : overage > 0 ? `Subscribe (+${overage} extra)` : 'Subscribe'}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 

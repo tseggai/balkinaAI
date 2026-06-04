@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPropertyAdmin } from '@/lib/property-admin';
-import { PROPERTY_PLAN_PRICE_IDS, PROPERTY_SEAT_PRICE_ID } from '@/lib/stripe';
+import { PROPERTY_PLAN_PRICE_IDS, PROPERTY_SEAT_PRICE_ID, PROPERTY_PLAN_INCLUDED_SEATS, includedSeatsForTier } from '@/lib/stripe';
 import { countPropertySeats, syncPropertySeats } from '@/lib/property-billing';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -32,6 +32,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     has_subscription: !!property?.stripe_subscription_id && isActive,
     seats: tenantCount,
     seat_billing: !!PROPERTY_SEAT_PRICE_ID,
+    included_seats: includedSeatsForTier(property?.tier ?? 'essentials'),
+    plan_included_seats: PROPERTY_PLAN_INCLUDED_SEATS,
     role: ctx.role,
     plans_configured: {
       essentials: !!PROPERTY_PLAN_PRICE_IDS.essentials,
