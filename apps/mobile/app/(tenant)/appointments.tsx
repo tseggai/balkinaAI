@@ -11,6 +11,8 @@ interface Appointment {
   start_time: string;
   end_time: string;
   status: string;
+  booking_type: string | null;
+  party_size: number | null;
   total_price: number;
   notes: string | null;
   staff_id: string | null;
@@ -37,6 +39,19 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   cancelled: { bg: '#fee2e2', text: '#991b1b' },
   no_show: { bg: '#f3f4f6', text: '#374151' },
 };
+
+// Restaurant booking types — short label for the card chip. Returns null for
+// normal service appointments (no chip shown).
+function getBookingTypeLabel(bookingType: string | null, partySize: number | null): string | null {
+  const guests = partySize && partySize > 0 ? `${partySize} ${partySize === 1 ? 'guest' : 'guests'}` : null;
+  const base =
+    bookingType === 'table' ? 'Table'
+    : bookingType === 'event' ? 'Event'
+    : bookingType === 'private_dining' ? 'Private Dining'
+    : null;
+  if (!base) return null;
+  return guests ? `${base} · ${guests}` : base;
+}
 
 export default function TenantAppointments() {
   const perms = useTenantPermissions();
@@ -172,6 +187,14 @@ export default function TenantAppointments() {
               )}
             </View>
             <Text style={styles.serviceName}>{svcName} — {svcDuration} min</Text>
+            {(() => {
+              const typeLabel = getBookingTypeLabel(item.booking_type, item.party_size);
+              return typeLabel ? (
+                <View style={styles.bookingTypeChip}>
+                  <Text style={styles.bookingTypeChipText}>{typeLabel}</Text>
+                </View>
+              ) : null;
+            })()}
             {staffName && <Text style={styles.staffText}>with {staffName}</Text>}
             {locName && <Text style={styles.locationText}>at {locName}</Text>}
             <Text style={styles.dateText}>
@@ -401,6 +424,8 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start' },
   customerName: { fontSize: 16, fontWeight: '600', color: '#111827' },
   serviceName: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  bookingTypeChip: { alignSelf: 'flex-start', marginTop: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, backgroundColor: '#EEF1FB' },
+  bookingTypeChipText: { fontSize: 11, fontWeight: '600', color: '#6B7FC4' },
   staffText: { fontSize: 12, color: '#6B7FC4', marginTop: 1 },
   locationText: { fontSize: 12, color: '#9ca3af', marginTop: 1 },
   dateText: { fontSize: 12, color: '#9ca3af', marginTop: 3 },
