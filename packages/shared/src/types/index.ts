@@ -93,11 +93,18 @@ export interface Category {
   created_at: Timestamp;
 }
 
+/**
+ * Discriminates the kind of service (Migration 048). Drives the service form,
+ * booking flow, pricing, and approval for restaurant bookings.
+ */
+export type ServiceType = 'standard' | 'event' | 'table';
+
 export interface Service {
   id: UUID;
   tenant_id: UUID;
   category_id: UUID | null;
   name: string;
+  service_type: ServiceType;
   duration_minutes: number;
   price: number;
   deposit_enabled: boolean;
