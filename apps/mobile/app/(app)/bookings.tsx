@@ -33,6 +33,8 @@ interface Appointment {
   start_time: string;
   end_time: string;
   status: string;
+  booking_type: string | null;
+  party_size: number | null;
   total_price: number;
   notes: string | null;
   deposit_paid: boolean | null;
@@ -59,6 +61,18 @@ function getStatusLabel(status: string): string {
     case 'cancelled': return 'Cancelled';
     case 'no_show': return 'No Show';
     default: return status;
+  }
+}
+
+// Restaurant booking types — a short label for the card chip. Returns null for
+// normal service appointments (no chip shown).
+function getBookingTypeLabel(bookingType: string | null, partySize: number | null): string | null {
+  const guests = partySize && partySize > 0 ? `${partySize} ${partySize === 1 ? 'guest' : 'guests'}` : null;
+  switch (bookingType) {
+    case 'table': return guests ? `Table · ${guests}` : 'Table';
+    case 'event': return guests ? `Event · ${guests}` : 'Event';
+    case 'private_dining': return guests ? `Private Dining · ${guests}` : 'Private Dining';
+    default: return null;
   }
 }
 
@@ -147,6 +161,16 @@ function BookingCardRow({
         </View>
 
         <Text style={styles.serviceName}>{displayName}</Text>
+
+        {(() => {
+          const typeLabel = getBookingTypeLabel(item.booking_type, item.party_size);
+          return typeLabel ? (
+            <View style={styles.bookingTypeChip}>
+              <Ionicons name="restaurant-outline" size={12} color="#6B7FC4" />
+              <Text style={styles.bookingTypeChipText}>{typeLabel}</Text>
+            </View>
+          ) : null;
+        })()}
 
         {item.staff?.name ? (
           <Text style={styles.staffName}>with {item.staff.name}</Text>
@@ -1100,6 +1124,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   businessName: { fontSize: 15, fontWeight: '600', color: '#111827', flex: 1, marginRight: 8 },
+  bookingTypeChip: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4, marginTop: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: '#EEF1FB' },
+  bookingTypeChipText: { fontSize: 11, fontWeight: '600', color: '#6B7FC4' },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
   statusText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
   serviceName: { fontSize: 14, color: '#374151', marginBottom: 2 },

@@ -26,6 +26,8 @@ interface Appointment {
   start_time: string;
   end_time: string;
   status: AppointmentStatus;
+  booking_type: string | null;
+  party_size: number | null;
   total_price: number;
   deposit_paid: boolean;
   deposit_amount_paid: number | null;
@@ -169,6 +171,19 @@ function formatTimeInput(iso: string): string {
 function formatHumanDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+// Restaurant booking types — short label for the table badge. Returns null for
+// normal service appointments (no badge shown).
+function getBookingTypeLabel(bookingType: string | null, partySize: number | null): string | null {
+  const guests = partySize && partySize > 0 ? `${partySize} ${partySize === 1 ? 'guest' : 'guests'}` : null;
+  const base =
+    bookingType === 'table' ? 'Table'
+    : bookingType === 'event' ? 'Event'
+    : bookingType === 'private_dining' ? 'Private Dining'
+    : null;
+  if (!base) return null;
+  return guests ? `${base} · ${guests}` : base;
 }
 
 // ---------------------------------------------------------------------------
@@ -1111,16 +1126,28 @@ export default function AppointmentsPage() {
                         {/* Service / Package */}
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
                           {(() => {
+                            const typeLabel = getBookingTypeLabel(appt.booking_type, appt.party_size);
+                            const typeBadge = typeLabel ? (
+                              <span className="mt-0.5 inline-flex w-fit items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                {typeLabel}
+                              </span>
+                            ) : null;
                             const pkgMatch = appt.notes?.match(/^Package:\s*(.+)$/);
                             if (pkgMatch) {
                               return (
-                                <div>
+                                <div className="flex flex-col">
                                   <div className="font-medium">{pkgMatch[1]}</div>
                                   <div className="text-xs text-gray-400">via {appt.services?.name}</div>
+                                  {typeBadge}
                                 </div>
                               );
                             }
-                            return appt.services?.name ?? '—';
+                            return (
+                              <div className="flex flex-col">
+                                <span>{appt.services?.name ?? '—'}</span>
+                                {typeBadge}
+                              </div>
+                            );
                           })()}
                         </td>
 
