@@ -1582,6 +1582,8 @@ export async function handleBookAppointment(
   const loyaltyPointsToRedeem = (input.loyalty_points_to_redeem as number) || 0;
   const useCustomerPackage = (input.use_customer_package as boolean) || false;
   const _packageId = (input.package_id as string) || null;
+  const partySize = (input.party_size as number) || null;
+  const bookingType = (input.booking_type as string) || 'service';
 
   if (!serviceId || !startTime) {
     return { success: false, error: 'service_id and start_time are required' };
@@ -1737,6 +1739,8 @@ export async function handleBookAppointment(
       start_time: start.toISOString(),
       end_time: end.toISOString(),
       status: requiresApproval ? 'pending' : 'confirmed',
+      booking_type: bookingType,
+      party_size: partySize,
       total_price: svc.price,
       deposit_paid: false,
       deposit_amount_paid: depositAmount,
@@ -1981,6 +1985,8 @@ export async function handleBookAppointment(
       used_package: useCustomerPackage,
       status: requiresApproval ? 'pending' : 'confirmed',
       requires_approval: requiresApproval,
+      booking_type: bookingType,
+      party_size: partySize,
       payment_url: paymentUrl,
       payment_client_secret: paymentClientSecret,
       payment_required: !!(paymentsEnabled && depositAmount && depositAmount > 0),

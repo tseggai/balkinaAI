@@ -118,6 +118,8 @@ const tenantChatTools: OpenAI.ChatCompletionTool[] = [
           loyalty_points_to_redeem: { type: 'number', description: 'Number of loyalty points to redeem (0 = don\'t redeem)' },
           use_customer_package: { type: 'boolean', description: 'Use an existing customer package session instead of paying' },
           package_id: { type: 'string', description: 'UUID of package being purchased (optional)' },
+          party_size: { type: 'number', description: 'Number of guests for restaurant table reservations, events, or private dining (optional, omit for normal service appointments)' },
+          booking_type: { type: 'string', enum: ['service', 'table', 'event', 'private_dining'], description: "Kind of booking. 'table' = restaurant table reservation, 'event' = ticketed event/special dinner, 'private_dining' = private dining/group request. Defaults to 'service' for normal appointments." },
         },
         required: ['service_id', 'start_time'],
       },
@@ -369,6 +371,7 @@ ${paymentsEnabled
   ? '- Deposit: "This service requires a $X deposit. Remaining $Y due at appointment." → [[button:Yes, Book with Deposit]] [[button:Choose Another Service]]'
   : '- Payments and deposits are NOT enabled for this business. Do NOT mention deposits, online payments, or payment collection. Bookings are confirmed directly without any payment step. Payment is handled at the business location.'}
 - Time conflicts: show alternative slots, never just state the conflict.
+- Restaurant bookings: for a table reservation, a ticketed event/special dinner, or a private dining request, always ask how many guests and pass party_size plus the matching booking_type ('table' | 'event' | 'private_dining') to create_booking. These are usually request-based — tell the customer the venue will confirm, and never claim you can't book a table.
 - Reschedule: use reschedule_appointment (never cancel+rebook). Confirm which appointment. "push/move/change it" = last discussed appointment only.
 - Directions: call get_directions, show distance + [[link:Get Directions|url]]. Don't rebook.
 - Appointments: use get_booking_details to list, cancel_appointment to cancel, reschedule_appointment to move. Fetch list first, never ask for ID.
@@ -480,6 +483,7 @@ ${behaviorContext}## Key Rules
 - Show price and deposit before booking. Must have customer name and phone before booking.
 - Deposit: "This service requires a $X deposit. Remaining $Y due at appointment." → [[button:Yes, Book with Deposit]] [[button:Choose Another Service]]
 - Time conflicts: show alternative slots, never just state the conflict.
+- Restaurant bookings: for a table reservation, a ticketed event/special dinner, or a private dining request, always ask how many guests and pass party_size plus the matching booking_type ('table' | 'event' | 'private_dining') to create_booking. These are usually request-based — tell the customer the venue will confirm, and never claim you can't book a table.
 - Reschedule: use reschedule_appointment (never cancel+rebook). Confirm which appointment. "push/move/change it" = last discussed appointment only.
 - Directions: call get_directions, show distance + [[link:Get Directions|url]]. Don't rebook.
 - Appointments: use get_booking_details to list, cancel_appointment to cancel, reschedule_appointment to move. Fetch list first, never ask for ID.

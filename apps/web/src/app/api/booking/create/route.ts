@@ -35,6 +35,8 @@ interface CreateBookingBody {
   customerName?: string;
   customerPhone?: string;
   customerEmail?: string;
+  partySize?: number; // number of guests (restaurant table/event/private dining)
+  bookingType?: 'service' | 'table' | 'event' | 'private_dining';
 }
 
 /**
@@ -91,6 +93,8 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CreateBookingBody;
     const { tenantId, locationId: requestedLocationId, serviceId, staffId, date, timeSlot, timeSlotIso, extras, packageName, userId, customerName, customerPhone, customerEmail } = body;
+    const bookingType = body.bookingType ?? 'service';
+    const partySize = body.partySize && body.partySize > 0 ? body.partySize : null;
 
     if (!tenantId || !serviceId || !date || !timeSlot) {
       return NextResponse.json(
@@ -294,8 +298,10 @@ export async function POST(request: Request) {
     const basePrice = packagePrice > 0 ? packagePrice : svc.price;
     const finalTotal = basePrice + extrasTotal;
 
-    // 6b. Check for conflicting appointments (overlapping time, not cancelled)
-    {
+    // 6b. Check for conflicting appointments (overlapping time, not cancelled).
+    // Skip for restaurant booking types — table requests can legitimately overlap
+    // (staff confirm them) and capacity-based events allow many bookings per slot.
+    if (bookingType === 'service') {
       let conflictQuery = supabase
         .from('appointments')
         .select('id')
@@ -331,6 +337,8 @@ export async function POST(request: Request) {
         start_time: start.toISOString(),
         end_time: end.toISOString(),
         status: requiresApproval ? 'pending' : 'confirmed',
+        booking_type: bookingType,
+        party_size: partySize,
         total_price: finalTotal,
         deposit_paid: false,
         deposit_amount_paid: depositAmount,
@@ -439,6 +447,8 @@ export async function POST(request: Request) {
         success: true,
         appointment_id: (appointment as { id: string }).id,
         status: requiresApproval ? 'pending' : 'confirmed',
+        booking_type: bookingType,
+        party_size: partySize,
         service_name: svc.name,
         staff_name: staffName,
         business_name: businessName,

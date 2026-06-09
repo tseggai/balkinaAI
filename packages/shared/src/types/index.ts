@@ -134,6 +134,13 @@ export interface Customer {
   created_at: Timestamp;
 }
 
+/**
+ * Discriminates the kind of booking an appointment represents (Migration 047).
+ * Restaurant booking types reuse the appointments + approval + deposit flow
+ * rather than a separate table-inventory engine.
+ */
+export type BookingType = 'service' | 'table' | 'event' | 'private_dining';
+
 export interface Appointment {
   id: UUID;
   customer_id: UUID;
@@ -144,6 +151,8 @@ export interface Appointment {
   start_time: Timestamp;
   end_time: Timestamp;
   status: AppointmentStatus;
+  booking_type: BookingType;
+  party_size: number | null;
   total_price: number;
   deposit_paid: boolean;
   deposit_amount_paid: number | null;
