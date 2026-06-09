@@ -248,3 +248,64 @@ The /api/chat endpoint accepts tenantId as OPTIONAL. When no tenantId is provide
 - Check /packages/db/rls-policies.sql for RLS policy patterns.
 - Do not install new npm packages without checking if existing dependencies cover the need.
 - If a Supabase query returns unexpected results, check RLS policies first.
+
+## Property Owner (White-Label Property) Feature — Current Understanding
+A **property** is a white-label operator (resort, hotel, mall, food hall) that manages many tenant businesses under one branded portal. Restaurants are a common property tenant and the motivation for the Restaurant Booking feature below.
+
+- **Billing (property pays Balkina)**: Migrations 044/046. Tiers: **Essentials** ($299, 5 included businesses) and **Premium** ($499, 20 included), with per-business overage billed via `PROPERTY_SEAT_PRICE_ID`. Env vars live in the `balkina-ai` Vercel project: `PROPERTY_PRICE_ID_ESSENTIALS`, `PROPERTY_PRICE_ID_PREMIUM`, `PROPERTY_SEAT_PRICE_ID`, `PROPERTY_INCLUDED_SEATS_ESSENTIALS=5`, `PROPERTY_INCLUDED_SEATS_PREMIUM=20`. Columns on `properties`: `stripe_customer_id`, `stripe_subscription_id`, `subscription_status`, `seats`, `stripe_seat_item_id`.
+- **Membership**: businesses join a property via `property_tenants`; onboarding via `property_invites` and property applications (`/api/property/[slug]/applications/[id]`). Applications auto-create the tenant, an **owner staff record**, and a default location.
+- **Portal**: custom-domain white-label site where AI discovery is **scoped to the property's businesses** (`handlePropertyFindBusinesses` in `chat/tool-handlers.ts`), never the global tenant pool.
+- **Also**: property messaging (043/045), property waitlist (042). Property dashboard lives in `apps/web` at `/property/[slug]`.
+
+## Restaurant Booking (Phase 1) — Blueprint
+Goal: let restaurant tenants take bookings through Balkina **without integrating their external table-management system**, reusing the existing appointments/approval/deposit engine. Two **cleanly separated** flows, switched by a single new column.
+
+### Core model — `services.service_type`
+Add `services.service_type TEXT NOT NULL DEFAULT 'standard'` — values `'standard' | 'event' | 'table'`. This one column drives the service form (which fields show), the booking flow, pricing, and approval. The appointment's `booking_type` (Migration 047) is derived from the service's `service_type` at booking time.
+
+**Phase 1 deliberately adds NO new "table"/"section"/"resource" entities.** Real table inventory + turn-times is Phase 2. In Phase 1, the **owner staff record acts only as the approver/notification target** — never as a table or hours source. Decisions reached:
+- **Hours of operation** → the **service `timesheet`** (for restaurants), NOT staff hours. Do **not** migrate salon hours off staff — staff-hours remains correct for standard resource businesses. The split (service-hours for restaurants, staff-hours for salons) is intentional and selected by `service_type`.
+- **Approval policy** → derived from `service_type` (`'table'` ⇒ request/pending; `'event'` ⇒ instant). Not the staff `requires_approval` flag.
+- **Approver / who is notified** → the **owner staff record** (a real person). The owner may reassign to another staff (host/server) via the appointment edit panel.
+- **Contract**: `service_type` of `'event'`/`'table'` MUST bypass the staff-hours slot engine (`check_availability` / staff `availability_schedule`), or the owner's default 9–5 schedule leaks in.
+
+### Already built (Phase 1 backbone — done, Migration 047)
+- `appointments.booking_type` (`'service'|'table'|'event'|'private_dining'`, default `'service'`) + `appointments.party_size`. `BookingType` in `/packages/shared`.
+- `create_booking` chat tool + `/api/booking/create` accept/store `booking_type` + `party_size`; REST skips the 1:1 time-conflict check for non-`service` types.
+- AI system prompts collect party size and frame tables/events as request-based.
+- Display chips on customer mobile bookings, web dashboard appointments, and mobile tenant appointments.
+
+### Flow A — Event / Set Menu (`service_type='event'`)
+An event is a **ticket sale**: capacity-gated, instant-confirm, prepaid. **No staff.**
+- **Maps to**: service = the event (Brunch, NYE Dinner, tasting menu). `price` = per head; `pricing_type='per_person'` ⇒ `total = price × party_size`. `capacity` = total seats/covers (the inventory). `deposit` = prepay. `duration` = seating length. `is_recurring` = one-off (off) vs recurring (on). `timesheet` window start = a **seating** (not a slot grid). `service_extras` = add-ons. `booking_limit_per_customer` = max seats per customer.
+- **New field**: **Event date(s)** for one-offs → writes `service_special_days` (date + start_time). Recurring events use `is_recurring` + `timesheet` (day-of-week); the customer picks which occurrence date.
+- **Hidden fields**: Staff selection tab, "allow choose staff", custom duration, per-slot limiter (superseded by `capacity`).
+- **Availability = capacity check** (NOT the slot engine): `seats_left = capacity − SUM(party_size) WHERE service_id=event AND start_time=seating AND status IN ('pending','approved','confirmed')`; bookable iff `seats_left ≥ party_size`.
+- **Confirmation**: instant (`status='confirmed'`) when seats remain; deposit via the existing Stripe deposit flow. `staff_id` = null. `booking_type='event'`.
+- **Defaults (open to revisit)**: v1 supports a single seating per event date (multiple seatings = repeat the date/window); events are instant-confirm-with-optional-deposit (no approval).
+
+### Flow B — Request-Only Table (`service_type='table'`)
+A request is a **reservation the venue confirms**: open-hours-based, staff-approved, pay-later. **No staff resource, no capacity enforcement in Phase 1.**
+- **Maps to**: service = "Table Reservation". `duration` = turn time. `timesheet` = **open hours**. `booking_limit_per_customer` = max active reservations. Optional `deposit` = no-show hold. Optional `booking_limit_per_slot` = soft buffer (allocation released to Balkina). Optional `service_extras` = pre-order.
+- **Hidden / N/A fields**: Price (free), pricing_type, capacity, is_recurring, custom duration, "allow choose staff", Staff selection tab.
+- **Availability**: do **not** generate slots via the staff-hours engine. Validate the requested time is **within the service `timesheet` open hours**; the venue confirms. Overlapping requests at the same time are allowed (the REST conflict-skip already covers non-`service` types; ensure the chat path also does not block).
+- **Confirmation**: always `status='pending'`; approval required (from `service_type='table'`). Owner staff = approver/notification recipient; may reassign on approval. `party_size` = guests. `booking_type='table'`.
+
+### Restaurant vocabulary / labels (Option A + B)
+- Add `tenants.business_type TEXT NOT NULL DEFAULT 'standard'` (`'standard' | 'restaurant' | ...`).
+- Central `LABELS` map in `/packages/shared` keyed by `business_type` (single source of truth). Starter mapping for `restaurant`: service→"Experience", services→"Menu", staff→"Host", book→"Reserve", appointment→"Reservation".
+- **Option A (do first)**: inject restaurant vocabulary into the AI chat system prompt when `business_type='restaurant'` (smallest change, biggest customer-facing impact).
+- **Option B (then)**: point tenant-dashboard headings/nav and customer chat cards at the same `LABELS` map. Skip per-tenant custom terminology (Option C) until requested.
+
+### Pending build tasks (suggested order)
+1. **Events first** (self-contained, no engine change, high-ticket): `services.service_type` migration + service-form type switch with per-type show/hide/relabel; Event date field → `service_special_days`; per-person pricing; capacity check; instant-confirm + deposit.
+2. **Request tables**: service-timesheet open-hours + "within hours" validation; approval-from-`service_type`; bypass staff slot engine; owner staff as approver; chat path overlap allowance.
+3. **Vocabulary**: `tenants.business_type` + `LABELS` map + AI prompt vocab + dashboard/chat labels.
+4. **Onboarding consolidation** (below) — parallel, benefits all businesses.
+
+## Tenant Onboarding Consolidation (waitlist + self-serve)
+Today the **owner staff record + default location + default schedule** are auto-provisioned only on managed paths (`admin/waitlist/setup`, property applications) — **not** on self-serve `auth/register` (which relies on the onboarding wizard to prompt). This is needed by **all** businesses (a tenant can't take bookings without a staff record).
+
+- Extract a single server-side `provisionTenantDefaults(tenantId, owner)` helper (service-role) that creates: the **owner staff** (active, `user_id` linked, default schedule), a **default location**, and anything else the waitlist setup does. Make it **idempotent** (skip if owner-staff already exists).
+- Call it from **all three** onboarding paths (waitlist setup, property applications, self-serve) so they cannot drift. Wire self-serve at the server-side tenant-creation point (not client register code).
+- Before building, audit `apps/admin/.../waitlist/setup/route.ts` to enumerate the full set of provisioned defaults to port.
