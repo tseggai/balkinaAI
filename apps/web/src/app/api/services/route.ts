@@ -84,6 +84,7 @@ export async function POST(request: Request) {
       timesheet: body.timesheet || null,
       staff_selection_enabled: body.staff_selection_enabled ?? true,
       pricing_type: body.pricing_type || 'per_service',
+      service_type: body.service_type || 'standard',
     } as never)
     .select()
     .single();
@@ -155,6 +156,7 @@ export async function PATCH(request: Request) {
     'timesheet',
     'staff_selection_enabled',
     'pricing_type',
+    'service_type',
   ];
 
   for (const col of serviceColumns) {

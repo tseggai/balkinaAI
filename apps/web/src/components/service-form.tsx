@@ -79,6 +79,7 @@ interface ServiceStaffMember {
 interface Service {
   id: string;
   name: string;
+  service_type?: string;
   category_id: string | null;
   category_name: string | null;
   duration_minutes: number;
@@ -196,6 +197,7 @@ export function ServiceForm({
 
   // --- Details tab state ---
   const [name, setName] = useState(service?.name ?? '');
+  const [serviceType, setServiceType] = useState(service?.service_type ?? 'standard');
   const [categoryName, setCategoryName] = useState(service?.category_name ?? '');
   const [description, setDescription] = useState(service?.description ?? '');
   const [imageUrl, setImageUrl] = useState(service?.image_url ?? '');
@@ -307,6 +309,7 @@ export function ServiceForm({
 
   const getFormSnapshot = useCallback((): Record<string, unknown> => ({
     name,
+    serviceType,
     categoryName,
     description,
     imageUrl,
@@ -343,7 +346,7 @@ export function ServiceForm({
     selectedLocations,
     customDurations,
   }), [
-    name, categoryName, description, imageUrl, price, depositEnabled, depositType,
+    name, serviceType, categoryName, description, imageUrl, price, depositEnabled, depositType,
     depositAmount, duration, bufferTime, customDuration, capacity, hidePrice,
     hideDuration, staffSelectionEnabled, pricingType, isRecurring, selectedStaff, timesheetEnabled, timesheet, extras,
     visibility, minBookingLeadTime, maxDaysEnabled, maxBookingDaysAhead,
@@ -439,6 +442,7 @@ export function ServiceForm({
     const body = {
       id: isEdit ? service?.id : undefined,
       name,
+      service_type: serviceType,
       category_name: categoryName || null,
       description: description || null,
       image_url: imageUrl || null,
@@ -512,6 +516,35 @@ export function ServiceForm({
   // RENDER
   // =========================================================================
 
+  function renderTypeSelector() {
+    const types: { key: string; label: string; hint: string }[] = [
+      { key: 'standard', label: 'Standard', hint: 'Appointment booked against staff availability' },
+      { key: 'event', label: 'Event / Set Menu', hint: 'Capacity-based, instant-confirm, prepaid' },
+      { key: 'table', label: 'Table Reservation', hint: 'Open-hours request the venue confirms' },
+    ];
+    const active = types.find((t) => t.key === serviceType) ?? types[0]!;
+    return (
+      <div>
+        <span className="text-xs text-gray-400">Service Type</span>
+        <div className="mt-1 grid grid-cols-3 gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+          {types.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setServiceType(t.key)}
+              className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                serviceType === t.key ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1 text-[11px] text-gray-400">{active.hint}</p>
+      </div>
+    );
+  }
+
   function renderDetailsTab() {
     // ----- EDIT MODE: horizontal labels, hover-to-edit -----
     if (isEditMode) {
@@ -519,6 +552,8 @@ export function ServiceForm({
         <div className="space-y-3">
           {/* Row 1: Image Upload — full width */}
           <ImageUpload value={imageUrl} onChange={setImageUrl} label="" />
+
+          {renderTypeSelector()}
 
           {/* Row 2: Name + Category (50% each) */}
           <div className="grid grid-cols-2 gap-3">
@@ -861,6 +896,8 @@ export function ServiceForm({
       <div className="space-y-3">
         {/* Row 1: Image Upload (100% width) */}
         <ImageUpload value={imageUrl} onChange={setImageUrl} label="" />
+
+        {renderTypeSelector()}
 
         {/* Row 2: Name + Category (50% each) */}
         <div className="grid grid-cols-2 gap-3">
@@ -1669,6 +1706,10 @@ export function ServiceForm({
   }
 
   function renderActiveTab() {
+    // Staff tab is hidden for restaurant types — fall back to Details if stranded there.
+    if (activeTab === 'staff' && serviceType !== 'standard') {
+      return renderDetailsTab();
+    }
     switch (activeTab) {
       case 'details':
         return renderDetailsTab();
@@ -1689,7 +1730,7 @@ export function ServiceForm({
     <form onSubmit={handleSubmit} className="flex h-full w-full flex-col">
       {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto border-b border-gray-200 px-1">
-        {TABS.map((tab) => (
+        {TABS.filter((tab) => !(tab.key === 'staff' && serviceType !== 'standard')).map((tab) => (
           <button
             key={tab.key}
             type="button"

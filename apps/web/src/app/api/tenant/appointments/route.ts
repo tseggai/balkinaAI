@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 
     let query = admin
       .from('appointments')
-      .select('id, start_time, end_time, status, total_price, notes, staff_id, location_id, customer_id, service_id, services(name, duration_minutes), staff(id, name), tenant_locations(name)')
+      .select('id, start_time, end_time, status, booking_type, party_size, total_price, notes, staff_id, location_id, customer_id, service_id, services(name, duration_minutes), staff(id, name), tenant_locations(name)')
       .eq('tenant_id', tenantId)
       .order('start_time', { ascending: true });
 

@@ -102,7 +102,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from('appointments')
       .select(
-        'id, start_time, end_time, status, total_price, notes, deposit_paid, deposit_amount_paid, stripe_payment_intent_id, suggested_times, services(name), staff(name), tenant_locations(name, address, latitude, longitude), tenants(name)',
+        'id, start_time, end_time, status, booking_type, party_size, total_price, notes, deposit_paid, deposit_amount_paid, stripe_payment_intent_id, suggested_times, services(name), staff(name), tenant_locations(name, address, latitude, longitude), tenants(name)',
       )
       .eq('customer_id', customerId)
       .order('start_time', { ascending: isUpcoming });

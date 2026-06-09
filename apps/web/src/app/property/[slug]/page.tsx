@@ -546,6 +546,9 @@ interface BillingState {
   subscription_status: string;
   has_subscription: boolean;
   seats: number;
+  seat_billing: boolean;
+  included_seats: number;
+  plan_included_seats: Record<string, number>;
   role: string;
   plans_configured: { essentials: boolean; premium: boolean };
 }
@@ -553,6 +556,7 @@ interface BillingState {
 const PLAN_LABELS: Record<string, { name: string; blurb: string }> = {
   essentials: { name: 'Essentials', blurb: 'Branded booking portal, tenant management, messaging' },
   premium: { name: 'Premium', blurb: 'Everything in Essentials + custom domain, native app, advanced analytics' },
+  custom: { name: 'Custom', blurb: 'A tailored plan managed by Balkina' },
 };
 
 function BillingSection({ slug }: { slug: string }) {
@@ -596,6 +600,7 @@ function BillingSection({ slug }: { slug: string }) {
   const isAdmin = state.role === 'admin';
   const active = state.subscription_status === 'active';
   const pastDue = state.subscription_status === 'past_due';
+  const isCustom = state.tier === 'custom';
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-5">
@@ -611,26 +616,50 @@ function BillingSection({ slug }: { slug: string }) {
         }`}>
           {active ? 'Active' : pastDue ? 'Past due' : 'Not subscribed'}
         </span>
-        <span className="text-xs text-gray-400">{state.seats} business{state.seats === 1 ? '' : 'es'} billed</span>
+        <span className="text-xs text-gray-400">{state.seats} business{state.seats === 1 ? '' : 'es'}</span>
       </div>
 
-      {state.has_subscription ? (
+      {state.seat_billing && !isCustom && (
+        <p className="mt-2 text-xs text-gray-400">
+          {PLAN_LABELS[state.tier]?.name ?? state.tier} includes {state.included_seats} business{state.included_seats === 1 ? '' : 'es'}
+          {state.seats > state.included_seats ? ` · ${state.seats - state.included_seats} billed as extra` : ' · within allowance'}
+        </p>
+      )}
+
+      {isCustom ? (
+        <div className="mt-4">
+          <p className="text-xs text-gray-500">This is a tailored plan managed by Balkina. Contact your account manager to make changes.</p>
+          {state.has_subscription && (
+            <button onClick={openPortal} disabled={!isAdmin || busy === 'portal'}
+              className="mt-3 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+              {busy === 'portal' ? 'Opening…' : 'Manage billing'}
+            </button>
+          )}
+        </div>
+      ) : state.has_subscription ? (
         <button onClick={openPortal} disabled={!isAdmin || busy === 'portal'}
           className="mt-4 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
           {busy === 'portal' ? 'Opening…' : 'Manage billing'}
         </button>
       ) : (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {(['essentials', 'premium'] as const).map((plan) => (
-            <div key={plan} className="rounded-lg border border-gray-200 p-4">
-              <p className="text-sm font-semibold text-gray-900">{PLAN_LABELS[plan]?.name ?? plan}</p>
-              <p className="mt-1 text-xs text-gray-500">{PLAN_LABELS[plan]?.blurb ?? ''}</p>
-              <button onClick={() => subscribe(plan)} disabled={!isAdmin || !state.plans_configured[plan] || busy === plan}
-                className="mt-3 w-full rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-                {busy === plan ? 'Starting…' : !state.plans_configured[plan] ? 'Coming soon' : `Subscribe + ${state.seats} seats`}
-              </button>
-            </div>
-          ))}
+          {(['essentials', 'premium'] as const).map((plan) => {
+            const included = state.plan_included_seats[plan] ?? 0;
+            const overage = state.seat_billing ? Math.max(0, state.seats - included) : 0;
+            return (
+              <div key={plan} className="rounded-lg border border-gray-200 p-4">
+                <p className="text-sm font-semibold text-gray-900">{PLAN_LABELS[plan]?.name ?? plan}</p>
+                <p className="mt-1 text-xs text-gray-500">{PLAN_LABELS[plan]?.blurb ?? ''}</p>
+                {state.seat_billing && (
+                  <p className="mt-1 text-xs text-gray-400">Includes {included} business{included === 1 ? '' : 'es'}, then per-business after that.</p>
+                )}
+                <button onClick={() => subscribe(plan)} disabled={!isAdmin || !state.plans_configured[plan] || busy === plan}
+                  className="mt-3 w-full rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                  {busy === plan ? 'Starting…' : !state.plans_configured[plan] ? 'Coming soon' : overage > 0 ? `Subscribe (+${overage} extra)` : 'Subscribe'}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 

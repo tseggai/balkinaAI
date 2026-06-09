@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { getPropertyAdmin } from '@/lib/property-admin';
 import { getStripe, PROPERTY_SEAT_PRICE_ID } from '@/lib/stripe';
+import { countPropertySeats } from '@/lib/property-billing';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Db = any;
@@ -32,16 +33,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   }
 
   const seatItem = subscription.items.data.find((i) => i.price.id === PROPERTY_SEAT_PRICE_ID);
-  const seatQty = seatItem?.quantity ?? 0;
 
   const admin: Db = ctx.admin;
+  const total = await countPropertySeats(admin, ctx.propertyId);
   await admin.from('properties').update({
     stripe_subscription_id: subscription.id,
     subscription_status: subscription.status,
     tier: session.metadata?.plan ?? 'essentials',
     stripe_seat_item_id: seatItem?.id ?? null,
-    seats: seatQty,
+    seats: total,
   }).eq('id', ctx.propertyId);
 
-  return NextResponse.json({ status: 'active', tier: session.metadata?.plan ?? 'essentials', seats: seatQty });
+  return NextResponse.json({ status: 'active', tier: session.metadata?.plan ?? 'essentials', seats: total });
 }

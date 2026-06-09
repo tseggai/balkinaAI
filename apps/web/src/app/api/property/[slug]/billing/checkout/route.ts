@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPropertyAdmin } from '@/lib/property-admin';
-import { getStripe, PROPERTY_PLAN_PRICE_IDS, PROPERTY_SEAT_PRICE_ID, type PropertyPlanKey } from '@/lib/stripe';
+import { getStripe, PROPERTY_PLAN_PRICE_IDS, PROPERTY_SEAT_PRICE_ID, billableSeats, type PropertyPlanKey } from '@/lib/stripe';
 import { getOrCreatePropertyCustomer, countPropertySeats, type PropertyBillingRow } from '@/lib/property-billing';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -36,10 +36,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   if (!property) return NextResponse.json({ error: 'Property not found' }, { status: 404 });
 
   const customerId = await getOrCreatePropertyCustomer(admin, property);
-  const seats = await countPropertySeats(admin, ctx.propertyId);
+  const total = await countPropertySeats(admin, ctx.propertyId);
+  const overage = billableSeats(plan, total); // businesses beyond the plan's included allowance
 
   const lineItems: { price: string; quantity: number }[] = [{ price: planPrice, quantity: 1 }];
-  if (PROPERTY_SEAT_PRICE_ID && seats > 0) lineItems.push({ price: PROPERTY_SEAT_PRICE_ID, quantity: seats });
+  if (PROPERTY_SEAT_PRICE_ID && overage > 0) lineItems.push({ price: PROPERTY_SEAT_PRICE_ID, quantity: overage });
 
   const origin = request.headers.get('origin') ?? process.env.NEXTAUTH_URL ?? 'https://app.balkina.ai';
   const stripe = getStripe();
