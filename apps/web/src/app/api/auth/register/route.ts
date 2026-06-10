@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { getStripe } from '@/lib/stripe';
+import { provisionTenantDefaults } from '@balkina/db';
 
 export async function POST(request: Request) {
   try {
@@ -106,6 +107,16 @@ export async function POST(request: Request) {
     if (categoryId) {
       await supabase.from('tenant_category_links').insert({ tenant_id: tenant.id, category_id: categoryId } as never);
     }
+
+    // Provision the owner staff + default location so the tenant can take
+    // bookings immediately — same idempotent helper the managed onboarding
+    // paths use, so self-serve no longer drifts (no address yet at signup).
+    await provisionTenantDefaults(supabase, tenant.id, {
+      userId,
+      ownerName,
+      email,
+      phone: phone || null,
+    });
 
     // If signing up via a property invite, auto-link the new tenant to the property
     if (propertyInvite) {

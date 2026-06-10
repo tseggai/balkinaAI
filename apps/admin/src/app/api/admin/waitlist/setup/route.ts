@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { sendTenantLoginEmail } from '@balkina/notifications';
+import { provisionTenantDefaults } from '@balkina/db';
 
 /**
  * POST /api/admin/waitlist/setup
@@ -124,45 +125,22 @@ async function createTenantFromWaitlist(supabase: any, entry: any, userId: strin
 
   const tenantId = tenant.id;
 
-  // 5. Create location (if address provided)
-  let locationId: string | null = null;
-  if (entry.location) {
-    const { data: loc } = await supabase.from('tenant_locations').insert({
-      tenant_id: tenantId,
-      name: 'Main Location',
-      address: entry.location,
-      street_address: entry.street || null,
-      city: entry.city || null,
-      state: entry.state || null,
-      country: entry.country || null,
-      postal_code: entry.postal_code || null,
-    }).select('id').single();
-    if (loc) locationId = (loc as { id: string }).id;
-  }
-
-  // 5b. Create staff member from the owner (so bookings work immediately)
-  const { data: ownerStaff } = await supabase.from('staff').insert({
-    tenant_id: tenantId,
-    name: entry.owner_name,
-    email: entry.email,
-    phone: entry.phone || null,
-    user_id: userId,
-    status: 'active',
-    availability_schedule: {
-      monday: { start: '09:00', end: '17:00' },
-      tuesday: { start: '09:00', end: '17:00' },
-      wednesday: { start: '09:00', end: '17:00' },
-      thursday: { start: '09:00', end: '17:00' },
-      friday: { start: '09:00', end: '17:00' },
-      saturday: { start: '09:00', end: '17:00' },
-    },
-  } as never).select('id').single();
-  const staffId = ownerStaff ? (ownerStaff as { id: string }).id : null;
-
-  // Assign staff to location
-  if (staffId && locationId) {
-    await supabase.from('staff_locations').insert({ staff_id: staffId, location_id: locationId } as never);
-  }
+  // 5. Provision the owner staff + default location (shared, idempotent helper).
+  const { staffId, locationId } = await provisionTenantDefaults(
+    supabase,
+    tenantId,
+    { userId, ownerName: entry.owner_name, email: entry.email, phone: entry.phone || null },
+    entry.location
+      ? {
+          address: entry.location,
+          street_address: entry.street || null,
+          city: entry.city || null,
+          state: entry.state || null,
+          country: entry.country || null,
+          postal_code: entry.postal_code || null,
+        }
+      : null,
+  );
 
   // 6. Parse and create services (from services_description)
   const serviceIds: string[] = [];
