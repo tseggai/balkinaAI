@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ImageUpload } from '@/components/image-upload';
+import { useBusinessLabels } from '@/lib/useBusinessLabels';
 
 const EDIT_INPUT_CLASS =
   'w-full h-[46px] rounded-[.3rem] border border-transparent bg-transparent px-0 text-sm hover:border-[#f1f1f1] hover:bg-[#f9fafb] hover:px-3 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:px-3';
@@ -194,6 +195,8 @@ export function ServiceForm({
   paymentsEnabled?: boolean;
 }) {
   const isEditMode = Boolean(service?.id);
+  const { businessType } = useBusinessLabels();
+  const isRestaurantTenant = businessType === 'restaurant';
   const [activeTab, setActiveTab] = useState<TabKey>('details');
 
   // --- Details tab state ---
@@ -203,6 +206,12 @@ export function ServiceForm({
   const isEvent = serviceType === 'event';
   const isTable = serviceType === 'table';
   const isRestaurant = isEvent || isTable;
+  // New services at a restaurant default to an event (selector offers Event/Table only).
+  useEffect(() => {
+    if (isRestaurantTenant && !isEditMode && serviceType === 'standard') {
+      setServiceType('event');
+    }
+  }, [isRestaurantTenant, isEditMode, serviceType]);
   const [categoryName, setCategoryName] = useState(service?.category_name ?? '');
   const [description, setDescription] = useState(service?.description ?? '');
   const [imageUrl, setImageUrl] = useState(service?.image_url ?? '');
@@ -569,8 +578,10 @@ export function ServiceForm({
   }
 
   function renderTypeSelector() {
+    // Standard businesses only offer standard services — no selector needed.
+    if (!isRestaurantTenant) return null;
+    // Restaurants choose between the two restaurant booking types.
     const types: { key: string; label: string; hint: string }[] = [
-      { key: 'standard', label: 'Standard', hint: 'Appointment booked against staff availability' },
       { key: 'event', label: 'Event / Set Menu', hint: 'Capacity-based, instant-confirm, prepaid' },
       { key: 'table', label: 'Table Reservation', hint: 'Open-hours request the venue confirms' },
     ];
@@ -578,7 +589,7 @@ export function ServiceForm({
     return (
       <div>
         <span className="text-xs text-gray-400">Service Type</span>
-        <div className="mt-1 grid grid-cols-3 gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+        <div className="mt-1 grid grid-cols-2 gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
           {types.map((t) => (
             <button
               key={t.key}

@@ -11,9 +11,10 @@ export async function POST(request: Request) {
       email: string;
       phone?: string;
       categoryId?: string;
+      businessType?: string;
       propertyInvite?: string;
     };
-    const { userId, businessName, ownerName, email, phone, categoryId, propertyInvite } = body;
+    const { userId, businessName, ownerName, email, phone, categoryId, businessType, propertyInvite } = body;
 
     if (!userId || !businessName || !ownerName || !email) {
       return NextResponse.json(
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
         email,
         phone: phone || null,
         category_id: categoryId || null,
+        business_type: businessType === 'restaurant' ? 'restaurant' : 'standard',
         stripe_customer_id: stripeCustomerId,
         status: 'pending_subscription' as const,
       } as never)

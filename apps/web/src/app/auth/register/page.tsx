@@ -19,6 +19,7 @@ export default function RegisterPage() {
     password: '',
     phone: '',
     categoryId: '',
+    businessType: 'standard',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -98,6 +99,7 @@ export default function RegisterPage() {
             email: formData.email,
             phone: formData.phone,
             categoryId: formData.categoryId || null,
+            businessType: formData.businessType,
             propertyInvite: inviteCode || undefined,
           }),
         });
@@ -158,6 +160,16 @@ export default function RegisterPage() {
             <input id="businessName" type="text" value={formData.businessName}
               onChange={(e) => updateField('businessName', e.target.value)}
               placeholder="Acme Barbershop" required className={inputClass} />
+          </div>
+
+          <div>
+            <label htmlFor="businessType" className="mb-1 block text-sm font-medium text-gray-700">Business type</label>
+            <select id="businessType" value={formData.businessType}
+              onChange={(e) => updateField('businessType', e.target.value)}
+              required className={inputClass}>
+              <option value="standard">Standard — appointments / bookings</option>
+              <option value="restaurant">Restaurant — reservations &amp; events</option>
+            </select>
           </div>
 
           <div>
