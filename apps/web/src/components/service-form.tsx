@@ -109,6 +109,7 @@ interface Service {
   booking_limit_per_slot: number | null;
   booking_limit_per_slot_interval: string | null;
   timesheet: Record<string, unknown> | null;
+  service_special_days?: { id?: string; date: string; start_time: string | null; is_day_off?: boolean }[];
   service_extras?: ServiceExtra[];
   service_staff?: ServiceStaffMember[];
   service_locations?: string[];
@@ -218,6 +219,12 @@ export function ServiceForm({
   const [pricingType, setPricingType] = useState(service?.pricing_type ?? 'per_service');
   const [hideDuration, setHideDuration] = useState(service?.hide_duration ?? false);
   const [isRecurring, setIsRecurring] = useState(service?.is_recurring ?? false);
+  // Event date(s) for non-recurring events — each row is one seating, stored in service_special_days.
+  const [eventDates, setEventDates] = useState<{ date: string; start_time: string }[]>(
+    ((service?.service_special_days ?? []) as { date: string; start_time: string | null; is_day_off?: boolean }[])
+      .filter((d) => !d.is_day_off)
+      .map((d) => ({ date: d.date, start_time: (d.start_time ?? '').slice(0, 5) })),
+  );
 
   // --- Staff tab state ---
   const [allStaff, setAllStaff] = useState<StaffOption[]>([]);
@@ -329,6 +336,7 @@ export function ServiceForm({
     hideDuration,
     staffSelectionEnabled,
     isRecurring,
+    eventDates,
     selectedStaff,
     timesheetEnabled,
     timesheet,
@@ -352,7 +360,7 @@ export function ServiceForm({
   }), [
     name, serviceType, categoryName, description, imageUrl, price, depositEnabled, depositType,
     depositAmount, duration, bufferTime, customDuration, capacity, hidePrice,
-    hideDuration, staffSelectionEnabled, pricingType, isRecurring, selectedStaff, timesheetEnabled, timesheet, extras,
+    hideDuration, staffSelectionEnabled, pricingType, isRecurring, eventDates, selectedStaff, timesheetEnabled, timesheet, extras,
     visibility, minBookingLeadTime, maxDaysEnabled, maxBookingDaysAhead,
     minExtrasEnabled, minExtras, maxExtrasEnabled, maxExtras,
     limitPerCustomerEnabled, limitPerCustomer, limitPerCustomerInterval,
@@ -440,6 +448,13 @@ export function ServiceForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    // A non-recurring event must have at least one seating date.
+    if (isEvent && !isRecurring && eventDates.filter((d) => d.date).length === 0) {
+      setError('Add at least one event date.');
+      return;
+    }
+
     setSaving(true);
 
     const isEdit = Boolean(service?.id);
@@ -479,6 +494,8 @@ export function ServiceForm({
       staff: selectedStaff.map((s) => s.staff_id),
       extras: extras.filter((ex) => ex.name.trim()),
       locations: selectedLocations,
+      // Non-recurring events store their seatings in service_special_days.
+      event_dates: isEvent && !isRecurring ? eventDates.filter((d) => d.date) : [],
     };
 
     const res = await fetch('/api/services', {
@@ -519,6 +536,37 @@ export function ServiceForm({
   // =========================================================================
   // RENDER
   // =========================================================================
+
+  function addEventDate() {
+    setEventDates((prev) => [...prev, { date: '', start_time: '' }]);
+  }
+  function updateEventDate(i: number, field: 'date' | 'start_time', val: string) {
+    setEventDates((prev) => prev.map((d, idx) => (idx === i ? { ...d, [field]: val } : d)));
+  }
+  function removeEventDate(i: number) {
+    setEventDates((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  // Event date repeater — only for non-recurring events. Each row is one seating.
+  function renderEventDates() {
+    if (!isEvent || isRecurring) return null;
+    return (
+      <div>
+        <span className="text-xs text-gray-400">Event date(s) &amp; time</span>
+        <div className="mt-1 space-y-2">
+          {eventDates.map((ed, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input type="date" value={ed.date} onChange={(e) => updateEventDate(i, 'date', e.target.value)} className={`${inputClass} flex-1`} />
+              <input type="time" value={ed.start_time} onChange={(e) => updateEventDate(i, 'start_time', e.target.value)} className={`${inputClass} flex-1`} />
+              <button type="button" onClick={() => removeEventDate(i)} className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50">Remove</button>
+            </div>
+          ))}
+          <button type="button" onClick={addEventDate} className="rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">+ Add date</button>
+        </div>
+        <p className="mt-1 text-[11px] text-gray-400">Customers pick one of these seatings. At least one date is required.</p>
+      </div>
+    );
+  }
 
   function renderTypeSelector() {
     const types: { key: string; label: string; hint: string }[] = [
@@ -566,7 +614,7 @@ export function ServiceForm({
               <HoverInput required value={name} onChange={setName} placeholder="Service name" />
             </div>
             <div>
-              <span className="text-xs text-gray-400">Category</span>
+              <span className="text-xs text-gray-400">{isEvent ? 'Event type' : 'Category'}</span>
               {addingNewCategory ? (
                 <div className="flex gap-2">
                   <input
@@ -879,6 +927,8 @@ export function ServiceForm({
             )}
           </div>
           )}
+
+          {renderEventDates()}
 
           {/* Separator */}
           <div className="border-t border-gray-200" />
@@ -1220,6 +1270,8 @@ export function ServiceForm({
           )}
         </div>
         )}
+
+        {renderEventDates()}
 
         {/* Separator */}
         <div className="border-t border-gray-200" />
