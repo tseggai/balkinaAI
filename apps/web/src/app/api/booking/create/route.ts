@@ -93,7 +93,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CreateBookingBody;
     const { tenantId, locationId: requestedLocationId, serviceId, staffId, date, timeSlot, timeSlotIso, extras, packageName, userId, customerName, customerPhone, customerEmail } = body;
-    const bookingType = body.bookingType ?? 'service';
+    let bookingType = body.bookingType ?? 'service';
     const partySize = body.partySize && body.partySize > 0 ? body.partySize : null;
 
     if (!tenantId || !serviceId || !date || !timeSlot) {
@@ -216,7 +216,17 @@ export async function POST(request: Request) {
     const svc = serviceResult.data as {
       name: string; duration_minutes: number; price: number;
       deposit_enabled: boolean; deposit_type: string | null; deposit_amount: number | null; tenant_id: string;
+      service_type?: string; pricing_type?: string; capacity?: number;
     };
+
+    // Restaurant booking: derive type + pricing from the service itself.
+    const isEvent = svc.service_type === 'event';
+    if (svc.service_type === 'event') bookingType = 'event';
+    else if (svc.service_type === 'table') bookingType = 'table';
+    const isPerPerson = svc.pricing_type === 'per_person';
+    const guests = partySize && partySize > 0 ? partySize : 1;
+    // Per-guest pricing (events): the per-person price is multiplied by party size.
+    const perGuestBase = isPerPerson ? svc.price * guests : svc.price;
 
     // Unpack customer
     if (!customerResult.id) {
@@ -265,7 +275,7 @@ export async function POST(request: Request) {
     let depositAmount: number | null = null;
     if (paymentsEnabled && svc.deposit_enabled && svc.deposit_amount) {
       depositAmount =
-        svc.deposit_type === 'percentage' ? (svc.price * svc.deposit_amount) / 100 : svc.deposit_amount;
+        svc.deposit_type === 'percentage' ? (perGuestBase * svc.deposit_amount) / 100 : svc.deposit_amount;
     }
 
     // 7a. Look up extras prices and package price
@@ -294,8 +304,8 @@ export async function POST(request: Request) {
       packagePrice = (packageResult.data as { price: number }).price ?? 0;
     }
 
-    // Calculate final total: use package price if selected, otherwise service price, plus extras
-    const basePrice = packagePrice > 0 ? packagePrice : svc.price;
+    // Calculate final total: package price if selected, else per-guest/service base, plus extras
+    const basePrice = packagePrice > 0 ? packagePrice : perGuestBase;
     const finalTotal = basePrice + extrasTotal;
 
     // 6b. Check for conflicting appointments (overlapping time, not cancelled).
@@ -324,7 +334,28 @@ export async function POST(request: Request) {
       }
     }
 
-    // 7. Create appointment
+    // 6c. Event capacity check — seats_left = capacity − SUM(party_size) for this seating.
+    if (isEvent && svc.capacity && svc.capacity > 0) {
+      const { data: seatRows } = await supabase
+        .from('appointments')
+        .select('party_size')
+        .eq('service_id', serviceId)
+        .eq('start_time', start.toISOString())
+        .in('status', ['pending', 'confirmed', 'approved']);
+      const seatsTaken = ((seatRows ?? []) as { party_size: number | null }[])
+        .reduce((sum, r) => sum + (r.party_size ?? 1), 0);
+      const seatsLeft = svc.capacity - seatsTaken;
+      if (seatsLeft < guests) {
+        return NextResponse.json(
+          { error: seatsLeft <= 0 ? 'This event is sold out.' : `Only ${seatsLeft} seat(s) left for this event.` },
+          { status: 409, headers: CORS_HEADERS },
+        );
+      }
+    }
+
+    // 7. Create appointment. Events instant-confirm with no staff resource.
+    const finalStatus = isEvent ? 'confirmed' : (requiresApproval ? 'pending' : 'confirmed');
+    const apptStaffId = isEvent ? null : finalStaffId;
     const balanceDue = depositAmount ? finalTotal - depositAmount : finalTotal;
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
@@ -332,11 +363,11 @@ export async function POST(request: Request) {
         customer_id: customerId,
         tenant_id: tenantId,
         service_id: serviceId,
-        staff_id: finalStaffId,
+        staff_id: apptStaffId,
         location_id: locationId,
         start_time: start.toISOString(),
         end_time: end.toISOString(),
-        status: requiresApproval ? 'pending' : 'confirmed',
+        status: finalStatus,
         booking_type: bookingType,
         party_size: partySize,
         total_price: finalTotal,

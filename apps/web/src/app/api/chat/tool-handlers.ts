@@ -1583,7 +1583,7 @@ export async function handleBookAppointment(
   const useCustomerPackage = (input.use_customer_package as boolean) || false;
   const _packageId = (input.package_id as string) || null;
   const partySize = (input.party_size as number) || null;
-  const bookingType = (input.booking_type as string) || 'service';
+  let bookingType = (input.booking_type as string) || 'service';
 
   if (!serviceId || !startTime) {
     return { success: false, error: 'service_id and start_time are required' };
@@ -1677,7 +1677,16 @@ export async function handleBookAppointment(
   // Unpack service
   if (!serviceResult.data) return { success: false, error: 'Service not found' };
   const service = serviceResult.data;
-  const svc = service as { duration_minutes: number; price: number; deposit_enabled: boolean; deposit_type: string | null; deposit_amount: number | null; tenant_id: string };
+  const svc = service as { duration_minutes: number; price: number; deposit_enabled: boolean; deposit_type: string | null; deposit_amount: number | null; tenant_id: string; service_type?: string; pricing_type?: string; capacity?: number };
+
+  // Restaurant booking: derive type + pricing from the service itself.
+  const isEvent = svc.service_type === 'event';
+  if (svc.service_type === 'event') bookingType = 'event';
+  else if (svc.service_type === 'table') bookingType = 'table';
+  const isPerPerson = svc.pricing_type === 'per_person';
+  const guests = partySize && partySize > 0 ? partySize : 1;
+  // Per-guest pricing (events): per-person price × party size.
+  const eventBase = isPerPerson ? svc.price * guests : svc.price;
 
   // Unpack customer
   const customerId = customerResult.id;
@@ -1721,12 +1730,29 @@ export async function handleBookAppointment(
   let depositAmount: number | null = null;
   if (paymentsEnabled && svc.deposit_enabled && svc.deposit_amount) {
     depositAmount = svc.deposit_type === 'percentage'
-      ? (svc.price * svc.deposit_amount) / 100
+      ? (eventBase * svc.deposit_amount) / 100
       : svc.deposit_amount;
   }
 
-  // 7. Create the appointment
-  const balanceDue = depositAmount ? svc.price - depositAmount : svc.price;
+  // 6c. Event capacity check — seats_left = capacity − SUM(party_size) for this seating.
+  if (isEvent && svc.capacity && svc.capacity > 0) {
+    const { data: seatRows } = await supabase
+      .from('appointments')
+      .select('party_size')
+      .eq('service_id', serviceId)
+      .eq('start_time', start.toISOString())
+      .in('status', ['pending', 'confirmed', 'approved']);
+    const seatsTaken = ((seatRows ?? []) as { party_size: number | null }[])
+      .reduce((sum, r) => sum + (r.party_size ?? 1), 0);
+    const seatsLeft = svc.capacity - seatsTaken;
+    if (seatsLeft < guests) {
+      return { success: false, error: seatsLeft <= 0 ? 'This event is sold out.' : `Only ${seatsLeft} seat(s) left for this event.` };
+    }
+  }
+
+  // 7. Create the appointment. Events instant-confirm with no staff resource.
+  const finalStatus = isEvent ? 'confirmed' : (requiresApproval ? 'pending' : 'confirmed');
+  const balanceDue = depositAmount ? eventBase - depositAmount : eventBase;
 
   const { data: appointment, error: apptErr } = await supabase
     .from('appointments')
@@ -1734,14 +1760,14 @@ export async function handleBookAppointment(
       customer_id: customerId,
       tenant_id: tenantId,
       service_id: serviceId,
-      staff_id: finalStaffId,
+      staff_id: isEvent ? null : finalStaffId,
       location_id: finalLocationId,
       start_time: start.toISOString(),
       end_time: end.toISOString(),
-      status: requiresApproval ? 'pending' : 'confirmed',
+      status: finalStatus,
       booking_type: bookingType,
       party_size: partySize,
-      total_price: svc.price,
+      total_price: eventBase,
       deposit_paid: false,
       deposit_amount_paid: depositAmount,
       balance_due: balanceDue,
@@ -1944,7 +1970,7 @@ export async function handleBookAppointment(
   }
 
   // Update appointment total if adjustments were made
-  const finalTotal = svc.price + extrasTotal - couponDiscount - loyaltyDiscount;
+  const finalTotal = eventBase + extrasTotal - couponDiscount - loyaltyDiscount;
   if (extrasTotal > 0 || couponDiscount > 0 || loyaltyDiscount > 0) {
     await supabase.from('appointments').update({
       total_price: finalTotal, balance_due: finalTotal - (depositAmount ?? 0),
@@ -1971,7 +1997,7 @@ export async function handleBookAppointment(
       local_end_time: localEndStr,
       local_date: localDateStr,
       location_address: locationAddress,
-      subtotal: svc.price,
+      subtotal: eventBase,
       extras_total: extrasTotal,
       coupon_discount: couponDiscount,
       coupon_code: couponCode,
