@@ -20,7 +20,7 @@ export async function GET() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('services')
-    .select('*, service_extras(*), service_staff(staff_id, staff(name)), service_locations(location_id), service_special_days(id, date, start_time, is_day_off)')
+    .select('*, service_extras(*), service_staff(staff_id, staff(name)), service_locations(location_id), service_special_days(id, date, start_time, end_time, is_day_off)')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false });
 
@@ -124,15 +124,16 @@ export async function POST(request: Request) {
     );
   }
 
-  // Insert event seatings (non-recurring events) into service_special_days
+  // Insert event seatings into service_special_days (date + from/to time).
   if (body.event_dates && Array.isArray(body.event_dates) && (body.event_dates as unknown[]).length > 0) {
     await supabase.from('service_special_days').insert(
-      (body.event_dates as { date: string; start_time: string }[])
+      (body.event_dates as { date: string; start_time: string; end_time?: string }[])
         .filter((d) => d.date)
         .map((d) => ({
           service_id: serviceData.id,
           date: d.date,
           start_time: d.start_time || null,
+          end_time: d.end_time || null,
           is_day_off: false,
         })) as never
     );
@@ -231,8 +232,8 @@ export async function PATCH(request: Request) {
     }
   }
 
-  // Replace event seatings (non-recurring events) in service_special_days
-  const eventDates = body.event_dates as { date: string; start_time: string }[] | undefined;
+  // Replace event seatings in service_special_days (date + from/to time).
+  const eventDates = body.event_dates as { date: string; start_time: string; end_time?: string }[] | undefined;
   if (eventDates && Array.isArray(eventDates)) {
     await supabase.from('service_special_days').delete().eq('service_id', id);
     const rows = eventDates.filter((d) => d.date);
@@ -242,6 +243,7 @@ export async function PATCH(request: Request) {
           service_id: id,
           date: d.date,
           start_time: d.start_time || null,
+          end_time: d.end_time || null,
           is_day_off: false,
         })) as never
       );
