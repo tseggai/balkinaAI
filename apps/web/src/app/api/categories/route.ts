@@ -7,7 +7,7 @@ export async function GET() {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('categories')
-    .select('id, name, slug')
+    .select('id, name, slug, parent_id, business_type')
     .order('display_order');
 
   if (error) return NextResponse.json({ data: [], error: error.message });

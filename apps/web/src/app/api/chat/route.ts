@@ -9,7 +9,7 @@
  * discover businesses first via the find_businesses tool.
  */
 import OpenAI from 'openai';
-import { getLabels } from '@balkina/shared';
+import { getLabels, normalizeBusinessType } from '@balkina/shared';
 import { createAdminClient } from '@/lib/supabase/server';
 import { executeTool } from './tool-handlers';
 
@@ -299,12 +299,12 @@ function buildTenantSystemPrompt(
   dateInfo?: { todayISO: string; tomorrowISO: string; endOfWeekISO: string; nextWeekMondayISO: string; nextWeekSundayISO: string; currentHourPST: number },
   paymentsEnabled = false,
   behaviorContext = '',
-  businessType = 'standard',
+  businessType = 'service',
 ): string {
-  // Restaurant vocabulary injection (Migration 049 / LABELS).
+  // Hospitality vocabulary injection (Migrations 049 / 050 / LABELS).
   const labels = getLabels(businessType);
-  const vocabBlock = businessType === 'restaurant'
-    ? `\n## Restaurant Vocabulary\nThis is a restaurant. Speak like a restaurant host, not a salon: say "${labels.book.toLowerCase()}"/"${labels.booking.toLowerCase()}" instead of "book"/"appointment", call the offerings the "${labels.services.toLowerCase()}" or "experiences", refer to ${labels.staff.toLowerCase()}s rather than staff, and address customers as "${labels.customer.toLowerCase()}s". Frame the whole conversation as making a ${labels.booking.toLowerCase()}.\n`
+  const vocabBlock = normalizeBusinessType(businessType) === 'hospitality'
+    ? `\n## Hospitality Vocabulary\nThis is a hospitality venue. Speak like a venue host, not a salon: say "${labels.book.toLowerCase()}"/"${labels.booking.toLowerCase()}" instead of "book"/"appointment", call the offerings the "${labels.services.toLowerCase()}" or "experiences", refer to ${labels.staff.toLowerCase()}s rather than staff, and address customers as "${labels.customer.toLowerCase()}s". Frame the whole conversation as making a ${labels.booking.toLowerCase()}.\n`
     : '';
 
   let customerSection: string;
@@ -551,7 +551,7 @@ export async function POST(request: Request) {
   let tenantName = 'Balkina AI';
   let resolvedTenantId = tenantId ?? '';
   let tenantPaymentsEnabled = false;
-  let tenantBusinessType = 'standard';
+  let tenantBusinessType = 'service';
 
   if (tenantId) {
     const { data: tenantData, error: tenantErr } = await supabase
@@ -574,7 +574,7 @@ export async function POST(request: Request) {
     tenantName = tenant.name;
     resolvedTenantId = tenant.id;
     tenantPaymentsEnabled = tenant.payments_enabled ?? false;
-    tenantBusinessType = tenant.business_type ?? 'standard';
+    tenantBusinessType = tenant.business_type ?? 'service';
   }
 
   // 1b. Property scoping (white-label portal discovery mode). When a propertyId

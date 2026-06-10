@@ -293,9 +293,11 @@ A request is a **reservation the venue confirms**: open-hours-based, staff-appro
 - **Confirmation**: always `status='pending'`; approval required (from `service_type='table'`). Owner staff = approver/notification recipient; may reassign on approval. `party_size` = guests. `booking_type='table'`.
 
 ### Restaurant vocabulary / labels (Option A + B)
-- Add `tenants.business_type TEXT NOT NULL DEFAULT 'standard'` (`'standard' | 'restaurant' | ...`).
-- Central `LABELS` map in `/packages/shared` keyed by `business_type` (single source of truth). Starter mapping for `restaurant`: service→"Experience", services→"Menu", staff→"Host", book→"Reserve", appointment→"Reservation".
-- **Option A (do first)**: inject restaurant vocabulary into the AI chat system prompt when `business_type='restaurant'` (smallest change, biggest customer-facing impact).
+- `tenants.business_type TEXT NOT NULL DEFAULT 'service'` (`'service' | 'hospitality'`). Migration 049 introduced this as `'standard' | 'restaurant'`; **Migration 050 renamed the buckets** to the broader `service` (appointments & bookings) / `hospitality` (reservations & events) so the second bucket covers cafés/bars, event venues, and hotels — not just restaurants. `getLabels`/`normalizeBusinessType` in `/packages/shared` map the legacy values for safety.
+- Central `LABELS` map in `/packages/shared` keyed by `business_type` (single source of truth). Mapping for `hospitality`: service→"Experience", services→"Menu", staff→"Host", book→"Reserve", appointment→"Reservation".
+- **Option A (do first)**: inject hospitality vocabulary into the AI chat system prompt when `business_type='hospitality'` (smallest change, biggest customer-facing impact).
+- **Categories taxonomy (Migration 050)**: `categories.business_type` (`'service' | 'hospitality'`) splits the taxonomy. Registration shows only the categories matching the chosen bucket, grouped under their parent. Hospitality group children: Restaurant, Café / Bar, Events Venue / Private Dining, Hotel / Resort.
+- **Onboarding plans**: `/onboarding/select-plan` is driven from `/api/plans` → the admin-managed `subscription_plans` table (same source as the marketing pricing page), and `/api/checkout` looks up the Stripe price by `planId`. Plans without a `stripe_price_id` are hidden. Do NOT hardcode plan names in onboarding (the old Starter/Pro/Enterprise hardcode caused "Plan not configured").
 - **Option B (then)**: point tenant-dashboard headings/nav and customer chat cards at the same `LABELS` map. Skip per-tenant custom terminology (Option C) until requested.
 
 ### Pending build tasks (suggested order)

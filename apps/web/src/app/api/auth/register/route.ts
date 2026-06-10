@@ -79,7 +79,7 @@ export async function POST(request: Request) {
         email,
         phone: phone || null,
         category_id: categoryId || null,
-        business_type: businessType === 'restaurant' ? 'restaurant' : 'standard',
+        business_type: businessType === 'hospitality' ? 'hospitality' : 'service',
         stripe_customer_id: stripeCustomerId,
         status: 'pending_subscription' as const,
       } as never)

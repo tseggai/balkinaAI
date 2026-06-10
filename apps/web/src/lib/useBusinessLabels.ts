@@ -10,7 +10,7 @@ import { getLabels, type LabelSet } from '@balkina/shared';
  * use the labels unconditionally.
  */
 export function useBusinessLabels(): { businessType: string; labels: LabelSet } {
-  const [businessType, setBusinessType] = useState('standard');
+  const [businessType, setBusinessType] = useState('service');
 
   useEffect(() => {
     let cancelled = false;
@@ -24,7 +24,7 @@ export function useBusinessLabels(): { businessType: string; labels: LabelSet } 
         .eq('user_id', user.id)
         .single();
       if (!cancelled && data) {
-        setBusinessType((data as { business_type: string | null }).business_type ?? 'standard');
+        setBusinessType((data as { business_type: string | null }).business_type ?? 'service');
       }
     })();
     return () => { cancelled = true; };

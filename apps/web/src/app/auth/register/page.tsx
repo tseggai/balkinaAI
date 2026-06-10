@@ -8,6 +8,8 @@ interface Category {
   id: string;
   name: string;
   slug: string;
+  parent_id: string | null;
+  business_type: string;
 }
 
 export default function RegisterPage() {
@@ -19,7 +21,7 @@ export default function RegisterPage() {
     password: '',
     phone: '',
     categoryId: '',
-    businessType: 'standard',
+    businessType: 'service',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -52,8 +54,26 @@ export default function RegisterPage() {
   }, []);
 
   function updateField(field: string, value: string) {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+      // Switching business type changes which categories are valid — clear the
+      // current pick so a service category can't be submitted for a hospitality
+      // business (or vice-versa).
+      ...(field === 'businessType' ? { categoryId: '' } : {}),
+    }));
   }
+
+  // Categories relevant to the selected business type, grouped under their parent
+  // (e.g. "Beauty & Personal Care" → Barbershop, Spa…). Parents are group headers,
+  // children are the selectable options.
+  const categoryGroups = categories
+    .filter((c) => c.parent_id === null && c.business_type === formData.businessType)
+    .map((parent) => ({
+      parent,
+      children: categories.filter((c) => c.parent_id === parent.id),
+    }))
+    .filter((g) => g.children.length > 0);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -167,8 +187,8 @@ export default function RegisterPage() {
             <select id="businessType" value={formData.businessType}
               onChange={(e) => updateField('businessType', e.target.value)}
               required className={inputClass}>
-              <option value="standard">Standard — appointments / bookings</option>
-              <option value="restaurant">Restaurant — reservations &amp; events</option>
+              <option value="service">Service — appointments &amp; bookings</option>
+              <option value="hospitality">Hospitality — reservations &amp; events</option>
             </select>
           </div>
 
@@ -207,8 +227,12 @@ export default function RegisterPage() {
               onChange={(e) => updateField('categoryId', e.target.value)}
               required className={inputClass}>
               <option value="">Select a category</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              {categoryGroups.map((group) => (
+                <optgroup key={group.parent.id} label={group.parent.name}>
+                  {group.children.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
