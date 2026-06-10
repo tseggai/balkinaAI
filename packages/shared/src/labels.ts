@@ -32,7 +32,7 @@ export const LABELS: Record<string, LabelSet> = {
   },
   hospitality: {
     service: 'Experience',
-    services: 'Menu',
+    services: 'Experiences',
     staff: 'Host',
     book: 'Reserve',
     booking: 'Reservation',

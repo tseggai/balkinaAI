@@ -727,7 +727,7 @@ export default function ServicesPage() {
             className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
             <PlusIcon />
-            Add Service
+            Add {labels.service}
           </button>
         </div>
       </div>
@@ -808,7 +808,7 @@ export default function ServicesPage() {
         ) : filteredServices.length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
             <p className="text-sm text-gray-500">
-              {search.trim() ? 'No services match your search.' : 'No services yet.'}
+              {search.trim() ? `No ${labels.services.toLowerCase()} match your search.` : `No ${labels.services.toLowerCase()} yet.`}
             </p>
             {!search.trim() && (
               <button
@@ -818,7 +818,7 @@ export default function ServicesPage() {
                 }}
                 className="mt-3 text-sm font-medium text-brand-600 hover:text-brand-700"
               >
-                Add your first service
+                Add your first {labels.service.toLowerCase()}
               </button>
             )}
           </div>
@@ -934,7 +934,7 @@ export default function ServicesPage() {
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
-                {editing ? 'Edit Service' : 'Add Service'}
+                {editing ? `Edit ${labels.service}` : `Add ${labels.service}`}
               </h2>
               <button
                 onClick={handleClose}
