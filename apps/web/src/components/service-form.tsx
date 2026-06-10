@@ -196,7 +196,7 @@ export function ServiceForm({
 }) {
   const isEditMode = Boolean(service?.id);
   const { businessType } = useBusinessLabels();
-  const isRestaurantTenant = businessType === 'restaurant';
+  const isRestaurantTenant = businessType === 'hospitality';
   const [activeTab, setActiveTab] = useState<TabKey>('details');
 
   // --- Details tab state ---

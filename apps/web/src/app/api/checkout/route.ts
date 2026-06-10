@@ -2,14 +2,11 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getStripe } from '@/lib/stripe';
 
-const VALID_PLANS = ['starter', 'pro', 'enterprise'] as const;
-type PlanKey = (typeof VALID_PLANS)[number];
-
 export async function POST(request: Request) {
   try {
-    const { plan } = await request.json() as { plan: string };
+    const { planId } = await request.json() as { planId: string };
 
-    if (!plan || !VALID_PLANS.includes(plan as PlanKey)) {
+    if (!planId) {
       return NextResponse.json(
         { data: null, error: { message: 'Invalid plan selected', code: 'VALIDATION_ERROR' } },
         { status: 400 }
@@ -49,13 +46,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Look up the Stripe price ID from the subscription_plans table.
-    // Plan name in DB is title-case (Starter, Pro, Enterprise).
-    const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
+    // Look up the Stripe price ID from the subscription_plans table by id
+    // (the onboarding UI is driven from /api/plans → the same table).
     const { data: planData, error: planError } = await supabase
       .from('subscription_plans')
       .select('id, stripe_price_id')
-      .eq('name', planName)
+      .eq('id', planId)
       .single();
 
     const subPlan = planData as { id: string; stripe_price_id: string | null } | null;

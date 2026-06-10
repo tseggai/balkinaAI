@@ -1,10 +1,14 @@
 /**
- * Vocabulary / labels keyed by tenant business_type (Migration 049).
- * Single source of truth for restaurant (and future vertical) terminology.
+ * Vocabulary / labels keyed by tenant business_type (Migrations 049 / 050).
+ * Single source of truth for hospitality (and future vertical) terminology.
  * The data model stays canonical (services, staff, appointments) — only the
  * words shown to humans and injected into the AI prompt change.
+ *
+ * The two buckets are 'service' (appointments / bookings) and 'hospitality'
+ * (reservations & events). Legacy values 'standard'/'restaurant' (Migration
+ * 049) are normalized in getLabels for safety.
  */
-export type BusinessType = 'standard' | 'restaurant';
+export type BusinessType = 'service' | 'hospitality';
 
 export interface LabelSet {
   service: string;
@@ -17,7 +21,7 @@ export interface LabelSet {
 }
 
 export const LABELS: Record<string, LabelSet> = {
-  standard: {
+  service: {
     service: 'Service',
     services: 'Services',
     staff: 'Staff',
@@ -26,7 +30,7 @@ export const LABELS: Record<string, LabelSet> = {
     bookings: 'Appointments',
     customer: 'Customer',
   },
-  restaurant: {
+  hospitality: {
     service: 'Experience',
     services: 'Menu',
     staff: 'Host',
@@ -37,6 +41,12 @@ export const LABELS: Record<string, LabelSet> = {
   },
 };
 
+/** Normalize legacy (Migration 049) values to the current buckets. */
+export function normalizeBusinessType(businessType?: string | null): BusinessType {
+  if (businessType === 'hospitality' || businessType === 'restaurant') return 'hospitality';
+  return 'service';
+}
+
 export function getLabels(businessType?: string | null): LabelSet {
-  return LABELS[businessType ?? 'standard'] ?? LABELS.standard!;
+  return LABELS[normalizeBusinessType(businessType)] ?? LABELS.service!;
 }

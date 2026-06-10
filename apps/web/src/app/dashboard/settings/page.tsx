@@ -29,7 +29,7 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('profile');
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: '', phone: '', category_ids: [] as string[], business_type: 'standard' });
+  const [form, setForm] = useState({ name: '', phone: '', category_ids: [] as string[], business_type: 'service' });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -66,7 +66,7 @@ export default function SettingsPage() {
         .select('category_id')
         .eq('tenant_id', tenantInfo.id);
       const catIds = ((tcLinks ?? []) as { category_id: string }[]).map((l) => l.category_id);
-      const formValues = { name: tenantInfo.name, phone: tenantInfo.phone ?? '', category_ids: catIds, business_type: tenantInfo.business_type ?? 'standard' };
+      const formValues = { name: tenantInfo.name, phone: tenantInfo.phone ?? '', category_ids: catIds, business_type: tenantInfo.business_type ?? 'service' };
       setForm(formValues);
       initialFormValues.current = { ...formValues, category_ids: [...catIds] };
       setLogoPreview(tenantInfo.logo_url);
@@ -273,10 +273,10 @@ export default function SettingsPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">Business Type</label>
               <select value={form.business_type} onChange={(e) => setForm({ ...form, business_type: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
-                <option value="standard">Standard (appointments)</option>
-                <option value="restaurant">Restaurant (reservations &amp; events)</option>
+                <option value="service">Service — appointments &amp; bookings</option>
+                <option value="hospitality">Hospitality — reservations &amp; events</option>
               </select>
-              <p className="mt-1 text-xs text-gray-400">Restaurant mode tailors the AI&apos;s wording (experiences, reserve, host, guests) to your venue.</p>
+              <p className="mt-1 text-xs text-gray-400">Hospitality mode tailors the AI&apos;s wording (experiences, reserve, host, guests) to your venue.</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Owner Email</label>
