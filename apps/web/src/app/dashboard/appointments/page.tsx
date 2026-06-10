@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useBusinessLabels } from '@/lib/useBusinessLabels';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -191,6 +192,7 @@ function getBookingTypeLabel(bookingType: string | null, partySize: number | nul
 // ---------------------------------------------------------------------------
 
 export default function AppointmentsPage() {
+  const { labels } = useBusinessLabels();
   // Data state
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [total, setTotal] = useState(0);
@@ -830,7 +832,7 @@ export default function AppointmentsPage() {
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{labels.bookings}</h1>
             <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
               {total}
             </span>

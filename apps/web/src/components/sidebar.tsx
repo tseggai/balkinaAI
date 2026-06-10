@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useBusinessLabels } from '@/lib/useBusinessLabels';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: HomeIcon },
@@ -35,6 +36,17 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const [unread, setUnread] = useState(0);
+  const { labels } = useBusinessLabels();
+
+  // Restaurant-aware nav labels (default wording for standard tenants).
+  const navLabelFor = (item: { href: string; label: string }): string => {
+    switch (item.href) {
+      case '/dashboard/services': return labels.services;
+      case '/dashboard/staff': return labels.staff;
+      case '/dashboard/appointments': return labels.bookings;
+      default: return item.label;
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -82,7 +94,7 @@ export function Sidebar({
                   }`}
                 >
                   <item.icon active={isActive} />
-                  <span className="flex-1">{item.label}</span>
+                  <span className="flex-1">{navLabelFor(item)}</span>
                   {item.href === '/dashboard/messages' && unread > 0 && (
                     <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-brand-600 px-1.5 text-xs font-semibold text-white">
                       {unread}
