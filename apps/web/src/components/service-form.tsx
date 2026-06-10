@@ -110,7 +110,7 @@ interface Service {
   booking_limit_per_slot: number | null;
   booking_limit_per_slot_interval: string | null;
   timesheet: Record<string, unknown> | null;
-  service_special_days?: { id?: string; date: string; start_time: string | null; is_day_off?: boolean }[];
+  service_special_days?: { id?: string; date: string; start_time: string | null; end_time?: string | null; is_day_off?: boolean }[];
   service_extras?: ServiceExtra[];
   service_staff?: ServiceStaffMember[];
   service_locations?: string[];
@@ -228,11 +228,11 @@ export function ServiceForm({
   const [pricingType, setPricingType] = useState(service?.pricing_type ?? 'per_service');
   const [hideDuration, setHideDuration] = useState(service?.hide_duration ?? false);
   const [isRecurring, setIsRecurring] = useState(service?.is_recurring ?? false);
-  // Event date(s) for non-recurring events — each row is one seating, stored in service_special_days.
-  const [eventDates, setEventDates] = useState<{ date: string; start_time: string }[]>(
-    ((service?.service_special_days ?? []) as { date: string; start_time: string | null; is_day_off?: boolean }[])
+  // Event date(s) for events — each row is one seating (date + from/to time), stored in service_special_days.
+  const [eventDates, setEventDates] = useState<{ date: string; start_time: string; end_time: string }[]>(
+    ((service?.service_special_days ?? []) as { date: string; start_time: string | null; end_time?: string | null; is_day_off?: boolean }[])
       .filter((d) => !d.is_day_off)
-      .map((d) => ({ date: d.date, start_time: (d.start_time ?? '').slice(0, 5) })),
+      .map((d) => ({ date: d.date, start_time: (d.start_time ?? '').slice(0, 5), end_time: (d.end_time ?? '').slice(0, 5) })),
   );
 
   // --- Staff tab state ---
@@ -458,8 +458,8 @@ export function ServiceForm({
     e.preventDefault();
     setError('');
 
-    // A non-recurring event must have at least one seating date.
-    if (isEvent && !isRecurring && eventDates.filter((d) => d.date).length === 0) {
+    // Every event needs at least one seating date (recurring just repeats it).
+    if (isEvent && eventDates.filter((d) => d.date).length === 0) {
       setError('Add at least one event date.');
       return;
     }
@@ -476,7 +476,7 @@ export function ServiceForm({
       image_url: imageUrl || null,
       color: service?.color ?? '#6B7FC4',
       price: Number(price),
-      duration_minutes: Number(duration),
+      duration_minutes: isEvent ? computeEventDuration() : isTable ? 120 : Number(duration),
       deposit_enabled: depositEnabled,
       deposit_type: depositEnabled ? depositType : null,
       deposit_amount: depositEnabled ? Number(depositAmount) : null,
@@ -489,7 +489,7 @@ export function ServiceForm({
       hide_price: hidePrice,
       hide_duration: hideDuration,
       staff_selection_enabled: staffSelectionEnabled,
-      pricing_type: pricingType,
+      pricing_type: isEvent ? 'per_person' : isTable ? 'per_service' : pricingType,
       visibility,
       min_booking_lead_time: Number(minBookingLeadTime),
       max_booking_days_ahead: maxDaysEnabled ? Number(maxBookingDaysAhead) : 0,
@@ -499,12 +499,12 @@ export function ServiceForm({
       booking_limit_per_customer_interval: limitPerCustomerEnabled ? limitPerCustomerInterval : null,
       booking_limit_per_slot: limitPerSlotEnabled ? Number(limitPerSlot) : null,
       booking_limit_per_slot_interval: limitPerSlotEnabled ? limitPerSlotInterval : null,
-      timesheet: timesheetEnabled ? timesheet : null,
+      timesheet: isTable ? timesheet : isEvent ? null : (timesheetEnabled ? timesheet : null),
       staff: selectedStaff.map((s) => s.staff_id),
-      extras: extras.filter((ex) => ex.name.trim()),
+      extras: isTable ? [] : extras.filter((ex) => ex.name.trim()),
       locations: selectedLocations,
-      // Non-recurring events store their seatings in service_special_days.
-      event_dates: isEvent && !isRecurring ? eventDates.filter((d) => d.date) : [],
+      // Events store their seatings (date + from/to time) in service_special_days.
+      event_dates: isEvent ? eventDates.filter((d) => d.date) : [],
     };
 
     const res = await fetch('/api/services', {
@@ -547,18 +547,31 @@ export function ServiceForm({
   // =========================================================================
 
   function addEventDate() {
-    setEventDates((prev) => [...prev, { date: '', start_time: '' }]);
+    setEventDates((prev) => [...prev, { date: '', start_time: '', end_time: '' }]);
   }
-  function updateEventDate(i: number, field: 'date' | 'start_time', val: string) {
+  function updateEventDate(i: number, field: 'date' | 'start_time' | 'end_time', val: string) {
     setEventDates((prev) => prev.map((d, idx) => (idx === i ? { ...d, [field]: val } : d)));
   }
   function removeEventDate(i: number) {
     setEventDates((prev) => prev.filter((_, idx) => idx !== i));
   }
 
-  // Event date repeater — only for non-recurring events. Each row is one seating.
+  // Derive the seating length (minutes) from the first date's from/to. The
+  // service stores a single duration_minutes; events don't show a duration
+  // field, so we compute it from the seating window (defaults to 120).
+  function computeEventDuration(): number {
+    const first = eventDates.find((d) => d.start_time && d.end_time);
+    if (!first) return 120;
+    const [sh = 0, sm = 0] = first.start_time.split(':').map(Number);
+    const [eh = 0, em = 0] = first.end_time.split(':').map(Number);
+    const mins = (eh * 60 + em) - (sh * 60 + sm);
+    return mins > 0 ? mins : 120;
+  }
+
+  // Event date repeater. Each row is one seating: date + from/to time. Always
+  // shown for events (recurring just repeats these dates on a cadence).
   function renderEventDates() {
-    if (!isEvent || isRecurring) return null;
+    if (!isEvent) return null;
     return (
       <div>
         <span className="text-xs text-gray-400">Event date(s) &amp; time</span>
@@ -566,13 +579,314 @@ export function ServiceForm({
           {eventDates.map((ed, i) => (
             <div key={i} className="flex items-center gap-2">
               <input type="date" value={ed.date} onChange={(e) => updateEventDate(i, 'date', e.target.value)} className={`${inputClass} flex-1`} />
-              <input type="time" value={ed.start_time} onChange={(e) => updateEventDate(i, 'start_time', e.target.value)} className={`${inputClass} flex-1`} />
+              <input type="time" value={ed.start_time} onChange={(e) => updateEventDate(i, 'start_time', e.target.value)} className={`${inputClass} w-28`} title="From" />
+              <span className="text-xs text-gray-400">to</span>
+              <input type="time" value={ed.end_time} onChange={(e) => updateEventDate(i, 'end_time', e.target.value)} className={`${inputClass} w-28`} title="To" />
               <button type="button" onClick={() => removeEventDate(i)} className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50">Remove</button>
             </div>
           ))}
           <button type="button" onClick={addEventDate} className="rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">+ Add date</button>
         </div>
-        <p className="mt-1 text-[11px] text-gray-400">Customers pick one of these seatings. At least one date is required.</p>
+        <p className="mt-1 text-[11px] text-gray-400">Guests pick one of these seatings. At least one date is required.</p>
+      </div>
+    );
+  }
+
+  // Compact inline extras editor (Name + Price) for hospitality events.
+  function renderInlineExtras() {
+    return (
+      <div>
+        <span className="text-xs text-gray-400">Add-ons / extras</span>
+        <div className="mt-1 space-y-2">
+          {extras.map((extra, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                placeholder="e.g. Champagne"
+                value={extra.name}
+                onChange={(e) => updateExtra(i, 'name', e.target.value)}
+                className={`${inputClass} flex-1`}
+              />
+              <div className="relative w-28">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{currencySymbol}</span>
+                <input
+                  type="number" min="0" step="0.01"
+                  placeholder="0.00"
+                  value={extra.price || ''}
+                  onChange={(e) => updateExtra(i, 'price', Number(e.target.value))}
+                  className={`${inputClass} pl-7`}
+                />
+              </div>
+              <button type="button" onClick={() => removeExtra(i)} className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50">Remove</button>
+            </div>
+          ))}
+          <button type="button" onClick={addExtra} className="rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">+ Add extra</button>
+        </div>
+      </div>
+    );
+  }
+
+  // Open-hours editor (per-day from/to) reused by the table Details section and
+  // the standard Time Sheet tab.
+  function renderTimesheetDays() {
+    const timeOptions: string[] = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        timeOptions.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+      }
+    }
+    return (
+      <div className="space-y-2 rounded-lg border border-gray-200 p-4">
+        {TIMESHEET_DAYS.map((day) => {
+          const key = day.toLowerCase();
+          const ds = timesheet[key] ?? { enabled: false, start: '09:00', end: '17:00' };
+          return (
+            <div key={day} className="flex items-center gap-3">
+              <label className="relative inline-flex w-28 cursor-pointer items-center gap-2">
+                <input type="checkbox" checked={ds.enabled} onChange={(e) => updateTimesheetDay(key, 'enabled', e.target.checked)} className="peer sr-only" />
+                <div className="peer relative h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:left-[calc(100%-2px)] peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                <span className="text-sm text-gray-700">{day}</span>
+              </label>
+              {ds.enabled && (
+                <>
+                  <select value={ds.start} onChange={(e) => updateTimesheetDay(key, 'start', e.target.value)} className="rounded border border-gray-300 px-2 py-1 text-sm">
+                    {timeOptions.map((t) => (<option key={t} value={t}>{t}</option>))}
+                  </select>
+                  <span className="text-sm text-gray-400">to</span>
+                  <select value={ds.end} onChange={(e) => updateTimesheetDay(key, 'end', e.target.value)} className="rounded border border-gray-300 px-2 py-1 text-sm">
+                    {timeOptions.map((t) => (<option key={t} value={t}>{t}</option>))}
+                  </select>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Locations multi-select (pills) — shared by the restaurant Details section.
+  function renderLocationsField() {
+    if (allLocations.length === 0) return null;
+    return (
+      <div>
+        <span className="text-xs text-gray-400">Locations</span>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 p-3 min-h-[42px]">
+          {allLocations.filter((loc) => selectedLocations.includes(loc.id)).map((loc) => (
+            <span key={loc.id} className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700">
+              {loc.name}
+              <button type="button" onClick={() => setSelectedLocations((prev) => prev.filter((id) => id !== loc.id))} className="ml-0.5 text-brand-400 hover:text-brand-600">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </span>
+          ))}
+          {selectedLocations.length === 0 && (<span className="text-sm text-gray-400">All locations</span>)}
+          <div className="relative">
+            <button type="button" onClick={() => setShowLocationDropdown(!showLocationDropdown)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1 text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+              Add
+            </button>
+            {showLocationDropdown && (
+              <div className="absolute left-0 top-full z-20 mt-1 max-h-48 w-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                {allLocations.filter((loc) => !selectedLocations.includes(loc.id)).map((loc) => (
+                  <button key={loc.id} type="button" onClick={() => { setSelectedLocations((prev) => [...prev, loc.id]); setShowLocationDropdown(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
+                    <div><span className="font-medium">{loc.name}</span>{loc.address && (<span className="ml-1 text-xs text-gray-400">{loc.address}</span>)}</div>
+                  </button>
+                ))}
+                {allLocations.filter((loc) => !selectedLocations.includes(loc.id)).length === 0 && (<div className="px-3 py-2 text-sm text-gray-400">All locations selected</div>)}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Deposit toggle (shared) — only rendered when payments are enabled.
+  function renderDepositField(label: string) {
+    if (!paymentsEnabled) return null;
+    return (
+      <div className="flex items-start">
+        <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
+          <input type="checkbox" checked={depositEnabled} onChange={(e) => setDepositEnabled(e.target.checked)} className="peer sr-only" />
+          <div className="peer relative h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:left-[calc(100%-2px)] peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+          <span className="text-sm font-medium text-gray-700">{label}</span>
+        </label>
+        {depositEnabled && (
+          <div className="grid w-1/2 grid-cols-2 gap-2">
+            <select value={depositType} onChange={(e) => setDepositType(e.target.value as 'fixed' | 'percentage')} className={selectClass}>
+              <option value="fixed">Fixed amount</option>
+              <option value="percentage">Percentage</option>
+            </select>
+            <div className="relative">
+              {depositType === 'fixed' && (<span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">{currencySymbol}</span>)}
+              <input type="number" min="0" step={depositType === 'percentage' ? '1' : '0.01'} value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder={depositType === 'percentage' ? '%' : '0.00'} className={`${inputClass}${depositType === 'fixed' ? ' pl-7' : ''}`} />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Toggle row helper (label + checkbox + optional trailing control).
+  function renderToggle(checked: boolean, onChange: (v: boolean) => void, label: string, trailing?: React.ReactNode) {
+    return (
+      <div className="flex items-start">
+        <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
+          <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+          <div className="peer relative h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:left-[calc(100%-2px)] peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+          <span className="text-sm font-medium text-gray-700">{label}</span>
+        </label>
+        {trailing && <div className="flex w-1/2 items-center gap-2">{trailing}</div>}
+      </div>
+    );
+  }
+
+  // ---- Hospitality (event / table) Details section — single code path. ----
+  function renderRestaurantDetails() {
+    return (
+      <div className="space-y-3">
+        <ImageUpload value={imageUrl} onChange={setImageUrl} label="" />
+        {renderTypeSelector()}
+
+        {isEvent ? (
+          <>
+            {/* Name + Price side by side */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-xs text-gray-400">Name</span>
+                <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sunday Brunch" className={inputClass} />
+              </div>
+              <div>
+                <span className="text-xs text-gray-400">Price per guest</span>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">{currencySymbol}</span>
+                  <input type="number" required min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" className={`${inputClass} pl-7`} />
+                </div>
+              </div>
+            </div>
+
+            {/* Total seats available */}
+            <div>
+              <span className="text-xs text-gray-400">Total seats available</span>
+              <input type="number" min="1" step="1" value={capacity} onChange={(e) => setCapacity(e.target.value)} placeholder="e.g. 60" className={inputClass} />
+              <p className="mt-1 text-[11px] text-gray-400">Total covers per seating. Bookings stop once seats run out.</p>
+            </div>
+
+            {/* Description */}
+            <div>
+              <span className="text-xs text-gray-400">Description</span>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="What's included" className={`${inputClass} h-auto py-2`} />
+            </div>
+
+            {renderInlineExtras()}
+            {renderEventDates()}
+
+            {/* Recurring toggle + cadence — dates stay visible */}
+            {renderToggle(isRecurring, setIsRecurring, 'Recurring event', isRecurring ? (
+              <>
+                <input type="number" min="1" value={recurringCount} onChange={(e) => setRecurringCount(e.target.value)} className={`${inputClass} w-20`} />
+                <select value={recurringInterval} onChange={(e) => setRecurringInterval(e.target.value)} className={selectClass}>
+                  <option value="day">Per day</option>
+                  <option value="week">Per week</option>
+                  <option value="month">Per month</option>
+                </select>
+              </>
+            ) : undefined)}
+
+            {renderDepositField('Require prepayment / deposit')}
+            {renderLocationsField()}
+          </>
+        ) : (
+          <>
+            {/* Table: Name full width */}
+            <div>
+              <span className="text-xs text-gray-400">Name</span>
+              <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Lunch, Dinner" className={inputClass} />
+            </div>
+
+            <div>
+              <span className="text-xs text-gray-400">Description</span>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="e.g. Table reservations for lunch service" className={`${inputClass} h-auto py-2`} />
+            </div>
+
+            {/* Open hours */}
+            <div>
+              <span className="text-xs text-gray-400">Open hours</span>
+              <p className="mb-2 mt-0.5 text-[11px] text-gray-400">Guests can request a table within these hours. The venue confirms each reservation.</p>
+              {renderTimesheetDays()}
+            </div>
+
+            {renderDepositField('Require a no-show deposit')}
+            {renderLocationsField()}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ---- Hospitality merged Settings + Booking Rules tab. ----
+  function renderRestaurantSettings() {
+    return (
+      <div className="space-y-5">
+        {/* Visibility */}
+        <div className="flex gap-3">
+          <button type="button" onClick={() => setVisibility('public')} className={`rounded-lg px-4 py-2 text-sm font-medium ${visibility === 'public' ? 'bg-brand-600 text-white' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>Public</button>
+          <button type="button" onClick={() => setVisibility('staff_only')} className={`rounded-lg px-4 py-2 text-sm font-medium ${visibility === 'staff_only' ? 'bg-brand-600 text-white' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>Staff Only</button>
+        </div>
+
+        {/* Min advance notice */}
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Minimum advance notice to {isEvent ? 'book' : 'reserve'}</label>
+          <select value={minBookingLeadTime} onChange={(e) => setMinBookingLeadTime(e.target.value)} className={selectClass}>
+            {LEAD_TIME_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+          </select>
+        </div>
+
+        {/* Max days ahead */}
+        <div className="rounded-lg border border-gray-200 p-4">
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={maxDaysEnabled} onChange={(e) => setMaxDaysEnabled(e.target.checked)} className="peer sr-only" />
+            <div className="peer relative h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:left-[calc(100%-2px)] peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <span className="text-sm font-medium text-gray-700">Limit how far ahead guests can {isEvent ? 'book' : 'reserve'}</span>
+          </label>
+          {maxDaysEnabled && (<div className="mt-3"><input type="number" min="1" value={maxBookingDaysAhead} onChange={(e) => setMaxBookingDaysAhead(e.target.value)} placeholder="Maximum days ahead" className={`${inputClass} w-32`} /></div>)}
+        </div>
+
+        {/* Limit per customer */}
+        <div className="rounded-lg border border-gray-200 p-4">
+          <label className="relative inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={limitPerCustomerEnabled} onChange={(e) => setLimitPerCustomerEnabled(e.target.checked)} className="peer sr-only" />
+            <div className="peer relative h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:left-[calc(100%-2px)] peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            <span className="text-sm font-medium text-gray-700">{isEvent ? 'Limit bookings per guest' : 'Limit active reservations per guest'}</span>
+          </label>
+          {limitPerCustomerEnabled && (
+            <div className="mt-3 flex items-center gap-3">
+              <input type="number" min="1" value={limitPerCustomer} onChange={(e) => setLimitPerCustomer(e.target.value)} className={`${inputClass} w-24`} />
+              <select value={limitPerCustomerInterval} onChange={(e) => setLimitPerCustomerInterval(e.target.value)} className={selectClass}>
+                {INTERVAL_OPTIONS.map((opt) => (<option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Table-only: soft per-slot buffer */}
+        {isTable && (
+          <div className="rounded-lg border border-gray-200 p-4">
+            <label className="relative inline-flex cursor-pointer items-center gap-2">
+              <input type="checkbox" checked={limitPerSlotEnabled} onChange={(e) => setLimitPerSlotEnabled(e.target.checked)} className="peer sr-only" />
+              <div className="peer relative h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:left-[calc(100%-2px)] peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+              <span className="text-sm font-medium text-gray-700">Limit reservations per time slot</span>
+            </label>
+            {limitPerSlotEnabled && (
+              <div className="mt-3 flex items-center gap-3">
+                <input type="number" min="1" value={limitPerSlot} onChange={(e) => setLimitPerSlot(e.target.value)} className={`${inputClass} w-24`} />
+                <select value={limitPerSlotInterval} onChange={(e) => setLimitPerSlotInterval(e.target.value)} className={selectClass}>
+                  {INTERVAL_OPTIONS.map((opt) => (<option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -609,6 +923,8 @@ export function ServiceForm({
   }
 
   function renderDetailsTab() {
+    // Hospitality (event/table) uses a single tailored details layout.
+    if (isRestaurant) return renderRestaurantDetails();
     // ----- EDIT MODE: horizontal labels, hover-to-edit -----
     if (isEditMode) {
       return (
@@ -1823,12 +2139,18 @@ export function ServiceForm({
     );
   }
 
+  // Hospitality types collapse to two tabs: Details + a merged Settings/Rules.
+  const visibleTabs = isRestaurant
+    ? TABS.filter((t) => t.key === 'details' || t.key === 'settings')
+    : TABS;
+
   function renderActiveTab() {
-    // Staff tab is hidden for restaurant types — fall back to Details if stranded there.
-    if (activeTab === 'staff' && serviceType !== 'standard') {
-      return renderDetailsTab();
+    const allowed = new Set(visibleTabs.map((t) => t.key));
+    const tab: TabKey = allowed.has(activeTab) ? activeTab : 'details';
+    if (isRestaurant) {
+      return tab === 'settings' ? renderRestaurantSettings() : renderDetailsTab();
     }
-    switch (activeTab) {
+    switch (tab) {
       case 'details':
         return renderDetailsTab();
       case 'staff':
@@ -1848,7 +2170,7 @@ export function ServiceForm({
     <form onSubmit={handleSubmit} className="flex h-full w-full flex-col">
       {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto border-b border-gray-200 px-1">
-        {TABS.filter((tab) => !(tab.key === 'staff' && serviceType !== 'standard')).map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab.key}
             type="button"

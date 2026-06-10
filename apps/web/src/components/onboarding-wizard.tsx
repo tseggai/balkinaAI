@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useBusinessLabels } from '@/lib/useBusinessLabels';
+import type { LabelSet } from '@balkina/shared';
 
 type WizardStep = 'welcome' | 'add-service' | 'add-staff' | 'done' | null;
 
@@ -18,6 +20,7 @@ export function OnboardingWizard({ tenantName }: { tenantName: string }) {
   const [step, setStep] = useState<WizardStep>(null);
   const [loading, setLoading] = useState(true);
   const [fadeOut, setFadeOut] = useState(false);
+  const { labels } = useBusinessLabels();
 
   useEffect(() => {
     // Only run on the main dashboard page
@@ -116,15 +119,15 @@ export function OnboardingWizard({ tenantName }: { tenantName: string }) {
         )}
 
         {step === 'add-service' && (
-          <AddServiceStep onGo={goToServices} onSkip={() => setStep('add-staff')} />
+          <AddServiceStep labels={labels} onGo={goToServices} onSkip={() => setStep('add-staff')} />
         )}
 
         {step === 'add-staff' && (
-          <AddStaffStep onGo={goToStaff} onSkip={dismiss} />
+          <AddStaffStep labels={labels} onGo={goToStaff} onSkip={dismiss} />
         )}
 
         {step === 'done' && (
-          <DoneStep onClose={dismiss} />
+          <DoneStep labels={labels} onClose={dismiss} />
         )}
       </div>
     </div>
@@ -165,7 +168,8 @@ function WelcomeStep({ tenantName, onNext }: { tenantName: string; onNext: () =>
   );
 }
 
-function AddServiceStep({ onGo, onSkip }: { onGo: () => void; onSkip: () => void }) {
+function AddServiceStep({ labels, onGo, onSkip }: { labels: LabelSet; onGo: () => void; onSkip: () => void }) {
+  const isHosp = labels.service !== 'Service';
   return (
     <div className="text-center">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
@@ -173,9 +177,11 @@ function AddServiceStep({ onGo, onSkip }: { onGo: () => void; onSkip: () => void
           <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0" />
         </svg>
       </div>
-      <h2 className="text-xl font-bold text-gray-900">Add your first service</h2>
+      <h2 className="text-xl font-bold text-gray-900">{isHosp ? 'Add your first experience' : 'Add your first service'}</h2>
       <p className="mt-2 text-gray-600">
-        What do you offer? Haircuts, consultations, training sessions — add a service so customers know what they can book.
+        {isHosp
+          ? "What's on offer? Brunches, set menus, table reservations — add an experience so guests know what they can reserve."
+          : 'What do you offer? Haircuts, consultations, training sessions — add a service so customers know what they can book.'}
       </p>
 
       <div className="mx-auto mt-6 flex max-w-[200px] items-center gap-2">
@@ -188,7 +194,7 @@ function AddServiceStep({ onGo, onSkip }: { onGo: () => void; onSkip: () => void
         onClick={onGo}
         className="mt-6 w-full rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
       >
-        Add a service
+        {isHosp ? 'Add an experience' : 'Add a service'}
       </button>
       <button
         onClick={onSkip}
@@ -200,7 +206,8 @@ function AddServiceStep({ onGo, onSkip }: { onGo: () => void; onSkip: () => void
   );
 }
 
-function AddStaffStep({ onGo, onSkip }: { onGo: () => void; onSkip: () => void }) {
+function AddStaffStep({ labels, onGo, onSkip }: { labels: LabelSet; onGo: () => void; onSkip: () => void }) {
+  const isHosp = labels.staff !== 'Staff';
   return (
     <div className="text-center">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
@@ -208,9 +215,11 @@ function AddStaffStep({ onGo, onSkip }: { onGo: () => void; onSkip: () => void }
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
         </svg>
       </div>
-      <h2 className="text-xl font-bold text-gray-900">Add your first staff member</h2>
+      <h2 className="text-xl font-bold text-gray-900">{isHosp ? 'Add your first host' : 'Add your first staff member'}</h2>
       <p className="mt-2 text-gray-600">
-        Who provides the services? Add yourself or a team member so customers can see who they&apos;re booking with.
+        {isHosp
+          ? 'Who looks after your guests? Add yourself or a team member so every reservation has an owner.'
+          : "Who provides the services? Add yourself or a team member so customers can see who they're booking with."}
       </p>
 
       <div className="mx-auto mt-6 flex max-w-[200px] items-center gap-2">
@@ -223,7 +232,7 @@ function AddStaffStep({ onGo, onSkip }: { onGo: () => void; onSkip: () => void }
         onClick={onGo}
         className="mt-6 w-full rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
       >
-        Add a staff member
+        {isHosp ? 'Add a host' : 'Add a staff member'}
       </button>
       <button
         onClick={onSkip}
@@ -235,7 +244,8 @@ function AddStaffStep({ onGo, onSkip }: { onGo: () => void; onSkip: () => void }
   );
 }
 
-function DoneStep({ onClose }: { onClose: () => void }) {
+function DoneStep({ labels, onClose }: { labels: LabelSet; onClose: () => void }) {
+  const isHosp = labels.staff !== 'Staff';
   return (
     <div className="text-center">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
@@ -245,7 +255,9 @@ function DoneStep({ onClose }: { onClose: () => void }) {
       </div>
       <h2 className="text-xl font-bold text-gray-900">You&apos;re all set!</h2>
       <p className="mt-2 text-gray-600">
-        Your business is ready to accept bookings. Customers can now discover you through the Balkina AI chatbot.
+        {isHosp
+          ? 'Your venue is ready to accept reservations. Guests can now discover you through the Balkina AI chatbot.'
+          : 'Your business is ready to accept bookings. Customers can now discover you through the Balkina AI chatbot.'}
       </p>
       <p className="mt-4 text-sm text-gray-500">
         You can add more services, staff, and locations anytime from the sidebar.
