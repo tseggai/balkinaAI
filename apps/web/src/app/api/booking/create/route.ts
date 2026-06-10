@@ -89,6 +89,28 @@ function localTimeToUTC(date: string, time12h: string, timezone: string): Date {
   return new Date(wantedMs - offsetMs);
 }
 
+/**
+ * Validate that a requested datetime falls within a service's timesheet open hours
+ * (used for restaurant table requests — bypasses the staff-hours slot engine).
+ */
+function checkOpenHours(
+  start: Date,
+  timesheet: Record<string, { enabled?: boolean; start?: string; end?: string }>,
+  timezone: string,
+): { ok: boolean; message?: string } {
+  const dayName = start.toLocaleDateString('en-US', { timeZone: timezone, weekday: 'long' }).toLowerCase();
+  const day = timesheet[dayName];
+  if (!day || day.enabled === false || !day.start || !day.end) {
+    return { ok: false, message: `We're closed on ${dayName.charAt(0).toUpperCase()}${dayName.slice(1)}. Please choose another day.` };
+  }
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(start);
+  const hm = `${parts.find((p) => p.type === 'hour')?.value ?? '00'}:${parts.find((p) => p.type === 'minute')?.value ?? '00'}`;
+  if (hm < day.start || hm > day.end) {
+    return { ok: false, message: `That time is outside our hours that day (${day.start}–${day.end}). Please pick a time within open hours.` };
+  }
+  return { ok: true };
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CreateBookingBody;
@@ -217,10 +239,12 @@ export async function POST(request: Request) {
       name: string; duration_minutes: number; price: number;
       deposit_enabled: boolean; deposit_type: string | null; deposit_amount: number | null; tenant_id: string;
       service_type?: string; pricing_type?: string; capacity?: number;
+      timesheet?: Record<string, { enabled?: boolean; start?: string; end?: string }> | null;
     };
 
     // Restaurant booking: derive type + pricing from the service itself.
     const isEvent = svc.service_type === 'event';
+    const isTable = svc.service_type === 'table';
     if (svc.service_type === 'event') bookingType = 'event';
     else if (svc.service_type === 'table') bookingType = 'table';
     const isPerPerson = svc.pricing_type === 'per_person';
@@ -267,6 +291,14 @@ export async function POST(request: Request) {
         { error: 'Cannot book a time slot less than 15 minutes from now. Please choose a later time.' },
         { status: 400, headers: CORS_HEADERS },
       );
+    }
+
+    // Table reservations: validate the requested time is within the service's open hours.
+    if (isTable && svc.timesheet) {
+      const oh = checkOpenHours(start, svc.timesheet, tz);
+      if (!oh.ok) {
+        return NextResponse.json({ error: oh.message }, { status: 400, headers: CORS_HEADERS });
+      }
     }
 
     const end = new Date(start.getTime() + svc.duration_minutes * 60000);
@@ -353,8 +385,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // 7. Create appointment. Events instant-confirm with no staff resource.
-    const finalStatus = isEvent ? 'confirmed' : (requiresApproval ? 'pending' : 'confirmed');
+    // 7. Create appointment. Events instant-confirm (no staff); tables are always
+    // a request (pending) with the owner staff as approver.
+    const finalStatus = isEvent ? 'confirmed' : (isTable ? 'pending' : (requiresApproval ? 'pending' : 'confirmed'));
+    const needsApproval = finalStatus === 'pending';
     const apptStaffId = isEvent ? null : finalStaffId;
     const balanceDue = depositAmount ? finalTotal - depositAmount : finalTotal;
     const { data: appointment, error: apptErr } = await supabase
@@ -403,7 +437,7 @@ export async function POST(request: Request) {
     // Skip for requires_approval bookings — deposit is collected AFTER staff approves.
     let paymentUrl: string | null = null;
     let paymentClientSecret: string | null = null;
-    const paymentRequired = !!(paymentsEnabled && depositAmount && depositAmount > 0 && !requiresApproval);
+    const paymentRequired = !!(paymentsEnabled && depositAmount && depositAmount > 0 && !needsApproval);
     const tenantStripeAccountId = tenantData?.stripe_account_id ?? null;
     if (paymentRequired && tenantStripeAccountId) {
       try {
@@ -443,7 +477,7 @@ export async function POST(request: Request) {
 
     // Fire notifications — await so they complete before Vercel terminates the function
     try {
-      if (requiresApproval) {
+      if (needsApproval) {
         // Booking needs staff approval — notify customer it's submitted, notify staff to approve
         await Promise.allSettled([
           notifyBookingSubmitted(apptId),
@@ -461,7 +495,7 @@ export async function POST(request: Request) {
     }
 
     // 8c. Push to staff's Google Calendar (non-blocking)
-    if (!requiresApproval) {
+    if (!needsApproval) {
       pushEventToGoogleCalendar(apptId).catch(() => {});
     }
 
@@ -477,7 +511,7 @@ export async function POST(request: Request) {
       {
         success: true,
         appointment_id: (appointment as { id: string }).id,
-        status: requiresApproval ? 'pending' : 'confirmed',
+        status: finalStatus,
         booking_type: bookingType,
         party_size: partySize,
         service_name: svc.name,
