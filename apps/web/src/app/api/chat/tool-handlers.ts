@@ -1102,7 +1102,9 @@ export async function handleGetServices(
       id, name, price, duration_minutes, description, image_url,
       deposit_enabled, deposit_amount, deposit_type,
       service_category, service_subcategory,
+      service_type, pricing_type, capacity, is_recurring,
       service_extras (id, name, price, duration_minutes),
+      service_special_days (date, start_time, is_day_off),
       service_staff (
         staff_id,
         staff:staff_id (id, name, image_url)
@@ -1118,13 +1120,47 @@ export async function handleGetServices(
   const { data: services, error } = await query;
   if (error) return { success: false, error: error.message };
 
-  const mapped = ((services ?? []) as unknown as {
+  const rows = (services ?? []) as unknown as {
     id: string; name: string; price: number; duration_minutes: number;
     description: string | null; image_url: string | null; deposit_enabled: boolean; deposit_amount: number | null;
     deposit_type: string | null; service_category: string | null; service_subcategory: string | null;
+    service_type: string | null; pricing_type: string | null; capacity: number | null; is_recurring: boolean | null;
     service_extras: { id: string; name: string; price: number; duration_minutes: number }[] | null;
+    service_special_days: { date: string; start_time: string | null; is_day_off: boolean | null }[] | null;
     service_staff: { staff_id: string; staff: { id: string; name: string; image_url: string | null } | null }[] | null;
-  }[]).map((s) => ({
+  }[];
+
+  // For event services, compute upcoming seatings with remaining seats.
+  const seatingsByService = new Map<string, { date: string; start_time: string | null; iso: string; seats_left: number }[]>();
+  const eventRows = rows.filter((s) => s.service_type === 'event');
+  if (eventRows.length > 0) {
+    const tz = await getTenantTimezone(supabase, tenantId);
+    const now = Date.now();
+    const eventIds = eventRows.map((e) => e.id);
+    const { data: apptRows } = await supabase
+      .from('appointments')
+      .select('service_id, start_time, party_size')
+      .in('service_id', eventIds)
+      .in('status', ['pending', 'confirmed', 'approved']);
+    const takenByKey = new Map<string, number>();
+    for (const a of (apptRows ?? []) as { service_id: string; start_time: string; party_size: number | null }[]) {
+      const key = `${a.service_id}|${new Date(a.start_time).toISOString()}`;
+      takenByKey.set(key, (takenByKey.get(key) ?? 0) + (a.party_size ?? 1));
+    }
+    for (const ev of eventRows) {
+      const seatings = (ev.service_special_days ?? [])
+        .filter((d) => !d.is_day_off && d.date)
+        .map((d) => {
+          const iso = localTimeToUTC(d.date, (d.start_time ?? '00:00').slice(0, 5), tz).toISOString();
+          return { date: d.date, start_time: d.start_time, iso, seats_left: (ev.capacity ?? 0) - (takenByKey.get(`${ev.id}|${iso}`) ?? 0) };
+        })
+        .filter((s) => new Date(s.iso).getTime() > now)
+        .sort((a, b) => a.iso.localeCompare(b.iso));
+      seatingsByService.set(ev.id, seatings);
+    }
+  }
+
+  const mapped = rows.map((s) => ({
     id: s.id,
     name: s.name,
     price: s.price,
@@ -1135,6 +1171,14 @@ export async function handleGetServices(
     deposit_amount: s.deposit_amount,
     deposit_type: s.deposit_type,
     category: s.service_category,
+    // Restaurant booking fields
+    service_type: s.service_type ?? 'standard',
+    pricing_type: s.pricing_type ?? 'per_service',
+    is_per_person: s.pricing_type === 'per_person',
+    capacity: s.capacity,
+    is_recurring: s.is_recurring ?? false,
+    // Upcoming event seatings (events only) with seats remaining
+    seatings: s.service_type === 'event' ? (seatingsByService.get(s.id) ?? []) : undefined,
     // Extras scoped to THIS service only
     extras: s.service_extras ?? [],
     has_extras: (s.service_extras ?? []).length > 0,
