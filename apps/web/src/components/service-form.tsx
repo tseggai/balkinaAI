@@ -109,6 +109,7 @@ interface Service {
   booking_limit_per_slot: number | null;
   booking_limit_per_slot_interval: string | null;
   timesheet: Record<string, unknown> | null;
+  service_special_days?: { id?: string; date: string; start_time: string | null; is_day_off?: boolean }[];
   service_extras?: ServiceExtra[];
   service_staff?: ServiceStaffMember[];
   service_locations?: string[];
@@ -198,6 +199,10 @@ export function ServiceForm({
   // --- Details tab state ---
   const [name, setName] = useState(service?.name ?? '');
   const [serviceType, setServiceType] = useState(service?.service_type ?? 'standard');
+  // Restaurant-mode derived flags — drive which service-form fields show/relabel.
+  const isEvent = serviceType === 'event';
+  const isTable = serviceType === 'table';
+  const isRestaurant = isEvent || isTable;
   const [categoryName, setCategoryName] = useState(service?.category_name ?? '');
   const [description, setDescription] = useState(service?.description ?? '');
   const [imageUrl, setImageUrl] = useState(service?.image_url ?? '');
@@ -214,6 +219,12 @@ export function ServiceForm({
   const [pricingType, setPricingType] = useState(service?.pricing_type ?? 'per_service');
   const [hideDuration, setHideDuration] = useState(service?.hide_duration ?? false);
   const [isRecurring, setIsRecurring] = useState(service?.is_recurring ?? false);
+  // Event date(s) for non-recurring events — each row is one seating, stored in service_special_days.
+  const [eventDates, setEventDates] = useState<{ date: string; start_time: string }[]>(
+    ((service?.service_special_days ?? []) as { date: string; start_time: string | null; is_day_off?: boolean }[])
+      .filter((d) => !d.is_day_off)
+      .map((d) => ({ date: d.date, start_time: (d.start_time ?? '').slice(0, 5) })),
+  );
 
   // --- Staff tab state ---
   const [allStaff, setAllStaff] = useState<StaffOption[]>([]);
@@ -325,6 +336,7 @@ export function ServiceForm({
     hideDuration,
     staffSelectionEnabled,
     isRecurring,
+    eventDates,
     selectedStaff,
     timesheetEnabled,
     timesheet,
@@ -348,7 +360,7 @@ export function ServiceForm({
   }), [
     name, serviceType, categoryName, description, imageUrl, price, depositEnabled, depositType,
     depositAmount, duration, bufferTime, customDuration, capacity, hidePrice,
-    hideDuration, staffSelectionEnabled, pricingType, isRecurring, selectedStaff, timesheetEnabled, timesheet, extras,
+    hideDuration, staffSelectionEnabled, pricingType, isRecurring, eventDates, selectedStaff, timesheetEnabled, timesheet, extras,
     visibility, minBookingLeadTime, maxDaysEnabled, maxBookingDaysAhead,
     minExtrasEnabled, minExtras, maxExtrasEnabled, maxExtras,
     limitPerCustomerEnabled, limitPerCustomer, limitPerCustomerInterval,
@@ -436,6 +448,13 @@ export function ServiceForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    // A non-recurring event must have at least one seating date.
+    if (isEvent && !isRecurring && eventDates.filter((d) => d.date).length === 0) {
+      setError('Add at least one event date.');
+      return;
+    }
+
     setSaving(true);
 
     const isEdit = Boolean(service?.id);
@@ -475,6 +494,8 @@ export function ServiceForm({
       staff: selectedStaff.map((s) => s.staff_id),
       extras: extras.filter((ex) => ex.name.trim()),
       locations: selectedLocations,
+      // Non-recurring events store their seatings in service_special_days.
+      event_dates: isEvent && !isRecurring ? eventDates.filter((d) => d.date) : [],
     };
 
     const res = await fetch('/api/services', {
@@ -515,6 +536,37 @@ export function ServiceForm({
   // =========================================================================
   // RENDER
   // =========================================================================
+
+  function addEventDate() {
+    setEventDates((prev) => [...prev, { date: '', start_time: '' }]);
+  }
+  function updateEventDate(i: number, field: 'date' | 'start_time', val: string) {
+    setEventDates((prev) => prev.map((d, idx) => (idx === i ? { ...d, [field]: val } : d)));
+  }
+  function removeEventDate(i: number) {
+    setEventDates((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  // Event date repeater — only for non-recurring events. Each row is one seating.
+  function renderEventDates() {
+    if (!isEvent || isRecurring) return null;
+    return (
+      <div>
+        <span className="text-xs text-gray-400">Event date(s) &amp; time</span>
+        <div className="mt-1 space-y-2">
+          {eventDates.map((ed, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input type="date" value={ed.date} onChange={(e) => updateEventDate(i, 'date', e.target.value)} className={`${inputClass} flex-1`} />
+              <input type="time" value={ed.start_time} onChange={(e) => updateEventDate(i, 'start_time', e.target.value)} className={`${inputClass} flex-1`} />
+              <button type="button" onClick={() => removeEventDate(i)} className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50">Remove</button>
+            </div>
+          ))}
+          <button type="button" onClick={addEventDate} className="rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">+ Add date</button>
+        </div>
+        <p className="mt-1 text-[11px] text-gray-400">Customers pick one of these seatings. At least one date is required.</p>
+      </div>
+    );
+  }
 
   function renderTypeSelector() {
     const types: { key: string; label: string; hint: string }[] = [
@@ -562,7 +614,7 @@ export function ServiceForm({
               <HoverInput required value={name} onChange={setName} placeholder="Service name" />
             </div>
             <div>
-              <span className="text-xs text-gray-400">Category</span>
+              <span className="text-xs text-gray-400">{isEvent ? 'Event type' : 'Category'}</span>
               {addingNewCategory ? (
                 <div className="flex gap-2">
                   <input
@@ -717,35 +769,50 @@ export function ServiceForm({
             </div>
           )}
 
-          {/* Row 4: Price + Capacity (50% each) */}
+          {/* Row 4: Price + Capacity (50% each) — hidden for table reservations (free) */}
+          {!isTable && (
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <span className="text-xs text-gray-400">Price</span>
+              <span className="text-xs text-gray-400">{isEvent ? 'Price per guest' : 'Price'}</span>
               <HoverInput type="number" required min="0" step="0.01" value={price} onChange={setPrice} placeholder="0.00" prefix={currencySymbol} />
             </div>
             <div>
-              <span className="text-xs text-gray-400">Capacity</span>
-              <HoverSelect
-                value={capacity}
-                onChange={setCapacity}
-                displayValue={CAPACITY_OPTIONS.find((o) => String(o.value) === capacity)?.label ?? capacity}
-              >
-                {CAPACITY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </HoverSelect>
+              <span className="text-xs text-gray-400">{isEvent ? 'Total seats' : 'Capacity'}</span>
+              {isEvent ? (
+                <HoverInput type="number" min="1" step="1" value={capacity} onChange={setCapacity} placeholder="e.g. 60" />
+              ) : (
+                <HoverSelect
+                  value={capacity}
+                  onChange={setCapacity}
+                  displayValue={CAPACITY_OPTIONS.find((o) => String(o.value) === capacity)?.label ?? capacity}
+                >
+                  {CAPACITY_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </HoverSelect>
+              )}
             </div>
           </div>
+          )}
 
-          {/* Pricing type */}
+          {/* Pricing type — hidden for table reservations */}
+          {!isTable && (
           <div>
             <span className="text-xs text-gray-400">Pricing Type</span>
-            <HoverSelect value={pricingType} onChange={setPricingType} displayValue={pricingType === 'per_day' ? 'Per Day' : pricingType === 'per_week' ? 'Per Week' : 'Per Service'}>
-              <option value="per_service">Per Service</option>
-              <option value="per_day">Per Day</option>
-              <option value="per_week">Per Week</option>
-            </HoverSelect>
+            {isEvent ? (
+              <HoverSelect value={pricingType} onChange={setPricingType} displayValue={pricingType === 'per_person' ? 'Per Guest' : 'Flat (whole event)'}>
+                <option value="per_person">Per Guest</option>
+                <option value="per_service">Flat (whole event)</option>
+              </HoverSelect>
+            ) : (
+              <HoverSelect value={pricingType} onChange={setPricingType} displayValue={pricingType === 'per_day' ? 'Per Day' : pricingType === 'per_week' ? 'Per Week' : 'Per Service'}>
+                <option value="per_service">Per Service</option>
+                <option value="per_day">Per Day</option>
+                <option value="per_week">Per Week</option>
+              </HoverSelect>
+            )}
           </div>
+          )}
 
           {/* Row 5: Enable Deposit (only when payments are enabled for this tenant) */}
           {paymentsEnabled && (
@@ -779,10 +846,10 @@ export function ServiceForm({
           </div>
           )}
 
-          {/* Row 6: Duration + Buffer (50% each) */}
+          {/* Row 6: Duration + Buffer (50% each) — buffer hidden for restaurant types */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <span className="text-xs text-gray-400">Duration</span>
+              <span className="text-xs text-gray-400">{isEvent ? 'Seating length' : isTable ? 'Table held for' : 'Duration'}</span>
               <HoverSelect
                 value={duration}
                 onChange={setDuration}
@@ -799,6 +866,7 @@ export function ServiceForm({
                 ))}
               </HoverSelect>
             </div>
+            {!isRestaurant && (
             <div>
               <span className="text-xs text-gray-400">Buffer</span>
               <HoverSelect
@@ -813,9 +881,12 @@ export function ServiceForm({
                 ))}
               </HoverSelect>
             </div>
+            )}
           </div>
 
-          {/* Row 7: Allow Custom Duration Toggle */}
+          {/* Row 7: Allow Custom Duration Toggle — hidden for restaurant types */}
+          {!isRestaurant && (
+          <>
           <div className="flex items-start">
             <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
               <input type="checkbox" checked={customDuration} onChange={(e) => setCustomDuration(e.target.checked)} className="peer sr-only" />
@@ -829,13 +900,16 @@ export function ServiceForm({
             )}
           </div>
           {customDuration && renderCustomDurationSection()}
+          </>
+          )}
 
-          {/* Row 8: Recurring Service */}
+          {/* Row 8: Recurring Service — hidden for table reservations, relabeled for events */}
+          {!isTable && (
           <div className="flex items-start">
             <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
               <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="peer sr-only" />
               <div className="peer relative h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:left-[calc(100%-2px)] peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-              <span className="text-sm font-medium text-gray-700">Recurring Service</span>
+              <span className="text-sm font-medium text-gray-700">{isEvent ? 'Recurring event' : 'Recurring Service'}</span>
             </label>
             {isRecurring && (
               <div className="flex w-1/2 items-center gap-2">
@@ -852,6 +926,9 @@ export function ServiceForm({
               </div>
             )}
           </div>
+          )}
+
+          {renderEventDates()}
 
           {/* Separator */}
           <div className="border-t border-gray-200" />
@@ -865,7 +942,8 @@ export function ServiceForm({
             </label>
           </div>
 
-          {/* Staff selection toggle */}
+          {/* Staff selection toggle — hidden for restaurant types (no staff) */}
+          {!isRestaurant && (
           <div>
             <div className="flex items-center">
               <label className="relative inline-flex cursor-pointer items-center gap-2">
@@ -878,6 +956,7 @@ export function ServiceForm({
               <p className="mt-1 ml-11 text-xs text-gray-500">Customers will see available times only. You assign staff from the appointments page.</p>
             )}
           </div>
+          )}
 
           {/* Row 10: Hide duration on the booking page */}
           <div className="flex items-center">
@@ -1034,7 +1113,8 @@ export function ServiceForm({
           </div>
         )}
 
-        {/* Row 4: Price + Capacity (50% each) */}
+        {/* Row 4: Price + Capacity — hidden for table reservations (free) */}
+        {!isTable && (
         <div className="grid grid-cols-2 gap-3">
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">{currencySymbol}</span>
@@ -1045,28 +1125,42 @@ export function ServiceForm({
               step="0.01"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              placeholder="Price"
+              placeholder={isEvent ? 'Price per guest' : 'Price'}
               className={`${inputClass} pl-7`}
             />
           </div>
-          <select value={capacity} onChange={(e) => setCapacity(e.target.value)} className={selectClass}>
-            {CAPACITY_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          {isEvent ? (
+            <input type="number" min="1" step="1" value={capacity} onChange={(e) => setCapacity(e.target.value)} placeholder="Total seats" className={inputClass} />
+          ) : (
+            <select value={capacity} onChange={(e) => setCapacity(e.target.value)} className={selectClass}>
+              {CAPACITY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
+        )}
 
-        {/* Pricing type */}
+        {/* Pricing type — hidden for table reservations */}
+        {!isTable && (
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Pricing Type</label>
-          <select value={pricingType} onChange={(e) => setPricingType(e.target.value)} className={selectClass}>
-            <option value="per_service">Per Service</option>
-            <option value="per_day">Per Day</option>
-            <option value="per_week">Per Week</option>
-          </select>
+          {isEvent ? (
+            <select value={pricingType} onChange={(e) => setPricingType(e.target.value)} className={selectClass}>
+              <option value="per_person">Per Guest</option>
+              <option value="per_service">Flat (whole event)</option>
+            </select>
+          ) : (
+            <select value={pricingType} onChange={(e) => setPricingType(e.target.value)} className={selectClass}>
+              <option value="per_service">Per Service</option>
+              <option value="per_day">Per Day</option>
+              <option value="per_week">Per Week</option>
+            </select>
+          )}
         </div>
+        )}
 
         {/* Row 5: Enable Deposit (only when payments are enabled for this tenant) */}
         {paymentsEnabled && (
@@ -1114,6 +1208,7 @@ export function ServiceForm({
               </option>
             ))}
           </select>
+          {!isRestaurant && (
           <select value={bufferTime} onChange={(e) => setBufferTime(e.target.value)} className={selectClass}>
             <option value="0">Buffer: None</option>
             {BUFFER_OPTIONS.filter((b) => b > 0).map((b) => (
@@ -1122,9 +1217,12 @@ export function ServiceForm({
               </option>
             ))}
           </select>
+          )}
         </div>
 
-        {/* Row 7: Allow Custom Duration Toggle */}
+        {/* Row 7: Allow Custom Duration Toggle — hidden for restaurant types */}
+        {!isRestaurant && (
+        <>
         <div className="flex items-start">
           <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
             <input type="checkbox" checked={customDuration} onChange={(e) => setCustomDuration(e.target.checked)} className="peer sr-only" />
@@ -1138,13 +1236,16 @@ export function ServiceForm({
           )}
         </div>
         {customDuration && renderCustomDurationSection()}
+        </>
+        )}
 
-        {/* Row 8: Recurring Service */}
+        {/* Row 8: Recurring Service — hidden for table reservations, relabeled for events */}
+        {!isTable && (
         <div className="flex items-start">
           <label className="relative inline-flex w-1/2 cursor-pointer items-center gap-2 pt-1">
             <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="peer sr-only" />
             <div className="peer relative h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:left-[calc(100%-2px)] peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-            <span className="text-sm font-medium text-gray-700">Recurring Service</span>
+            <span className="text-sm font-medium text-gray-700">{isEvent ? 'Recurring event' : 'Recurring Service'}</span>
           </label>
           {isRecurring && (
             <div className="flex w-1/2 items-center gap-2">
@@ -1168,6 +1269,9 @@ export function ServiceForm({
             </div>
           )}
         </div>
+        )}
+
+        {renderEventDates()}
 
         {/* Separator */}
         <div className="border-t border-gray-200" />
@@ -1181,7 +1285,8 @@ export function ServiceForm({
           </label>
         </div>
 
-        {/* Staff selection toggle */}
+        {/* Staff selection toggle — hidden for restaurant types (no staff) */}
+        {!isRestaurant && (
         <div>
           <div className="flex items-center">
             <label className="relative inline-flex cursor-pointer items-center gap-2">
@@ -1194,6 +1299,7 @@ export function ServiceForm({
             <p className="mt-1 ml-11 text-xs text-gray-500">Customers will see available times only. You assign staff from the appointments page.</p>
           )}
         </div>
+        )}
 
         {/* Row 10: Hide duration on the booking page */}
         <div className="flex items-center">
@@ -1548,6 +1654,7 @@ export function ServiceForm({
 
         {/* Min Booking Lead Time */}
         <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Minimum advance notice to book</label>
           <select
             value={minBookingLeadTime}
             onChange={(e) => setMinBookingLeadTime(e.target.value)}
@@ -1635,7 +1742,7 @@ export function ServiceForm({
           <label className="relative inline-flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={limitPerCustomerEnabled} onChange={(e) => setLimitPerCustomerEnabled(e.target.checked)} className="peer sr-only" />
             <div className="peer relative h-5 w-9 shrink-0 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-1/2 after:-translate-y-1/2 after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-600 peer-checked:after:left-[calc(100%-2px)] peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-            <span className="text-sm font-medium text-gray-700">Limit appointments per customer</span>
+            <span className="text-sm font-medium text-gray-700">Limit bookings per customer</span>
           </label>
           {limitPerCustomerEnabled && (
             <div className="mt-3 flex items-center gap-3">

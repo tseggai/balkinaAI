@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { ServiceForm } from '@/components/service-form';
+import { useBusinessLabels } from '@/lib/useBusinessLabels';
 import { useCurrency } from '@/components/currency-context';
 import { useSupabase } from '@/lib/supabase/client';
 
@@ -572,6 +573,7 @@ function DiagramServiceCard({
 // ---------------------------------------------------------------------------
 
 export default function ServicesPage() {
+  const { labels } = useBusinessLabels();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const { symbol: cs } = useCurrency();
@@ -681,7 +683,7 @@ export default function ServicesPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-900">Services</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{labels.services}</h1>
           <span className="inline-flex items-center justify-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">
             {services.length}
           </span>

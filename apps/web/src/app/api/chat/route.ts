@@ -9,6 +9,7 @@
  * discover businesses first via the find_businesses tool.
  */
 import OpenAI from 'openai';
+import { getLabels } from '@balkina/shared';
 import { createAdminClient } from '@/lib/supabase/server';
 import { executeTool } from './tool-handlers';
 
@@ -298,7 +299,14 @@ function buildTenantSystemPrompt(
   dateInfo?: { todayISO: string; tomorrowISO: string; endOfWeekISO: string; nextWeekMondayISO: string; nextWeekSundayISO: string; currentHourPST: number },
   paymentsEnabled = false,
   behaviorContext = '',
+  businessType = 'standard',
 ): string {
+  // Restaurant vocabulary injection (Migration 049 / LABELS).
+  const labels = getLabels(businessType);
+  const vocabBlock = businessType === 'restaurant'
+    ? `\n## Restaurant Vocabulary\nThis is a restaurant. Speak like a restaurant host, not a salon: say "${labels.book.toLowerCase()}"/"${labels.booking.toLowerCase()}" instead of "book"/"appointment", call the offerings the "${labels.services.toLowerCase()}" or "experiences", refer to ${labels.staff.toLowerCase()}s rather than staff, and address customers as "${labels.customer.toLowerCase()}s". Frame the whole conversation as making a ${labels.booking.toLowerCase()}.\n`
+    : '';
+
   let customerSection: string;
   if (userId) {
     // Authenticated user — we already have their info, do NOT ask again
@@ -315,7 +323,7 @@ function buildTenantSystemPrompt(
   }
 
   return `You are the booking assistant for "${tenantName}" on Balkina AI. Be ULTRA concise — max 1 short sentence then cards/buttons. Never write paragraphs.
-
+${vocabBlock}
 ## Response Format
 Use [[CARD:...]] for structured UI. Use [[button:...]] ONLY for: dates, yes/no, Show More.
 NEVER wrap [[CARD:...]] or [[button:...]] in markdown code fences (\`\`\`). Output them as raw text directly in the message.
@@ -372,6 +380,8 @@ ${paymentsEnabled
   : '- Payments and deposits are NOT enabled for this business. Do NOT mention deposits, online payments, or payment collection. Bookings are confirmed directly without any payment step. Payment is handled at the business location.'}
 - Time conflicts: show alternative slots, never just state the conflict.
 - Restaurant bookings: for a table reservation, a ticketed event/special dinner, or a private dining request, always ask how many guests and pass party_size plus the matching booking_type ('table' | 'event' | 'private_dining') to create_booking. These are usually request-based — tell the customer the venue will confirm, and never claim you can't book a table.
+- Events (a service whose service_type='event' in get_services): present it as an experience with its seatings (each has date, time, and seats_left) and the per-guest price. Ask party size, then call create_booking with the event's service_id, the chosen seating's iso as start_time, and party_size. Events are instant-confirm — do NOT call get_staff or check_availability for them and there is no time-slot step. Show total = per-guest price × guests (plus deposit if any) before booking. If a seating's seats_left is less than the party size, say it's sold out and offer another seating.
+- Table reservations (a service whose service_type='table'): ask the date, time, and party size; do NOT call get_staff or check_availability (there is no time-slot step). Call create_booking with the service_id, the requested time, and party_size. It is always a REQUEST the venue confirms — tell the customer it's submitted for confirmation (not instantly booked). If the time is outside the venue's hours the booking will be rejected with the open hours; offer a time within them.
 - Reschedule: use reschedule_appointment (never cancel+rebook). Confirm which appointment. "push/move/change it" = last discussed appointment only.
 - Directions: call get_directions, show distance + [[link:Get Directions|url]]. Don't rebook.
 - Appointments: use get_booking_details to list, cancel_appointment to cancel, reschedule_appointment to move. Fetch list first, never ask for ID.
@@ -484,6 +494,8 @@ ${behaviorContext}## Key Rules
 - Deposit: "This service requires a $X deposit. Remaining $Y due at appointment." → [[button:Yes, Book with Deposit]] [[button:Choose Another Service]]
 - Time conflicts: show alternative slots, never just state the conflict.
 - Restaurant bookings: for a table reservation, a ticketed event/special dinner, or a private dining request, always ask how many guests and pass party_size plus the matching booking_type ('table' | 'event' | 'private_dining') to create_booking. These are usually request-based — tell the customer the venue will confirm, and never claim you can't book a table.
+- Events (a service whose service_type='event' in get_services): present it as an experience with its seatings (each has date, time, and seats_left) and the per-guest price. Ask party size, then call create_booking with the event's service_id, the chosen seating's iso as start_time, and party_size. Events are instant-confirm — do NOT call get_staff or check_availability for them and there is no time-slot step. Show total = per-guest price × guests (plus deposit if any) before booking. If a seating's seats_left is less than the party size, say it's sold out and offer another seating.
+- Table reservations (a service whose service_type='table'): ask the date, time, and party size; do NOT call get_staff or check_availability (there is no time-slot step). Call create_booking with the service_id, the requested time, and party_size. It is always a REQUEST the venue confirms — tell the customer it's submitted for confirmation (not instantly booked). If the time is outside the venue's hours the booking will be rejected with the open hours; offer a time within them.
 - Reschedule: use reschedule_appointment (never cancel+rebook). Confirm which appointment. "push/move/change it" = last discussed appointment only.
 - Directions: call get_directions, show distance + [[link:Get Directions|url]]. Don't rebook.
 - Appointments: use get_booking_details to list, cancel_appointment to cancel, reschedule_appointment to move. Fetch list first, never ask for ID.
@@ -539,11 +551,12 @@ export async function POST(request: Request) {
   let tenantName = 'Balkina AI';
   let resolvedTenantId = tenantId ?? '';
   let tenantPaymentsEnabled = false;
+  let tenantBusinessType = 'standard';
 
   if (tenantId) {
     const { data: tenantData, error: tenantErr } = await supabase
       .from('tenants')
-      .select('id, name, status, payments_enabled')
+      .select('id, name, status, payments_enabled, business_type')
       .eq('id', tenantId)
       .single();
 
@@ -551,7 +564,7 @@ export async function POST(request: Request) {
       console.error('[chat] Tenant lookup failed:', tenantErr.message);
     }
 
-    const tenant = tenantData as { id: string; name: string; status: string; payments_enabled: boolean } | null;
+    const tenant = tenantData as { id: string; name: string; status: string; payments_enabled: boolean; business_type: string | null } | null;
     if (!tenant || tenant.status !== 'active') {
       return new Response(JSON.stringify({ error: 'Business not found or inactive' }), {
         status: 404,
@@ -561,6 +574,7 @@ export async function POST(request: Request) {
     tenantName = tenant.name;
     resolvedTenantId = tenant.id;
     tenantPaymentsEnabled = tenant.payments_enabled ?? false;
+    tenantBusinessType = tenant.business_type ?? 'standard';
   }
 
   // 1b. Property scoping (white-label portal discovery mode). When a propertyId
@@ -864,6 +878,7 @@ export async function POST(request: Request) {
         dateInfo,
         tenantPaymentsEnabled,
         behaviorContext,
+        tenantBusinessType,
       )
     : buildDiscoverySystemPrompt(
         resolvedName,

@@ -52,6 +52,28 @@ async function getTenantTimezone(supabase: AdminClient, tenantId: string): Promi
   return (data as { timezone: string } | null)?.timezone || 'UTC';
 }
 
+/**
+ * Validate a requested datetime falls within a service's timesheet open hours
+ * (restaurant table requests — bypasses the staff-hours slot engine).
+ */
+function checkServiceOpenHours(
+  start: Date,
+  timesheet: Record<string, { enabled?: boolean; start?: string; end?: string }>,
+  timezone: string,
+): { ok: boolean; message?: string } {
+  const dayName = start.toLocaleDateString('en-US', { timeZone: timezone, weekday: 'long' }).toLowerCase();
+  const day = timesheet[dayName];
+  if (!day || day.enabled === false || !day.start || !day.end) {
+    return { ok: false, message: `We're closed on ${dayName.charAt(0).toUpperCase()}${dayName.slice(1)}. Please choose another day.` };
+  }
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(start);
+  const hm = `${parts.find((p) => p.type === 'hour')?.value ?? '00'}:${parts.find((p) => p.type === 'minute')?.value ?? '00'}`;
+  if (hm < day.start || hm > day.end) {
+    return { ok: false, message: `That time is outside our hours that day (${day.start}–${day.end}). Please pick a time within open hours.` };
+  }
+  return { ok: true };
+}
+
 // ── Synonym map for search term expansion ────────────────────────────────────
 // Maps common search terms to additional terms to search for.
 const SEARCH_SYNONYMS: Record<string, string[]> = {
@@ -1102,7 +1124,9 @@ export async function handleGetServices(
       id, name, price, duration_minutes, description, image_url,
       deposit_enabled, deposit_amount, deposit_type,
       service_category, service_subcategory,
+      service_type, pricing_type, capacity, is_recurring,
       service_extras (id, name, price, duration_minutes),
+      service_special_days (date, start_time, is_day_off),
       service_staff (
         staff_id,
         staff:staff_id (id, name, image_url)
@@ -1118,13 +1142,47 @@ export async function handleGetServices(
   const { data: services, error } = await query;
   if (error) return { success: false, error: error.message };
 
-  const mapped = ((services ?? []) as unknown as {
+  const rows = (services ?? []) as unknown as {
     id: string; name: string; price: number; duration_minutes: number;
     description: string | null; image_url: string | null; deposit_enabled: boolean; deposit_amount: number | null;
     deposit_type: string | null; service_category: string | null; service_subcategory: string | null;
+    service_type: string | null; pricing_type: string | null; capacity: number | null; is_recurring: boolean | null;
     service_extras: { id: string; name: string; price: number; duration_minutes: number }[] | null;
+    service_special_days: { date: string; start_time: string | null; is_day_off: boolean | null }[] | null;
     service_staff: { staff_id: string; staff: { id: string; name: string; image_url: string | null } | null }[] | null;
-  }[]).map((s) => ({
+  }[];
+
+  // For event services, compute upcoming seatings with remaining seats.
+  const seatingsByService = new Map<string, { date: string; start_time: string | null; iso: string; seats_left: number }[]>();
+  const eventRows = rows.filter((s) => s.service_type === 'event');
+  if (eventRows.length > 0) {
+    const tz = await getTenantTimezone(supabase, tenantId);
+    const now = Date.now();
+    const eventIds = eventRows.map((e) => e.id);
+    const { data: apptRows } = await supabase
+      .from('appointments')
+      .select('service_id, start_time, party_size')
+      .in('service_id', eventIds)
+      .in('status', ['pending', 'confirmed', 'approved']);
+    const takenByKey = new Map<string, number>();
+    for (const a of (apptRows ?? []) as { service_id: string; start_time: string; party_size: number | null }[]) {
+      const key = `${a.service_id}|${new Date(a.start_time).toISOString()}`;
+      takenByKey.set(key, (takenByKey.get(key) ?? 0) + (a.party_size ?? 1));
+    }
+    for (const ev of eventRows) {
+      const seatings = (ev.service_special_days ?? [])
+        .filter((d) => !d.is_day_off && d.date)
+        .map((d) => {
+          const iso = localTimeToUTC(d.date, (d.start_time ?? '00:00').slice(0, 5), tz).toISOString();
+          return { date: d.date, start_time: d.start_time, iso, seats_left: (ev.capacity ?? 0) - (takenByKey.get(`${ev.id}|${iso}`) ?? 0) };
+        })
+        .filter((s) => new Date(s.iso).getTime() > now)
+        .sort((a, b) => a.iso.localeCompare(b.iso));
+      seatingsByService.set(ev.id, seatings);
+    }
+  }
+
+  const mapped = rows.map((s) => ({
     id: s.id,
     name: s.name,
     price: s.price,
@@ -1135,6 +1193,14 @@ export async function handleGetServices(
     deposit_amount: s.deposit_amount,
     deposit_type: s.deposit_type,
     category: s.service_category,
+    // Restaurant booking fields
+    service_type: s.service_type ?? 'standard',
+    pricing_type: s.pricing_type ?? 'per_service',
+    is_per_person: s.pricing_type === 'per_person',
+    capacity: s.capacity,
+    is_recurring: s.is_recurring ?? false,
+    // Upcoming event seatings (events only) with seats remaining
+    seatings: s.service_type === 'event' ? (seatingsByService.get(s.id) ?? []) : undefined,
     // Extras scoped to THIS service only
     extras: s.service_extras ?? [],
     has_extras: (s.service_extras ?? []).length > 0,
@@ -1583,7 +1649,7 @@ export async function handleBookAppointment(
   const useCustomerPackage = (input.use_customer_package as boolean) || false;
   const _packageId = (input.package_id as string) || null;
   const partySize = (input.party_size as number) || null;
-  const bookingType = (input.booking_type as string) || 'service';
+  let bookingType = (input.booking_type as string) || 'service';
 
   if (!serviceId || !startTime) {
     return { success: false, error: 'service_id and start_time are required' };
@@ -1677,7 +1743,17 @@ export async function handleBookAppointment(
   // Unpack service
   if (!serviceResult.data) return { success: false, error: 'Service not found' };
   const service = serviceResult.data;
-  const svc = service as { duration_minutes: number; price: number; deposit_enabled: boolean; deposit_type: string | null; deposit_amount: number | null; tenant_id: string };
+  const svc = service as { duration_minutes: number; price: number; deposit_enabled: boolean; deposit_type: string | null; deposit_amount: number | null; tenant_id: string; service_type?: string; pricing_type?: string; capacity?: number; timesheet?: Record<string, { enabled?: boolean; start?: string; end?: string }> | null };
+
+  // Restaurant booking: derive type + pricing from the service itself.
+  const isEvent = svc.service_type === 'event';
+  const isTable = svc.service_type === 'table';
+  if (svc.service_type === 'event') bookingType = 'event';
+  else if (svc.service_type === 'table') bookingType = 'table';
+  const isPerPerson = svc.pricing_type === 'per_person';
+  const guests = partySize && partySize > 0 ? partySize : 1;
+  // Per-guest pricing (events): per-person price × party size.
+  const eventBase = isPerPerson ? svc.price * guests : svc.price;
 
   // Unpack customer
   const customerId = customerResult.id;
@@ -1715,18 +1791,43 @@ export async function handleBookAppointment(
     return { success: false, error: 'Cannot book a time slot less than 15 minutes from now. Please choose a later time.' };
   }
 
+  // Table reservations: validate the requested time is within the service's open hours.
+  if (isTable && svc.timesheet) {
+    const oh = checkServiceOpenHours(start, svc.timesheet, bookingTimezone);
+    if (!oh.ok) return { success: false, error: oh.message };
+  }
+
   const end = new Date(start.getTime() + svc.duration_minutes * 60000);
 
   // 3. Calculate deposit (skip if payments not enabled for this tenant)
   let depositAmount: number | null = null;
   if (paymentsEnabled && svc.deposit_enabled && svc.deposit_amount) {
     depositAmount = svc.deposit_type === 'percentage'
-      ? (svc.price * svc.deposit_amount) / 100
+      ? (eventBase * svc.deposit_amount) / 100
       : svc.deposit_amount;
   }
 
-  // 7. Create the appointment
-  const balanceDue = depositAmount ? svc.price - depositAmount : svc.price;
+  // 6c. Event capacity check — seats_left = capacity − SUM(party_size) for this seating.
+  if (isEvent && svc.capacity && svc.capacity > 0) {
+    const { data: seatRows } = await supabase
+      .from('appointments')
+      .select('party_size')
+      .eq('service_id', serviceId)
+      .eq('start_time', start.toISOString())
+      .in('status', ['pending', 'confirmed', 'approved']);
+    const seatsTaken = ((seatRows ?? []) as { party_size: number | null }[])
+      .reduce((sum, r) => sum + (r.party_size ?? 1), 0);
+    const seatsLeft = svc.capacity - seatsTaken;
+    if (seatsLeft < guests) {
+      return { success: false, error: seatsLeft <= 0 ? 'This event is sold out.' : `Only ${seatsLeft} seat(s) left for this event.` };
+    }
+  }
+
+  // 7. Create the appointment. Events instant-confirm (no staff); tables are
+  // always a request (pending) with the owner staff as approver.
+  const finalStatus = isEvent ? 'confirmed' : (isTable ? 'pending' : (requiresApproval ? 'pending' : 'confirmed'));
+  const needsApproval = finalStatus === 'pending';
+  const balanceDue = depositAmount ? eventBase - depositAmount : eventBase;
 
   const { data: appointment, error: apptErr } = await supabase
     .from('appointments')
@@ -1734,14 +1835,14 @@ export async function handleBookAppointment(
       customer_id: customerId,
       tenant_id: tenantId,
       service_id: serviceId,
-      staff_id: finalStaffId,
+      staff_id: isEvent ? null : finalStaffId,
       location_id: finalLocationId,
       start_time: start.toISOString(),
       end_time: end.toISOString(),
-      status: requiresApproval ? 'pending' : 'confirmed',
+      status: finalStatus,
       booking_type: bookingType,
       party_size: partySize,
-      total_price: svc.price,
+      total_price: eventBase,
       deposit_paid: false,
       deposit_amount_paid: depositAmount,
       balance_due: balanceDue,
@@ -1757,7 +1858,7 @@ export async function handleBookAppointment(
   // Skip for requires_approval bookings — deposit is collected AFTER staff approves.
   let paymentUrl: string | null = null;
   let paymentClientSecret: string | null = null;
-  if (paymentsEnabled && depositAmount && depositAmount > 0 && tenantStripeAccountId && !requiresApproval) {
+  if (paymentsEnabled && depositAmount && depositAmount > 0 && tenantStripeAccountId && !needsApproval) {
     try {
       const Stripe = (await import('stripe')).default;
       const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2026-02-25.clover' });
@@ -1798,7 +1899,7 @@ export async function handleBookAppointment(
   // Fire notifications — await so they complete before Vercel terminates the function
   const { notifyBookingConfirmed, notifyBookingSubmitted, notifyStaffNewBooking } = await import('@/lib/notifications/booking-events');
   try {
-    if (requiresApproval) {
+    if (needsApproval) {
       await Promise.allSettled([
         notifyBookingSubmitted(appointmentId),
         notifyStaffNewBooking(appointmentId),
@@ -1944,7 +2045,7 @@ export async function handleBookAppointment(
   }
 
   // Update appointment total if adjustments were made
-  const finalTotal = svc.price + extrasTotal - couponDiscount - loyaltyDiscount;
+  const finalTotal = eventBase + extrasTotal - couponDiscount - loyaltyDiscount;
   if (extrasTotal > 0 || couponDiscount > 0 || loyaltyDiscount > 0) {
     await supabase.from('appointments').update({
       total_price: finalTotal, balance_due: finalTotal - (depositAmount ?? 0),
@@ -1971,7 +2072,7 @@ export async function handleBookAppointment(
       local_end_time: localEndStr,
       local_date: localDateStr,
       location_address: locationAddress,
-      subtotal: svc.price,
+      subtotal: eventBase,
       extras_total: extrasTotal,
       coupon_discount: couponDiscount,
       coupon_code: couponCode,
@@ -1983,8 +2084,8 @@ export async function handleBookAppointment(
       deposit_paid: false,
       balance_due: finalTotal - (depositAmount ?? 0),
       used_package: useCustomerPackage,
-      status: requiresApproval ? 'pending' : 'confirmed',
-      requires_approval: requiresApproval,
+      status: finalStatus,
+      requires_approval: needsApproval,
       booking_type: bookingType,
       party_size: partySize,
       payment_url: paymentUrl,
