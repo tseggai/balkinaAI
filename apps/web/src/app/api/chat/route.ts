@@ -9,6 +9,7 @@
  * discover businesses first via the find_businesses tool.
  */
 import OpenAI from 'openai';
+import { getLabels } from '@balkina/shared';
 import { createAdminClient } from '@/lib/supabase/server';
 import { executeTool } from './tool-handlers';
 
@@ -298,7 +299,14 @@ function buildTenantSystemPrompt(
   dateInfo?: { todayISO: string; tomorrowISO: string; endOfWeekISO: string; nextWeekMondayISO: string; nextWeekSundayISO: string; currentHourPST: number },
   paymentsEnabled = false,
   behaviorContext = '',
+  businessType = 'standard',
 ): string {
+  // Restaurant vocabulary injection (Migration 049 / LABELS).
+  const labels = getLabels(businessType);
+  const vocabBlock = businessType === 'restaurant'
+    ? `\n## Restaurant Vocabulary\nThis is a restaurant. Speak like a restaurant host, not a salon: say "${labels.book.toLowerCase()}"/"${labels.booking.toLowerCase()}" instead of "book"/"appointment", call the offerings the "${labels.services.toLowerCase()}" or "experiences", refer to ${labels.staff.toLowerCase()}s rather than staff, and address customers as "${labels.customer.toLowerCase()}s". Frame the whole conversation as making a ${labels.booking.toLowerCase()}.\n`
+    : '';
+
   let customerSection: string;
   if (userId) {
     // Authenticated user — we already have their info, do NOT ask again
@@ -315,7 +323,7 @@ function buildTenantSystemPrompt(
   }
 
   return `You are the booking assistant for "${tenantName}" on Balkina AI. Be ULTRA concise — max 1 short sentence then cards/buttons. Never write paragraphs.
-
+${vocabBlock}
 ## Response Format
 Use [[CARD:...]] for structured UI. Use [[button:...]] ONLY for: dates, yes/no, Show More.
 NEVER wrap [[CARD:...]] or [[button:...]] in markdown code fences (\`\`\`). Output them as raw text directly in the message.
@@ -543,11 +551,12 @@ export async function POST(request: Request) {
   let tenantName = 'Balkina AI';
   let resolvedTenantId = tenantId ?? '';
   let tenantPaymentsEnabled = false;
+  let tenantBusinessType = 'standard';
 
   if (tenantId) {
     const { data: tenantData, error: tenantErr } = await supabase
       .from('tenants')
-      .select('id, name, status, payments_enabled')
+      .select('id, name, status, payments_enabled, business_type')
       .eq('id', tenantId)
       .single();
 
@@ -555,7 +564,7 @@ export async function POST(request: Request) {
       console.error('[chat] Tenant lookup failed:', tenantErr.message);
     }
 
-    const tenant = tenantData as { id: string; name: string; status: string; payments_enabled: boolean } | null;
+    const tenant = tenantData as { id: string; name: string; status: string; payments_enabled: boolean; business_type: string | null } | null;
     if (!tenant || tenant.status !== 'active') {
       return new Response(JSON.stringify({ error: 'Business not found or inactive' }), {
         status: 404,
@@ -565,6 +574,7 @@ export async function POST(request: Request) {
     tenantName = tenant.name;
     resolvedTenantId = tenant.id;
     tenantPaymentsEnabled = tenant.payments_enabled ?? false;
+    tenantBusinessType = tenant.business_type ?? 'standard';
   }
 
   // 1b. Property scoping (white-label portal discovery mode). When a propertyId
@@ -868,6 +878,7 @@ export async function POST(request: Request) {
         dateInfo,
         tenantPaymentsEnabled,
         behaviorContext,
+        tenantBusinessType,
       )
     : buildDiscoverySystemPrompt(
         resolvedName,
