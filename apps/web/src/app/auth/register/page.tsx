@@ -183,16 +183,6 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label htmlFor="businessType" className="mb-1 block text-sm font-medium text-gray-700">Business type</label>
-            <select id="businessType" value={formData.businessType}
-              onChange={(e) => updateField('businessType', e.target.value)}
-              required className={inputClass}>
-              <option value="service">Service — appointments &amp; bookings</option>
-              <option value="hospitality">Hospitality — reservations &amp; events</option>
-            </select>
-          </div>
-
-          <div>
             <label htmlFor="ownerName" className="mb-1 block text-sm font-medium text-gray-700">Owner full name</label>
             <input id="ownerName" type="text" value={formData.ownerName}
               onChange={(e) => updateField('ownerName', e.target.value)}
