@@ -13,7 +13,8 @@
       "node": "20.18.0",
       "env": {
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
-        "EAS_BUILD": "true"
+        "EAS_BUILD": "true",
+        "EXPO_NO_CAPABILITY_SYNC": "1"
       }
     },
     "preview": {
@@ -27,7 +28,8 @@
       },
       "env": {
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
-        "EAS_BUILD": "true"
+        "EAS_BUILD": "true",
+        "EXPO_NO_CAPABILITY_SYNC": "1"
       }
     },
     "production": {
@@ -36,7 +38,8 @@
       "node": "20.18.0",
       "env": {
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
-        "EAS_BUILD": "true"
+        "EAS_BUILD": "true",
+        "EXPO_NO_CAPABILITY_SYNC": "1"
       }
     }
   },

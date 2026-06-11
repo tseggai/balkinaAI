@@ -1424,6 +1424,9 @@ export default function ChatScreen() {
         .from('categories')
         .select('id, name, slug')
         .is('parent_id', null)
+        // Hospitality is a property-portal-only vertical — keep it out of the
+        // global Balkina discovery category grid.
+        .neq('business_type', 'hospitality')
         .order('display_order');
       if (data) setCategories(data as { id: string; name: string; slug: string }[]);
       setCategoriesLoading(false);
