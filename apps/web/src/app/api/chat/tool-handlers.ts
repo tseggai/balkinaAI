@@ -356,6 +356,9 @@ async function handleFindBusinessesInner(
       .from('tenants')
       .select('id, name, logo_url, avg_rating, review_count, categories(name)')
       .eq('status', 'active')
+      // Hospitality businesses are discoverable only inside their property's
+      // white-label portal — never in the global Balkina discovery pool.
+      .neq('business_type', 'hospitality')
       .eq('category_id', categoryId);
 
     if (catError) return { success: false, error: catError.message };
@@ -509,6 +512,7 @@ async function handleFindBusinessesInner(
       .from('tenants')
       .select('id, name, logo_url, category_id, categories(name)')
       .eq('status', 'active')
+      .neq('business_type', 'hospitality')
       .not('category_id', 'is', null);
 
     // Filter tenants whose category name matches the service type (case-insensitive)
@@ -542,6 +546,7 @@ async function handleFindBusinessesInner(
         .from('tenants')
         .select('id, name')
         .eq('status', 'active')
+        .neq('business_type', 'hospitality')
         .or(namePatterns.map(p => `name.ilike.${p}`).join(','));
       for (const nt of (nameTenants ?? []) as { id: string; name: string }[]) {
         nameMatchTenantIds.add(nt.id);
@@ -629,7 +634,8 @@ async function handleFindBusinessesInner(
         .from('tenants')
         .select('id, name, logo_url, avg_rating, review_count, categories(name)')
         .in('id', matchingTenantIds)
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .neq('business_type', 'hospitality');
 
       console.log('[find_businesses] tenants fetched:', tenants?.length, 'error:', tenantError?.message);
 
@@ -769,6 +775,7 @@ async function handleFindBusinessesInner(
       .from('tenants')
       .select('id, name, logo_url, avg_rating, review_count, categories(name)')
       .eq('status', 'active')
+      .neq('business_type', 'hospitality')
       .limit(200);
 
     console.log('[find_businesses] no-query result:', { count: data?.length, error: error?.message });
@@ -893,6 +900,7 @@ async function handleFindBusinessesInner(
     .from('tenants')
     .select('id, name, logo_url, avg_rating, review_count, categories(name)')
     .eq('status', 'active')
+    .neq('business_type', 'hospitality')
     .ilike('name', `%${sanitized}%`)
     .limit(50);
 
@@ -932,6 +940,7 @@ async function handleFindBusinessesInner(
     .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name, logo_url, categories(name))')
     .or(uniquePatterns.join(','))
     .eq('tenants.status', 'active')
+    .neq('tenants.business_type', 'hospitality')
     .limit(20);
 
   // 3. Search tenants by category (e.g. "beauty" matches "Beauty & Personal Care")
@@ -939,6 +948,7 @@ async function handleFindBusinessesInner(
     .from('tenants')
     .select('id, name, logo_url, avg_rating, review_count, categories!inner(name)')
     .eq('status', 'active')
+    .neq('business_type', 'hospitality')
     .ilike('categories.name', `%${sanitized}%`)
     .limit(50);
 
