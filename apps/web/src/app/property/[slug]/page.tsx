@@ -351,6 +351,10 @@ function TenantsTab({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Per-application business-type choice (defaults to 'service'). Hospitality
+  // classification is set HERE by the property owner — it is not offered on the
+  // global self-serve signup. Drives the experience/table flow + label set.
+  const [bizTypeById, setBizTypeById] = useState<Map<string, string>>(new Map());
 
   const refresh = useCallback(async () => {
     const [invRes, appRes] = await Promise.all([
@@ -392,7 +396,12 @@ function TenantsTab({
 
   const handleApprove = async (id: string) => {
     setBusyId(id);
-    const res = await fetch(`/api/property/${slug}/applications/${id}`, { method: 'POST' });
+    const businessType = bizTypeById.get(id) ?? 'service';
+    const res = await fetch(`/api/property/${slug}/applications/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ businessType }),
+    });
     const json = await res.json();
     setBusyId(null);
     if (!res.ok) { alert(json.error ?? 'Failed to approve'); return; }
@@ -479,6 +488,16 @@ function TenantsTab({
               <p className="text-xs text-gray-500 truncate">{a.owner_name} · {a.email}{a.category ? ` · ${a.category}` : ''}</p>
             </div>
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE.pending}`}>pending</span>
+            <select
+              value={bizTypeById.get(a.id) ?? 'service'}
+              onChange={(e) => setBizTypeById((prev) => new Map(prev).set(a.id, e.target.value))}
+              disabled={busyId === a.id}
+              className="rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:outline-none"
+              title="Classify this business"
+            >
+              <option value="service">Service</option>
+              <option value="hospitality">Hospitality</option>
+            </select>
             <button onClick={() => handleApprove(a.id)} disabled={busyId === a.id}
               className="rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50">
               {busyId === a.id ? 'Approving...' : 'Approve'}
