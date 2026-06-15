@@ -1443,7 +1443,7 @@ export default function ChatScreen() {
   }, []);
 
   const [propertyData, setPropertyData] = useState<{
-    name: string; logo_url: string | null; welcome_message: string; primary_color: string;
+    id: string; name: string; logo_url: string | null; welcome_message: string; primary_color: string;
     tenants: { id: string; name: string; logo_url: string | null; subcategory: string | null; description: string | null; slug: string | null; avg_rating: number | null; review_count: number | null }[];
   } | null>(null);
 
@@ -1455,6 +1455,7 @@ export default function ChatScreen() {
         if (!res.ok) return;
         const data = await res.json();
         setPropertyData({
+          id: data.property.id,
           name: data.property.name,
           logo_url: data.property.logo_url,
           welcome_message: data.property.welcome_message ?? 'What would you like to book today?',
@@ -2303,6 +2304,7 @@ export default function ChatScreen() {
 
       try {
         const body: Record<string, string | number> = { message: trimmed, sessionId };
+        if (propertyData?.id) body.propertyId = propertyData.id;
         if (customerName) body.customerName = customerName;
         if (customerPhone) body.customerPhone = customerPhone;
         if (customerEmail) body.customerEmail = customerEmail;
