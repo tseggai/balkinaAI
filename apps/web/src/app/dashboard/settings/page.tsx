@@ -13,6 +13,7 @@ interface TenantInfo {
   email: string;
   phone: string | null;
   logo_url: string | null;
+  cover_image_url: string | null;
   stripe_customer_id: string | null;
   subscription_plan_id: string | null;
   category_id: string | null;
@@ -34,8 +35,11 @@ export default function SettingsPage() {
   const [message, setMessage] = useState('');
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const initialFormValues = useRef<Record<string, unknown>>({});
 
   const fetchTenant = useCallback(async () => {
@@ -46,7 +50,7 @@ export default function SettingsPage() {
     const [{ data }, { data: cats }] = await Promise.all([
       supabase
         .from('tenants')
-        .select('id, name, owner_name, email, phone, logo_url, stripe_customer_id, subscription_plan_id, category_id, slug, business_type')
+        .select('id, name, owner_name, email, phone, logo_url, cover_image_url, stripe_customer_id, subscription_plan_id, category_id, slug, business_type')
         .eq('user_id', user.id)
         .single(),
       supabase
@@ -70,6 +74,7 @@ export default function SettingsPage() {
       setForm(formValues);
       initialFormValues.current = { ...formValues, category_ids: [...catIds] };
       setLogoPreview(tenantInfo.logo_url);
+      setCoverPreview(tenantInfo.cover_image_url);
     }
     setLoading(false);
   }, []);
@@ -138,6 +143,61 @@ export default function SettingsPage() {
     if (error) { setMessage('Failed to remove logo'); return; }
     setLogoPreview(null);
     setMessage('Logo removed');
+    fetchTenant();
+  }
+
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !tenant) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage('Image must be under 5MB');
+      return;
+    }
+
+    setUploadingCover(true);
+    setMessage('');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+    const uploadJson = await uploadRes.json();
+
+    if (!uploadRes.ok || !uploadJson.url) {
+      setUploadingCover(false);
+      setMessage(uploadJson.error ?? 'Failed to upload cover image');
+      return;
+    }
+
+    const coverUrl = uploadJson.url;
+    const sb = createClient();
+    const { error: updateError } = await sb
+      .from('tenants')
+      .update({ cover_image_url: coverUrl } as never)
+      .eq('id', tenant.id);
+
+    setUploadingCover(false);
+    if (updateError) { setMessage('Failed to save cover image'); return; }
+    setCoverPreview(coverUrl);
+    setMessage('Cover image updated!');
+    fetchTenant();
+  }
+
+  async function handleRemoveCover() {
+    if (!tenant) return;
+    setUploadingCover(true);
+    setMessage('');
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('tenants')
+      .update({ cover_image_url: null } as never)
+      .eq('id', tenant.id);
+
+    setUploadingCover(false);
+    if (error) { setMessage('Failed to remove cover image'); return; }
+    setCoverPreview(null);
+    setMessage('Cover image removed');
     fetchTenant();
   }
 
@@ -262,6 +322,45 @@ export default function SettingsPage() {
                   )}
                   <p className="text-xs text-gray-400">PNG, JPG up to 5MB</p>
                 </div>
+              </div>
+            </div>
+            {/* Cover Image (storefront card photo) */}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Cover Image</label>
+              <p className="mb-2 text-xs text-gray-400">Wide photo used on your card in property apps. Landscape works best.</p>
+              <div className="relative h-32 w-full overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
+                {coverPreview ? (
+                  <Image src={coverPreview} alt="Business cover" fill className="object-cover" unoptimized />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">No cover image</div>
+                )}
+              </div>
+              <div className="mt-2 flex items-center gap-3">
+                <input
+                  ref={coverInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCoverUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => coverInputRef.current?.click()}
+                  disabled={uploadingCover}
+                  className="rounded-lg border border-gray-300 px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {uploadingCover ? 'Uploading...' : coverPreview ? 'Change Cover' : 'Upload Cover'}
+                </button>
+                {coverPreview && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveCover}
+                    disabled={uploadingCover}
+                    className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
             </div>
             <div>

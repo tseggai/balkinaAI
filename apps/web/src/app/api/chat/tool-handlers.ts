@@ -130,7 +130,7 @@ function estimateDriveMinutes(distanceKm: number): number {
   return Math.max(1, Math.round((distanceKm / avgSpeedKmh) * 60));
 }
 
-type ServiceRow = { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null };
+type ServiceRow = { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null; service_type?: string | null; pricing_type?: string | null; capacity?: number | null };
 
 /**
  * Filter services to only those available at a specific location.
@@ -234,7 +234,7 @@ export async function handleFindBusinesses(
   }
 }
 
-interface PortalService { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }
+interface PortalService { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null; service_type?: string | null; pricing_type?: string | null; capacity?: number | null }
 interface PortalLocation { id: string; name: string; address: string; latitude: number | null; longitude: number | null }
 
 /**
@@ -367,7 +367,7 @@ async function handleFindBusinessesInner(
       const row = t as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; categories: { name: string } | { name: string }[] | null };
       const cat = Array.isArray(row.categories) ? row.categories[0]?.name ?? null : row.categories?.name ?? null;
       return { id: row.id, name: row.name, image_url: row.logo_url ?? undefined, category: cat, business_category: cat, avg_rating: row.avg_rating ?? undefined, review_count: row.review_count ?? 0 };
-    }) as { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[] }[];
+    }) as { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null; service_type?: string | null; pricing_type?: string | null; capacity?: number | null }[] }[];
 
     console.log(`[find_businesses] ⏱ category tenant query: ${Date.now() - t0}ms (${businesses.length} tenants)`);
     // Fetch locations and services in parallel (both depend on catBizIds only)
@@ -376,7 +376,7 @@ async function handleFindBusinessesInner(
     const [{ data: catLocs }, { data: catSvcs }, { data: catSvcLocs }] = catBizIds.length > 0
       ? await Promise.all([
           supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', catBizIds),
-          supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility').in('tenant_id', catBizIds).eq('visibility', 'public'),
+          supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility, service_type, pricing_type, capacity').in('tenant_id', catBizIds).eq('visibility', 'public'),
           supabase.from('service_locations').select('service_id, location_id'),
         ])
       : [{ data: [] }, { data: [] }, { data: [] }];
@@ -391,10 +391,10 @@ async function handleFindBusinessesInner(
       catLocMap.set(loc.tenant_id, existing);
     }
 
-    const catSvcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]>();
-    for (const svc of (catSvcs ?? []) as { tenant_id: string; id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]) {
+    const catSvcMap = new Map<string, { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null; service_type?: string | null; pricing_type?: string | null; capacity?: number | null }[]>();
+    for (const svc of (catSvcs ?? []) as (ServiceRow & { tenant_id: string })[]) {
       const existing = catSvcMap.get(svc.tenant_id) ?? [];
-      existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url });
+      existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url, service_type: svc.service_type ?? 'standard', pricing_type: svc.pricing_type ?? null, capacity: svc.capacity ?? null });
       catSvcMap.set(svc.tenant_id, existing);
     }
     console.log(`[find_businesses] ⏱ category parallel queries: ${Date.now() - tCatParallel}ms (locs:${catLocs?.length ?? 0}, svcs:${catSvcs?.length ?? 0}, svcLocs:${catSvcLocs?.length ?? 0})`);
@@ -647,7 +647,7 @@ async function handleFindBusinessesInner(
     }
 
     if (serviceTenantMap.size > 0) {
-      let businesses: { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; matched_services?: string[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null }[]; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[] = Array.from(serviceTenantMap.values());
+      let businesses: { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; matched_services?: string[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null; service_type?: string | null; pricing_type?: string | null; capacity?: number | null }[]; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[] = Array.from(serviceTenantMap.values());
 
       // Fetch locations, services, and service_locations in parallel
       const bizIds = businesses.map((b) => b.id);
@@ -655,7 +655,7 @@ async function handleFindBusinessesInner(
       const [{ data: bizLocations }, { data: allBizServices }] = bizIds.length > 0
         ? await Promise.all([
             supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', bizIds),
-            supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility').in('tenant_id', bizIds).eq('visibility', 'public'),
+            supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility, service_type, pricing_type, capacity').in('tenant_id', bizIds).eq('visibility', 'public'),
           ])
         : [{ data: [] }, { data: [] }];
       console.log(`[find_businesses] ⏱ biz locs+svcs parallel: ${Date.now() - tBizParallel}ms (locs:${bizLocations?.length ?? 0}, svcs:${allBizServices?.length ?? 0})`);
@@ -675,7 +675,7 @@ async function handleFindBusinessesInner(
       const bizSvcMap = new Map<string, ServiceRow[]>();
       for (const svc of (allBizServices ?? []) as (ServiceRow & { tenant_id: string })[]) {
         const existing = bizSvcMap.get(svc.tenant_id) ?? [];
-        existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url });
+        existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url, service_type: svc.service_type ?? 'standard', pricing_type: svc.pricing_type ?? null, capacity: svc.capacity ?? null });
         bizSvcMap.set(svc.tenant_id, existing);
       }
 
@@ -794,7 +794,7 @@ async function handleFindBusinessesInner(
     const [{ data: locationsAll }, { data: noQueryServices }, { data: noQuerySvcLocs }] = tenantIdsAll.length > 0
       ? await Promise.all([
           supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', tenantIdsAll),
-          supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility').in('tenant_id', tenantIdsAll).eq('visibility', 'public'),
+          supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility, service_type, pricing_type, capacity').in('tenant_id', tenantIdsAll).eq('visibility', 'public'),
           supabase.from('service_locations').select('service_id, location_id'),
         ])
       : [{ data: [] }, { data: [] }, { data: [] }];
@@ -813,7 +813,7 @@ async function handleFindBusinessesInner(
     const noQuerySvcMap = new Map<string, ServiceRow[]>();
     for (const svc of (noQueryServices ?? []) as (ServiceRow & { tenant_id: string })[]) {
       const existing = noQuerySvcMap.get(svc.tenant_id) ?? [];
-      existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url });
+      existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url, service_type: svc.service_type ?? 'standard', pricing_type: svc.pricing_type ?? null, capacity: svc.capacity ?? null });
       noQuerySvcMap.set(svc.tenant_id, existing);
     }
     businesses = businesses.map((b) => ({ ...b, all_services: noQuerySvcMap.get(b.id) ?? [] })) as typeof businesses;
@@ -1004,7 +1004,7 @@ async function handleFindBusinessesInner(
   const [{ data: bizLocations }, { data: queryBizServices }, { data: querySvcLocs }] = bizIds.length > 0
     ? await Promise.all([
         supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', bizIds),
-        supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility').in('tenant_id', bizIds).eq('visibility', 'public'),
+        supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, visibility, service_type, pricing_type, capacity').in('tenant_id', bizIds).eq('visibility', 'public'),
         supabase.from('service_locations').select('service_id, location_id'),
       ])
     : [{ data: [] }, { data: [] }, { data: [] }];

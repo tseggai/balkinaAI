@@ -35,6 +35,8 @@ export interface ServiceCardData {
   deposit_amount?: number;
   deposit_type?: 'fixed' | 'percentage';
   pricing_type?: string;
+  service_type?: string;
+  capacity?: number | null;
   currency?: string;
 }
 

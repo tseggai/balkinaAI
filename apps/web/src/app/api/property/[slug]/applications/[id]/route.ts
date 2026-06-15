@@ -33,6 +33,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   const ctx = await getPropertyAdmin(slug);
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Property owner classifies the joining business. Hospitality is only set
+  // here (the property white-label flow), never on global self-serve signup.
+  const body = await request.json().catch(() => ({}));
+  const businessType = (body as { businessType?: string }).businessType === 'hospitality' ? 'hospitality' : 'service';
+
   const supabase: Db = ctx.admin;
 
   // Fetch the application, scoped to this property.
@@ -85,10 +90,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
   if (!userId) return NextResponse.json({ error: 'Could not resolve user' }, { status: 500 });
 
-  // 2. Resolve category by name (optional).
+  // 2. Resolve category by name (optional). Constrain the lookup to the chosen
+  //    business_type bucket so a hospitality venue can't inherit a service
+  //    category (and vice-versa).
   let categoryId: string | null = null;
   if (entry.category) {
-    const { data: cat } = await supabase.from('categories').select('id').ilike('name', `%${entry.category}%`).limit(1).single();
+    const { data: cat } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('business_type', businessType)
+      .ilike('name', `%${entry.category}%`)
+      .limit(1)
+      .single();
     if (cat) categoryId = cat.id;
   }
 
@@ -102,6 +115,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       email: entry.email,
       phone: entry.phone || null,
       category_id: categoryId,
+      business_type: businessType,
       currency: entry.currency || 'EUR',
       status: 'active',
     })

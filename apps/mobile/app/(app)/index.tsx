@@ -28,6 +28,7 @@ import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
 import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
+import PropertyStorefront, { StorefrontTenant } from '@/components/PropertyStorefront';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
 import { consumePendingDeepLinkTenant, parseTenantFromUrl } from '@/lib/deepLink';
 import { formatPrice, currencySymbol } from '@/lib/currency';
@@ -220,7 +221,7 @@ const ServiceCardRow = React.memo(function ServiceCardRow({ items, onTap, curren
           </View>
           <View style={richCardStyles.serviceInfo}>
             <Text style={richCardStyles.serviceName} numberOfLines={2}>{svc.name}</Text>
-            <Text style={richCardStyles.servicePrice}>{formatPrice(svc.price, (svc as { currency?: string }).currency ?? currencyProp ?? 'USD')}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : ''}</Text>
+            <Text style={richCardStyles.servicePrice}>{formatPrice(svc.price, (svc as { currency?: string }).currency ?? currencyProp ?? 'USD')}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : svc.pricing_type === 'per_person' ? '/guest' : ''}</Text>
             <Text style={richCardStyles.serviceDuration}>{svc.pricing_type === 'per_day' ? 'Full day' : svc.pricing_type === 'per_week' ? 'Full week' : `${svc.duration_minutes} min`}</Text>
             {svc.deposit_enabled && svc.deposit_amount ? (
               <View style={richCardStyles.depositBadge}>
@@ -365,7 +366,7 @@ const BusinessWithServicesRow = React.memo(function BusinessWithServicesRow({ da
                   <View style={{ flex: 1 }}>
                     <Text style={[combinedStyles.serviceCardLgName, isSelected && combinedStyles.serviceCardLgNameSelected]} numberOfLines={1}>{svc.name}</Text>
                     <View style={combinedStyles.serviceCardLgRow}>
-                      <Text style={[combinedStyles.serviceCardLgPrice, isSelected && combinedStyles.serviceCardLgPriceSelected]}>{formatPrice(svc.price, cc)}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : ''}</Text>
+                      <Text style={[combinedStyles.serviceCardLgPrice, isSelected && combinedStyles.serviceCardLgPriceSelected]}>{formatPrice(svc.price, cc)}{svc.pricing_type === 'per_day' ? '/day' : svc.pricing_type === 'per_week' ? '/week' : svc.pricing_type === 'per_person' ? '/guest' : ''}</Text>
                       <Text style={[combinedStyles.serviceCardLgDuration, isSelected && combinedStyles.serviceCardLgDurationSelected]}>{svc.pricing_type === 'per_day' ? 'Full day' : svc.pricing_type === 'per_week' ? 'Full week' : `${svc.duration_minutes} min`}</Text>
                     </View>
                     {svc.deposit_enabled && svc.deposit_amount ? (
@@ -1443,9 +1444,11 @@ export default function ChatScreen() {
   }, []);
 
   const [propertyData, setPropertyData] = useState<{
-    name: string; logo_url: string | null; welcome_message: string; primary_color: string;
-    tenants: { id: string; name: string; logo_url: string | null; subcategory: string | null; description: string | null; slug: string | null; avg_rating: number | null; review_count: number | null }[];
+    id: string; name: string; logo_url: string | null; cover_image_url: string | null; welcome_message: string; primary_color: string;
+    tenants: { id: string; name: string; logo_url: string | null; cover_image_url: string | null; subcategory: string | null; description: string | null; slug: string | null; avg_rating: number | null; review_count: number | null; featured?: boolean }[];
   } | null>(null);
+  const [conciergeOpen, setConciergeOpen] = useState(false);
+  const conciergeInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (!propertySlug) return;
@@ -1455,8 +1458,10 @@ export default function ChatScreen() {
         if (!res.ok) return;
         const data = await res.json();
         setPropertyData({
+          id: data.property.id,
           name: data.property.name,
           logo_url: data.property.logo_url,
+          cover_image_url: data.property.cover_image_url ?? null,
           welcome_message: data.property.welcome_message ?? 'What would you like to book today?',
           primary_color: data.property.primary_color ?? '#6B7FC4',
           tenants: data.tenants ?? [],
@@ -2303,6 +2308,7 @@ export default function ChatScreen() {
 
       try {
         const body: Record<string, string | number> = { message: trimmed, sessionId };
+        if (propertyData?.id) body.propertyId = propertyData.id;
         if (customerName) body.customerName = customerName;
         if (customerPhone) body.customerPhone = customerPhone;
         if (customerEmail) body.customerEmail = customerEmail;
@@ -2589,6 +2595,75 @@ export default function ChatScreen() {
 
   // Service-type buttons per category slug (Option 2 — horizontal tabs)
   const activeCategories = categories;
+
+  // ── White-label property storefront (browse-first, Soho House style) ──
+  // Shown before the first concierge message; once a message is sent the
+  // standard chat view takes over and drives the booking flow.
+  if (propertyData && !hasMessages) {
+    const seedConcierge = (text: string) => {
+      setConciergeOpen(false);
+      handleButtonPress(text);
+    };
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: '#F7F4EF' }]}>
+        <View style={[styles.flex, { paddingBottom: kbPadding }]}>
+          <PropertyStorefront
+            property={propertyData}
+            apiBase={API_BASE}
+            onSelectBusiness={(t: StorefrontTenant) => seedConcierge(`Show me services at ${t.name}`)}
+            onSelectEvent={(ev, tenantName) =>
+              seedConcierge(`I'd like to book ${ev.name}${tenantName ? ` at ${tenantName}` : ''}`)
+            }
+          />
+          {conciergeOpen ? (
+            <View style={styles.inputBar}>
+              <View style={{ position: 'relative' }}>
+                <TextInput
+                  ref={conciergeInputRef}
+                  style={styles.textInput}
+                  value={input}
+                  onChangeText={setInput}
+                  placeholder={`Ask the ${propertyData.name} concierge…`}
+                  placeholderTextColor="#9ca3af"
+                  autoFocus
+                  multiline
+                  maxLength={2000}
+                  editable={!isLoading}
+                  blurOnSubmit={false}
+                />
+                <TouchableOpacity
+                  style={[styles.sendBtn, (!input.trim() || isLoading) && styles.sendBtnDisabled]}
+                  onPress={() => sendMessage()}
+                  disabled={!input.trim() || isLoading}
+                >
+                  <Ionicons name="send" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={{
+                position: 'absolute', bottom: 24, alignSelf: 'center',
+                flexDirection: 'row', alignItems: 'center', gap: 8,
+                backgroundColor: propertyData.primary_color,
+                paddingHorizontal: 22, paddingVertical: 14, borderRadius: 999,
+                shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 12,
+                shadowOffset: { width: 0, height: 4 }, elevation: 6,
+              }}
+              activeOpacity={0.9}
+              onPress={() => {
+                setConciergeOpen(true);
+                setTimeout(() => conciergeInputRef.current?.focus(), 50);
+              }}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Ask the concierge</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!hasMessages) {
     return (
