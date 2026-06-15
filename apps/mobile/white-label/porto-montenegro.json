@@ -1,9 +1,9 @@
 {
   "propertySlug": "porto-montenegro",
-  "appName": "Porto Montenegro",
+  "appName": "Portonovi",
   "bundleId": "ai.balkina.portomontenegro",
   "androidPackage": "ai.balkina.portomontenegro",
-  "primaryColor": "#1a365d",
+  "primaryColor": "#055f81",
   "backgroundColor": "#ffffff",
   "iconPath": "./white-label/assets/porto-montenegro/icon.png",
   "splashPath": "./white-label/assets/porto-montenegro/splash.png",

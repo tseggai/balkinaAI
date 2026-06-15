@@ -21,6 +21,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import { useStripe } from '@/lib/stripe';
@@ -1210,11 +1211,13 @@ const MessageBubble = React.memo(function MessageBubble({
   onButtonPress,
   onGalleryOpen,
   currency,
+  accent,
 }: {
   message: ChatMessage;
   onButtonPress: (label: string) => void;
   onGalleryOpen?: (photos: GalleryPhoto[]) => void;
   currency?: string;
+  accent?: string;
 }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(10)).current;
@@ -1233,7 +1236,7 @@ const MessageBubble = React.memo(function MessageBubble({
       <Animated.View
         style={[bubbleStyles.wrapper, bubbleStyles.wrapperUser, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
       >
-        <View style={[bubbleStyles.bubble, bubbleStyles.bubbleUser]}>
+        <View style={[bubbleStyles.bubble, bubbleStyles.bubbleUser, accent ? { backgroundColor: accent } : null]}>
           <Text style={[bubbleStyles.text, bubbleStyles.textUser]}>{message.content}</Text>
         </View>
       </Animated.View>
@@ -1452,6 +1455,23 @@ export default function ChatScreen() {
   const [conciergeOpen, setConciergeOpen] = useState(false);
   const conciergeInputRef = useRef<TextInput>(null);
   const [bookingTarget, setBookingTarget] = useState<{ tenantId: string; businessName: string; service: BookingService | null } | null>(null);
+  // True while the white-label property is still loading, so we never flash the
+  // generic Balkina welcome before the branded storefront appears.
+  const [propertyLoading, setPropertyLoading] = useState<boolean>(!!propertySlug);
+  const router = useRouter();
+
+  // Branding shown on the boot loader before propertyData has been fetched.
+  const bootBrand = useMemo(() => {
+    try {
+      const C = require('expo-constants').default;
+      return {
+        name: C.expoConfig?.extra?.propertyName as string | undefined,
+        color: (C.expoConfig?.extra?.primaryColor as string | undefined) ?? '#6B7FC4',
+      };
+    } catch {
+      return { name: undefined as string | undefined, color: '#6B7FC4' };
+    }
+  }, []);
 
   useEffect(() => {
     if (!propertySlug) return;
@@ -1469,7 +1489,9 @@ export default function ChatScreen() {
           primary_color: data.property.primary_color ?? '#6B7FC4',
           tenants: data.tenants ?? [],
         });
-      } catch { /* ignore */ }
+      } catch { /* ignore */ } finally {
+        setPropertyLoading(false);
+      }
     })();
   }, [propertySlug]);
 
@@ -2599,6 +2621,23 @@ export default function ChatScreen() {
   // Service-type buttons per category slug (Option 2 — horizontal tabs)
   const activeCategories = categories;
 
+  // While a white-label property is still loading, show a property-branded
+  // loader rather than flashing the generic Balkina welcome screen.
+  if (propertySlug && !propertyData && propertyLoading && !hasMessages) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: '#fff' }]}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={bootBrand.color} />
+          {bootBrand.name ? (
+            <Text style={{ marginTop: 16, fontSize: 20, fontWeight: '700', color: bootBrand.color }}>
+              {bootBrand.name}
+            </Text>
+          ) : null}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // ── White-label property storefront (browse-first, Soho House style) ──
   // Shown before the first concierge message; once a message is sent the
   // standard chat view takes over and drives the booking flow.
@@ -2609,6 +2648,11 @@ export default function ChatScreen() {
           <PropertyStorefront
             property={propertyData}
             apiBase={API_BASE}
+            isLoggedIn={!!userId}
+            onAccountPress={() => {
+              if (userId) router.navigate('/(app)/bookings');
+              else router.navigate('/(auth)/email-login');
+            }}
             onSelectBusiness={(t: StorefrontTenant) =>
               setBookingTarget({ tenantId: t.id, businessName: t.name, service: null })
             }
@@ -2653,7 +2697,7 @@ export default function ChatScreen() {
                   blurOnSubmit={false}
                 />
                 <TouchableOpacity
-                  style={[styles.sendBtn, (!input.trim() || isLoading) && styles.sendBtnDisabled]}
+                  style={[styles.sendBtn, { backgroundColor: propertyData.primary_color }, (!input.trim() || isLoading) && styles.sendBtnDisabled]}
                   onPress={() => sendMessage()}
                   disabled={!input.trim() || isLoading}
                 >
@@ -2808,7 +2852,7 @@ export default function ChatScreen() {
           extraData={bookingState.currency}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <MessageBubble message={item} onButtonPress={handleButtonPress} onGalleryOpen={(photos) => setGalleryModal({ photos, initialIndex: 0 })} currency={bookingState.currency} />
+            <MessageBubble message={item} onButtonPress={handleButtonPress} onGalleryOpen={(photos) => setGalleryModal({ photos, initialIndex: 0 })} currency={bookingState.currency} accent={propertyData?.primary_color} />
           )}
           contentContainerStyle={[styles.messagesList, { flexGrow: 1 }]}
           inverted
@@ -2833,7 +2877,7 @@ export default function ChatScreen() {
               blurOnSubmit={false}
             />
             <TouchableOpacity
-              style={[styles.sendBtn, (!input.trim() || isLoading) && styles.sendBtnDisabled]}
+              style={[styles.sendBtn, propertyData ? { backgroundColor: propertyData.primary_color } : null, (!input.trim() || isLoading) && styles.sendBtnDisabled]}
               onPress={() => sendMessage()}
               disabled={!input.trim() || isLoading}
             >

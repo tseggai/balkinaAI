@@ -19,12 +19,18 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { useStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 
 const API_BASE =
   process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
+
+// White-label accent + merchant name: property values on property builds,
+// Balkina defaults everywhere else (so the Balkina app is unchanged).
+const ACCENT = (Constants.expoConfig?.extra?.primaryColor as string | undefined) ?? '#6B7FC4';
+const MERCHANT_NAME = (Constants.expoConfig?.extra?.propertyName as string | undefined) ?? 'Balkina AI';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -166,7 +172,7 @@ function BookingCardRow({
           const typeLabel = getBookingTypeLabel(item.booking_type, item.party_size);
           return typeLabel ? (
             <View style={styles.bookingTypeChip}>
-              <Ionicons name="restaurant-outline" size={12} color="#6B7FC4" />
+              <Ionicons name="restaurant-outline" size={12} color={ACCENT} />
               <Text style={styles.bookingTypeChipText}>{typeLabel}</Text>
             </View>
           ) : null;
@@ -219,7 +225,7 @@ function BookingCardRow({
       {/* View Suggestion button — shown on cancelled appointments with suggested times */}
       {hasSuggestion && !expanded ? (
         <TouchableOpacity
-          style={[styles.payDepositBtn, { backgroundColor: '#6B7FC4' }]}
+          style={[styles.payDepositBtn, { backgroundColor: ACCENT }]}
           onPress={() => onViewSuggestion(item)}
           activeOpacity={0.7}
         >
@@ -632,7 +638,7 @@ export default function BookingsScreen() {
       // 2. Init PaymentSheet
       const { error: initError } = await initPaymentSheet({
         paymentIntentClientSecret: clientSecret,
-        merchantDisplayName: 'Balkina AI',
+        merchantDisplayName: MERCHANT_NAME,
         allowsDelayedPaymentMethods: false,
         applePay: { merchantCountryCode: 'US' },
         googlePay: { merchantCountryCode: 'US', testEnv: true },
@@ -749,7 +755,7 @@ export default function BookingsScreen() {
           <Ionicons
             name={sortOrder === 'date_asc' ? 'arrow-up' : 'arrow-down'}
             size={14}
-            color="#6B7FC4"
+            color={ACCENT}
           />
           <Text style={styles.sortToggleText}>Date</Text>
         </TouchableOpacity>
@@ -765,13 +771,13 @@ export default function BookingsScreen() {
           <Text style={styles.statusDropdownText}>
             {statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
           </Text>
-          <Ionicons name="chevron-down" size={14} color="#6B7FC4" />
+          <Ionicons name="chevron-down" size={14} color={ACCENT} />
         </TouchableOpacity>
       </View>
 
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#6B7FC4" />
+          <ActivityIndicator size="large" color={ACCENT} />
         </View>
       ) : errorMsg ? (
         <View style={styles.empty}>
@@ -800,7 +806,7 @@ export default function BookingsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#6B7FC4"
+              tintColor={ACCENT}
             />
           }
           ListEmptyComponent={
@@ -938,12 +944,12 @@ export default function BookingsScreen() {
                   style={[
                     styles.suggestionCard,
                     { flex: 1, marginBottom: 0 },
-                    idx === selectedSuggestionIdx && { borderColor: '#6B7FC4', borderWidth: 2 },
+                    idx === selectedSuggestionIdx && { borderColor: ACCENT, borderWidth: 2 },
                   ]}
                   onPress={() => setSelectedSuggestionIdx(idx)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="calendar-outline" size={22} color="#6B7FC4" />
+                  <Ionicons name="calendar-outline" size={22} color={ACCENT} />
                   <View style={styles.suggestionInfo}>
                     <Text style={styles.suggestionDate}>{opt.date}</Text>
                     <Text style={styles.suggestionTime}>{opt.time}</Text>
@@ -1038,9 +1044,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
-  tabActive: { borderBottomColor: '#6B7FC4' },
+  tabActive: { borderBottomColor: ACCENT },
   tabText: { fontSize: 14, fontWeight: '600', color: '#9ca3af' },
-  tabTextActive: { color: '#6B7FC4' },
+  tabTextActive: { color: ACCENT },
 
   // Search + controls row
   searchRow: {
@@ -1071,7 +1077,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
     gap: 4,
   },
-  sortToggleText: { fontSize: 12, fontWeight: '600', color: '#6B7FC4' },
+  sortToggleText: { fontSize: 12, fontWeight: '600', color: ACCENT },
   statusDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1081,7 +1087,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
     gap: 4,
   },
-  statusDropdownText: { fontSize: 12, fontWeight: '600', color: '#6B7FC4' },
+  statusDropdownText: { fontSize: 12, fontWeight: '600', color: ACCENT },
 
   list: { padding: 16, paddingBottom: 24 },
 
@@ -1101,10 +1107,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     gap: 6,
   },
-  actionBtnDirections: { backgroundColor: '#6B7FC4' },
+  actionBtnDirections: { backgroundColor: ACCENT },
   actionBtnCancel: { backgroundColor: '#ef4444' },
   actionBtnRate: { backgroundColor: '#f59e0b' },
-  actionBtnPay: { backgroundColor: '#6B7FC4' },
+  actionBtnPay: { backgroundColor: ACCENT },
   actionBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
 
   card: {
@@ -1125,7 +1131,7 @@ const styles = StyleSheet.create({
   },
   businessName: { fontSize: 15, fontWeight: '600', color: '#111827', flex: 1, marginRight: 8 },
   bookingTypeChip: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4, marginTop: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: '#EEF1FB' },
-  bookingTypeChipText: { fontSize: 11, fontWeight: '600', color: '#6B7FC4' },
+  bookingTypeChipText: { fontSize: 11, fontWeight: '600', color: ACCENT },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
   statusText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
   serviceName: { fontSize: 14, color: '#374151', marginBottom: 2 },
@@ -1146,7 +1152,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#6B7FC4',
+    backgroundColor: ACCENT,
     paddingVertical: 14,
     borderRadius: 10,
     marginTop: 8,
@@ -1165,7 +1171,7 @@ const styles = StyleSheet.create({
   startChatBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#6B7FC4',
+    backgroundColor: ACCENT,
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 24,
@@ -1190,7 +1196,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 12,
     fontSize: 14, color: '#111827', minHeight: 80, marginBottom: 16,
   },
-  submitBtn: { backgroundColor: '#6B7FC4', paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
+  submitBtn: { backgroundColor: ACCENT, paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
   submitBtnDisabled: { opacity: 0.4 },
   submitBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
 
@@ -1202,9 +1208,9 @@ const styles = StyleSheet.create({
   },
   suggestionInfo: { flex: 1 },
   suggestionDate: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  suggestionTime: { fontSize: 14, color: '#6B7FC4', fontWeight: '600', marginTop: 2 },
+  suggestionTime: { fontSize: 14, color: ACCENT, fontWeight: '600', marginTop: 2 },
   suggestionActions: { gap: 10 },
-  acceptBtn: { backgroundColor: '#6B7FC4', paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
+  acceptBtn: { backgroundColor: ACCENT, paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
   acceptBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
   declineSuggestionBtn: { paddingVertical: 14, borderRadius: 10, alignItems: 'center', backgroundColor: '#f3f4f6' },
   declineSuggestionText: { fontSize: 15, fontWeight: '600', color: '#374151' },

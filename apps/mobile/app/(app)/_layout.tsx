@@ -1,7 +1,12 @@
 import { useEffect } from 'react';
-import { Linking } from 'react-native';
+import { Linking, TouchableOpacity } from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
+
+// White-label property builds present a browse-first storefront and surface
+// bookings/account from in-screen controls, so the Balkina tab bar is hidden.
+const IS_PROPERTY_APP = !!Constants.expoConfig?.extra?.propertySlug;
 import * as Notifications from 'expo-notifications';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
 import { registerPushToken } from '@/lib/registerPushToken';
@@ -130,14 +135,16 @@ export default function AppTabsLayout() {
       screenOptions={{
         tabBarActiveTintColor: '#6B7FC4',
         tabBarInactiveTintColor: '#9ca3af',
-        tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopColor: '#e5e7eb',
-          borderTopWidth: 1,
-          paddingBottom: 10,
-          paddingTop: 5,
-          height: 70,
-        },
+        tabBarStyle: IS_PROPERTY_APP
+          ? { display: 'none' }
+          : {
+              backgroundColor: '#fff',
+              borderTopColor: '#e5e7eb',
+              borderTopWidth: 1,
+              paddingBottom: 10,
+              paddingTop: 5,
+              height: 70,
+            },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',
@@ -173,6 +180,16 @@ export default function AppTabsLayout() {
           tabBarIcon: ({ color }) => (
             <Ionicons name="calendar-outline" size={26} color={color} />
           ),
+          // Tabs are hidden on property builds, so give a way back to the storefront.
+          ...(IS_PROPERTY_APP
+            ? {
+                headerLeft: () => (
+                  <TouchableOpacity onPress={() => router.navigate('/(app)')} style={{ paddingHorizontal: 16 }} hitSlop={10}>
+                    <Ionicons name="arrow-back" size={24} color="#111827" />
+                  </TouchableOpacity>
+                ),
+              }
+            : {}),
         }}
       />
       <Tabs.Screen
@@ -182,6 +199,15 @@ export default function AppTabsLayout() {
           tabBarIcon: ({ color }) => (
             <Ionicons name="person-outline" size={26} color={color} />
           ),
+          ...(IS_PROPERTY_APP
+            ? {
+                headerLeft: () => (
+                  <TouchableOpacity onPress={() => router.navigate('/(app)')} style={{ paddingHorizontal: 16 }} hitSlop={10}>
+                    <Ionicons name="arrow-back" size={24} color="#111827" />
+                  </TouchableOpacity>
+                ),
+              }
+            : {}),
         }}
       />
     </Tabs>
