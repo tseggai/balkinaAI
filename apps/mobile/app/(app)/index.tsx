@@ -28,6 +28,7 @@ import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
 import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
+import PropertyStorefront, { StorefrontTenant } from '@/components/PropertyStorefront';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
 import { consumePendingDeepLinkTenant, parseTenantFromUrl } from '@/lib/deepLink';
 import { formatPrice, currencySymbol } from '@/lib/currency';
@@ -1444,8 +1445,10 @@ export default function ChatScreen() {
 
   const [propertyData, setPropertyData] = useState<{
     id: string; name: string; logo_url: string | null; welcome_message: string; primary_color: string;
-    tenants: { id: string; name: string; logo_url: string | null; subcategory: string | null; description: string | null; slug: string | null; avg_rating: number | null; review_count: number | null }[];
+    tenants: { id: string; name: string; logo_url: string | null; subcategory: string | null; description: string | null; slug: string | null; avg_rating: number | null; review_count: number | null; featured?: boolean }[];
   } | null>(null);
+  const [conciergeOpen, setConciergeOpen] = useState(false);
+  const conciergeInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (!propertySlug) return;
@@ -2591,6 +2594,75 @@ export default function ChatScreen() {
 
   // Service-type buttons per category slug (Option 2 — horizontal tabs)
   const activeCategories = categories;
+
+  // ── White-label property storefront (browse-first, Soho House style) ──
+  // Shown before the first concierge message; once a message is sent the
+  // standard chat view takes over and drives the booking flow.
+  if (propertyData && !hasMessages) {
+    const seedConcierge = (text: string) => {
+      setConciergeOpen(false);
+      handleButtonPress(text);
+    };
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: '#F7F4EF' }]}>
+        <View style={[styles.flex, { paddingBottom: kbPadding }]}>
+          <PropertyStorefront
+            property={propertyData}
+            apiBase={API_BASE}
+            onSelectBusiness={(t: StorefrontTenant) => seedConcierge(`Show me services at ${t.name}`)}
+            onSelectEvent={(ev, tenantName) =>
+              seedConcierge(`I'd like to book ${ev.name}${tenantName ? ` at ${tenantName}` : ''}`)
+            }
+          />
+          {conciergeOpen ? (
+            <View style={styles.inputBar}>
+              <View style={{ position: 'relative' }}>
+                <TextInput
+                  ref={conciergeInputRef}
+                  style={styles.textInput}
+                  value={input}
+                  onChangeText={setInput}
+                  placeholder={`Ask the ${propertyData.name} concierge…`}
+                  placeholderTextColor="#9ca3af"
+                  autoFocus
+                  multiline
+                  maxLength={2000}
+                  editable={!isLoading}
+                  blurOnSubmit={false}
+                />
+                <TouchableOpacity
+                  style={[styles.sendBtn, (!input.trim() || isLoading) && styles.sendBtnDisabled]}
+                  onPress={() => sendMessage()}
+                  disabled={!input.trim() || isLoading}
+                >
+                  <Ionicons name="send" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={{
+                position: 'absolute', bottom: 24, alignSelf: 'center',
+                flexDirection: 'row', alignItems: 'center', gap: 8,
+                backgroundColor: propertyData.primary_color,
+                paddingHorizontal: 22, paddingVertical: 14, borderRadius: 999,
+                shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 12,
+                shadowOffset: { width: 0, height: 4 }, elevation: 6,
+              }}
+              activeOpacity={0.9}
+              onPress={() => {
+                setConciergeOpen(true);
+                setTimeout(() => conciergeInputRef.current?.focus(), 50);
+              }}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Ask the concierge</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!hasMessages) {
     return (
