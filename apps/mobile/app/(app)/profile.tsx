@@ -17,10 +17,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://app.balkina.ai';
+
+// White-label accent: the property's primary color on property builds,
+// Balkina's periwinkle everywhere else (so the Balkina app is unchanged).
+const ACCENT = (Constants.expoConfig?.extra?.primaryColor as string | undefined) ?? '#6B7FC4';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -165,7 +170,7 @@ export default function ProfileScreen() {
   }, []);
 
   if (loading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color="#6B7FC4" /></View>;
+    return <View style={styles.centered}><ActivityIndicator size="large" color={ACCENT} /></View>;
   }
 
   const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ');
@@ -194,7 +199,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.cardRow} onPress={() => setEditModalVisible(true)} activeOpacity={0.6}>
             <View style={styles.cardRowLeft}>
               <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
-                <Ionicons name="person-outline" size={18} color="#6B7FC4" />
+                <Ionicons name="person-outline" size={18} color={ACCENT} />
               </View>
               <Text style={styles.cardRowLabel}>Edit Profile</Text>
             </View>
@@ -219,7 +224,7 @@ export default function ProfileScreen() {
               value={notifySms}
               onValueChange={(val) => { setNotifySms(val); updatePreference('notify_sms', val); }}
               disabled={toggling}
-              trackColor={{ false: '#e5e7eb', true: '#6B7FC4' }}
+              trackColor={{ false: '#e5e7eb', true: ACCENT }}
               thumbColor="#fff"
             />
           </View>
@@ -237,7 +242,7 @@ export default function ProfileScreen() {
               value={notifyPush}
               onValueChange={(val) => { setNotifyPush(val); updatePreference('notify_push', val); }}
               disabled={toggling}
-              trackColor={{ false: '#e5e7eb', true: '#6B7FC4' }}
+              trackColor={{ false: '#e5e7eb', true: ACCENT }}
               thumbColor="#fff"
             />
           </View>
@@ -263,7 +268,7 @@ export default function ProfileScreen() {
             <TouchableOpacity style={styles.cardRow} onPress={() => router.replace('/(tenant)/dashboard')} activeOpacity={0.6}>
               <View style={styles.cardRowLeft}>
                 <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
-                  <Ionicons name="swap-horizontal-outline" size={18} color="#6B7FC4" />
+                  <Ionicons name="swap-horizontal-outline" size={18} color={ACCENT} />
                 </View>
                 <View>
                   <Text style={styles.cardRowLabel}>Switch to Business</Text>
@@ -355,7 +360,7 @@ function SettingsModal({
             >
               <View style={styles.cardRowLeft}>
                 <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
-                  <Ionicons name="document-text-outline" size={18} color="#6B7FC4" />
+                  <Ionicons name="document-text-outline" size={18} color={ACCENT} />
                 </View>
                 <Text style={styles.cardRowLabel}>Terms of Service</Text>
               </View>
@@ -368,7 +373,7 @@ function SettingsModal({
             >
               <View style={styles.cardRowLeft}>
                 <View style={[styles.iconCircle, { backgroundColor: '#EEF0FB' }]}>
-                  <Ionicons name="shield-checkmark-outline" size={18} color="#6B7FC4" />
+                  <Ionicons name="shield-checkmark-outline" size={18} color={ACCENT} />
                 </View>
                 <Text style={styles.cardRowLabel}>Privacy Policy</Text>
               </View>
@@ -620,7 +625,7 @@ function EditProfileModal({
           <Text style={styles.modalTitle}>Edit Profile</Text>
           <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.headerBtn}>
             {saving ? (
-              <ActivityIndicator size="small" color="#6B7FC4" />
+              <ActivityIndicator size="small" color={ACCENT} />
             ) : (
               <Text style={styles.modalSave}>Save</Text>
             )}
@@ -739,7 +744,7 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
   content: { paddingBottom: 40 },
   avatarSection: { alignItems: 'center', paddingTop: 24, paddingBottom: 20 },
-  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#6B7FC4', justifyContent: 'center', alignItems: 'center' },
+  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: ACCENT, justifyContent: 'center', alignItems: 'center' },
   avatarImage: { width: 80, height: 80, borderRadius: 40 },
   avatarText: { fontSize: 32, fontWeight: '700', color: '#fff' },
   nameText: { marginTop: 12, fontSize: 20, fontWeight: '700', color: '#111827' },
@@ -759,16 +764,16 @@ const styles = StyleSheet.create({
   headerBtn: { width: 60, alignItems: 'center' },
   modalTitle: { fontSize: 17, fontWeight: '700', color: '#111827' },
   modalCancel: { fontSize: 15, color: '#6b7280' },
-  modalSave: { fontSize: 15, fontWeight: '600', color: '#6B7FC4' },
+  modalSave: { fontSize: 15, fontWeight: '600', color: ACCENT },
   modalBody: { flex: 1 },
   modalBodyContent: { padding: 20, paddingBottom: 60 },
 
   // Photo
   photoSection: { alignItems: 'center', marginBottom: 24 },
   photoImage: { width: 88, height: 88, borderRadius: 44 },
-  photoPlaceholder: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#6B7FC4', justifyContent: 'center', alignItems: 'center' },
+  photoPlaceholder: { width: 88, height: 88, borderRadius: 44, backgroundColor: ACCENT, justifyContent: 'center', alignItems: 'center' },
   photoPlaceholderText: { fontSize: 34, fontWeight: '700', color: '#fff' },
-  photoChangeText: { marginTop: 8, fontSize: 14, fontWeight: '600', color: '#6B7FC4' },
+  photoChangeText: { marginTop: 8, fontSize: 14, fontWeight: '600', color: ACCENT },
 
   // Form
   label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6, marginTop: 16 },
@@ -780,7 +785,7 @@ const styles = StyleSheet.create({
   genderOption: { paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   genderOptionSelected: { backgroundColor: '#EEF0FB' },
   genderOptionText: { fontSize: 15, color: '#374151' },
-  genderOptionTextSelected: { color: '#6B7FC4', fontWeight: '600' },
+  genderOptionTextSelected: { color: ACCENT, fontWeight: '600' },
 
   // Danger Zone
   dangerZoneContent: { paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#FEE2E2' },
