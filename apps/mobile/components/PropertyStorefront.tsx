@@ -60,6 +60,8 @@ export interface StorefrontProperty {
 interface Props {
   property: StorefrontProperty;
   apiBase: string;
+  isLoggedIn?: boolean;
+  onAccountPress?: () => void;
   onSelectBusiness: (tenant: StorefrontTenant) => void;
   onSelectEvent: (event: EventService, tenantName: string) => void;
 }
@@ -94,7 +96,7 @@ function Rating({ avg, count, light }: { avg: number | null; count: number | nul
   );
 }
 
-export default function PropertyStorefront({ property, apiBase, onSelectBusiness, onSelectEvent }: Props) {
+export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAccountPress, onSelectBusiness, onSelectEvent }: Props) {
   const accent = property.primary_color || '#1a365d';
   const [events, setEvents] = useState<EventService[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -153,6 +155,12 @@ export default function PropertyStorefront({ property, apiBase, onSelectBusiness
             <Image source={{ uri: property.cover_image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
             <View style={styles.heroScrim} />
           </>
+        ) : null}
+        {onAccountPress ? (
+          <TouchableOpacity style={styles.accountBtn} onPress={onAccountPress} activeOpacity={0.85}>
+            <Ionicons name={isLoggedIn ? 'person-circle-outline' : 'person-outline'} size={18} color="#fff" />
+            <Text style={styles.accountBtnText}>{isLoggedIn ? 'My bookings' : 'Sign in'}</Text>
+          </TouchableOpacity>
         ) : null}
         <View style={styles.heroContent}>
           {property.logo_url ? (
@@ -290,6 +298,13 @@ const styles = StyleSheet.create({
 
   hero: { minHeight: 300, justifyContent: 'flex-end', overflow: 'hidden' },
   heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  accountBtn: {
+    position: 'absolute', top: 52, right: 18, zIndex: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)',
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
+  },
+  accountBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   heroContent: { paddingHorizontal: 28, paddingTop: 56, paddingBottom: 36, alignItems: 'center' },
   heroLogo: { width: 72, height: 72, borderRadius: 16, marginBottom: 18 },
   heroEyebrow: {

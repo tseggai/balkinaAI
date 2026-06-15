@@ -9,6 +9,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { parseTenantFromUrl, setPendingDeepLinkTenant } from '@/lib/deepLink';
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
+const PROPERTY_NAME = (Constants.expoConfig?.extra?.propertyName as string | undefined) ?? null;
+const PROPERTY_PRIMARY = (Constants.expoConfig?.extra?.primaryColor as string | undefined) ?? '#6B7FC4';
 
 function RootLayoutContent() {
   const [session, setSession] = useState<Session | null>(null);
@@ -89,7 +91,7 @@ function RootLayoutContent() {
   if (!initialized) {
     return (
       <View style={styles.loading}>
-        <Text style={styles.loadingText}>Balkina AI</Text>
+        <Text style={[styles.loadingText, { color: PROPERTY_PRIMARY }]}>{PROPERTY_NAME ?? 'Balkina AI'}</Text>
       </View>
     );
   }
