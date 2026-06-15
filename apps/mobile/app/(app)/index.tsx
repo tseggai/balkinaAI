@@ -1413,6 +1413,7 @@ export default function ChatScreen() {
     setIsLoading(false);
     setSessionId(generateId());
     setBookingState(INITIAL_BOOKING_STATE);
+    setConciergeOpen(false);
     lastDisplayedServices.current = [];
   }, []);
 
@@ -2768,10 +2769,16 @@ export default function ChatScreen() {
         <View style={[styles.flex, { paddingBottom: kbPadding }]}>
           <View style={styles.chatHeader}>
             <TouchableOpacity style={styles.resetBtn} onPress={resetConversation} activeOpacity={0.7}>
-              <Ionicons name="arrow-back" size={18} color="#6B7FC4" />
-              <Text style={styles.resetBtnText}>Start over</Text>
+              <Ionicons name="arrow-back" size={18} color={propertyData ? propertyData.primary_color : '#6B7FC4'} />
+              <Text style={[styles.resetBtnText, propertyData ? { color: propertyData.primary_color } : null]}>
+                {propertyData ? 'Back' : 'Start over'}
+              </Text>
             </TouchableOpacity>
-            <BalkinaLogoInline />
+            {propertyData ? (
+              <Text style={styles.chatHeaderTitle} numberOfLines={1}>{propertyData.name}</Text>
+            ) : (
+              <BalkinaLogoInline />
+            )}
             <View style={styles.resetBtnPlaceholder} />
           </View>
 

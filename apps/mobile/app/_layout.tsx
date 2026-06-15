@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, StatusBar, Linking } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import Constants from 'expo-constants';
 import { SafeStripeProvider } from '@/lib/stripe';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured, getAuthenticatedRole } from '@/lib/supabase';
@@ -55,13 +56,21 @@ function RootLayoutContent() {
     const inTenantGroup = segments[0] === '(tenant)';
     const inStaffGroup = segments[0] === '(staff)';
 
+    // White-label property apps let customers browse the storefront without
+    // logging in — auth is only required at booking time.
+    const isPropertyApp = !!Constants.expoConfig?.extra?.propertySlug;
+
     if (!supabaseConfigured && !inAuthGroup) {
       router.replace('/(auth)/email-login');
       return;
     }
 
-    if (!session && !inAuthGroup) {
-      router.replace('/(auth)/email-login');
+    if (!session) {
+      if (isPropertyApp) {
+        if (!inAppGroup && !inAuthGroup) router.replace('/(app)');
+      } else if (!inAuthGroup) {
+        router.replace('/(auth)/email-login');
+      }
     } else if (session && !inAppGroup && !inTenantGroup && !inStaffGroup) {
       getAuthenticatedRole().then(({ role }) => {
         if (role === 'tenant') {

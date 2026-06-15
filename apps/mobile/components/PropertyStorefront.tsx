@@ -114,7 +114,8 @@ export default function PropertyStorefront({ property, apiBase, onSelectBusiness
         const res = await fetch(`${apiBase}/api/booking/services?tenantIds=${ids.join(',')}&serviceType=event`);
         if (!res.ok) return;
         const data = (await res.json()) as { services?: EventService[] };
-        if (!cancelled) setEvents(data.services ?? []);
+        // Defensive: only surface true events as Experiences.
+        if (!cancelled) setEvents((data.services ?? []).filter((s) => s.service_type === 'event'));
       } catch {
         /* ignore — events section simply hides */
       } finally {
@@ -201,7 +202,7 @@ export default function PropertyStorefront({ property, apiBase, onSelectBusiness
       ) : events.length > 0 ? (
         <View style={styles.section}>
           <Text style={styles.eyebrow}>EXPERIENCES</Text>
-          <View style={{ gap: 14 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredRow}>
             {events.map((ev) => {
               const tenant = tenantById.get(ev.tenant_id);
               const perPerson = ev.pricing_type === 'per_person';
@@ -220,23 +221,21 @@ export default function PropertyStorefront({ property, apiBase, onSelectBusiness
                       <Ionicons name="sparkles-outline" size={26} color="rgba(255,255,255,0.85)" />
                     )}
                   </View>
-                  <View style={styles.eventBody}>
-                    <Text style={styles.eventName} numberOfLines={1}>{ev.name}</Text>
-                    {tenant?.name ? <Text style={styles.cardMeta} numberOfLines={1}>{tenant.name}</Text> : null}
-                    <View style={styles.eventFooter}>
-                      <Text style={styles.eventPrice}>
-                        {formatPrice(Number(ev.price))}
-                        {perPerson ? ' / guest' : ''}
-                      </Text>
-                      <View style={[styles.reservePill, { borderColor: accent }]}>
-                        <Text style={[styles.reservePillText, { color: accent }]}>Reserve</Text>
-                      </View>
+                  <Text style={styles.eventName} numberOfLines={1}>{ev.name}</Text>
+                  {tenant?.name ? <Text style={styles.cardMeta} numberOfLines={1}>{tenant.name}</Text> : null}
+                  <View style={styles.eventFooter}>
+                    <Text style={styles.eventPrice}>
+                      {formatPrice(Number(ev.price))}
+                      {perPerson ? ' / guest' : ''}
+                    </Text>
+                    <View style={[styles.reservePill, { borderColor: accent }]}>
+                      <Text style={[styles.reservePillText, { color: accent }]}>Reserve</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
               );
             })}
-          </View>
+          </ScrollView>
         </View>
       ) : null}
 
@@ -336,19 +335,19 @@ const styles = StyleSheet.create({
   },
   featuredName: { fontSize: 16, fontWeight: '700', color: INK },
 
-  // Events
-  eventCard: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
+  // Events (horizontal carousel cards)
+  eventCard: { width: SCREEN_W * 0.7, maxWidth: 300 },
+  eventBanner: {
+    width: '100%',
+    height: 150,
     borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: HAIRLINE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
-  eventBanner: { width: 92, alignItems: 'center', justifyContent: 'center' },
-  eventBody: { flex: 1, padding: 14 },
   eventName: { fontSize: 16, fontWeight: '700', color: INK },
-  eventFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
+  eventFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
   eventPrice: { fontSize: 14, fontWeight: '700', color: INK },
   reservePill: { borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6 },
   reservePillText: { fontSize: 13, fontWeight: '700' },
