@@ -27,7 +27,7 @@ export async function OPTIONS() {
 const SELECT_COLUMNS =
   'id, tenant_id, name, description, image_url, color, price, pricing_type, ' +
   'duration_minutes, service_type, capacity, deposit_enabled, deposit_type, ' +
-  'deposit_amount, hide_price, hide_duration, category_name';
+  'deposit_amount, hide_price, hide_duration, category_name, timesheet';
 
 export async function GET(request: Request) {
   try {
@@ -66,7 +66,33 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500, headers: CORS_HEADERS });
     }
 
-    return NextResponse.json({ services: data ?? [] }, { headers: CORS_HEADERS });
+    const services = (data ?? []) as unknown as { id: string; service_type?: string; timesheet?: unknown }[];
+
+    // Attach upcoming seatings (service_special_days) to event services so the
+    // storefront booking flow can offer dates without a second round-trip.
+    const eventIds = services.filter((s) => s.service_type === 'event').map((s) => s.id);
+    if (eventIds.length > 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: days } = await supabase
+        .from('service_special_days')
+        .select('service_id, date, start_time')
+        .in('service_id', eventIds)
+        .gte('date', today)
+        .order('date', { ascending: true });
+      const byService = new Map<string, { date: string; start_time: string | null }[]>();
+      for (const d of (days ?? []) as { service_id: string; date: string; start_time: string | null }[]) {
+        const arr = byService.get(d.service_id) ?? [];
+        arr.push({ date: d.date, start_time: d.start_time });
+        byService.set(d.service_id, arr);
+      }
+      for (const s of services) {
+        if (s.service_type === 'event') {
+          (s as Record<string, unknown>).event_dates = byService.get(s.id) ?? [];
+        }
+      }
+    }
+
+    return NextResponse.json({ services }, { headers: CORS_HEADERS });
   } catch (err) {
     console.error('[booking/services] error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: CORS_HEADERS });

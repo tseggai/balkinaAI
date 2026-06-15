@@ -42,6 +42,9 @@ interface EventService {
   duration_minutes: number;
   service_type: string;
   capacity: number | null;
+  deposit_enabled?: boolean;
+  hide_price?: boolean;
+  event_dates?: { date: string; start_time: string | null }[];
 }
 
 export interface StorefrontProperty {
