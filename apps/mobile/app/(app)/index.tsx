@@ -29,6 +29,7 @@ import * as Location from 'expo-location';
 import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
 import PropertyStorefront, { StorefrontTenant } from '@/components/PropertyStorefront';
+import PropertyBookingFlow, { BookingService } from '@/components/PropertyBookingFlow';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
 import { consumePendingDeepLinkTenant, parseTenantFromUrl } from '@/lib/deepLink';
 import { formatPrice, currencySymbol } from '@/lib/currency';
@@ -1413,6 +1414,7 @@ export default function ChatScreen() {
     setIsLoading(false);
     setSessionId(generateId());
     setBookingState(INITIAL_BOOKING_STATE);
+    setConciergeOpen(false);
     lastDisplayedServices.current = [];
   }, []);
 
@@ -1449,6 +1451,7 @@ export default function ChatScreen() {
   } | null>(null);
   const [conciergeOpen, setConciergeOpen] = useState(false);
   const conciergeInputRef = useRef<TextInput>(null);
+  const [bookingTarget, setBookingTarget] = useState<{ tenantId: string; businessName: string; service: BookingService | null } | null>(null);
 
   useEffect(() => {
     if (!propertySlug) return;
@@ -2600,20 +2603,38 @@ export default function ChatScreen() {
   // Shown before the first concierge message; once a message is sent the
   // standard chat view takes over and drives the booking flow.
   if (propertyData && !hasMessages) {
-    const seedConcierge = (text: string) => {
-      setConciergeOpen(false);
-      handleButtonPress(text);
-    };
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: '#F7F4EF' }]}>
         <View style={[styles.flex, { paddingBottom: kbPadding }]}>
           <PropertyStorefront
             property={propertyData}
             apiBase={API_BASE}
-            onSelectBusiness={(t: StorefrontTenant) => seedConcierge(`Show me services at ${t.name}`)}
-            onSelectEvent={(ev, tenantName) =>
-              seedConcierge(`I'd like to book ${ev.name}${tenantName ? ` at ${tenantName}` : ''}`)
+            onSelectBusiness={(t: StorefrontTenant) =>
+              setBookingTarget({ tenantId: t.id, businessName: t.name, service: null })
             }
+            onSelectEvent={(ev, tenantName) =>
+              setBookingTarget({
+                tenantId: ev.tenant_id,
+                businessName: tenantName || propertyData.name,
+                service: {
+                  id: ev.id, name: ev.name, description: ev.description, image_url: ev.image_url,
+                  price: ev.price, pricing_type: ev.pricing_type, duration_minutes: ev.duration_minutes,
+                  service_type: 'event', capacity: ev.capacity,
+                  deposit_enabled: ev.deposit_enabled ?? false, hide_price: ev.hide_price ?? false,
+                  event_dates: ev.event_dates ?? [],
+                },
+              })
+            }
+          />
+          <PropertyBookingFlow
+            visible={!!bookingTarget}
+            apiBase={API_BASE}
+            accent={propertyData.primary_color}
+            tenantId={bookingTarget?.tenantId ?? ''}
+            businessName={bookingTarget?.businessName ?? ''}
+            initialService={bookingTarget?.service ?? null}
+            customer={{ userId, name: customerName, phone: customerPhone, email: customerEmail }}
+            onClose={() => setBookingTarget(null)}
           />
           {conciergeOpen ? (
             <View style={styles.inputBar}>
@@ -2768,10 +2789,16 @@ export default function ChatScreen() {
         <View style={[styles.flex, { paddingBottom: kbPadding }]}>
           <View style={styles.chatHeader}>
             <TouchableOpacity style={styles.resetBtn} onPress={resetConversation} activeOpacity={0.7}>
-              <Ionicons name="arrow-back" size={18} color="#6B7FC4" />
-              <Text style={styles.resetBtnText}>Start over</Text>
+              <Ionicons name="arrow-back" size={18} color={propertyData ? propertyData.primary_color : '#6B7FC4'} />
+              <Text style={[styles.resetBtnText, propertyData ? { color: propertyData.primary_color } : null]}>
+                {propertyData ? 'Back' : 'Start over'}
+              </Text>
             </TouchableOpacity>
-            <BalkinaLogoInline />
+            {propertyData ? (
+              <Text style={styles.chatHeaderTitle} numberOfLines={1}>{propertyData.name}</Text>
+            ) : (
+              <BalkinaLogoInline />
+            )}
             <View style={styles.resetBtnPlaceholder} />
           </View>
 
