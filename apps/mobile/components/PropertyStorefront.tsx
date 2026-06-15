@@ -22,6 +22,7 @@ export interface StorefrontTenant {
   id: string;
   name: string;
   logo_url: string | null;
+  cover_image_url: string | null;
   subcategory: string | null;
   description: string | null;
   slug: string | null;
@@ -47,6 +48,7 @@ export interface StorefrontProperty {
   id: string;
   name: string;
   logo_url: string | null;
+  cover_image_url: string | null;
   welcome_message: string;
   primary_color: string;
   tenants: StorefrontTenant[];
@@ -59,7 +61,12 @@ interface Props {
   onSelectEvent: (event: EventService, tenantName: string) => void;
 }
 
-/** A small two-letter monogram used when a business/property has no logo. */
+/** The best available photo for a business — cover first, then logo. */
+function coverFor(t: StorefrontTenant): string | null {
+  return t.cover_image_url || t.logo_url;
+}
+
+/** A monogram used when a business/property has no photo at all. */
 function Monogram({ name, color, size }: { name: string; color: string; size: number }) {
   return (
     <View style={[styles.monogram, { width: size, height: size, backgroundColor: color }]}>
@@ -70,12 +77,13 @@ function Monogram({ name, color, size }: { name: string; color: string; size: nu
   );
 }
 
-function Rating({ avg, count }: { avg: number | null; count: number | null }) {
+function Rating({ avg, count, light }: { avg: number | null; count: number | null; light?: boolean }) {
   if (!avg || avg <= 0) return null;
+  const color = light ? '#fff' : INK;
   return (
     <View style={styles.ratingRow}>
-      <Ionicons name="star" size={11} color={INK} />
-      <Text style={styles.ratingText}>
+      <Ionicons name="star" size={11} color={color} />
+      <Text style={[styles.ratingText, { color }]}>
         {avg.toFixed(1)}
         {count ? ` · ${count}` : ''}
       </Text>
@@ -134,16 +142,22 @@ export default function PropertyStorefront({ property, apiBase, onSelectBusiness
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      {/* ── Hero ───────────────────────────────────────────── */}
+      {/* ── Hero (full-bleed cover) ────────────────────────── */}
       <View style={[styles.hero, { backgroundColor: accent }]}>
-        {property.logo_url ? (
-          <Image source={{ uri: property.logo_url }} style={styles.heroLogo} />
-        ) : (
-          <Monogram name={property.name} color="rgba(255,255,255,0.18)" size={72} />
-        )}
-        <Text style={styles.heroEyebrow}>WELCOME TO</Text>
-        <Text style={styles.heroTitle}>{property.name}</Text>
-        <Text style={styles.heroSubtitle}>{property.welcome_message}</Text>
+        {property.cover_image_url ? (
+          <>
+            <Image source={{ uri: property.cover_image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <View style={styles.heroScrim} />
+          </>
+        ) : null}
+        <View style={styles.heroContent}>
+          {property.logo_url ? (
+            <Image source={{ uri: property.logo_url }} style={styles.heroLogo} />
+          ) : null}
+          <Text style={styles.heroEyebrow}>WELCOME TO</Text>
+          <Text style={styles.heroTitle}>{property.name}</Text>
+          <Text style={styles.heroSubtitle}>{property.welcome_message}</Text>
+        </View>
       </View>
 
       {/* ── Featured ───────────────────────────────────────── */}
@@ -155,25 +169,28 @@ export default function PropertyStorefront({ property, apiBase, onSelectBusiness
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.featuredRow}
           >
-            {featured.map((t) => (
-              <TouchableOpacity
-                key={t.id}
-                style={styles.featuredCard}
-                activeOpacity={0.85}
-                onPress={() => onSelectBusiness(t)}
-              >
-                <View style={[styles.featuredImage, { backgroundColor: accent }]}>
-                  {t.logo_url ? (
-                    <Image source={{ uri: t.logo_url }} style={styles.featuredImageInner} />
-                  ) : (
-                    <Monogram name={t.name} color="rgba(255,255,255,0.2)" size={64} />
-                  )}
-                </View>
-                <Text style={styles.featuredName} numberOfLines={1}>{t.name}</Text>
-                {t.subcategory ? <Text style={styles.cardMeta} numberOfLines={1}>{t.subcategory}</Text> : null}
-                <Rating avg={t.avg_rating} count={t.review_count} />
-              </TouchableOpacity>
-            ))}
+            {featured.map((t) => {
+              const img = coverFor(t);
+              return (
+                <TouchableOpacity
+                  key={t.id}
+                  style={styles.featuredCard}
+                  activeOpacity={0.85}
+                  onPress={() => onSelectBusiness(t)}
+                >
+                  <View style={[styles.featuredImage, { backgroundColor: accent }]}>
+                    {img ? (
+                      <Image source={{ uri: img }} style={styles.fillImage} resizeMode="cover" />
+                    ) : (
+                      <Monogram name={t.name} color="rgba(255,255,255,0.2)" size={64} />
+                    )}
+                  </View>
+                  <Text style={styles.featuredName} numberOfLines={1}>{t.name}</Text>
+                  {t.subcategory ? <Text style={styles.cardMeta} numberOfLines={1}>{t.subcategory}</Text> : null}
+                  <Rating avg={t.avg_rating} count={t.review_count} />
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       )}
@@ -188,6 +205,7 @@ export default function PropertyStorefront({ property, apiBase, onSelectBusiness
             {events.map((ev) => {
               const tenant = tenantById.get(ev.tenant_id);
               const perPerson = ev.pricing_type === 'per_person';
+              const img = ev.image_url || (tenant ? coverFor(tenant) : null);
               return (
                 <TouchableOpacity
                   key={ev.id}
@@ -196,8 +214,8 @@ export default function PropertyStorefront({ property, apiBase, onSelectBusiness
                   onPress={() => onSelectEvent(ev, tenant?.name ?? '')}
                 >
                   <View style={[styles.eventBanner, { backgroundColor: accent }]}>
-                    {ev.image_url ? (
-                      <Image source={{ uri: ev.image_url }} style={styles.eventBannerImg} />
+                    {img ? (
+                      <Image source={{ uri: img }} style={styles.fillImage} resizeMode="cover" />
                     ) : (
                       <Ionicons name="sparkles-outline" size={26} color="rgba(255,255,255,0.85)" />
                     )}
@@ -222,33 +240,39 @@ export default function PropertyStorefront({ property, apiBase, onSelectBusiness
         </View>
       ) : null}
 
-      {/* ── Editorial sections by category ─────────────────── */}
+      {/* ── Editorial sections by category (large photo cards) ─ */}
       {sections.map(([title, tenants]) => (
         <View key={title} style={styles.section}>
           <Text style={styles.eyebrow}>{title.toUpperCase()}</Text>
-          <View style={{ gap: 12 }}>
-            {tenants.map((t) => (
-              <TouchableOpacity
-                key={t.id}
-                style={styles.listCard}
-                activeOpacity={0.85}
-                onPress={() => onSelectBusiness(t)}
-              >
-                {t.logo_url ? (
-                  <Image source={{ uri: t.logo_url }} style={styles.listThumb} />
-                ) : (
-                  <Monogram name={t.name} color={accent} size={56} />
-                )}
-                <View style={styles.listBody}>
-                  <Text style={styles.listName} numberOfLines={1}>{t.name}</Text>
-                  {t.description ? (
-                    <Text style={styles.listDesc} numberOfLines={2}>{t.description}</Text>
-                  ) : null}
-                  <Rating avg={t.avg_rating} count={t.review_count} />
-                </View>
-                <Ionicons name="arrow-forward" size={16} color={MUTED} />
-              </TouchableOpacity>
-            ))}
+          <View style={{ gap: 16 }}>
+            {tenants.map((t) => {
+              const img = coverFor(t);
+              return (
+                <TouchableOpacity
+                  key={t.id}
+                  style={[styles.photoCard, { backgroundColor: accent }]}
+                  activeOpacity={0.88}
+                  onPress={() => onSelectBusiness(t)}
+                >
+                  {img ? (
+                    <Image source={{ uri: img }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.photoCardMonogram}>
+                      <Monogram name={t.name} color="rgba(255,255,255,0.18)" size={72} />
+                    </View>
+                  )}
+                  <View style={styles.photoCardScrim} />
+                  <View style={styles.photoCardContent}>
+                    {t.subcategory ? <Text style={styles.photoCardMeta}>{t.subcategory.toUpperCase()}</Text> : null}
+                    <Text style={styles.photoCardName} numberOfLines={1}>{t.name}</Text>
+                    {t.description ? (
+                      <Text style={styles.photoCardDesc} numberOfLines={1}>{t.description}</Text>
+                    ) : null}
+                    <Rating avg={t.avg_rating} count={t.review_count} light />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       ))}
@@ -262,15 +286,12 @@ const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: IVORY },
   scrollContent: { paddingBottom: 24 },
 
-  hero: {
-    paddingTop: 48,
-    paddingBottom: 40,
-    paddingHorizontal: 28,
-    alignItems: 'center',
-  },
-  heroLogo: { width: 76, height: 76, borderRadius: 16, marginBottom: 18 },
+  hero: { minHeight: 300, justifyContent: 'flex-end', overflow: 'hidden' },
+  heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  heroContent: { paddingHorizontal: 28, paddingTop: 56, paddingBottom: 36, alignItems: 'center' },
+  heroLogo: { width: 72, height: 72, borderRadius: 16, marginBottom: 18 },
   heroEyebrow: {
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.78)',
     fontSize: 11,
     letterSpacing: 3,
     fontWeight: '600',
@@ -278,13 +299,13 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: '#fff',
-    fontSize: 30,
+    fontSize: 32,
     fontWeight: '700',
     letterSpacing: 0.5,
     textAlign: 'center',
   },
   heroSubtitle: {
-    color: 'rgba(255,255,255,0.82)',
+    color: 'rgba(255,255,255,0.9)',
     fontSize: 14,
     textAlign: 'center',
     marginTop: 10,
@@ -313,7 +334,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 10,
   },
-  featuredImageInner: { width: '100%', height: '100%' },
   featuredName: { fontSize: 16, fontWeight: '700', color: INK },
 
   // Events
@@ -326,7 +346,6 @@ const styles = StyleSheet.create({
     borderColor: HAIRLINE,
   },
   eventBanner: { width: 92, alignItems: 'center', justifyContent: 'center' },
-  eventBannerImg: { width: '100%', height: '100%' },
   eventBody: { flex: 1, padding: 14 },
   eventName: { fontSize: 16, fontWeight: '700', color: INK },
   eventFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
@@ -334,26 +353,25 @@ const styles = StyleSheet.create({
   reservePill: { borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6 },
   reservePillText: { fontSize: 13, fontWeight: '700' },
 
-  // List
-  listCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: HAIRLINE,
+  // Large editorial photo cards
+  photoCard: {
+    height: 200,
+    borderRadius: 18,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
   },
-  listThumb: { width: 56, height: 56, borderRadius: 12 },
-  listBody: { flex: 1 },
-  listName: { fontSize: 16, fontWeight: '700', color: INK },
-  listDesc: { fontSize: 13, color: MUTED, marginTop: 3, lineHeight: 18 },
+  photoCardMonogram: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  photoCardScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.32)' },
+  photoCardContent: { padding: 18 },
+  photoCardMeta: { color: 'rgba(255,255,255,0.85)', fontSize: 11, letterSpacing: 1.8, fontWeight: '700', marginBottom: 6 },
+  photoCardName: { color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 0.3 },
+  photoCardDesc: { color: 'rgba(255,255,255,0.9)', fontSize: 13, marginTop: 4 },
 
   // Shared
+  fillImage: { width: '100%', height: '100%' },
   cardMeta: { fontSize: 12, color: MUTED, marginTop: 3, letterSpacing: 0.3 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
-  ratingText: { fontSize: 12, color: INK, fontWeight: '600' },
+  ratingText: { fontSize: 12, fontWeight: '600' },
   monogram: { borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   monogramText: { color: '#fff', fontWeight: '700' },
 });

@@ -1444,8 +1444,8 @@ export default function ChatScreen() {
   }, []);
 
   const [propertyData, setPropertyData] = useState<{
-    id: string; name: string; logo_url: string | null; welcome_message: string; primary_color: string;
-    tenants: { id: string; name: string; logo_url: string | null; subcategory: string | null; description: string | null; slug: string | null; avg_rating: number | null; review_count: number | null; featured?: boolean }[];
+    id: string; name: string; logo_url: string | null; cover_image_url: string | null; welcome_message: string; primary_color: string;
+    tenants: { id: string; name: string; logo_url: string | null; cover_image_url: string | null; subcategory: string | null; description: string | null; slug: string | null; avg_rating: number | null; review_count: number | null; featured?: boolean }[];
   } | null>(null);
   const [conciergeOpen, setConciergeOpen] = useState(false);
   const conciergeInputRef = useRef<TextInput>(null);
@@ -1461,6 +1461,7 @@ export default function ChatScreen() {
           id: data.property.id,
           name: data.property.name,
           logo_url: data.property.logo_url,
+          cover_image_url: data.property.cover_image_url ?? null,
           welcome_message: data.property.welcome_message ?? 'What would you like to book today?',
           primary_color: data.property.primary_color ?? '#6B7FC4',
           tenants: data.tenants ?? [],

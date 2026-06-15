@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 
   const { data: tenantLinks } = await supabase
     .from('property_tenants')
-    .select('tenant_id, display_order, featured, tenants(id, name, logo_url, avg_rating, review_count, description, slug)')
+    .select('tenant_id, display_order, featured, tenants(id, name, logo_url, cover_image_url, avg_rating, review_count, description, slug)')
     .eq('property_id', p.id)
     .order('display_order');
 
@@ -45,13 +45,14 @@ export async function GET(request: Request) {
     tenant_id: string;
     display_order: number;
     featured: boolean;
-    tenants: { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; description: string | null; slug: string | null } | null;
+    tenants: { id: string; name: string; logo_url: string | null; cover_image_url: string | null; avg_rating: number | null; review_count: number | null; description: string | null; slug: string | null } | null;
   }[])
     .filter((tl) => tl.tenants)
     .map((tl) => ({
       id: tl.tenants!.id, // eslint-disable-line
       name: tl.tenants!.name,
       logo_url: tl.tenants!.logo_url,
+      cover_image_url: tl.tenants!.cover_image_url,
       avg_rating: tl.tenants!.avg_rating,
       review_count: tl.tenants!.review_count,
       description: tl.tenants!.description,

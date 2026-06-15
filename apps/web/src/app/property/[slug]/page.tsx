@@ -11,6 +11,7 @@ interface Property {
   name: string;
   slug: string;
   logo_url: string | null;
+  cover_image_url: string | null;
   description: string | null;
   welcome_message: string;
   primary_color: string;
@@ -175,6 +176,14 @@ export default function PropertyDashboard() {
               <label className="block text-sm font-medium text-gray-700">Logo</label>
               <ImageUpload value={property.logo_url ?? ''} onChange={async (url) => {
                 await supabase.from('properties').update({ logo_url: url } as never).eq('id', property.id);
+                fetchData();
+              }} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Cover Image</label>
+              <p className="mb-1 text-xs text-gray-500">Full-bleed hero photo shown at the top of your branded app.</p>
+              <ImageUpload value={property.cover_image_url ?? ''} onChange={async (url) => {
+                await supabase.from('properties').update({ cover_image_url: url } as never).eq('id', property.id);
                 fetchData();
               }} />
             </div>
