@@ -124,7 +124,7 @@ export default function PropertySectionList({
                   </View>
                   <View style={styles.cardBody}>
                     <Text style={styles.cardName} numberOfLines={1}>{t.name}</Text>
-                    {t.subcategory ? <Text style={styles.cardEyebrow}>{t.subcategory.toUpperCase()}</Text> : null}
+                    {(t.subcategory || t.category) ? <Text style={styles.cardEyebrow}>{(t.subcategory || t.category)!.toUpperCase()}</Text> : null}
                     {t.description ? <Text style={styles.cardDesc} numberOfLines={2}>{t.description}</Text> : null}
                     <View style={styles.cardFooter}>
                       {t.avg_rating && t.avg_rating > 0 ? (

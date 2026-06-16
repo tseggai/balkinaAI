@@ -1452,7 +1452,7 @@ export default function ChatScreen() {
 
   const [propertyData, setPropertyData] = useState<{
     id: string; name: string; logo_url: string | null; cover_image_url: string | null; welcome_message: string; primary_color: string;
-    tenants: { id: string; name: string; logo_url: string | null; cover_image_url: string | null; subcategory: string | null; description: string | null; slug: string | null; avg_rating: number | null; review_count: number | null; featured?: boolean }[];
+    tenants: { id: string; name: string; logo_url: string | null; cover_image_url: string | null; category: string | null; subcategory: string | null; description: string | null; slug: string | null; avg_rating: number | null; review_count: number | null; featured?: boolean }[];
   } | null>(null);
   const [conciergeOpen, setConciergeOpen] = useState(false);
   const conciergeInputRef = useRef<TextInput>(null);

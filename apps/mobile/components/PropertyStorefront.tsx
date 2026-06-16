@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { formatPrice } from '@/lib/currency';
 import PropertySectionList from './PropertySectionList';
+import PropertySearch from './PropertySearch';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const IVORY = '#F8F6F2';
@@ -36,6 +37,7 @@ export interface StorefrontTenant {
   name: string;
   logo_url: string | null;
   cover_image_url: string | null;
+  category: string | null;
   subcategory: string | null;
   description: string | null;
   slug: string | null;
@@ -121,6 +123,7 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
   const [allServices, setAllServices] = useState<EventService[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [sectionList, setSectionList] = useState<SectionTarget | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const scrollY = useRef(new Animated.Value(0)).current;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,7 +186,7 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
   const sections = useMemo(() => {
     const groups = new Map<string, StorefrontTenant[]>();
     property.tenants.forEach((t) => {
-      const key = t.subcategory?.trim() || 'Discover';
+      const key = t.category?.trim() || t.subcategory?.trim() || 'Discover';
       const arr = groups.get(key) ?? [];
       arr.push(t);
       groups.set(key, arr);
@@ -233,7 +236,7 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
         </View>
         <View style={styles.cardBody}>
           <Text style={styles.cardName} numberOfLines={1}>{t.name}</Text>
-          {t.subcategory ? <Text style={styles.cardEyebrow}>{t.subcategory.toUpperCase()}</Text> : null}
+          {(t.subcategory || t.category) ? <Text style={styles.cardEyebrow}>{(t.subcategory || t.category)!.toUpperCase()}</Text> : null}
           <View style={styles.cardFooter}>
             <Rating avg={t.avg_rating} count={t.review_count} />
             <OpenDot id={t.id} />
@@ -357,11 +360,16 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
           {property.logo_url ? <Image source={{ uri: property.logo_url }} style={styles.miniLogo} /> : null}
           <Text style={styles.miniName} numberOfLines={1}>{property.name}</Text>
         </Animated.View>
-        {onAccountPress ? (
-          <TouchableOpacity style={styles.accountBtn} onPress={onAccountPress} activeOpacity={0.8} hitSlop={8}>
-            <Ionicons name={isLoggedIn ? 'person' : 'person-outline'} size={18} color={INK} />
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.accountBtn} onPress={() => setSearchOpen(true)} activeOpacity={0.8} hitSlop={8}>
+            <Ionicons name="search" size={18} color={INK} />
           </TouchableOpacity>
-        ) : null}
+          {onAccountPress ? (
+            <TouchableOpacity style={styles.accountBtn} onPress={onAccountPress} activeOpacity={0.8} hitSlop={8}>
+              <Ionicons name={isLoggedIn ? 'person' : 'person-outline'} size={18} color={INK} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
 
       {/* See-all drill-down */}
@@ -382,6 +390,22 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
           if (full) setTimeout(() => onSelectEvent(full, tenantById.get(full.tenant_id)?.name ?? ''), 320);
         }}
       />
+
+      {/* Search (autocomplete) */}
+      <PropertySearch
+        visible={searchOpen}
+        accent={accent}
+        tenants={property.tenants}
+        events={events}
+        tenantName={(id) => tenantById.get(id)?.name}
+        onClose={() => setSearchOpen(false)}
+        onSelectBusiness={(t) => { setSearchOpen(false); setTimeout(() => onSelectBusiness(t), 320); }}
+        onSelectEvent={(e) => {
+          const full = events.find((ev) => ev.id === e.id);
+          setSearchOpen(false);
+          if (full) setTimeout(() => onSelectEvent(full, tenantById.get(full.tenant_id)?.name ?? ''), 320);
+        }}
+      />
     </View>
   );
 }
@@ -394,6 +418,7 @@ const styles = StyleSheet.create({
   miniBrand: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1 },
   miniLogo: { width: 26, height: 26, borderRadius: 7 },
   miniName: { fontSize: 16, fontWeight: '500', color: INK, fontFamily: DISPLAY, letterSpacing: 0.3 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   accountBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: HAIRLINE, backgroundColor: 'rgba(255,255,255,0.92)' },
 
   tabsBar: { position: 'absolute', top: 0, left: 0, right: 0, height: TABS_H, zIndex: 20, backgroundColor: IVORY, borderBottomWidth: 1, borderBottomColor: HAIRLINE },
