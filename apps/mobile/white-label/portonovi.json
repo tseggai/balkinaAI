@@ -3,7 +3,7 @@
   "appName": "Portonovi",
   "bundleId": "ai.balkina.portonovi",
   "androidPackage": "ai.balkina.portonovi",
-  "primaryColor": "#1a365d",
+  "primaryColor": "#055f81",
   "backgroundColor": "#ffffff",
   "iconPath": "./white-label/assets/portonovi/icon.png",
   "splashPath": "./white-label/assets/portonovi/splash.png",

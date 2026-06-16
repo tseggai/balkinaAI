@@ -26,7 +26,7 @@ export interface SendEmailParams {
   /**
    * Optional display name for the sender. The address always stays on the
    * verified RESEND_FROM_EMAIL domain, but the name can be branded per-property
-   * (e.g. "Porto Montenegro") so white-label invites feel first-party.
+   * (e.g. "Portonovi") so white-label invites feel first-party.
    */
   fromName?: string;
 }

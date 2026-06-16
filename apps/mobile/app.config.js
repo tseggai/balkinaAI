@@ -4,8 +4,8 @@
 // branded property storefront — and it works in Expo Go (`expo start`) as well
 // as EAS builds, since both honour the APP_VARIANT environment variable:
 //
-//   APP_VARIANT=porto-montenegro npx expo start
-//   APP_VARIANT=porto-montenegro eas build --profile production --platform ios
+//   APP_VARIANT=portonovi npx expo start
+//   APP_VARIANT=portonovi eas build --profile production --platform ios
 //
 const fs = require('fs');
 const path = require('path');
