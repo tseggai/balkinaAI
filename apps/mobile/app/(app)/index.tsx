@@ -31,6 +31,8 @@ import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
 import PropertyStorefront, { StorefrontTenant } from '@/components/PropertyStorefront';
 import PropertyBookingFlow, { BookingService } from '@/components/PropertyBookingFlow';
+import PropertyBusinessPage, { BusinessSummary } from '@/components/PropertyBusinessPage';
+import PropertyAccountDrawer from '@/components/PropertyAccountDrawer';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
 import { consumePendingDeepLinkTenant, parseTenantFromUrl } from '@/lib/deepLink';
 import { formatPrice, currencySymbol } from '@/lib/currency';
@@ -1455,6 +1457,8 @@ export default function ChatScreen() {
   const [conciergeOpen, setConciergeOpen] = useState(false);
   const conciergeInputRef = useRef<TextInput>(null);
   const [bookingTarget, setBookingTarget] = useState<{ tenantId: string; businessName: string; service: BookingService | null } | null>(null);
+  const [businessTarget, setBusinessTarget] = useState<BusinessSummary | null>(null);
+  const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
   // True while the white-label property is still loading, so we never flash the
   // generic Balkina welcome before the branded storefront appears.
   const [propertyLoading, setPropertyLoading] = useState<boolean>(!!propertySlug);
@@ -2649,12 +2653,13 @@ export default function ChatScreen() {
             property={propertyData}
             apiBase={API_BASE}
             isLoggedIn={!!userId}
-            onAccountPress={() => {
-              if (userId) router.navigate('/(app)/bookings');
-              else router.navigate('/(auth)/email-login');
-            }}
+            onAccountPress={() => setAccountDrawerOpen(true)}
             onSelectBusiness={(t: StorefrontTenant) =>
-              setBookingTarget({ tenantId: t.id, businessName: t.name, service: null })
+              setBusinessTarget({
+                id: t.id, name: t.name, cover_image_url: t.cover_image_url, logo_url: t.logo_url,
+                subcategory: t.subcategory, description: t.description,
+                avg_rating: t.avg_rating, review_count: t.review_count,
+              })
             }
             onSelectEvent={(ev, tenantName) =>
               setBookingTarget({
@@ -2667,6 +2672,32 @@ export default function ChatScreen() {
                   deposit_enabled: ev.deposit_enabled ?? false, hide_price: ev.hide_price ?? false,
                   event_dates: ev.event_dates ?? [],
                 },
+              })
+            }
+          />
+          <PropertyAccountDrawer
+            visible={accountDrawerOpen}
+            accent={propertyData.primary_color}
+            isLoggedIn={!!userId}
+            customerName={customerName}
+            customerEmail={customerEmail}
+            onClose={() => setAccountDrawerOpen(false)}
+            onBookings={() => (userId ? router.navigate('/(app)/bookings') : router.navigate('/(auth)/email-login'))}
+            onProfile={() => (userId ? router.navigate('/(app)/profile') : router.navigate('/(auth)/email-login'))}
+            onSignIn={() => router.navigate('/(auth)/email-login')}
+            onSignOut={() => { void supabase.auth.signOut(); }}
+          />
+          <PropertyBusinessPage
+            visible={!!businessTarget}
+            apiBase={API_BASE}
+            accent={propertyData.primary_color}
+            business={businessTarget}
+            onClose={() => setBusinessTarget(null)}
+            onBook={(service) =>
+              setBookingTarget({
+                tenantId: businessTarget?.id ?? '',
+                businessName: businessTarget?.name ?? '',
+                service,
               })
             }
           />

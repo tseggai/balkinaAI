@@ -31,6 +31,8 @@ const API_BASE =
 // Balkina defaults everywhere else (so the Balkina app is unchanged).
 const ACCENT = (Constants.expoConfig?.extra?.primaryColor as string | undefined) ?? '#6B7FC4';
 const MERCHANT_NAME = (Constants.expoConfig?.extra?.propertyName as string | undefined) ?? 'Balkina AI';
+// On a white-label property build, scope bookings to that property's businesses.
+const PROPERTY_SLUG = (Constants.expoConfig?.extra?.propertySlug as string | undefined) ?? null;
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -374,6 +376,7 @@ export default function BookingsScreen() {
       if (user.id) params.set('userId', user.id);
       if (user.email) params.set('email', user.email);
       if (user.phone) params.set('phone', user.phone);
+      if (PROPERTY_SLUG) params.set('propertySlug', PROPERTY_SLUG);
 
       console.log('[bookings] fetching:', `${API_BASE}/api/customer/bookings?${params.toString()}`);
       const res = await fetch(
