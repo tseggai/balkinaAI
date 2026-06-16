@@ -25,6 +25,7 @@ export async function GET(request: Request) {
     const email = searchParams.get('email');
     const phone = searchParams.get('phone');
     const tab = searchParams.get('tab') || 'upcoming';
+    const propertySlug = searchParams.get('propertySlug');
 
     if (!userId && !email && !phone) {
       return NextResponse.json(
@@ -93,6 +94,29 @@ export async function GET(request: Request) {
       return NextResponse.json({ data: [], error: null }, { headers: CORS_HEADERS });
     }
 
+    // White-label property apps scope bookings to that property's businesses.
+    let propertyTenantIds: string[] | null = null;
+    if (propertySlug) {
+      const { data: prop } = await supabase
+        .from('properties')
+        .select('id')
+        .eq('slug', propertySlug)
+        .limit(1)
+        .maybeSingle();
+      const propId = (prop as { id: string } | null)?.id;
+      if (!propId) {
+        return NextResponse.json({ data: [], error: null }, { headers: CORS_HEADERS });
+      }
+      const { data: pts } = await supabase
+        .from('property_tenants')
+        .select('tenant_id')
+        .eq('property_id', propId);
+      propertyTenantIds = ((pts ?? []) as { tenant_id: string }[]).map((r) => r.tenant_id);
+      if (propertyTenantIds.length === 0) {
+        return NextResponse.json({ data: [], error: null }, { headers: CORS_HEADERS });
+      }
+    }
+
     const now = new Date().toISOString();
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -106,6 +130,10 @@ export async function GET(request: Request) {
       )
       .eq('customer_id', customerId)
       .order('start_time', { ascending: isUpcoming });
+
+    if (propertyTenantIds) {
+      query = query.in('tenant_id', propertyTenantIds);
+    }
 
     if (isUpcoming) {
       query = query
