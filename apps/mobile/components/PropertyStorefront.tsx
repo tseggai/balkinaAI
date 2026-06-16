@@ -24,10 +24,12 @@ const OPEN_GREEN = '#1E9E63';
 // Quicksand-like rounded geometric face; falls back to the system sans.
 const DISPLAY = Platform.select({ ios: 'Avenir Next', default: undefined });
 
-const TOP_INSET = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 50;
+// The storefront renders inside a SafeAreaView (top inset already applied on
+// iOS), so the header only needs a little breathing room — not a full inset.
+const TOP_INSET = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) + 4 : 8;
 const BANNER_H = 300;
 const TABS_H = 54;
-const MINI_H = TOP_INSET + 50;
+const MINI_H = TOP_INSET + 46;
 
 export interface StorefrontTenant {
   id: string;
@@ -183,9 +185,11 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
   const tabs = useMemo(() => ['All', ...categories], [categories]);
 
   // Hero fades on scroll; compact header + sticky tabs slide up into place.
+  // On overscroll (pull-to-refresh, scrollY < 0) the tab bar moves DOWN with
+  // the banner instead of staying pinned, so the banner never slides under it.
   const heroOpacity = scrollY.interpolate({ inputRange: [0, BANNER_H - MINI_H], outputRange: [1, 0], extrapolate: 'clamp' });
   const miniBg = scrollY.interpolate({ inputRange: [BANNER_H - MINI_H - 50, BANNER_H - MINI_H], outputRange: [0, 1], extrapolate: 'clamp' });
-  const tabsTranslate = scrollY.interpolate({ inputRange: [0, BANNER_H - MINI_H], outputRange: [BANNER_H, MINI_H], extrapolate: 'clamp' });
+  const tabsTranslate = scrollY.interpolate({ inputRange: [0, BANNER_H - MINI_H], outputRange: [BANNER_H, MINI_H], extrapolateLeft: 'extend', extrapolateRight: 'clamp' });
 
   const OpenDot = ({ id }: { id: string }) => {
     const state = openByTenant.get(id);

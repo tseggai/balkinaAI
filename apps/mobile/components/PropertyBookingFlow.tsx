@@ -125,6 +125,8 @@ export default function PropertyBookingFlow({
 
   const isEvent = selected?.service_type === 'event';
   const isTable = selected?.service_type === 'table';
+  // Logged-in customers book with their saved profile; only guests are asked.
+  const knownCustomer = !!(customer.userId && customer.name?.trim() && customer.phone?.trim());
   const dates = useMemo(() => next14Days(), []);
 
   // (Re)initialise whenever the modal opens.
@@ -428,12 +430,25 @@ export default function PropertyBookingFlow({
                 </View>
               )}
 
-              <Text style={styles.label}>Name</Text>
-              <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your name" placeholderTextColor="#9ca3af" />
-              <Text style={styles.label}>Phone</Text>
-              <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Phone number" placeholderTextColor="#9ca3af" keyboardType="phone-pad" />
-              <Text style={styles.label}>Email (optional)</Text>
-              <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor="#9ca3af" keyboardType="email-address" autoCapitalize="none" />
+              {knownCustomer ? (
+                // Logged-in customer: use their profile, don't re-ask details.
+                <View style={styles.bookingAs}>
+                  <Ionicons name="person-circle-outline" size={22} color={accent} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.bookingAsName}>{name}</Text>
+                    <Text style={styles.rowMeta}>{[phone, email].filter(Boolean).join(' · ')}</Text>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.label}>Name</Text>
+                  <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your name" placeholderTextColor="#9ca3af" />
+                  <Text style={styles.label}>Phone</Text>
+                  <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Phone number" placeholderTextColor="#9ca3af" keyboardType="phone-pad" />
+                  <Text style={styles.label}>Email (optional)</Text>
+                  <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor="#9ca3af" keyboardType="email-address" autoCapitalize="none" />
+                </>
+              )}
 
               {!selected.hide_price && (
                 <View style={styles.totalRow}>
@@ -521,6 +536,8 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 14, fontWeight: '600', color: INK },
 
   summary: { backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: HAIRLINE, marginBottom: 20 },
+  bookingAs: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: HAIRLINE, marginTop: 8 },
+  bookingAsName: { fontSize: 16, fontWeight: '700', color: INK },
   summaryName: { fontSize: 17, fontWeight: '700', color: INK },
 
   partyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
