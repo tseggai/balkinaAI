@@ -2629,16 +2629,15 @@ export default function ChatScreen() {
   // loader rather than flashing the generic Balkina welcome screen.
   if (propertySlug && !propertyData && propertyLoading && !hasMessages) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: '#fff' }]}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={bootBrand.color} />
-          {bootBrand.name ? (
-            <Text style={{ marginTop: 16, fontSize: 20, fontWeight: '700', color: bootBrand.color }}>
-              {bootBrand.name}
-            </Text>
-          ) : null}
-        </View>
-      </SafeAreaView>
+      <View style={[styles.container, { backgroundColor: bootBrand.color, justifyContent: 'center', alignItems: 'center' }]}>
+        {bootBrand.name ? (
+          <Text style={{ fontSize: 26, fontWeight: '700', color: '#fff', letterSpacing: 0.5 }}>
+            {bootBrand.name}
+          </Text>
+        ) : (
+          <ActivityIndicator size="large" color="#fff" />
+        )}
+      </View>
     );
   }
 

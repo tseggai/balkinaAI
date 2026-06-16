@@ -90,8 +90,8 @@ function RootLayoutContent() {
 
   if (!initialized) {
     return (
-      <View style={styles.loading}>
-        <Text style={[styles.loadingText, { color: PROPERTY_PRIMARY }]}>{PROPERTY_NAME ?? 'Balkina AI'}</Text>
+      <View style={[styles.loading, PROPERTY_NAME ? { backgroundColor: PROPERTY_PRIMARY } : null]}>
+        <Text style={[styles.loadingText, { color: PROPERTY_NAME ? '#fff' : PROPERTY_PRIMARY }]}>{PROPERTY_NAME ?? 'Balkina AI'}</Text>
       </View>
     );
   }

@@ -7,11 +7,14 @@ const PRIMARY_COLOR = (Constants.expoConfig?.extra?.primaryColor as string | und
 export default function Index() {
   // Root layout handles auth-based navigation.
   // This screen is briefly shown while the auth state is determined.
-  // For white-label property builds, show the property branding so customers
-  // never see the Balkina identity during boot.
+  // For white-label property builds we paint the property color full-screen
+  // with the property name, matching the native splash so the boot reads as a
+  // single continuous splash (no Balkina flash, no jarring screen swaps).
+  const bg = PROPERTY_NAME ? PRIMARY_COLOR : '#fff';
+  const fg = PROPERTY_NAME ? '#fff' : PRIMARY_COLOR;
   return (
-    <View style={styles.container}>
-      <Text style={[styles.text, { color: PRIMARY_COLOR }]}>{PROPERTY_NAME ?? 'Balkina AI'}</Text>
+    <View style={[styles.container, { backgroundColor: bg }]}>
+      <Text style={[styles.text, { color: fg }]}>{PROPERTY_NAME ?? 'Balkina AI'}</Text>
     </View>
   );
 }
