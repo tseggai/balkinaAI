@@ -332,6 +332,16 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 const FILTERS = ['all', 'active', 'pending', 'invited'] as const;
+
+interface DiscoverTenant {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  cover_image_url: string | null;
+  category: string | null;
+  address: string | null;
+  distance_km: number | null;
+}
 type Filter = (typeof FILTERS)[number];
 
 function TenantsTab({
@@ -360,6 +370,13 @@ function TenantsTab({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Discover-existing-tenants modal
+  const [showDiscover, setShowDiscover] = useState(false);
+  const [discoverQuery, setDiscoverQuery] = useState('');
+  const [discoverResults, setDiscoverResults] = useState<DiscoverTenant[]>([]);
+  const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   // Per-application business-type choice (defaults to 'service'). Hospitality
   // classification is set HERE by the property owner — it is not offered on the
   // global self-serve signup. Drives the experience/table flow + label set.
@@ -401,6 +418,34 @@ function TenantsTab({
     setAddEmail('');
     if (json.status === 'added') onChange();
     refresh();
+  };
+
+  const runDiscover = useCallback(async (q: string) => {
+    setDiscoverLoading(true);
+    try {
+      const res = await fetch(`/api/property/${slug}/discover-tenants?q=${encodeURIComponent(q)}`);
+      const json = await res.json();
+      setDiscoverResults(res.ok ? (json.data ?? []) : []);
+    } catch { setDiscoverResults([]); }
+    setDiscoverLoading(false);
+  }, [slug]);
+
+  useEffect(() => {
+    if (!showDiscover) return;
+    const h = setTimeout(() => runDiscover(discoverQuery.trim()), 250);
+    return () => clearTimeout(h);
+  }, [showDiscover, discoverQuery, runDiscover]);
+
+  const handleAddExisting = async (tenantId: string) => {
+    setBusyId(tenantId);
+    const res = await fetch(`/api/property/${slug}/tenants`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tenantId }),
+    });
+    const json = await res.json();
+    setBusyId(null);
+    if (!res.ok) { alert(json.error ?? 'Failed to add'); return; }
+    setAddedIds((prev) => new Set(prev).add(tenantId));
+    onChange();
   };
 
   const handleApprove = async (id: string) => {
@@ -446,10 +491,16 @@ function TenantsTab({
     <div>
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-gray-900">Tenants ({tenants.length})</h2>
-        <button onClick={() => { setShowAdd(true); setResult(null); setAddEmail(''); }}
-          className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
-          + Add Tenant
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => { setShowDiscover(true); setDiscoverQuery(''); setDiscoverResults([]); }}
+            className="rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50">
+            Discover businesses
+          </button>
+          <button onClick={() => { setShowAdd(true); setResult(null); setAddEmail(''); }}
+            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+            + Add Tenant
+          </button>
+        </div>
       </div>
 
       {/* Filter */}
@@ -562,6 +613,59 @@ function TenantsTab({
                 {result.message}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Discover existing businesses */}
+      {showDiscover && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowDiscover(false)}>
+          <div className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">Discover businesses</h3>
+              <button onClick={() => setShowDiscover(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Businesses already on Balkina, ranked by distance from your property. Add them directly — or use
+              &ldquo;+ Add Tenant&rdquo; to invite one that isn&apos;t on Balkina yet.
+            </p>
+            <input
+              value={discoverQuery}
+              onChange={(e) => setDiscoverQuery(e.target.value)}
+              placeholder="Search by name or category…"
+              autoFocus
+              className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+            />
+            <div className="mt-3 flex-1 space-y-2 overflow-y-auto">
+              {discoverLoading ? (
+                <p className="py-6 text-center text-xs text-gray-400">Searching…</p>
+              ) : discoverResults.length === 0 ? (
+                <p className="py-6 text-center text-xs text-gray-400">No businesses found. Try a different search, or invite by email.</p>
+              ) : discoverResults.map((d) => {
+                const added = addedIds.has(d.id);
+                return (
+                  <div key={d.id} className="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2">
+                    {d.logo_url || d.cover_image_url
+                      ? <img src={(d.logo_url || d.cover_image_url)!} alt="" className="h-10 w-10 flex-shrink-0 rounded-lg object-cover" />
+                      : <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-200 text-sm font-bold text-gray-500">{d.name.charAt(0)}</div>}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-900">{d.name}</p>
+                      <p className="truncate text-xs text-gray-500">
+                        {[d.category, d.address, d.distance_km != null ? `${d.distance_km} km away` : null].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                    {added ? (
+                      <span className="rounded-lg bg-green-50 px-3 py-1 text-xs font-medium text-green-600">Added ✓</span>
+                    ) : (
+                      <button onClick={() => handleAddExisting(d.id)} disabled={busyId === d.id}
+                        className="rounded-lg bg-brand-500 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                        {busyId === d.id ? '…' : 'Add'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

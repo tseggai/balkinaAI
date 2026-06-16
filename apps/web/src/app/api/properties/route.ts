@@ -61,27 +61,53 @@ export async function GET(request: Request) {
       featured: tl.featured,
     }));
 
-  // Get subcategories for each tenant
+  // Resolve each tenant's category. Businesses are tagged at the parent level
+  // ("Health & Wellness") and optionally a child sub-category ("Spa"). The
+  // storefront groups by parent `category`; `subcategory` is an optional filter.
   const tenantIds = tenants.map((t) => t.id);
-  const { data: subcatRows } = tenantIds.length > 0
+  const { data: catRows } = tenantIds.length > 0
     ? await supabase
         .from('tenant_category_links')
-        .select('tenant_id, categories!inner(name, parent_id)')
+        .select('tenant_id, categories!inner(id, name, parent_id)')
         .in('tenant_id', tenantIds)
-        .not('categories.parent_id', 'is', null)
     : { data: [] };
 
-  const subcatMap = new Map<string, string>();
-  for (const row of (subcatRows ?? []) as { tenant_id: string; categories: { name: string } | { name: string }[] }[]) {
+  type CatRow = { tenant_id: string; categories: { id: string; name: string; parent_id: string | null } | { id: string; name: string; parent_id: string | null }[] };
+  const rows = (catRows ?? []) as CatRow[];
+
+  // Look up parent names for child links so we can derive the parent category.
+  const parentIds = new Set<string>();
+  for (const row of rows) {
     const cat = Array.isArray(row.categories) ? row.categories[0] : row.categories;
-    if (cat?.name && !subcatMap.has(row.tenant_id)) {
-      subcatMap.set(row.tenant_id, cat.name);
+    if (cat?.parent_id) parentIds.add(cat.parent_id);
+  }
+  const parentNameById = new Map<string, string>();
+  if (parentIds.size > 0) {
+    const { data: parents } = await supabase
+      .from('categories')
+      .select('id, name')
+      .in('id', Array.from(parentIds));
+    for (const p of (parents ?? []) as { id: string; name: string }[]) parentNameById.set(p.id, p.name);
+  }
+
+  const catMap = new Map<string, { category?: string; subcategory?: string }>();
+  for (const row of rows) {
+    const cat = Array.isArray(row.categories) ? row.categories[0] : row.categories;
+    if (!cat?.name) continue;
+    const entry = catMap.get(row.tenant_id) ?? {};
+    if (cat.parent_id) {
+      entry.subcategory = entry.subcategory ?? cat.name;
+      entry.category = entry.category ?? parentNameById.get(cat.parent_id);
+    } else {
+      entry.category = entry.category ?? cat.name;
     }
+    catMap.set(row.tenant_id, entry);
   }
 
   const enrichedTenants = tenants.map((t) => ({
     ...t,
-    subcategory: subcatMap.get(t.id) ?? undefined,
+    category: catMap.get(t.id)?.category ?? undefined,
+    subcategory: catMap.get(t.id)?.subcategory ?? undefined,
   }));
 
   return NextResponse.json({

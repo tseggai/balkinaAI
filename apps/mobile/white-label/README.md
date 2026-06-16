@@ -25,15 +25,15 @@ cp white-label/template.json white-label/<property-slug>.json
 `propertySlug` **must** match the `properties.slug` in the database — that is what
 the app uses to fetch branding, businesses, and experiences.
 
-(`white-label/porto-montenegro.json` already exists as a working example.)
+(`white-label/portonovi.json` already exists as a working example.)
 
 ## 3. Test in Expo Go
 
 ```bash
-APP_VARIANT=porto-montenegro npx expo start
+APP_VARIANT=portonovi npx expo start
 ```
 
-Open in Expo Go — the app boots into the Porto Montenegro storefront. Without
+Open in Expo Go — the app boots into the Portonovi storefront. Without
 `APP_VARIANT` the standard chat-first Balkina app loads.
 
 > The storefront fetches from the API in `app/(app)/index.tsx` (`API_BASE`,
@@ -44,7 +44,7 @@ Open in Expo Go — the app boots into the Porto Montenegro storefront. Without
 ## 4. Build & submit (EAS)
 
 ```bash
-APP_VARIANT=porto-montenegro eas build --profile production --platform ios
+APP_VARIANT=portonovi eas build --profile production --platform ios
 eas submit --platform ios
 ```
 
