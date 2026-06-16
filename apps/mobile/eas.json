@@ -32,6 +32,15 @@
         "EXPO_NO_CAPABILITY_SYNC": "1"
       }
     },
+    "preview-portonovi": {
+      "extends": "preview",
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
+        "EAS_BUILD": "true",
+        "EXPO_NO_CAPABILITY_SYNC": "1",
+        "APP_VARIANT": "porto-montenegro"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "distribution": "store",
