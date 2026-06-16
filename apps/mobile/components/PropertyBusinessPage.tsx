@@ -19,7 +19,7 @@ const INK = '#171513';
 const MUTED = '#8A837A';
 const HAIRLINE = '#ECE7DE';
 const OPEN_GREEN = '#1E9E63';
-const DISPLAY = Platform.select({ ios: 'Optima', default: undefined });
+const DISPLAY = Platform.select({ ios: 'Avenir Next', default: undefined });
 
 export interface BusinessSummary {
   id: string;
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: '#D8D2C8', marginTop: 8, marginBottom: 6 },
 
   header: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 22, paddingTop: 6, paddingBottom: 16 },
-  title: { fontSize: 30, fontWeight: '800', color: INK, fontFamily: DISPLAY, letterSpacing: 0.2 },
+  title: { fontSize: 26, fontWeight: '600', color: INK, fontFamily: DISPLAY, letterSpacing: 0.3 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
   metaStrong: { fontSize: 14, fontWeight: '700' },
   metaDim: { fontSize: 14, color: MUTED },
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   cover: { width: '100%', height: 240, overflow: 'hidden' },
   description: { fontSize: 15, color: '#4A453E', lineHeight: 23, paddingHorizontal: 22, paddingTop: 22 },
 
-  sectionTitle: { fontSize: 20, fontWeight: '800', color: INK, letterSpacing: -0.3, marginTop: 30, marginBottom: 16, paddingHorizontal: 22 },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: INK, fontFamily: DISPLAY, letterSpacing: 0.8, marginTop: 30, marginBottom: 16, paddingHorizontal: 22 },
 
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#fff',

@@ -8,9 +8,9 @@ import {
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
-  SafeAreaView,
   Animated,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatPrice } from '@/lib/currency';
@@ -21,9 +21,13 @@ const INK = '#171513';
 const MUTED = '#8A837A';
 const HAIRLINE = '#ECE7DE';
 const OPEN_GREEN = '#1E9E63';
-// A refined display face for headings (iOS ships Didot/Optima); falls back to
-// the system sans elsewhere. Names/headers lean editorial + airy.
-const DISPLAY = Platform.select({ ios: 'Optima', default: undefined });
+// Quicksand-like rounded geometric face; falls back to the system sans.
+const DISPLAY = Platform.select({ ios: 'Avenir Next', default: undefined });
+
+const TOP_INSET = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 50;
+const BANNER_H = 300;
+const TABS_H = 54;
+const MINI_H = TOP_INSET + 50;
 
 export interface StorefrontTenant {
   id: string;
@@ -55,7 +59,6 @@ interface EventService {
   timesheet?: Record<string, { enabled?: boolean; start?: string; end?: string }> | null;
 }
 
-/** True if the service's open-hours timesheet covers the current local time. */
 function isOpenNow(ts: Record<string, { enabled?: boolean; start?: string; end?: string }> | null | undefined): boolean {
   if (!ts) return false;
   const now = new Date();
@@ -115,7 +118,6 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
   const [servicesLoading, setServicesLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
   const [openNow, setOpenNow] = useState(false);
-  const [headerH, setHeaderH] = useState(150);
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const fade = useRef(new Animated.Value(0)).current;
@@ -180,12 +182,11 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
   const categories = useMemo(() => sections.map(([title]) => title), [sections]);
   const tabs = useMemo(() => ['All', ...categories], [categories]);
 
-  // Collapsing hero: big logo fades out, compact header logo fades in.
-  const heroOpacity = scrollY.interpolate({ inputRange: [0, 150], outputRange: [1, 0], extrapolate: 'clamp' });
-  const heroTranslate = scrollY.interpolate({ inputRange: [0, 220], outputRange: [0, -40], extrapolate: 'clamp' });
-  const miniOpacity = scrollY.interpolate({ inputRange: [110, 190], outputRange: [0, 1], extrapolate: 'clamp' });
+  // Hero fades on scroll; compact header + sticky tabs slide up into place.
+  const heroOpacity = scrollY.interpolate({ inputRange: [0, BANNER_H - MINI_H], outputRange: [1, 0], extrapolate: 'clamp' });
+  const miniBg = scrollY.interpolate({ inputRange: [BANNER_H - MINI_H - 50, BANNER_H - MINI_H], outputRange: [0, 1], extrapolate: 'clamp' });
+  const tabsTranslate = scrollY.interpolate({ inputRange: [0, BANNER_H - MINI_H], outputRange: [BANNER_H, MINI_H], extrapolate: 'clamp' });
 
-  // ── Cards (image-top, white detail below — luxury editorial) ──
   const OpenDot = ({ id }: { id: string }) => {
     const state = openByTenant.get(id);
     if (state === null || state === undefined) return null;
@@ -203,7 +204,7 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
       <TouchableOpacity style={[styles.card, wide ? styles.cardWide : styles.cardCarousel]} activeOpacity={0.9} onPress={() => onSelectBusiness(t)}>
         <View style={[styles.cardImage, wide ? styles.cardImageWide : styles.cardImageCarousel, { backgroundColor: accent }]}>
           {img ? <Image source={{ uri: img }} style={styles.fill} resizeMode="cover" />
-               : <Monogram name={t.name} color="rgba(255,255,255,0.2)" size={60} />}
+               : <Monogram name={t.name} color="rgba(255,255,255,0.2)" size={56} />}
         </View>
         <View style={styles.cardBody}>
           <Text style={styles.cardName} numberOfLines={1}>{t.name}</Text>
@@ -231,48 +232,15 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
 
   return (
     <View style={styles.scroll}>
-      {/* ── Fixed luxury header (compact logo + scrollable tabs) ── */}
-      <SafeAreaView style={styles.header} onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}>
-        <View style={styles.headerTop}>
-          <Animated.View style={[styles.headerBrand, { opacity: miniOpacity }]}>
-            {property.logo_url ? <Image source={{ uri: property.logo_url }} style={styles.headerLogo} /> : null}
-            <Text style={styles.headerName} numberOfLines={1}>{property.name}</Text>
-          </Animated.View>
-          {onAccountPress ? (
-            <TouchableOpacity style={[styles.accountBtn, { borderColor: HAIRLINE }]} onPress={onAccountPress} activeOpacity={0.8} hitSlop={8}>
-              <Ionicons name={isLoggedIn ? 'person' : 'person-outline'} size={19} color={INK} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-        {tabs.length > 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>
-            {tabs.map((t) => {
-              const key = t === 'All' ? 'all' : t;
-              const active = filter === key;
-              return (
-                <TouchableOpacity key={t} onPress={() => setFilter(key)} style={styles.tab} activeOpacity={0.7}>
-                  <Text style={[styles.tabText, active && { color: INK }]}>{t}</Text>
-                  {active ? <View style={[styles.tabUnderline, { backgroundColor: accent }]} /> : null}
-                </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity onPress={() => setOpenNow((o) => !o)} style={[styles.openChip, openNow && { backgroundColor: accent, borderColor: accent }]} activeOpacity={0.8}>
-              <View style={[styles.dot, { backgroundColor: openNow ? '#fff' : OPEN_GREEN }]} />
-              <Text style={[styles.openChipText, openNow && { color: '#fff' }]}>Open now</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        )}
-      </SafeAreaView>
-
       <Animated.ScrollView
         style={{ opacity: fade }}
-        contentContainerStyle={{ paddingTop: headerH, paddingBottom: 130 }}
+        contentContainerStyle={{ paddingBottom: 130 }}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
       >
         {/* ── Hero banner (big logo fades on scroll) ── */}
-        <Animated.View style={[styles.banner, { backgroundColor: accent, opacity: heroOpacity, transform: [{ translateY: heroTranslate }] }]}>
+        <Animated.View style={[styles.banner, { backgroundColor: accent, opacity: heroOpacity }]}>
           {property.cover_image_url ? (
             <>
               <Image source={{ uri: property.cover_image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -286,6 +254,9 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
             <Text style={styles.bannerSubtitle}>{property.welcome_message}</Text>
           </View>
         </Animated.View>
+
+        {/* Spacer reserves the sticky tab bar's resting height. */}
+        <View style={{ height: TABS_H }} />
 
         {/* ── Featured ── */}
         {filter === 'all' && featured.length > 0 && (
@@ -363,6 +334,42 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
           })()
         )}
       </Animated.ScrollView>
+
+      {/* ── Sticky tab bar (starts below banner, slides up to stick) ── */}
+      {tabs.length > 1 && (
+        <Animated.View style={[styles.tabsBar, { transform: [{ translateY: tabsTranslate }] }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>
+            {tabs.map((t) => {
+              const key = t === 'All' ? 'all' : t;
+              const active = filter === key;
+              return (
+                <TouchableOpacity key={t} onPress={() => setFilter(key)} style={styles.tab} activeOpacity={0.7}>
+                  <Text style={[styles.tabText, active && { color: INK }]}>{t.toUpperCase()}</Text>
+                  {active ? <View style={[styles.tabUnderline, { backgroundColor: accent }]} /> : null}
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity onPress={() => setOpenNow((o) => !o)} style={[styles.openChip, openNow && { backgroundColor: accent, borderColor: accent }]} activeOpacity={0.8}>
+              <View style={[styles.dot, { backgroundColor: openNow ? '#fff' : OPEN_GREEN }]} />
+              <Text style={[styles.openChipText, openNow && { color: '#fff' }]}>OPEN NOW</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {/* ── Compact header (fades in on scroll) + account ── */}
+      <View style={[styles.miniHeader, { height: MINI_H, paddingTop: TOP_INSET }]} pointerEvents="box-none">
+        <Animated.View style={[StyleSheet.absoluteFill, styles.miniBgFill, { opacity: miniBg }]} pointerEvents="none" />
+        <Animated.View style={[styles.miniBrand, { opacity: miniBg }]} pointerEvents="none">
+          {property.logo_url ? <Image source={{ uri: property.logo_url }} style={styles.miniLogo} /> : null}
+          <Text style={styles.miniName} numberOfLines={1}>{property.name}</Text>
+        </Animated.View>
+        {onAccountPress ? (
+          <TouchableOpacity style={styles.accountBtn} onPress={onAccountPress} activeOpacity={0.8} hitSlop={8}>
+            <Ionicons name={isLoggedIn ? 'person' : 'person-outline'} size={18} color={INK} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -370,70 +377,63 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
 const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: IVORY },
 
-  // Fixed header
-  header: {
-    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
-    backgroundColor: 'rgba(248,246,242,0.96)', borderBottomWidth: 1, borderBottomColor: HAIRLINE,
-  },
-  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, minHeight: 44 },
-  headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  headerLogo: { width: 30, height: 30, borderRadius: 8 },
-  headerName: { fontSize: 19, fontWeight: '600', color: INK, fontFamily: DISPLAY, letterSpacing: 0.3 },
-  accountBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, backgroundColor: '#fff' },
+  // Compact header
+  miniHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 18, paddingBottom: 8 },
+  miniBgFill: { backgroundColor: 'rgba(248,246,242,0.97)', borderBottomWidth: 1, borderBottomColor: HAIRLINE },
+  miniBrand: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1 },
+  miniLogo: { width: 26, height: 26, borderRadius: 7 },
+  miniName: { fontSize: 16, fontWeight: '500', color: INK, fontFamily: DISPLAY, letterSpacing: 0.3 },
+  accountBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: HAIRLINE, backgroundColor: 'rgba(255,255,255,0.92)' },
 
-  tabsRow: { gap: 22, paddingHorizontal: 20, paddingTop: 12, alignItems: 'flex-end' },
-  tab: { paddingBottom: 12 },
-  tabText: { fontSize: 15, fontWeight: '600', color: MUTED, letterSpacing: 0.2 },
-  tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2.5, borderRadius: 2 },
-  openChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8,
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: HAIRLINE, backgroundColor: '#fff',
-  },
-  openChipText: { fontSize: 12, fontWeight: '700', color: INK },
+  // Sticky tabs
+  tabsBar: { position: 'absolute', top: 0, left: 0, right: 0, height: TABS_H, zIndex: 20, backgroundColor: IVORY, borderBottomWidth: 1, borderBottomColor: HAIRLINE },
+  tabsRow: { gap: 22, paddingHorizontal: 20, alignItems: 'center', height: TABS_H },
+  tab: { justifyContent: 'center', height: TABS_H },
+  tabText: { fontSize: 12.5, fontWeight: '600', color: MUTED, letterSpacing: 1.3 },
+  tabUnderline: { position: 'absolute', bottom: 12, left: 0, right: 0, height: 2, borderRadius: 2 },
+  openChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: HAIRLINE, backgroundColor: '#fff' },
+  openChipText: { fontSize: 11, fontWeight: '700', color: INK, letterSpacing: 0.8 },
 
   // Banner
-  banner: { minHeight: 300, justifyContent: 'flex-end', overflow: 'hidden' },
+  banner: { height: BANNER_H, justifyContent: 'flex-end', overflow: 'hidden' },
   bannerScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.42)' },
-  bannerContent: { paddingHorizontal: 28, paddingTop: 40, paddingBottom: 40, alignItems: 'center' },
-  bannerLogo: { width: 76, height: 76, borderRadius: 18, marginBottom: 20 },
-  bannerEyebrow: { color: 'rgba(255,255,255,0.82)', fontSize: 11, letterSpacing: 3.5, fontWeight: '600', marginBottom: 12 },
-  bannerTitle: { color: '#fff', fontSize: 38, fontFamily: DISPLAY, fontWeight: '600', letterSpacing: 0.5, textAlign: 'center' },
-  bannerSubtitle: { color: 'rgba(255,255,255,0.92)', fontSize: 15, textAlign: 'center', marginTop: 14, lineHeight: 22, maxWidth: 300 },
+  bannerContent: { paddingHorizontal: 28, paddingTop: 40, paddingBottom: 36, alignItems: 'center' },
+  bannerLogo: { width: 70, height: 70, borderRadius: 16, marginBottom: 18 },
+  bannerEyebrow: { color: 'rgba(255,255,255,0.82)', fontSize: 10.5, letterSpacing: 3.5, fontWeight: '500', marginBottom: 12 },
+  bannerTitle: { color: '#fff', fontSize: 30, fontFamily: DISPLAY, fontWeight: '500', letterSpacing: 0.4, textAlign: 'center' },
+  bannerSubtitle: { color: 'rgba(255,255,255,0.92)', fontSize: 14, textAlign: 'center', marginTop: 12, lineHeight: 21, maxWidth: 300 },
 
   // Sections
-  section: { paddingHorizontal: 20, marginTop: 40 },
-  sectionHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 18 },
-  sectionTitle: { fontSize: 26, fontWeight: '800', color: INK, letterSpacing: -0.5 },
-  seeAll: { fontSize: 14, fontWeight: '700' },
+  section: { paddingHorizontal: 20, marginTop: 36 },
+  sectionHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16 },
+  sectionTitle: { fontSize: 19, fontWeight: '600', color: INK, fontFamily: DISPLAY, letterSpacing: 0.3 },
+  seeAll: { fontSize: 13, fontWeight: '600' },
   emptyText: { fontSize: 14, color: MUTED, paddingVertical: 8 },
   carouselRow: { gap: 18, paddingRight: 20 },
 
   // Cards (image-top, white body)
-  card: {
-    backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2,
-  },
-  cardCarousel: { width: SCREEN_W * 0.72, maxWidth: 320 },
+  card: { backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
+  cardCarousel: { width: SCREEN_W * 0.7, maxWidth: 310 },
   cardWide: { width: '100%' },
   cardImage: { width: '100%', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  cardImageCarousel: { height: 170 },
-  cardImageWide: { height: 210 },
-  cardBody: { padding: 18 },
-  cardName: { fontSize: 20, fontWeight: '700', color: INK, fontFamily: DISPLAY, letterSpacing: 0.2 },
-  cardEyebrow: { fontSize: 11, letterSpacing: 1.6, fontWeight: '700', color: MUTED, marginTop: 6 },
-  cardDesc: { fontSize: 14, color: MUTED, marginTop: 10, lineHeight: 20 },
-  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 },
-  price: { fontSize: 16, fontWeight: '700', color: INK },
-  reservePill: { borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 7 },
-  reservePillText: { fontSize: 13, fontWeight: '700' },
+  cardImageCarousel: { height: 160 },
+  cardImageWide: { height: 200 },
+  cardBody: { padding: 16 },
+  cardName: { fontSize: 17, fontWeight: '600', color: INK, fontFamily: DISPLAY, letterSpacing: 0.2 },
+  cardEyebrow: { fontSize: 10.5, letterSpacing: 1.4, fontWeight: '600', color: MUTED, marginTop: 6 },
+  cardDesc: { fontSize: 13.5, color: MUTED, marginTop: 9, lineHeight: 19 },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
+  price: { fontSize: 15, fontWeight: '600', color: INK },
+  reservePill: { borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6 },
+  reservePillText: { fontSize: 12.5, fontWeight: '600' },
 
   openRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  openText: { fontSize: 12, fontWeight: '700' },
+  openText: { fontSize: 11.5, fontWeight: '600' },
 
   fill: { width: '100%', height: '100%' },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  ratingText: { fontSize: 13, fontWeight: '600', color: INK },
+  ratingText: { fontSize: 12.5, fontWeight: '600', color: INK },
   monogram: { borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   monogramText: { color: '#fff', fontWeight: '700' },
 });

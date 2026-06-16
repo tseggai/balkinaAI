@@ -2692,13 +2692,16 @@ export default function ChatScreen() {
             accent={propertyData.primary_color}
             business={businessTarget}
             onClose={() => setBusinessTarget(null)}
-            onBook={(service) =>
-              setBookingTarget({
-                tenantId: businessTarget?.id ?? '',
-                businessName: businessTarget?.name ?? '',
-                service,
-              })
-            }
+            onBook={(service) => {
+              // Dismiss the business sheet first — iOS cannot reliably present a
+              // second modal (the booking flow) on top of an open page-sheet.
+              const biz = businessTarget;
+              setBusinessTarget(null);
+              setTimeout(
+                () => setBookingTarget({ tenantId: biz?.id ?? '', businessName: biz?.name ?? '', service }),
+                320,
+              );
+            }}
           />
           <PropertyBookingFlow
             visible={!!bookingTarget}
