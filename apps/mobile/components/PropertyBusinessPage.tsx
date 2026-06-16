@@ -8,20 +8,18 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  SafeAreaView,
-  Animated,
-  Easing,
-  Dimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatPrice } from '@/lib/currency';
 import type { BookingService } from './PropertyBookingFlow';
 
-const { height: SCREEN_H } = Dimensions.get('window');
-const IVORY = '#F7F4EF';
-const INK = '#1A1A1A';
-const MUTED = '#6B655C';
-const HAIRLINE = '#E4DED4';
+const IVORY = '#F8F6F2';
+const INK = '#171513';
+const MUTED = '#8A837A';
+const HAIRLINE = '#ECE7DE';
+const OPEN_GREEN = '#1E9E63';
+const DISPLAY = Platform.select({ ios: 'Optima', default: undefined });
 
 export interface BusinessSummary {
   id: string;
@@ -43,25 +41,40 @@ interface Props {
   onBook: (service: BookingService) => void;
 }
 
+function to12h(t: string): string {
+  const [hStr, mStr] = t.split(':');
+  let h = parseInt(hStr ?? '0', 10);
+  const mer = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (h === 0) h = 12;
+  return `${h}:${mStr ?? '00'} ${mer}`;
+}
+
+/** Today's open window + open-now flag derived from any service timesheet. */
+function deriveHours(services: BookingService[]): { open: boolean; label: string | null } {
+  const now = new Date();
+  const weekday = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  for (const s of services) {
+    const ts = s.timesheet as Record<string, { enabled?: boolean; start?: string; end?: string }> | null | undefined;
+    const day = ts?.[weekday];
+    if (day && day.enabled !== false && day.start && day.end) {
+      const [sh, sm] = day.start.split(':').map(Number);
+      const [eh, em] = day.end.split(':').map(Number);
+      const mins = now.getHours() * 60 + now.getMinutes();
+      const open = mins >= sh! * 60 + (sm ?? 0) && mins <= eh! * 60 + (em ?? 0);
+      return { open, label: `${to12h(day.start)} – ${to12h(day.end)}` };
+    }
+  }
+  return { open: false, label: null };
+}
+
 export default function PropertyBusinessPage({ visible, apiBase, accent, business, onClose, onBook }: Props) {
   const [services, setServices] = useState<BookingService[]>([]);
   const [loading, setLoading] = useState(false);
-  const anim = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<ScrollView>(null);
   const servicesY = useRef(0);
 
   useEffect(() => {
     if (!visible || !business) return;
-    // Splash entrance: hero fills the screen, then eases down to a header
-    // while the body content fades in.
-    anim.setValue(0);
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: 650,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -83,122 +96,116 @@ export default function PropertyBusinessPage({ visible, apiBase, accent, busines
   const experiences = services.filter((s) => s.service_type === 'event');
   const bookables = services.filter((s) => s.service_type !== 'event');
   const cover = business?.cover_image_url || business?.logo_url || null;
-
-  const heroHeight = anim.interpolate({ inputRange: [0, 1], outputRange: [SCREEN_H, 300] });
-  const heroScale = anim.interpolate({ inputRange: [0, 1], outputRange: [1.15, 1] });
-  const bodyOpacity = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, 0, 1] });
+  const hours = deriveHours(services);
+  const bookableCount = services.length;
 
   const priceLabel = (s: BookingService) =>
     s.hide_price ? '' : `${formatPrice(Number(s.price))}${s.pricing_type === 'per_person' ? ' / guest' : ''}`;
 
+  const onBookPress = () => {
+    if (bookableCount === 1) onBook(services[0]!);
+    else scrollRef.current?.scrollTo({ y: servicesY.current, animated: true });
+  };
+
   return (
-    <Modal visible={visible} animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.container}>
-        {/* Animated hero */}
-        <Animated.View style={[styles.hero, { height: heroHeight, backgroundColor: accent }]}>
-          {cover ? (
-            <Animated.Image source={{ uri: cover }} style={[StyleSheet.absoluteFill, { transform: [{ scale: heroScale }] }]} resizeMode="cover" />
-          ) : null}
-          <View style={styles.heroScrim} />
-          <SafeAreaView style={styles.heroBar}>
-            <TouchableOpacity onPress={onClose} style={styles.heroBtn} hitSlop={10}>
-              <Ionicons name="arrow-back" size={22} color="#fff" />
-            </TouchableOpacity>
-          </SafeAreaView>
-          <View style={styles.heroContent}>
-            {business?.subcategory ? <Text style={styles.heroEyebrow}>{business.subcategory.toUpperCase()}</Text> : null}
-            <Text style={styles.heroTitle} numberOfLines={2}>{business?.name}</Text>
+        {/* Header — name, status, close (above the image, maps-sheet style) */}
+        <View style={styles.handle} />
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title} numberOfLines={2}>{business?.name}</Text>
+            <View style={styles.metaRow}>
+              {hours.label ? (
+                <>
+                  <View style={[styles.dot, { backgroundColor: hours.open ? OPEN_GREEN : '#C0392B' }]} />
+                  <Text style={[styles.metaStrong, { color: hours.open ? OPEN_GREEN : '#C0392B' }]}>{hours.open ? 'Open' : 'Closed'}</Text>
+                  <Text style={styles.metaDim}>· {hours.label}</Text>
+                </>
+              ) : business?.subcategory ? (
+                <Text style={styles.metaDim}>{business.subcategory}</Text>
+              ) : null}
+            </View>
             {business?.avg_rating && business.avg_rating > 0 ? (
               <View style={styles.ratingRow}>
-                <Ionicons name="star" size={13} color="#fff" />
-                <Text style={styles.ratingText}>
-                  {business.avg_rating.toFixed(1)}{business.review_count ? ` · ${business.review_count} reviews` : ''}
-                </Text>
+                <Ionicons name="star" size={13} color={INK} />
+                <Text style={styles.ratingText}>{business.avg_rating.toFixed(1)}{business.review_count ? ` · ${business.review_count} reviews` : ''}</Text>
               </View>
             ) : null}
           </View>
-        </Animated.View>
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={10}>
+            <Ionicons name="close" size={22} color={INK} />
+          </TouchableOpacity>
+        </View>
 
-        {/* Body */}
-        <Animated.View style={[styles.body, { opacity: bodyOpacity }]}>
-          <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            {business?.description ? (
-              <Text style={styles.description}>{business.description}</Text>
-            ) : null}
+        <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+          {/* Cover image */}
+          <View style={[styles.cover, { backgroundColor: accent }]}>
+            {cover ? <Image source={{ uri: cover }} style={styles.fill} resizeMode="cover" /> : null}
+          </View>
 
-            <TouchableOpacity
-              style={[styles.cta, { backgroundColor: accent }]}
-              activeOpacity={0.9}
-              onPress={() => scrollRef.current?.scrollTo({ y: servicesY.current, animated: true })}
-            >
-              <Text style={styles.ctaText}>Book now</Text>
-              <Ionicons name="arrow-down" size={18} color="#fff" />
-            </TouchableOpacity>
+          {business?.description ? <Text style={styles.description}>{business.description}</Text> : null}
 
-            {loading ? (
-              <ActivityIndicator color={accent} style={{ marginTop: 40 }} />
-            ) : (
-              <View onLayout={(e) => { servicesY.current = e.nativeEvent.layout.y; }}>
-                {/* Experiences */}
-                {experiences.length > 0 && (
-                  <>
-                    <Text style={styles.sectionTitle}>Experiences</Text>
-                    {experiences.map((s) => (
-                      <TouchableOpacity key={s.id} style={styles.expCard} activeOpacity={0.85} onPress={() => onBook(s)}>
-                        <View style={[styles.expThumb, { backgroundColor: accent }]}>
-                          {s.image_url ? (
-                            <Image source={{ uri: s.image_url }} style={styles.fill} resizeMode="cover" />
-                          ) : (
-                            <Ionicons name="sparkles-outline" size={24} color="rgba(255,255,255,0.85)" />
-                          )}
-                        </View>
-                        <View style={styles.expBody}>
-                          <Text style={styles.rowName} numberOfLines={1}>{s.name}</Text>
-                          {s.description ? <Text style={styles.rowDesc} numberOfLines={2}>{s.description}</Text> : null}
-                          <View style={styles.expFooter}>
-                            {priceLabel(s) ? <Text style={styles.price}>{priceLabel(s)}</Text> : <View />}
-                            <View style={[styles.pill, { borderColor: accent }]}>
-                              <Text style={[styles.pillText, { color: accent }]}>Reserve</Text>
-                            </View>
+          {loading ? (
+            <ActivityIndicator color={accent} style={{ marginTop: 40 }} />
+          ) : (
+            <View onLayout={(e) => { servicesY.current = e.nativeEvent.layout.y; }}>
+              {experiences.length > 0 && (
+                <>
+                  <Text style={styles.sectionTitle}>EXPERIENCES.</Text>
+                  {experiences.map((s) => (
+                    <TouchableOpacity key={s.id} style={styles.expCard} activeOpacity={0.9} onPress={() => onBook(s)}>
+                      <View style={[styles.expImage, { backgroundColor: accent }]}>
+                        {s.image_url ? <Image source={{ uri: s.image_url }} style={styles.fill} resizeMode="cover" />
+                                     : <Ionicons name="sparkles-outline" size={24} color="rgba(255,255,255,0.85)" />}
+                      </View>
+                      <View style={styles.expBody}>
+                        <Text style={styles.rowName} numberOfLines={1}>{s.name}</Text>
+                        {s.description ? <Text style={styles.rowDesc} numberOfLines={2}>{s.description}</Text> : null}
+                        <View style={styles.expFooter}>
+                          {priceLabel(s) ? <Text style={styles.price}>{priceLabel(s)}</Text> : <View />}
+                          <View style={[styles.pill, { borderColor: accent }]}>
+                            <Text style={[styles.pillText, { color: accent }]}>Reserve</Text>
                           </View>
                         </View>
-                      </TouchableOpacity>
-                    ))}
-                  </>
-                )}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
 
-                {/* Services */}
-                {bookables.length > 0 && (
-                  <>
-                    <Text style={styles.sectionTitle}>{experiences.length > 0 ? 'Services' : 'Book'}</Text>
-                    {bookables.map((s) => (
-                      <TouchableOpacity key={s.id} style={styles.row} activeOpacity={0.85} onPress={() => onBook(s)}>
-                        {s.image_url ? (
-                          <Image source={{ uri: s.image_url }} style={styles.rowThumb} />
-                        ) : (
-                          <View style={[styles.rowThumb, { backgroundColor: accent }]} />
-                        )}
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.rowName} numberOfLines={1}>{s.name}</Text>
-                          <Text style={styles.rowMeta}>
-                            {s.service_type === 'table' ? 'Reservation' : `${s.duration_minutes} min`}
-                            {priceLabel(s) ? ` · ${priceLabel(s)}` : ''}
-                          </Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={18} color={MUTED} />
-                      </TouchableOpacity>
-                    ))}
-                  </>
-                )}
+              {bookables.length > 0 && (
+                <>
+                  <Text style={styles.sectionTitle}>{experiences.length > 0 ? 'SERVICES.' : 'BOOK.'}</Text>
+                  {bookables.map((s) => (
+                    <TouchableOpacity key={s.id} style={styles.row} activeOpacity={0.85} onPress={() => onBook(s)}>
+                      {s.image_url ? <Image source={{ uri: s.image_url }} style={styles.rowThumb} />
+                                   : <View style={[styles.rowThumb, { backgroundColor: accent }]} />}
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.rowName} numberOfLines={1}>{s.name}</Text>
+                        <Text style={styles.rowMeta}>
+                          {s.service_type === 'table' ? 'Reservation' : `${s.duration_minutes} min`}
+                          {priceLabel(s) ? ` · ${priceLabel(s)}` : ''}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color={MUTED} />
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
 
-                {!loading && services.length === 0 && (
-                  <Text style={styles.empty}>No bookable services right now.</Text>
-                )}
-              </View>
-            )}
-            <View style={{ height: 60 }} />
-          </ScrollView>
-        </Animated.View>
+              {!loading && services.length === 0 && <Text style={styles.empty}>No bookable services right now.</Text>}
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Floating Book button — consistent with the concierge pill */}
+        {bookableCount > 0 ? (
+          <TouchableOpacity style={[styles.fab, { backgroundColor: accent }]} activeOpacity={0.9} onPress={onBookPress}>
+            <Ionicons name="calendar-outline" size={18} color="#fff" />
+            <Text style={styles.fabText}>Book</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </Modal>
   );
@@ -206,44 +213,48 @@ export default function PropertyBusinessPage({ visible, apiBase, accent, busines
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: IVORY },
-  hero: { width: '100%', overflow: 'hidden', justifyContent: 'flex-end' },
-  heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.34)' },
-  heroBar: { position: 'absolute', top: 0, left: 0, right: 0 },
-  heroBtn: {
-    margin: 12, width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center',
-  },
-  heroContent: { padding: 24, paddingBottom: 28 },
-  heroEyebrow: { color: 'rgba(255,255,255,0.85)', fontSize: 11, letterSpacing: 2.4, fontWeight: '700', marginBottom: 8 },
-  heroTitle: { color: '#fff', fontSize: 32, fontWeight: '700', letterSpacing: 0.3 },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
-  ratingText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: '#D8D2C8', marginTop: 8, marginBottom: 6 },
 
-  body: { flex: 1 },
-  scrollContent: { padding: 20 },
-  description: { fontSize: 15, color: MUTED, lineHeight: 22, marginBottom: 18 },
+  header: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 22, paddingTop: 6, paddingBottom: 16 },
+  title: { fontSize: 30, fontWeight: '800', color: INK, fontFamily: DISPLAY, letterSpacing: 0.2 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  metaStrong: { fontSize: 14, fontWeight: '700' },
+  metaDim: { fontSize: 14, color: MUTED },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
+  ratingText: { fontSize: 13, fontWeight: '600', color: INK },
+  closeBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', borderWidth: 1, borderColor: HAIRLINE, alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
 
-  cta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 15 },
-  ctaText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  cover: { width: '100%', height: 240, overflow: 'hidden' },
+  description: { fontSize: 15, color: '#4A453E', lineHeight: 23, paddingHorizontal: 22, paddingTop: 22 },
 
-  sectionTitle: { fontSize: 13, letterSpacing: 2, fontWeight: '700', color: INK, marginTop: 28, marginBottom: 14, textTransform: 'uppercase' },
+  sectionTitle: { fontSize: 20, fontWeight: '800', color: INK, letterSpacing: -0.3, marginTop: 30, marginBottom: 16, paddingHorizontal: 22 },
 
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#fff',
-    borderRadius: 14, padding: 14, borderWidth: 1, borderColor: HAIRLINE, marginBottom: 12,
+    borderRadius: 16, padding: 14, marginHorizontal: 22, marginBottom: 12,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 1,
   },
-  rowThumb: { width: 52, height: 52, borderRadius: 10 },
+  rowThumb: { width: 54, height: 54, borderRadius: 12 },
   rowName: { fontSize: 16, fontWeight: '700', color: INK },
   rowMeta: { fontSize: 13, color: MUTED, marginTop: 3 },
-  rowDesc: { fontSize: 13, color: MUTED, marginTop: 4, lineHeight: 18 },
+  rowDesc: { fontSize: 13, color: MUTED, marginTop: 5, lineHeight: 19 },
 
-  expCard: { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: HAIRLINE, overflow: 'hidden', marginBottom: 14 },
-  expThumb: { height: 150, alignItems: 'center', justifyContent: 'center' },
-  expBody: { padding: 16 },
-  expFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
-  price: { fontSize: 15, fontWeight: '700', color: INK },
-  pill: { borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6 },
+  expCard: { backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden', marginHorizontal: 22, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2 },
+  expImage: { height: 160, alignItems: 'center', justifyContent: 'center' },
+  expBody: { padding: 18 },
+  expFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 },
+  price: { fontSize: 16, fontWeight: '700', color: INK },
+  pill: { borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 7 },
   pillText: { fontSize: 13, fontWeight: '700' },
+
+  fab: {
+    position: 'absolute', bottom: 28, alignSelf: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 26, paddingVertical: 15, borderRadius: 999,
+    shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 7,
+  },
+  fabText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
 
   fill: { width: '100%', height: '100%' },
   empty: { fontSize: 14, color: MUTED, marginTop: 28, textAlign: 'center' },
