@@ -1107,7 +1107,35 @@ export async function POST(request: Request) {
         }
 
         console.log(`[chat] ⏱ TOTAL chat processing: ${Date.now() - chatStartTime}ms (${toolRound} rounds)`);
-        // Max tool rounds reached
+        // Max tool rounds reached. Force a final text answer (tools disabled) so
+        // the client never receives an empty stream ("I couldn't process that").
+        let finalText = '';
+        try {
+          const finalResp = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            max_tokens: 1024,
+            messages: currentMessages,
+            stream: true,
+          });
+          for await (const chunk of finalResp) {
+            const c = chunk.choices[0]?.delta?.content;
+            if (c) {
+              finalText += c;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', content: c })}\n\n`));
+            }
+          }
+        } catch (finalErr) {
+          console.error('[chat] final completion failed:', finalErr);
+        }
+        if (!finalText) {
+          finalText = "I'm having trouble pulling that together right now. Could you rephrase, or tell me what you'd like to book?";
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', content: finalText })}\n\n`));
+        }
+        await supabase.from('chat_messages').insert({
+          session_id: chatSession!.id,
+          role: 'assistant',
+          content: finalText,
+        } as never);
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`),
         );
