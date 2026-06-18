@@ -343,7 +343,7 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
       {/* Sticky nav bar */}
       {navTabs.length > 0 && (
         <Animated.View style={[styles.tabsBar, { transform: [{ translateY: tabsTranslate }] }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} alwaysBounceVertical={false} directionalLockEnabled contentContainerStyle={styles.tabsRow}>
             {navTabs.map((t) => (
               <TouchableOpacity key={t} onPress={() => scrollToSection(t)} style={styles.tab} activeOpacity={0.7}>
                 <Text style={styles.tabText}>{t.toUpperCase()}</Text>
@@ -421,9 +421,9 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   accountBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: HAIRLINE, backgroundColor: 'rgba(255,255,255,0.92)' },
 
-  tabsBar: { position: 'absolute', top: 0, left: 0, right: 0, height: TABS_H, zIndex: 20, backgroundColor: IVORY, borderBottomWidth: 1, borderBottomColor: HAIRLINE },
-  tabsRow: { gap: 24, paddingHorizontal: 20, alignItems: 'center', height: TABS_H },
-  tab: { justifyContent: 'center', height: TABS_H },
+  tabsBar: { position: 'absolute', top: 0, left: 0, right: 0, height: TABS_H, zIndex: 20, backgroundColor: IVORY, borderBottomWidth: 1, borderBottomColor: HAIRLINE, justifyContent: 'center' },
+  tabsRow: { gap: 24, paddingHorizontal: 20, alignItems: 'center' },
+  tab: { justifyContent: 'center', paddingVertical: 8 },
   tabText: { fontSize: 12.5, fontWeight: '600', color: INK, letterSpacing: 1.3 },
 
   banner: { height: BANNER_H, justifyContent: 'flex-end', overflow: 'hidden' },
