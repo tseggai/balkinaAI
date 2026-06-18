@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ImageUpload } from '@/components/image-upload';
+import { DateTimeField } from '@/components/datetime-field';
 import { PropertyDashboardShell } from '@/components/property-dashboard-shell';
 
 interface Property {
@@ -1501,11 +1502,11 @@ function CampaignsSection({ slug, tenants }: { slug: string; tenants: PropertyTe
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600">Starts</label>
-                  <input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                  <DateTimeField value={form.starts_at} onChange={(v) => setForm({ ...form, starts_at: v })} placeholder="Start date & time" />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600">Ends</label>
-                  <input type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                  <DateTimeField value={form.ends_at} onChange={(v) => setForm({ ...form, ends_at: v })} placeholder="End date & time" />
                 </div>
                 <div className="col-span-2">
                   <label className="mb-1 block text-xs font-medium text-gray-600">Description</label>
