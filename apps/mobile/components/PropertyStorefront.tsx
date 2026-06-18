@@ -92,6 +92,7 @@ interface Props {
   apiBase: string;
   isLoggedIn?: boolean;
   onAccountPress?: () => void;
+  customer?: { userId: string | null; name: string | null; phone: string | null; email: string | null };
   onSelectBusiness: (tenant: StorefrontTenant) => void;
   onSelectEvent: (event: EventService, tenantName: string) => void;
 }
@@ -120,7 +121,7 @@ function Rating({ avg, count }: { avg: number | null; count: number | null }) {
 
 type SectionTarget = { title: string; mode: 'business' | 'event'; tenants?: StorefrontTenant[]; events?: EventService[] };
 
-export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAccountPress, onSelectBusiness, onSelectEvent }: Props) {
+export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAccountPress, customer, onSelectBusiness, onSelectEvent }: Props) {
   const accent = property.primary_color || '#1a365d';
   const [allServices, setAllServices] = useState<EventService[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
@@ -433,8 +434,10 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
       <PropertyCampaignDetail
         visible={!!activeCampaign}
         accent={accent}
+        apiBase={apiBase}
         campaign={activeCampaign}
         partnerNames={(activeCampaign?.tenant_ids ?? []).map((id) => tenantById.get(id)?.name).filter(Boolean) as string[]}
+        customer={customer ?? { userId: null, name: null, phone: null, email: null }}
         onClose={() => setActiveCampaign(null)}
       />
     </View>

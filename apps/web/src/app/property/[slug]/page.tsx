@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ImageUpload } from '@/components/image-upload';
+import { DateTimeField } from '@/components/datetime-field';
 import { PropertyDashboardShell } from '@/components/property-dashboard-shell';
 
 interface Property {
@@ -1307,6 +1308,8 @@ interface Campaign {
   is_property_only: boolean;
   cta_label: string | null;
   cta_url: string | null;
+  cta_type: string;
+  cta_fields: string[];
   is_active: boolean;
   tenant_ids: string[];
 }
@@ -1321,8 +1324,25 @@ const CAMPAIGN_TYPES = [
 const EMPTY_FORM = {
   title: '', blurb: '', description: '', image_url: '', campaign_type: 'promotion',
   starts_at: '', ends_at: '', location: '', is_property_only: true, cta_label: '', cta_url: '',
+  cta_type: 'none', cta_fields: [] as string[],
   tenantIds: [] as string[],
 };
+
+const CTA_TYPES = [
+  { value: 'none', label: 'No button' },
+  { value: 'rsvp', label: 'RSVP' },
+  { value: 'signup', label: 'Sign up' },
+  { value: 'learn_more', label: 'Learn more (link)' },
+];
+
+const COLLECT_FIELDS = [
+  { key: 'first_name', label: 'First name' },
+  { key: 'last_name', label: 'Last name' },
+  { key: 'email', label: 'Email' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'plus_ones', label: 'Plus-ones' },
+  { key: 'notes', label: 'Notes' },
+];
 
 function toLocalInput(iso: string | null): string {
   if (!iso) return '';
@@ -1356,7 +1376,8 @@ function CampaignsSection({ slug, tenants }: { slug: string; tenants: PropertyTe
       title: c.title, blurb: c.blurb ?? '', description: c.description ?? '', image_url: c.image_url ?? '',
       campaign_type: c.campaign_type, starts_at: toLocalInput(c.starts_at), ends_at: toLocalInput(c.ends_at),
       location: c.location ?? '', is_property_only: c.is_property_only, cta_label: c.cta_label ?? '',
-      cta_url: c.cta_url ?? '', tenantIds: c.tenant_ids ?? [],
+      cta_url: c.cta_url ?? '', cta_type: c.cta_type ?? 'none', cta_fields: c.cta_fields ?? [],
+      tenantIds: c.tenant_ids ?? [],
     });
     setShowForm(true);
   };
@@ -1397,6 +1418,10 @@ function CampaignsSection({ slug, tenants }: { slug: string; tenants: PropertyTe
   const toggleTenant = (tid: string) => {
     setForm((f) => ({ ...f, tenantIds: f.tenantIds.includes(tid) ? f.tenantIds.filter((x) => x !== tid) : [...f.tenantIds, tid] }));
   };
+  const toggleField = (key: string) => {
+    setForm((f) => ({ ...f, cta_fields: f.cta_fields.includes(key) ? f.cta_fields.filter((x) => x !== key) : [...f.cta_fields, key] }));
+  };
+  const [entriesFor, setEntriesFor] = useState<Campaign | null>(null);
 
   return (
     <div>
@@ -1431,12 +1456,17 @@ function CampaignsSection({ slug, tenants }: { slug: string; tenants: PropertyTe
                 {c.ends_at ? ` – ${new Date(c.ends_at).toLocaleDateString()}` : ''}
               </p>
             </div>
+            {c.cta_type === 'rsvp' || c.cta_type === 'signup' ? (
+              <button onClick={() => setEntriesFor(c)} className="rounded-lg px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Entries</button>
+            ) : null}
             <button onClick={() => toggleActive(c)} className="rounded-lg px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">{c.is_active ? 'Pause' : 'Activate'}</button>
             <button onClick={() => openEdit(c)} className="rounded-lg px-3 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50">Edit</button>
             <button onClick={() => remove(c)} className="rounded-lg px-3 py-1 text-xs font-medium text-red-500 hover:bg-red-50">Delete</button>
           </div>
         ))}
       </div>
+
+      <CampaignEntriesModal slug={slug} campaign={entriesFor} onClose={() => setEntriesFor(null)} />
 
       {showForm && (
         <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4" onClick={() => setShowForm(false)}>
@@ -1472,24 +1502,59 @@ function CampaignsSection({ slug, tenants }: { slug: string; tenants: PropertyTe
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600">Starts</label>
-                  <input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                  <DateTimeField value={form.starts_at} onChange={(v) => setForm({ ...form, starts_at: v })} placeholder="Start date & time" />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600">Ends</label>
-                  <input type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                  <DateTimeField value={form.ends_at} onChange={(v) => setForm({ ...form, ends_at: v })} placeholder="End date & time" />
                 </div>
                 <div className="col-span-2">
                   <label className="mb-1 block text-xs font-medium text-gray-600">Description</label>
                   <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={4} placeholder="What's happening, who it's for, how to take part…" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Button label (optional)</label>
-                  <input value={form.cta_label} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} placeholder="RSVP / Learn more" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+              </div>
+
+              {/* Call to action */}
+              <div className="rounded-lg border border-gray-200 p-3">
+                <p className="mb-2 text-xs font-semibold text-gray-700">Call to action</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Button</label>
+                    <select value={form.cta_type} onChange={(e) => setForm({ ...form, cta_type: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+                      {CTA_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                  </div>
+                  {form.cta_type !== 'none' && (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600">Button label</label>
+                      <input value={form.cta_label} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} placeholder={form.cta_type === 'learn_more' ? 'Learn more' : 'RSVP'} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Button link (optional)</label>
-                  <input value={form.cta_url} onChange={(e) => setForm({ ...form, cta_url: e.target.value })} placeholder="https://…" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-                </div>
+
+                {form.cta_type === 'learn_more' && (
+                  <div className="mt-3">
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Link URL</label>
+                    <input value={form.cta_url} onChange={(e) => setForm({ ...form, cta_url: e.target.value })} placeholder="https://…" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                  </div>
+                )}
+
+                {(form.cta_type === 'rsvp' || form.cta_type === 'signup') && (
+                  <div className="mt-3">
+                    <p className="mb-2 text-xs text-gray-500">Collect from customers</p>
+                    <div className="flex flex-wrap gap-2">
+                      {COLLECT_FIELDS.map((f) => {
+                        const on = form.cta_fields.includes(f.key);
+                        return (
+                          <button key={f.key} type="button" onClick={() => toggleField(f.key)}
+                            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${on ? 'bg-brand-500 text-white' : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50'}`}>
+                            {on ? '✓ ' : '+ '}{f.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="rounded-lg border border-gray-200 p-3">
@@ -1518,6 +1583,64 @@ function CampaignsSection({ slug, tenants }: { slug: string; tenants: PropertyTe
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function CampaignEntriesModal({ slug, campaign, onClose }: { slug: string; campaign: Campaign | null; onClose: () => void }) {
+  const [data, setData] = useState<{ fields: string[]; entries: { id: string; data: Record<string, unknown>; created_at: string }[] } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!campaign) { setData(null); return; }
+    setLoading(true);
+    fetch(`/api/property/${slug}/campaigns/${campaign.id}/entries`)
+      .then((r) => r.json())
+      .then((j) => setData(j.error ? { fields: [], entries: [] } : j))
+      .catch(() => setData({ fields: [], entries: [] }))
+      .finally(() => setLoading(false));
+  }, [slug, campaign]);
+
+  if (!campaign) return null;
+  const fieldLabel = (k: string) => COLLECT_FIELDS.find((f) => f.key === k)?.label ?? k;
+  const fields = data?.fields ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" onClick={onClose}>
+      <div className="my-8 w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{campaign.title} — entries</h3>
+            <p className="text-xs text-gray-500">{data?.entries.length ?? 0} {(data?.entries.length ?? 0) === 1 ? 'entry' : 'entries'}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          {loading ? (
+            <p className="py-8 text-center text-sm text-gray-400">Loading…</p>
+          ) : (data?.entries.length ?? 0) === 0 ? (
+            <p className="py-8 text-center text-sm text-gray-400">No entries yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-400">
+                  {fields.map((f) => <th key={f} className="py-2 pr-4 font-medium">{fieldLabel(f)}</th>)}
+                  <th className="py-2 font-medium">Submitted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.entries ?? []).map((e) => (
+                  <tr key={e.id} className="border-b border-gray-100">
+                    {fields.map((f) => <td key={f} className="py-2 pr-4 text-gray-700">{String(e.data[f] ?? '—')}</td>)}
+                    <td className="py-2 text-gray-400">{new Date(e.created_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

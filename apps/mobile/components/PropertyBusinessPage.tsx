@@ -144,15 +144,28 @@ function ServiceSheet({
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={close} />
       </Animated.View>
       <Animated.View style={[styles.sheet, { transform: [{ translateY: slide }] }]}>
-        <View style={styles.sheetHandle} />
-        <View style={styles.sheetHeader}>
-          <Text style={styles.sheetTitle} numberOfLines={2}>{service.name}</Text>
-          <TouchableOpacity onPress={close} style={styles.sheetClose} hitSlop={10}>
-            <Ionicons name="close" size={22} color={INK} />
-          </TouchableOpacity>
-        </View>
+        {service.image_url ? (
+          <View style={styles.sheetImage}>
+            <Image source={{ uri: service.image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <View style={styles.sheetHandleLight} />
+            <TouchableOpacity onPress={close} style={styles.sheetImageClose} hitSlop={10}>
+              <Ionicons name="close" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.sheetHandle} />
+        )}
 
-        <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.sheetScroll} showsVerticalScrollIndicator={false}>
+          <View style={styles.sheetTitleRow}>
+            <Text style={styles.sheetTitle} numberOfLines={2}>{service.name}</Text>
+            {!service.image_url ? (
+              <TouchableOpacity onPress={close} style={styles.sheetClose} hitSlop={10}>
+                <Ionicons name="close" size={22} color={INK} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
           <View style={styles.sheetMetaRow}>
             {!service.hide_price ? <Text style={styles.sheetPrice}>{formatPrice(base)}{perPerson ? ' / guest' : ''}</Text> : null}
             {service.service_type !== 'event' ? <Text style={styles.sheetMeta}>{service.duration_minutes} min</Text> : null}
@@ -400,7 +413,12 @@ const styles = StyleSheet.create({
 
   // Service sheet
   sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, height: SCREEN_H * 0.86, backgroundColor: IVORY, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 22 },
+  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, height: SCREEN_H * 0.86, backgroundColor: IVORY, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' },
+  sheetImage: { width: '100%', height: 180, backgroundColor: '#ddd' },
+  sheetImageClose: { position: 'absolute', top: 14, right: 14, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
+  sheetHandleLight: { position: 'absolute', top: 8, alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.75)' },
+  sheetScroll: { paddingHorizontal: 22, paddingTop: 14, paddingBottom: 110 },
+  sheetTitleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   sheetHandle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: '#D8D2C8', marginTop: 10, marginBottom: 8 },
   sheetHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 },
   sheetTitle: { flex: 1, fontSize: 24, fontWeight: '600', color: INK, fontFamily: DISPLAY, letterSpacing: 0.2 },

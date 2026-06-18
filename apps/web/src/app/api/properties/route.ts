@@ -114,7 +114,7 @@ export async function GET(request: Request) {
   const nowIso = new Date().toISOString();
   const { data: campaignRows } = await supabase
     .from('property_campaigns')
-    .select('id, title, blurb, description, image_url, campaign_type, starts_at, ends_at, location, is_property_only, cta_label, cta_url')
+    .select('id, title, blurb, description, image_url, campaign_type, starts_at, ends_at, location, is_property_only, cta_label, cta_url, cta_type, cta_fields')
     .eq('property_id', (property as { id: string }).id)
     .eq('is_active', true)
     .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
