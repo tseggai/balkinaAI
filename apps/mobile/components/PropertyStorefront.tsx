@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatPrice } from '@/lib/currency';
 import PropertySectionList from './PropertySectionList';
 import PropertySearch from './PropertySearch';
+import PropertyCampaignDetail, { Campaign } from './PropertyCampaignDetail';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const IVORY = '#F8F6F2';
@@ -83,6 +84,7 @@ export interface StorefrontProperty {
   welcome_message: string;
   primary_color: string;
   tenants: StorefrontTenant[];
+  campaigns?: Campaign[];
 }
 
 interface Props {
@@ -124,6 +126,8 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
   const [servicesLoading, setServicesLoading] = useState(true);
   const [sectionList, setSectionList] = useState<SectionTarget | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null);
+  const campaigns = property.campaigns ?? [];
 
   const scrollY = useRef(new Animated.Value(0)).current;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -321,6 +325,24 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
 
         <View style={{ height: TABS_H }} />
 
+        {/* Campaigns strip (above categories) */}
+        {campaigns.length > 0 && (
+          <View style={styles.campaignSection}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.campaignRow}>
+              {campaigns.map((c) => (
+                <TouchableOpacity key={c.id} style={styles.campaignCard} activeOpacity={0.9} onPress={() => setActiveCampaign(c)}>
+                  {c.image_url ? <Image source={{ uri: c.image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <View style={[StyleSheet.absoluteFill, { backgroundColor: accent }]} />}
+                  <View style={styles.campaignScrim} />
+                  <View style={styles.campaignContent}>
+                    <Text style={styles.campaignTitle} numberOfLines={1}>{c.title}</Text>
+                    {c.blurb ? <Text style={styles.campaignBlurb} numberOfLines={1}>{c.blurb}</Text> : null}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         <BizSection title="Featured" list={featured} />
 
         {/* Experiences */}
@@ -406,6 +428,15 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
           if (full) setTimeout(() => onSelectEvent(full, tenantById.get(full.tenant_id)?.name ?? ''), 320);
         }}
       />
+
+      {/* Campaign detail */}
+      <PropertyCampaignDetail
+        visible={!!activeCampaign}
+        accent={accent}
+        campaign={activeCampaign}
+        partnerNames={(activeCampaign?.tenant_ids ?? []).map((id) => tenantById.get(id)?.name).filter(Boolean) as string[]}
+        onClose={() => setActiveCampaign(null)}
+      />
     </View>
   );
 }
@@ -433,6 +464,14 @@ const styles = StyleSheet.create({
   bannerEyebrow: { color: 'rgba(255,255,255,0.82)', fontSize: 10.5, letterSpacing: 3.5, fontWeight: '500', marginBottom: 12 },
   bannerTitle: { color: '#fff', fontSize: 30, fontFamily: DISPLAY, fontWeight: '500', letterSpacing: 0.4, textAlign: 'center' },
   bannerSubtitle: { color: 'rgba(255,255,255,0.92)', fontSize: 14, textAlign: 'center', marginTop: 12, lineHeight: 21, maxWidth: 300 },
+
+  campaignSection: { marginTop: 26 },
+  campaignRow: { gap: 14, paddingHorizontal: 20, paddingRight: 24 },
+  campaignCard: { width: SCREEN_W * 0.82, maxWidth: 360, height: 104, borderRadius: 16, overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: INK },
+  campaignScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  campaignContent: { padding: 16 },
+  campaignTitle: { color: '#fff', fontSize: 17, fontWeight: '700', fontFamily: DISPLAY, letterSpacing: 0.2 },
+  campaignBlurb: { color: 'rgba(255,255,255,0.92)', fontSize: 13, marginTop: 3 },
 
   section: { paddingHorizontal: 20, marginTop: 36 },
   sectionHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16 },

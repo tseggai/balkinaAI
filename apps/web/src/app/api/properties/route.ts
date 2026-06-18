@@ -110,8 +110,35 @@ export async function GET(request: Request) {
     subcategory: catMap.get(t.id)?.subcategory ?? undefined,
   }));
 
+  // Active campaigns (running or upcoming) for the storefront strip.
+  const nowIso = new Date().toISOString();
+  const { data: campaignRows } = await supabase
+    .from('property_campaigns')
+    .select('id, title, blurb, description, image_url, campaign_type, starts_at, ends_at, location, is_property_only, cta_label, cta_url')
+    .eq('property_id', (property as { id: string }).id)
+    .eq('is_active', true)
+    .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
+    .order('display_order', { ascending: true })
+    .order('starts_at', { ascending: true });
+
+  const campaigns = (campaignRows ?? []) as { id: string }[];
+  const campIds = campaigns.map((c) => c.id);
+  const campTenants = new Map<string, string[]>();
+  if (campIds.length > 0) {
+    const { data: ctRows } = await supabase
+      .from('campaign_tenants')
+      .select('campaign_id, tenant_id')
+      .in('campaign_id', campIds);
+    for (const r of (ctRows ?? []) as { campaign_id: string; tenant_id: string }[]) {
+      const arr = campTenants.get(r.campaign_id) ?? [];
+      arr.push(r.tenant_id);
+      campTenants.set(r.campaign_id, arr);
+    }
+  }
+
   return NextResponse.json({
     property,
     tenants: enrichedTenants,
+    campaigns: campaigns.map((c) => ({ ...c, tenant_ids: campTenants.get(c.id) ?? [] })),
   }, { headers: CORS_HEADERS });
 }

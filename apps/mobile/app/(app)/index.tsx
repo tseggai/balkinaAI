@@ -33,6 +33,7 @@ import PropertyStorefront, { StorefrontTenant } from '@/components/PropertyStore
 import PropertyBookingFlow, { BookingService } from '@/components/PropertyBookingFlow';
 import PropertyBusinessPage, { BusinessSummary } from '@/components/PropertyBusinessPage';
 import PropertyAccountDrawer from '@/components/PropertyAccountDrawer';
+import { Campaign } from '@/components/PropertyCampaignDetail';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
 import { consumePendingDeepLinkTenant, parseTenantFromUrl } from '@/lib/deepLink';
 import { formatPrice, currencySymbol } from '@/lib/currency';
@@ -1453,6 +1454,7 @@ export default function ChatScreen() {
   const [propertyData, setPropertyData] = useState<{
     id: string; name: string; logo_url: string | null; cover_image_url: string | null; welcome_message: string; primary_color: string;
     tenants: { id: string; name: string; logo_url: string | null; cover_image_url: string | null; category: string | null; subcategory: string | null; description: string | null; slug: string | null; avg_rating: number | null; review_count: number | null; featured?: boolean }[];
+    campaigns?: Campaign[];
   } | null>(null);
   const [conciergeOpen, setConciergeOpen] = useState(false);
   const conciergeInputRef = useRef<TextInput>(null);
@@ -1492,6 +1494,7 @@ export default function ChatScreen() {
           welcome_message: data.property.welcome_message ?? 'What would you like to book today?',
           primary_color: data.property.primary_color ?? '#6B7FC4',
           tenants: data.tenants ?? [],
+          campaigns: data.campaigns ?? [],
         });
       } catch { /* ignore */ } finally {
         setPropertyLoading(false);
