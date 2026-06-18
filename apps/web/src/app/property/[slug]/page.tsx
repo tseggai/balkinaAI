@@ -363,7 +363,6 @@ function TenantsTab({
   onToggleFeatured: (linkId: string, featured: boolean) => void;
   onRemoveTenant: (linkId: string) => void;
 }) {
-  const portalOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
   const [invites, setInvites] = useState<Invite[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
@@ -382,6 +381,7 @@ function TenantsTab({
   const [discoverResults, setDiscoverResults] = useState<DiscoverTenant[]>([]);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const [detailTenantId, setDetailTenantId] = useState<string | null>(null);
   // Per-application business-type choice (defaults to 'service'). Hospitality
   // classification is set HERE by the property owner — it is not offered on the
   // global self-serve signup. Drives the experience/table flow + label set.
@@ -531,10 +531,10 @@ function TenantsTab({
               {t.featured && <span className="text-xs text-brand-600 font-medium">Featured</span>}
             </div>
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE.active}`}>active</span>
-            <a href={`${portalOrigin}/property/${slug}`} target="_blank" rel="noopener noreferrer"
+            <button onClick={() => setDetailTenantId(t.tenant_id)}
               className="rounded-lg px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
-              View Page
-            </a>
+              View details
+            </button>
             <button onClick={() => onToggleFeatured(t.id, t.featured)}
               className={`rounded-lg px-3 py-1 text-xs font-medium ${t.featured ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-gray-500'}`}>
               {t.featured ? '★ Featured' : '☆ Feature'}
@@ -674,8 +674,102 @@ function TenantsTab({
           </div>
         </div>
       )}
+
+      <TenantDetailModal slug={slug} tenantId={detailTenantId} onClose={() => setDetailTenantId(null)} />
     </div>
   );
+}
+
+function TenantDetailModal({ slug, tenantId, onClose }: { slug: string; tenantId: string | null; onClose: () => void }) {
+  const [data, setData] = useState<TenantDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!tenantId) { setData(null); return; }
+    setLoading(true);
+    fetch(`/api/property/${slug}/tenant/${tenantId}`)
+      .then((r) => r.json())
+      .then((j) => setData(j.error ? null : j))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, [slug, tenantId]);
+
+  if (!tenantId) return null;
+  const t = data?.tenant;
+  const s = data?.stats;
+  const money = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4" onClick={onClose}>
+      <div className="my-8 w-full max-w-2xl rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+        {loading || !data ? (
+          <div className="p-10 text-center text-sm text-gray-400">{loading ? 'Loading insights…' : 'Could not load this business.'}</div>
+        ) : (
+          <>
+            <div className="relative h-32 rounded-t-xl bg-gray-100">
+              {t?.cover_image_url ? <img src={t.cover_image_url} alt="" className="h-full w-full rounded-t-xl object-cover" /> : null}
+              <button onClick={onClose} className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-sm text-gray-600 hover:bg-white">✕</button>
+            </div>
+            <div className="p-6">
+              <div className="-mt-12 flex items-end gap-3">
+                {t?.logo_url ? <img src={t.logo_url} alt="" className="h-16 w-16 rounded-xl border-4 border-white object-cover" /> : <div className="flex h-16 w-16 items-center justify-center rounded-xl border-4 border-white bg-gray-200 text-xl font-bold text-gray-500">{t?.name?.charAt(0)}</div>}
+                <div className="pb-1">
+                  <h3 className="text-lg font-bold text-gray-900">{t?.name}</h3>
+                  <p className="text-xs text-gray-500">{[t?.location_name, t?.address].filter(Boolean).join(' · ') || t?.email || ''}</p>
+                </div>
+              </div>
+
+              {t?.description ? <p className="mt-4 text-sm text-gray-600">{t.description}</p> : null}
+
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Stat label="Revenue" value={money(s?.revenue ?? 0)} />
+                <Stat label="Bookings" value={String(s?.total_appointments ?? 0)} />
+                <Stat label="Upcoming" value={String(s?.upcoming ?? 0)} />
+                <Stat label="Completed" value={String(s?.completed ?? 0)} />
+                <Stat label="Rating" value={s?.avg_rating != null ? `${s.avg_rating.toFixed(1)} (${s.review_count})` : '—'} />
+                <Stat label="Cancelled" value={String(s?.cancelled ?? 0)} />
+                <Stat label="Services" value={String(s?.service_count ?? 0)} />
+                <Stat label="Staff" value={String(s?.staff_count ?? 0)} />
+              </div>
+
+              <h4 className="mt-6 text-xs font-semibold uppercase tracking-wide text-gray-400">Recent bookings</h4>
+              <div className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200">
+                {(data.recent ?? []).length === 0 ? (
+                  <p className="p-4 text-center text-xs text-gray-400">No bookings yet.</p>
+                ) : data.recent.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-gray-900">{r.service}</p>
+                      <p className="truncate text-xs text-gray-500">{r.customer} · {new Date(r.date).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs capitalize text-gray-500">{r.status}</span>
+                      <span className="text-sm font-medium text-gray-900">{money(r.total)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3">
+      <p className="text-lg font-bold text-gray-900">{value}</p>
+      <p className="text-xs text-gray-500">{label}</p>
+    </div>
+  );
+}
+
+interface TenantDetail {
+  tenant: { name: string; logo_url: string | null; cover_image_url: string | null; email: string | null; description: string | null; location_name: string | null; address: string | null } | null;
+  stats: { total_appointments: number; upcoming: number; completed: number; cancelled: number; revenue: number; avg_rating: number | null; review_count: number; service_count: number; staff_count: number } | null;
+  recent: { id: string; service: string; customer: string; date: string; status: string; total: number }[];
 }
 
 interface BillingState {
