@@ -33,6 +33,7 @@ import PropertyStorefront, { StorefrontTenant } from '@/components/PropertyStore
 import PropertyBookingFlow, { BookingService } from '@/components/PropertyBookingFlow';
 import PropertyBusinessPage, { BusinessSummary } from '@/components/PropertyBusinessPage';
 import PropertyAccountDrawer from '@/components/PropertyAccountDrawer';
+import { Campaign } from '@/components/PropertyCampaignDetail';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
 import { consumePendingDeepLinkTenant, parseTenantFromUrl } from '@/lib/deepLink';
 import { formatPrice, currencySymbol } from '@/lib/currency';
@@ -1453,11 +1454,12 @@ export default function ChatScreen() {
   const [propertyData, setPropertyData] = useState<{
     id: string; name: string; logo_url: string | null; cover_image_url: string | null; welcome_message: string; primary_color: string;
     tenants: { id: string; name: string; logo_url: string | null; cover_image_url: string | null; category: string | null; subcategory: string | null; description: string | null; slug: string | null; avg_rating: number | null; review_count: number | null; featured?: boolean }[];
+    campaigns?: Campaign[];
   } | null>(null);
   const [conciergeOpen, setConciergeOpen] = useState(false);
   const conciergeInputRef = useRef<TextInput>(null);
-  const [bookingTarget, setBookingTarget] = useState<{ tenantId: string; businessName: string; service: BookingService | null } | null>(null);
-  const [businessTarget, setBusinessTarget] = useState<BusinessSummary | null>(null);
+  const [bookingTarget, setBookingTarget] = useState<{ tenantId: string; businessName: string; service: BookingService | null; extras?: string[]; packageName?: string; addOnTotal?: number } | null>(null);
+  const [businessTarget, setBusinessTarget] = useState<{ summary: BusinessSummary; initialServiceId?: string } | null>(null);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
   // True while the white-label property is still loading, so we never flash the
   // generic Balkina welcome before the branded storefront appears.
@@ -1492,6 +1494,7 @@ export default function ChatScreen() {
           welcome_message: data.property.welcome_message ?? 'What would you like to book today?',
           primary_color: data.property.primary_color ?? '#6B7FC4',
           tenants: data.tenants ?? [],
+          campaigns: data.campaigns ?? [],
         });
       } catch { /* ignore */ } finally {
         setPropertyLoading(false);
@@ -2655,24 +2658,31 @@ export default function ChatScreen() {
             onAccountPress={() => setAccountDrawerOpen(true)}
             onSelectBusiness={(t: StorefrontTenant) =>
               setBusinessTarget({
-                id: t.id, name: t.name, cover_image_url: t.cover_image_url, logo_url: t.logo_url,
-                subcategory: t.subcategory, description: t.description,
-                avg_rating: t.avg_rating, review_count: t.review_count,
-              })
-            }
-            onSelectEvent={(ev, tenantName) =>
-              setBookingTarget({
-                tenantId: ev.tenant_id,
-                businessName: tenantName || propertyData.name,
-                service: {
-                  id: ev.id, name: ev.name, description: ev.description, image_url: ev.image_url,
-                  price: ev.price, pricing_type: ev.pricing_type, duration_minutes: ev.duration_minutes,
-                  service_type: 'event', capacity: ev.capacity,
-                  deposit_enabled: ev.deposit_enabled ?? false, hide_price: ev.hide_price ?? false,
-                  event_dates: ev.event_dates ?? [],
+                summary: {
+                  id: t.id, name: t.name, cover_image_url: t.cover_image_url, logo_url: t.logo_url,
+                  category: t.category, subcategory: t.subcategory, description: t.description,
+                  avg_rating: t.avg_rating, review_count: t.review_count,
                 },
               })
             }
+            onSelectEvent={(ev, tenantName) => {
+              // Experiences open the venue page with the event's detail sheet auto-opened.
+              const t = propertyData.tenants.find((x) => x.id === ev.tenant_id);
+              setBusinessTarget({
+                summary: {
+                  id: ev.tenant_id,
+                  name: t?.name ?? tenantName ?? propertyData.name,
+                  cover_image_url: t?.cover_image_url ?? ev.image_url ?? null,
+                  logo_url: t?.logo_url ?? null,
+                  category: t?.category ?? null,
+                  subcategory: t?.subcategory ?? null,
+                  description: t?.description ?? null,
+                  avg_rating: t?.avg_rating ?? null,
+                  review_count: t?.review_count ?? null,
+                },
+                initialServiceId: ev.id,
+              });
+            }}
           />
           <PropertyAccountDrawer
             visible={accountDrawerOpen}
@@ -2690,15 +2700,19 @@ export default function ChatScreen() {
             visible={!!businessTarget}
             apiBase={API_BASE}
             accent={propertyData.primary_color}
-            business={businessTarget}
+            business={businessTarget?.summary ?? null}
+            initialServiceId={businessTarget?.initialServiceId ?? null}
             onClose={() => setBusinessTarget(null)}
-            onBook={(service) => {
-              // Dismiss the business sheet first — iOS cannot reliably present a
-              // second modal (the booking flow) on top of an open page-sheet.
-              const biz = businessTarget;
+            onBook={(service, selection) => {
+              // Dismiss the full-screen business page first — iOS cannot reliably
+              // present the booking modal on top of another full-screen modal.
+              const biz = businessTarget?.summary;
               setBusinessTarget(null);
               setTimeout(
-                () => setBookingTarget({ tenantId: biz?.id ?? '', businessName: biz?.name ?? '', service }),
+                () => setBookingTarget({
+                  tenantId: biz?.id ?? '', businessName: biz?.name ?? '', service,
+                  extras: selection.extras, packageName: selection.packageName, addOnTotal: selection.addOnTotal,
+                }),
                 320,
               );
             }}
@@ -2710,6 +2724,9 @@ export default function ChatScreen() {
             tenantId={bookingTarget?.tenantId ?? ''}
             businessName={bookingTarget?.businessName ?? ''}
             initialService={bookingTarget?.service ?? null}
+            extras={bookingTarget?.extras}
+            packageName={bookingTarget?.packageName}
+            addOnTotal={bookingTarget?.addOnTotal}
             customer={{ userId, name: customerName, phone: customerPhone, email: customerEmail }}
             onClose={() => setBookingTarget(null)}
           />

@@ -243,6 +243,11 @@ export default function PropertyDashboard() {
         <MessagesSection slug={slug} tenants={tenants} />
       )}
 
+      {/* Campaigns */}
+      {tab === 'campaigns' && (
+        <CampaignsSection slug={slug} tenants={tenants} />
+      )}
+
       {/* Team */}
       {tab === 'team' && (
         <TeamSection slug={slug} />
@@ -358,7 +363,6 @@ function TenantsTab({
   onToggleFeatured: (linkId: string, featured: boolean) => void;
   onRemoveTenant: (linkId: string) => void;
 }) {
-  const portalOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
   const [invites, setInvites] = useState<Invite[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
@@ -377,6 +381,7 @@ function TenantsTab({
   const [discoverResults, setDiscoverResults] = useState<DiscoverTenant[]>([]);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const [detailTenantId, setDetailTenantId] = useState<string | null>(null);
   // Per-application business-type choice (defaults to 'service'). Hospitality
   // classification is set HERE by the property owner — it is not offered on the
   // global self-serve signup. Drives the experience/table flow + label set.
@@ -526,10 +531,10 @@ function TenantsTab({
               {t.featured && <span className="text-xs text-brand-600 font-medium">Featured</span>}
             </div>
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE.active}`}>active</span>
-            <a href={`${portalOrigin}/property/${slug}`} target="_blank" rel="noopener noreferrer"
+            <button onClick={() => setDetailTenantId(t.tenant_id)}
               className="rounded-lg px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
-              View Page
-            </a>
+              View details
+            </button>
             <button onClick={() => onToggleFeatured(t.id, t.featured)}
               className={`rounded-lg px-3 py-1 text-xs font-medium ${t.featured ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-gray-500'}`}>
               {t.featured ? '★ Featured' : '☆ Feature'}
@@ -669,8 +674,102 @@ function TenantsTab({
           </div>
         </div>
       )}
+
+      <TenantDetailModal slug={slug} tenantId={detailTenantId} onClose={() => setDetailTenantId(null)} />
     </div>
   );
+}
+
+function TenantDetailModal({ slug, tenantId, onClose }: { slug: string; tenantId: string | null; onClose: () => void }) {
+  const [data, setData] = useState<TenantDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!tenantId) { setData(null); return; }
+    setLoading(true);
+    fetch(`/api/property/${slug}/tenant/${tenantId}`)
+      .then((r) => r.json())
+      .then((j) => setData(j.error ? null : j))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, [slug, tenantId]);
+
+  if (!tenantId) return null;
+  const t = data?.tenant;
+  const s = data?.stats;
+  const money = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4" onClick={onClose}>
+      <div className="my-8 w-full max-w-2xl rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+        {loading || !data ? (
+          <div className="p-10 text-center text-sm text-gray-400">{loading ? 'Loading insights…' : 'Could not load this business.'}</div>
+        ) : (
+          <>
+            <div className="relative h-32 rounded-t-xl bg-gray-100">
+              {t?.cover_image_url ? <img src={t.cover_image_url} alt="" className="h-full w-full rounded-t-xl object-cover" /> : null}
+              <button onClick={onClose} className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-sm text-gray-600 hover:bg-white">✕</button>
+            </div>
+            <div className="p-6">
+              <div className="-mt-12 flex items-end gap-3">
+                {t?.logo_url ? <img src={t.logo_url} alt="" className="h-16 w-16 rounded-xl border-4 border-white object-cover" /> : <div className="flex h-16 w-16 items-center justify-center rounded-xl border-4 border-white bg-gray-200 text-xl font-bold text-gray-500">{t?.name?.charAt(0)}</div>}
+                <div className="pb-1">
+                  <h3 className="text-lg font-bold text-gray-900">{t?.name}</h3>
+                  <p className="text-xs text-gray-500">{[t?.location_name, t?.address].filter(Boolean).join(' · ') || t?.email || ''}</p>
+                </div>
+              </div>
+
+              {t?.description ? <p className="mt-4 text-sm text-gray-600">{t.description}</p> : null}
+
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Stat label="Revenue" value={money(s?.revenue ?? 0)} />
+                <Stat label="Bookings" value={String(s?.total_appointments ?? 0)} />
+                <Stat label="Upcoming" value={String(s?.upcoming ?? 0)} />
+                <Stat label="Completed" value={String(s?.completed ?? 0)} />
+                <Stat label="Rating" value={s?.avg_rating != null ? `${s.avg_rating.toFixed(1)} (${s.review_count})` : '—'} />
+                <Stat label="Cancelled" value={String(s?.cancelled ?? 0)} />
+                <Stat label="Services" value={String(s?.service_count ?? 0)} />
+                <Stat label="Staff" value={String(s?.staff_count ?? 0)} />
+              </div>
+
+              <h4 className="mt-6 text-xs font-semibold uppercase tracking-wide text-gray-400">Recent bookings</h4>
+              <div className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200">
+                {(data.recent ?? []).length === 0 ? (
+                  <p className="p-4 text-center text-xs text-gray-400">No bookings yet.</p>
+                ) : data.recent.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-gray-900">{r.service}</p>
+                      <p className="truncate text-xs text-gray-500">{r.customer} · {new Date(r.date).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs capitalize text-gray-500">{r.status}</span>
+                      <span className="text-sm font-medium text-gray-900">{money(r.total)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3">
+      <p className="text-lg font-bold text-gray-900">{value}</p>
+      <p className="text-xs text-gray-500">{label}</p>
+    </div>
+  );
+}
+
+interface TenantDetail {
+  tenant: { name: string; logo_url: string | null; cover_image_url: string | null; email: string | null; description: string | null; location_name: string | null; address: string | null } | null;
+  stats: { total_appointments: number; upcoming: number; completed: number; cancelled: number; revenue: number; avg_rating: number | null; review_count: number; service_count: number; staff_count: number } | null;
+  recent: { id: string; service: string; customer: string; date: string; status: string; total: number }[];
 }
 
 interface BillingState {
@@ -1189,6 +1288,236 @@ function PropertyAnalytics({ tenants }: { tenants: { id: string; name: string }[
         <BreakdownList title="By tenant" rows={derived.byTenant} empty="No bookings yet." />
         <BreakdownList title="By category" rows={derived.byCategory} empty="No bookings yet." />
       </div>
+    </div>
+  );
+}
+
+// ── Campaigns ────────────────────────────────────────────────────────────────
+
+interface Campaign {
+  id: string;
+  title: string;
+  blurb: string | null;
+  description: string | null;
+  image_url: string | null;
+  campaign_type: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  location: string | null;
+  is_property_only: boolean;
+  cta_label: string | null;
+  cta_url: string | null;
+  is_active: boolean;
+  tenant_ids: string[];
+}
+
+const CAMPAIGN_TYPES = [
+  { value: 'promotion', label: 'Promotion / Sale' },
+  { value: 'event', label: 'Event' },
+  { value: 'contest', label: 'Challenge / Contest' },
+  { value: 'other', label: 'Other' },
+];
+
+const EMPTY_FORM = {
+  title: '', blurb: '', description: '', image_url: '', campaign_type: 'promotion',
+  starts_at: '', ends_at: '', location: '', is_property_only: true, cta_label: '', cta_url: '',
+  tenantIds: [] as string[],
+};
+
+function toLocalInput(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function CampaignsSection({ slug, tenants }: { slug: string; tenants: PropertyTenant[] }) {
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [saving, setSaving] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch(`/api/property/${slug}/campaigns`);
+    const json = await res.json();
+    setCampaigns(res.ok ? (json.data ?? []) : []);
+    setLoading(false);
+  }, [slug]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const openCreate = () => { setEditId(null); setForm({ ...EMPTY_FORM }); setShowForm(true); };
+  const openEdit = (c: Campaign) => {
+    setEditId(c.id);
+    setForm({
+      title: c.title, blurb: c.blurb ?? '', description: c.description ?? '', image_url: c.image_url ?? '',
+      campaign_type: c.campaign_type, starts_at: toLocalInput(c.starts_at), ends_at: toLocalInput(c.ends_at),
+      location: c.location ?? '', is_property_only: c.is_property_only, cta_label: c.cta_label ?? '',
+      cta_url: c.cta_url ?? '', tenantIds: c.tenant_ids ?? [],
+    });
+    setShowForm(true);
+  };
+
+  const save = async () => {
+    if (!form.title.trim()) { alert('Title is required'); return; }
+    setSaving(true);
+    const payload = {
+      ...form,
+      starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : null,
+      ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
+      tenantIds: form.is_property_only ? [] : form.tenantIds,
+    };
+    const res = await fetch(`/api/property/${slug}/campaigns${editId ? `/${editId}` : ''}`, {
+      method: editId ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    setSaving(false);
+    if (!res.ok) { const j = await res.json().catch(() => ({})); alert(j.error ?? 'Failed to save'); return; }
+    setShowForm(false);
+    refresh();
+  };
+
+  const toggleActive = async (c: Campaign) => {
+    await fetch(`/api/property/${slug}/campaigns/${c.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !c.is_active }),
+    });
+    refresh();
+  };
+
+  const remove = async (c: Campaign) => {
+    if (!confirm(`Delete campaign "${c.title}"?`)) return;
+    await fetch(`/api/property/${slug}/campaigns/${c.id}`, { method: 'DELETE' });
+    refresh();
+  };
+
+  const toggleTenant = (tid: string) => {
+    setForm((f) => ({ ...f, tenantIds: f.tenantIds.includes(tid) ? f.tenantIds.filter((x) => x !== tid) : [...f.tenantIds, tid] }));
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Campaigns</h2>
+          <p className="mt-1 text-sm text-gray-500">Promotions, events and contests shown above the categories in the customer app.</p>
+        </div>
+        <button onClick={openCreate} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">+ New Campaign</button>
+      </div>
+
+      <div className="mt-5 space-y-3">
+        {loading ? (
+          <p className="text-sm text-gray-400">Loading…</p>
+        ) : campaigns.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
+            <p className="text-sm text-gray-500">No campaigns yet. Create your first promotion or event.</p>
+          </div>
+        ) : campaigns.map((c) => (
+          <div key={c.id} className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-3">
+            {c.image_url ? <img src={c.image_url} alt="" className="h-16 w-24 flex-shrink-0 rounded-lg object-cover" /> : <div className="flex h-16 w-24 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400">🎉</div>}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="truncate text-sm font-semibold text-gray-900">{c.title}</p>
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium capitalize text-gray-600">{c.campaign_type}</span>
+                {!c.is_active && <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[11px] text-gray-500">paused</span>}
+              </div>
+              {c.blurb ? <p className="truncate text-xs text-gray-500">{c.blurb}</p> : null}
+              <p className="mt-0.5 text-xs text-gray-400">
+                {c.is_property_only ? 'Property-hosted' : `${c.tenant_ids.length} partner${c.tenant_ids.length === 1 ? '' : 's'}`}
+                {c.starts_at ? ` · ${new Date(c.starts_at).toLocaleDateString()}` : ''}
+                {c.ends_at ? ` – ${new Date(c.ends_at).toLocaleDateString()}` : ''}
+              </p>
+            </div>
+            <button onClick={() => toggleActive(c)} className="rounded-lg px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">{c.is_active ? 'Pause' : 'Activate'}</button>
+            <button onClick={() => openEdit(c)} className="rounded-lg px-3 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50">Edit</button>
+            <button onClick={() => remove(c)} className="rounded-lg px-3 py-1 text-xs font-medium text-red-500 hover:bg-red-50">Delete</button>
+          </div>
+        ))}
+      </div>
+
+      {showForm && (
+        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4" onClick={() => setShowForm(false)}>
+          <div className="my-8 w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-gray-900">{editId ? 'Edit campaign' : 'New campaign'}</h3>
+              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Hero image</label>
+                <ImageUpload value={form.image_url} onChange={(url) => setForm((f) => ({ ...f, image_url: url }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Title *</label>
+                  <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Black Friday Weekend" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                </div>
+                <div className="col-span-2">
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Short blurb (shown on the card)</label>
+                  <input value={form.blurb} onChange={(e) => setForm({ ...form, blurb: e.target.value })} placeholder="Up to 40% off across the marina" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Type</label>
+                  <select value={form.campaign_type} onChange={(e) => setForm({ ...form, campaign_type: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+                    {CAMPAIGN_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Location (optional)</label>
+                  <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Central Park, Pier 4…" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Starts</label>
+                  <input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Ends</label>
+                  <input type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                </div>
+                <div className="col-span-2">
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Description</label>
+                  <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={4} placeholder="What's happening, who it's for, how to take part…" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Button label (optional)</label>
+                  <input value={form.cta_label} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} placeholder="RSVP / Learn more" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Button link (optional)</label>
+                  <input value={form.cta_url} onChange={(e) => setForm({ ...form, cta_url: e.target.value })} placeholder="https://…" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 p-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input type="checkbox" checked={form.is_property_only} onChange={(e) => setForm({ ...form, is_property_only: e.target.checked })} />
+                  Hosted by the property only (no partner businesses)
+                </label>
+                {!form.is_property_only && (
+                  <div className="mt-3 max-h-44 space-y-1 overflow-y-auto">
+                    <p className="mb-1 text-xs text-gray-500">Participating businesses</p>
+                    {tenants.map((t) => (
+                      <label key={t.tenant_id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                        <input type="checkbox" checked={form.tenantIds.includes(t.tenant_id)} onChange={() => toggleTenant(t.tenant_id)} />
+                        {t.tenant_name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button onClick={() => setShowForm(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">Cancel</button>
+                <button onClick={save} disabled={saving} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{saving ? 'Saving…' : editId ? 'Save changes' : 'Create campaign'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
