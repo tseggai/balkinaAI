@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPropertyAdmin } from '@/lib/property-admin';
+import { notifyCampaign } from '@/lib/notify-campaign';
 
 interface CampaignBody {
   title?: string;
@@ -13,6 +14,8 @@ interface CampaignBody {
   is_property_only?: boolean;
   cta_label?: string;
   cta_url?: string;
+  cta_type?: string;
+  cta_fields?: string[];
   is_active?: boolean;
   tenantIds?: string[];
 }
@@ -71,6 +74,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       is_property_only: body.is_property_only ?? true,
       cta_label: body.cta_label ?? null,
       cta_url: body.cta_url ?? null,
+      cta_type: body.cta_type ?? 'none',
+      cta_fields: body.cta_fields ?? [],
       is_active: body.is_active ?? true,
     } as never)
     .select('id')
@@ -83,6 +88,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     await ctx.admin
       .from('campaign_tenants')
       .insert(tenantIds.map((tid) => ({ campaign_id: campaignId, tenant_id: tid })) as never);
+  }
+
+  if (body.is_active ?? true) {
+    await notifyCampaign(ctx.admin, ctx.propertyId, { id: campaignId, title: body.title.trim(), blurb: body.blurb ?? null });
   }
 
   return NextResponse.json({ id: campaignId, status: 'created' }, { status: 201 });

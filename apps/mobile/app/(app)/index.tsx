@@ -1502,6 +1502,26 @@ export default function ChatScreen() {
     })();
   }, [propertySlug]);
 
+  // Live-refresh campaigns when the property owner creates/edits one — no app reload.
+  useEffect(() => {
+    const propId = propertyData?.id;
+    if (!propId || !propertySlug) return;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel(`campaigns-${propId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'property_campaigns', filter: `property_id=eq.${propId}` }, async () => {
+          try {
+            const res = await fetch(`${API_BASE}/api/properties?slug=${propertySlug}`);
+            const data = await res.json();
+            setPropertyData((prev) => (prev ? { ...prev, campaigns: data.campaigns ?? [] } : prev));
+          } catch { /* ignore */ }
+        })
+        .subscribe();
+    } catch { /* realtime unavailable */ }
+    return () => { if (channel) supabase.removeChannel(channel); };
+  }, [propertyData?.id, propertySlug]);
+
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -2656,6 +2676,7 @@ export default function ChatScreen() {
             apiBase={API_BASE}
             isLoggedIn={!!userId}
             onAccountPress={() => setAccountDrawerOpen(true)}
+            customer={{ userId, name: customerName, phone: customerPhone, email: customerEmail }}
             onSelectBusiness={(t: StorefrontTenant) =>
               setBusinessTarget({
                 summary: {
