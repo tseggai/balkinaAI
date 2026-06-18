@@ -42,6 +42,9 @@ interface Props {
   tenantId: string;
   businessName: string;
   initialService?: BookingService | null;
+  extras?: string[];
+  packageName?: string;
+  addOnTotal?: number;
   customer: { userId: string | null; name: string | null; phone: string | null; email: string | null };
   onClose: () => void;
 }
@@ -101,7 +104,7 @@ function tableTimes(service: BookingService, dateStr: string): string[] {
 }
 
 export default function PropertyBookingFlow({
-  visible, apiBase, accent, tenantId, businessName, initialService, customer, onClose,
+  visible, apiBase, accent, tenantId, businessName, initialService, extras, packageName, addOnTotal, customer, onClose,
 }: Props) {
   const [services, setServices] = useState<BookingService[]>([]);
   const [servicesLoading, setServicesLoading] = useState(false);
@@ -233,6 +236,8 @@ export default function PropertyBookingFlow({
           timeSlotIso: !isEvent && !isTable ? selectedSlot?.iso : undefined,
           partySize: isEvent || isTable ? partySize : undefined,
           bookingType: isEvent ? 'event' : isTable ? 'table' : 'service',
+          extras: extras && extras.length > 0 ? extras : undefined,
+          packageName: packageName || undefined,
           customerName: name.trim(),
           customerPhone: phone.trim(),
           customerEmail: email.trim() || undefined,
@@ -450,11 +455,20 @@ export default function PropertyBookingFlow({
                 </>
               )}
 
+              {(packageName || (extras && extras.length > 0)) && (
+                <View style={styles.addOnsRow}>
+                  <Ionicons name="add-circle-outline" size={15} color={MUTED} />
+                  <Text style={styles.addOnsText} numberOfLines={2}>
+                    {[packageName, ...(extras ?? [])].filter(Boolean).join(', ')}
+                  </Text>
+                </View>
+              )}
+
               {!selected.hide_price && (
                 <View style={styles.totalRow}>
                   <Text style={styles.label}>Total</Text>
                   <Text style={styles.totalVal}>
-                    {formatPrice(Number(selected.price) * (selected.pricing_type === 'per_person' ? partySize : 1))}
+                    {formatPrice(Number(selected.price) * (selected.pricing_type === 'per_person' ? partySize : 1) + (addOnTotal ?? 0))}
                   </Text>
                 </View>
               )}
@@ -552,6 +566,8 @@ const styles = StyleSheet.create({
   },
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 },
   totalVal: { fontSize: 20, fontWeight: '700', color: INK },
+  addOnsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16 },
+  addOnsText: { flex: 1, fontSize: 13, color: MUTED },
   error: { color: '#dc2626', fontSize: 13, marginTop: 14 },
 
   cta: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
