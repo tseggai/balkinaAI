@@ -118,11 +118,9 @@ export default function PropertyCampaignDetail({ visible, accent, campaign, part
         </SafeAreaView>
 
         {campaign.cta_url ? (
-          <SafeAreaView style={styles.ctaBar}>
-            <TouchableOpacity style={[styles.cta, { backgroundColor: accent }]} activeOpacity={0.9} onPress={() => Linking.openURL(campaign.cta_url!)}>
-              <Text style={styles.ctaText}>{campaign.cta_label || 'Learn more'}</Text>
-            </TouchableOpacity>
-          </SafeAreaView>
+          <TouchableOpacity style={[styles.fab, { backgroundColor: accent }]} activeOpacity={0.9} onPress={() => Linking.openURL(campaign.cta_url!)}>
+            <Text style={styles.fabText}>{campaign.cta_label || 'Learn more'}</Text>
+          </TouchableOpacity>
         ) : null}
       </View>
     </Modal>
@@ -153,7 +151,6 @@ const styles = StyleSheet.create({
   partnerChip: { backgroundColor: '#fff', borderWidth: 1, borderColor: HAIRLINE, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   partnerChipText: { fontSize: 13, fontWeight: '600', color: INK },
 
-  ctaBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: 8 },
-  cta: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
-  ctaText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
+  fab: { position: 'absolute', bottom: 30, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 30, paddingVertical: 16, borderRadius: 999, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 7 },
+  fabText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
 });
