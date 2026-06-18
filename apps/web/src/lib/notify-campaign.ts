@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export async function notifyCampaign(
   admin: SupabaseClient,
   propertyId: string,
+  propertySlug: string,
   campaign: { id: string; title: string; blurb: string | null },
 ): Promise<void> {
   try {
@@ -23,10 +24,12 @@ export async function notifyCampaign(
     const customerIds = Array.from(new Set(((appts ?? []) as { customer_id: string }[]).map((a) => a.customer_id)));
     if (customerIds.length === 0) return;
 
+    // Only this property's app tokens — never the base Balkina app.
     const { data: toks } = await admin
       .from('customer_push_tokens')
       .select('token')
-      .in('customer_id', customerIds);
+      .in('customer_id', customerIds)
+      .eq('property_slug', propertySlug);
     const tokens = Array.from(new Set(((toks ?? []) as { token: string }[]).map((t) => t.token)));
     if (tokens.length === 0) return;
 

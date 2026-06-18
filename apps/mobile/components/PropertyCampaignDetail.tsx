@@ -16,6 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const IVORY = '#F8F6F2';
@@ -39,6 +40,8 @@ export interface Campaign {
   cta_url: string | null;
   cta_type: string;
   cta_fields: string[];
+  cta_required?: string[];
+  cta_plus_one_limit?: number | null;
   tenant_ids: string[];
 }
 
@@ -72,6 +75,8 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
   const [plusNames, setPlusNames] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const kb = useKeyboardHeight();
 
   const slide = useRef(new Animated.Value(SCREEN_H)).current;
   const fade = useRef(new Animated.Value(0)).current;
@@ -87,6 +92,7 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
     setPlusCount(0);
     setPlusNames([]);
     setSubmitted(false);
+    setError(null);
     setRsvpOpen(true);
     slide.setValue(SCREEN_H); fade.setValue(0);
     Animated.parallel([
@@ -103,6 +109,10 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
 
   const submit = async () => {
     if (!campaign) return;
+    const required = campaign.cta_required ?? [];
+    const missing = required.find((f) => f !== 'plus_ones' && !(values[f] ?? '').trim());
+    if (missing) { setError(`${FIELD_LABEL[missing] ?? missing} is required.`); return; }
+    setError(null);
     setSubmitting(true);
     const data: Record<string, unknown> = {};
     for (const f of campaign.cta_fields) {
@@ -188,7 +198,7 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
             <Animated.View style={[styles.sheetBackdrop, { opacity: fade }]}>
               <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeRsvp} />
             </Animated.View>
-            <Animated.View style={[styles.sheet, { transform: [{ translateY: slide }] }]}>
+            <Animated.View style={[styles.sheet, { transform: [{ translateY: slide }], bottom: kb }]}>
               <View style={styles.sheetHandle} />
               <View style={styles.sheetHeader}>
                 <Text style={styles.sheetTitle}>{ctaLabel}</Text>
@@ -200,13 +210,13 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
                   <View style={[styles.doneIcon, { backgroundColor: accent }]}><Ionicons name="checkmark" size={34} color="#fff" /></View>
                   <Text style={styles.doneTitle}>You&apos;re in!</Text>
                   <Text style={styles.doneSub}>Thanks — {campaign.title} has your entry.</Text>
-                  <TouchableOpacity style={[styles.submitBtn, { backgroundColor: accent, marginTop: 22 }]} onPress={closeRsvp}><Text style={styles.submitText}>Done</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.submitBtn, { backgroundColor: accent, marginTop: 24, alignSelf: 'stretch' }]} onPress={closeRsvp}><Text style={styles.submitText}>Done</Text></TouchableOpacity>
                 </View>
               ) : (
                 <ScrollView contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   {fields.map((f) => (
                     <View key={f}>
-                      <Text style={styles.label}>{FIELD_LABEL[f] ?? f}</Text>
+                      <Text style={styles.label}>{FIELD_LABEL[f] ?? f}{(campaign.cta_required ?? []).includes(f) ? ' *' : ''}</Text>
                       <TextInput
                         style={[styles.input, f === 'notes' && { height: 90, textAlignVertical: 'top' }]}
                         value={values[f] ?? ''}
@@ -223,11 +233,11 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
                   {hasPlusOnes ? (
                     <View style={{ marginTop: 8 }}>
                       <View style={styles.plusRow}>
-                        <Text style={styles.label}>Plus-ones</Text>
+                        <Text style={styles.label}>Plus-ones{campaign.cta_plus_one_limit != null ? ` (max ${campaign.cta_plus_one_limit})` : ''}</Text>
                         <View style={styles.stepper}>
                           <TouchableOpacity onPress={() => setPlusCount((c) => Math.max(0, c - 1))} style={styles.stepBtn}><Ionicons name="remove" size={18} color={INK} /></TouchableOpacity>
                           <Text style={styles.stepVal}>{plusCount}</Text>
-                          <TouchableOpacity onPress={() => setPlusCount((c) => c + 1)} style={styles.stepBtn}><Ionicons name="add" size={18} color={INK} /></TouchableOpacity>
+                          <TouchableOpacity onPress={() => setPlusCount((c) => (campaign.cta_plus_one_limit != null && c >= campaign.cta_plus_one_limit ? c : c + 1))} style={styles.stepBtn}><Ionicons name="add" size={18} color={INK} /></TouchableOpacity>
                         </View>
                       </View>
                       {Array.from({ length: plusCount }).map((_, i) => (
@@ -243,6 +253,7 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
                     </View>
                   ) : null}
 
+                  {error ? <Text style={styles.errorText}>{error}</Text> : null}
                   <TouchableOpacity style={[styles.submitBtn, { backgroundColor: accent, opacity: submitting ? 0.6 : 1 }]} onPress={submit} disabled={submitting} activeOpacity={0.9}>
                     {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{ctaLabel}</Text>}
                   </TouchableOpacity>
@@ -296,10 +307,11 @@ const styles = StyleSheet.create({
   stepBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: HAIRLINE, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
   stepVal: { fontSize: 17, fontWeight: '700', color: INK, minWidth: 22, textAlign: 'center' },
 
+  errorText: { color: '#dc2626', fontSize: 13, marginTop: 14 },
   submitBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 22 },
   submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
-  doneWrap: { alignItems: 'center', paddingVertical: 30 },
+  doneWrap: { alignItems: 'center', paddingTop: 30, paddingBottom: 44 },
   doneIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
   doneTitle: { fontSize: 22, fontWeight: '700', color: INK },
   doneSub: { fontSize: 14, color: MUTED, marginTop: 8, textAlign: 'center' },

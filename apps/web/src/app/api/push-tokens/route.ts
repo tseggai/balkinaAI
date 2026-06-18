@@ -24,6 +24,7 @@ export async function POST(request: Request) {
     recipientType: 'customer' | 'staff';
     recipientId: string;
     platform?: 'ios' | 'android';
+    propertySlug?: string | null;
   };
 
   if (!body.token || !body.recipientType || !body.recipientId) {
@@ -46,22 +47,27 @@ export async function POST(request: Request) {
     }
   }
 
-  // Delete old tokens for this recipient, then insert the current one.
-  // This prevents stale tokens from accumulating across app reinstalls/rebuilds
-  // and wasting Expo push API calls on every notification.
-  await admin.from(table).delete().eq(idColumn, body.recipientId).neq('token', body.token);
+  const propertySlug = body.propertySlug ?? null;
+
+  // Replace stale tokens for this recipient WITHIN THE SAME APP (property scope),
+  // so a customer who uses both the Balkina app and a property app keeps both.
+  if (body.recipientType === 'customer') {
+    let del = admin.from(table).delete().eq(idColumn, body.recipientId).neq('token', body.token);
+    del = propertySlug ? del.eq('property_slug', propertySlug) : del.is('property_slug', null);
+    await del;
+  } else {
+    await admin.from(table).delete().eq(idColumn, body.recipientId).neq('token', body.token);
+  }
 
   // Also remove this token if it was registered under a different recipient
   // (e.g. same device switched accounts)
   await admin.from(table).delete().eq('token', body.token).neq(idColumn, body.recipientId);
 
+  const insertRow: Record<string, unknown> = { [idColumn]: body.recipientId, token: body.token, platform: body.platform ?? null };
+  if (body.recipientType === 'customer') insertRow.property_slug = propertySlug;
   const { error } = await admin
     .from(table)
-    .upsert({
-      [idColumn]: body.recipientId,
-      token: body.token,
-      platform: body.platform ?? null,
-    } as never, { onConflict: `${idColumn},token` });
+    .upsert(insertRow as never, { onConflict: `${idColumn},token` });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
