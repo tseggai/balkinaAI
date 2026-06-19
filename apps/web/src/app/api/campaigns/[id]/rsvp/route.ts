@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { notifyRsvpConfirmation } from '@/lib/notify-campaign';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -48,5 +49,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .single();
   if (error || !inserted) return NextResponse.json({ error: error?.message ?? 'Failed' }, { status: 500, headers: CORS_HEADERS });
 
-  return NextResponse.json({ status: 'submitted', entryId: (inserted as { id: string }).id }, { status: 201, headers: CORS_HEADERS });
+  const entryId = (inserted as { id: string }).id;
+  await notifyRsvpConfirmation(supabase, id, entryId, body.data ?? {}, customerId);
+
+  return NextResponse.json({ status: 'submitted', entryId }, { status: 201, headers: CORS_HEADERS });
 }

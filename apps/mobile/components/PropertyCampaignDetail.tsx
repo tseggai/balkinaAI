@@ -10,6 +10,7 @@ import {
   Image,
   SafeAreaView,
   Linking,
+  Share,
   Animated,
   Dimensions,
   ActivityIndicator,
@@ -48,6 +49,10 @@ export interface Campaign {
 const TYPE_LABEL: Record<string, string> = { promotion: 'Promotion', event: 'Event', contest: 'Contest', other: 'Happening' };
 const FIELD_LABEL: Record<string, string> = { first_name: 'First name', last_name: 'Last name', email: 'Email', phone: 'Phone', notes: 'Notes' };
 
+function qrFor(entryId: string, i: number): string {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=460x460&margin=10&data=${entryId}.${i}`;
+}
+
 function dateRange(start: string | null, end: string | null): string | null {
   if (!start && !end) return null;
   const fmt = (s: string) => new Date(s).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -76,6 +81,7 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [entryId, setEntryId] = useState<string | null>(null);
+  const [submittedGuests, setSubmittedGuests] = useState<{ name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const kb = useKeyboardHeight();
 
@@ -125,6 +131,14 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
         data[f] = values[f] ?? '';
       }
     }
+    // Per-guest tickets: index 0 = the RSVPer, then each plus-one.
+    const primaryName = [values.first_name, values.last_name].filter(Boolean).join(' ').trim() || (customer.name ?? '').trim() || 'Guest';
+    const guests: { name: string }[] = [{ name: primaryName }];
+    if (campaign.cta_fields.includes('plus_ones')) {
+      plusNames.slice(0, plusCount).forEach((n) => guests.push({ name: (n || '').trim() || 'Guest' }));
+    }
+    data.guests = guests;
+    setSubmittedGuests(guests);
     try {
       const res = await fetch(`${apiBase}/api/campaigns/${campaign.id}/rsvp`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -215,9 +229,37 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
                   <Text style={styles.doneTitle}>You&apos;re in!</Text>
                   <Text style={styles.doneSub}>Thanks — {campaign.title} has your entry.</Text>
                   {entryId ? (
-                    <View style={styles.qrWrap}>
-                      <Image source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=460x460&margin=10&data=${entryId}` }} style={styles.qr} />
-                      <Text style={styles.qrHint}>Show this QR at the door to check in</Text>
+                    <View style={{ width: '100%' }}>
+                      <View style={styles.qrWrap}>
+                        <Image source={{ uri: qrFor(entryId, 0) }} style={styles.qr} />
+                        <Text style={styles.qrHint}>Your check-in QR — show at the door</Text>
+                        <TouchableOpacity style={[styles.shareBtn, { borderColor: accent }]} onPress={() => Share.share({ url: qrFor(entryId, 0), message: `My ${campaign.title} ticket` })}>
+                          <Ionicons name="share-outline" size={16} color={accent} />
+                          <Text style={[styles.shareText, { color: accent }]}>Share / Save</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {submittedGuests.length > 1 ? (
+                        <>
+                          <Text style={styles.sectionTitle}>GUEST TICKETS</Text>
+                          {submittedGuests.slice(1).map((g, idx) => {
+                            const i = idx + 1;
+                            return (
+                              <View key={i} style={styles.guestRow}>
+                                <Image source={{ uri: qrFor(entryId, i) }} style={styles.guestQr} />
+                                <View style={{ flex: 1 }}>
+                                  <Text style={styles.guestName} numberOfLines={1}>{g.name}</Text>
+                                  <Text style={styles.guestSub}>Their own check-in QR</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => Share.share({ url: qrFor(entryId, i), message: `Your ${campaign.title} ticket` })} hitSlop={8}>
+                                  <Ionicons name="share-outline" size={22} color={accent} />
+                                </TouchableOpacity>
+                              </View>
+                            );
+                          })}
+                          <Text style={styles.guestHint}>Send each guest their QR so they can arrive separately.</Text>
+                        </>
+                      ) : null}
                     </View>
                   ) : null}
                   <TouchableOpacity style={[styles.submitBtn, { backgroundColor: accent, marginTop: 24, alignSelf: 'stretch' }]} onPress={closeRsvp}><Text style={styles.submitText}>Done</Text></TouchableOpacity>
@@ -328,4 +370,11 @@ const styles = StyleSheet.create({
   qrWrap: { alignItems: 'center', marginTop: 22 },
   qr: { width: 220, height: 220, borderRadius: 12, backgroundColor: '#fff' },
   qrHint: { fontSize: 12, color: MUTED, marginTop: 10 },
+  shareBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
+  shareText: { fontSize: 13, fontWeight: '700' },
+  guestRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: HAIRLINE, padding: 12, marginBottom: 10 },
+  guestQr: { width: 52, height: 52, borderRadius: 8, backgroundColor: '#fff' },
+  guestName: { fontSize: 15, fontWeight: '700', color: INK },
+  guestSub: { fontSize: 12, color: MUTED, marginTop: 2 },
+  guestHint: { fontSize: 12, color: MUTED, textAlign: 'center', marginTop: 4 },
 });
