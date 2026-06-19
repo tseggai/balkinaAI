@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ImageUpload } from '@/components/image-upload';
@@ -1643,9 +1643,29 @@ function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: Pr
   );
 }
 
+interface EntryRow { id: string; data: Record<string, unknown>; created_at: string; checked_in_at: string | null }
+
 function CampaignEntriesModal({ slug, campaign, onClose }: { slug: string; campaign: Campaign | null; onClose: () => void }) {
-  const [data, setData] = useState<{ fields: string[]; entries: { id: string; data: Record<string, unknown>; created_at: string }[] } | null>(null);
+  const [data, setData] = useState<{ fields: string[]; entries: EntryRow[] } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const checkIn = useCallback(async (entryId: string, checked: boolean) => {
+    setData((d) => d ? { ...d, entries: d.entries.map((e) => e.id === entryId ? { ...e, checked_in_at: checked ? new Date().toISOString() : null } : e) } : d);
+    await fetch(`/api/property/${slug}/campaigns/${campaign!.id}/entries`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ entryId, checked_in: checked }),
+    }).catch(() => {});
+  }, [slug, campaign]);
+
+  const onScan = useCallback((code: string) => {
+    const entry = data?.entries.find((e) => e.id === code.trim());
+    if (!entry) { setToast('Not a valid entry for this campaign.'); setTimeout(() => setToast(null), 2500); return; }
+    if (entry.checked_in_at) { setToast('Already checked in.'); setTimeout(() => setToast(null), 2000); return; }
+    checkIn(entry.id, true);
+    const name = [entry.data.first_name, entry.data.last_name].filter(Boolean).join(' ') || 'Guest';
+    setToast(`✓ Checked in ${name}`); setTimeout(() => setToast(null), 2500);
+  }, [data, checkIn]);
 
   useEffect(() => {
     if (!campaign) { setData(null); return; }
@@ -1688,18 +1708,21 @@ function CampaignEntriesModal({ slug, campaign, onClose }: { slug: string; campa
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-semibold text-gray-900">{campaign.title} — entries</h3>
-            <p className="text-xs text-gray-500">{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</p>
+            <p className="text-xs text-gray-500">{entries.length} {entries.length === 1 ? 'entry' : 'entries'} · <span className="font-medium text-gray-700">{entries.filter((e) => e.checked_in_at).length} arrived</span></p>
           </div>
           <div className="flex items-center gap-2">
             {entries.length > 0 && (
               <>
-                <button onClick={downloadCsv} className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Download CSV</button>
-                <button onClick={printPdf} className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Print / PDF</button>
+                <button onClick={() => setScanOpen(true)} className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700">Scan QR</button>
+                <button onClick={downloadCsv} className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">CSV</button>
+                <button onClick={printPdf} className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Print</button>
               </>
             )}
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
           </div>
         </div>
+
+        {toast && <div className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{toast}</div>}
 
         <div className="mt-4 overflow-x-auto">
           {loading ? (
@@ -1710,21 +1733,108 @@ function CampaignEntriesModal({ slug, campaign, onClose }: { slug: string; campa
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-400">
+                  <th className="py-2 pr-4 font-medium">Arrived</th>
                   {fields.map((f) => <th key={f} className="py-2 pr-4 font-medium">{fieldLabel(f)}</th>)}
                   <th className="py-2 font-medium">Submitted</th>
                 </tr>
               </thead>
               <tbody>
-                {(data?.entries ?? []).map((e) => (
-                  <tr key={e.id} className="border-b border-gray-100">
-                    {fields.map((f) => <td key={f} className="py-2 pr-4 text-gray-700">{String(e.data[f] ?? '—')}</td>)}
-                    <td className="py-2 text-gray-400">{new Date(e.created_at).toLocaleString()}</td>
-                  </tr>
-                ))}
+                {(data?.entries ?? []).map((e) => {
+                  const inHere = !!e.checked_in_at;
+                  return (
+                    <tr key={e.id} className={`border-b border-gray-100 ${inHere ? 'bg-green-50/50' : ''}`}>
+                      <td className="py-2 pr-4">
+                        <button onClick={() => checkIn(e.id, !inHere)}
+                          className={`flex h-7 w-7 items-center justify-center rounded-md border text-sm ${inHere ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 text-transparent hover:bg-gray-50'}`}
+                          title={inHere ? 'Checked in — tap to undo' : 'Check in'}>✓</button>
+                      </td>
+                      {fields.map((f) => <td key={f} className="py-2 pr-4 text-gray-700">{String(e.data[f] ?? '—')}</td>)}
+                      <td className="py-2 text-gray-400">{new Date(e.created_at).toLocaleString()}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
         </div>
+      </div>
+      {scanOpen && <QrScanner onScan={onScan} onClose={() => setScanOpen(false)} />}
+    </div>
+  );
+}
+
+function QrScanner({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const lastRef = useRef<{ code: string; t: number }>({ code: '', t: 0 });
+
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    let raf = 0;
+    const canvas = document.createElement('canvas');
+
+    // Load jsQR from CDN at runtime (no npm dependency / build impact).
+    const ensureJsQR = () => new Promise<void>((resolve, reject) => {
+      const w = window as unknown as { jsQR?: unknown };
+      if (w.jsQR) return resolve();
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('Could not load the scanner.'));
+      document.head.appendChild(s);
+    });
+
+    (async () => {
+      try {
+        await ensureJsQR();
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        const video = videoRef.current!;
+        video.srcObject = stream;
+        await video.play();
+        const jsQR = (window as unknown as { jsQR: (d: Uint8ClampedArray, w: number, h: number) => { data: string } | null }).jsQR;
+        const tick = () => {
+          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const result = jsQR(img.data, img.width, img.height);
+            if (result?.data) {
+              const now = Date.now();
+              if (result.data !== lastRef.current.code || now - lastRef.current.t > 2500) {
+                lastRef.current = { code: result.data, t: now };
+                onScan(result.data);
+              }
+            }
+          }
+          raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : 'Camera unavailable. Use the checklist instead.');
+      }
+    })();
+
+    return () => { cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach((t) => t.stop()); };
+  }, [onScan]);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gray-900">Scan attendee QR</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+        </div>
+        {err ? (
+          <p className="mt-4 text-sm text-red-600">{err}</p>
+        ) : (
+          <>
+            <div className="mt-4 overflow-hidden rounded-xl bg-black">
+              <video ref={videoRef} playsInline muted className="aspect-square w-full object-cover" />
+            </div>
+            <p className="mt-3 text-center text-xs text-gray-500">Point at the attendee&apos;s QR — they&apos;re checked in automatically.</p>
+          </>
+        )}
       </div>
     </div>
   );

@@ -41,10 +41,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     customerId = (cust as { id: string } | null)?.id ?? null;
   }
 
-  const { error } = await supabase
+  const { data: inserted, error } = await supabase
     .from('campaign_entries')
-    .insert({ campaign_id: id, customer_id: customerId, data: body.data ?? {} } as never);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: CORS_HEADERS });
+    .insert({ campaign_id: id, customer_id: customerId, data: body.data ?? {} } as never)
+    .select('id')
+    .single();
+  if (error || !inserted) return NextResponse.json({ error: error?.message ?? 'Failed' }, { status: 500, headers: CORS_HEADERS });
 
-  return NextResponse.json({ status: 'submitted' }, { status: 201, headers: CORS_HEADERS });
+  return NextResponse.json({ status: 'submitted', entryId: (inserted as { id: string }).id }, { status: 201, headers: CORS_HEADERS });
 }
