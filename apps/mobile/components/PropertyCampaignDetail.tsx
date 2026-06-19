@@ -75,6 +75,7 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
   const [plusNames, setPlusNames] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [entryId, setEntryId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const kb = useKeyboardHeight();
 
@@ -92,6 +93,7 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
     setPlusCount(0);
     setPlusNames([]);
     setSubmitted(false);
+    setEntryId(null);
     setError(null);
     setRsvpOpen(true);
     slide.setValue(SCREEN_H); fade.setValue(0);
@@ -124,10 +126,12 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
       }
     }
     try {
-      await fetch(`${apiBase}/api/campaigns/${campaign.id}/rsvp`, {
+      const res = await fetch(`${apiBase}/api/campaigns/${campaign.id}/rsvp`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data, userId: customer.userId ?? undefined }),
       });
+      const json = await res.json().catch(() => ({}));
+      if (json.entryId) setEntryId(json.entryId);
       setSubmitted(true);
     } catch { /* ignore */ } finally {
       setSubmitting(false);
@@ -210,6 +214,12 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
                   <View style={[styles.doneIcon, { backgroundColor: accent }]}><Ionicons name="checkmark" size={34} color="#fff" /></View>
                   <Text style={styles.doneTitle}>You&apos;re in!</Text>
                   <Text style={styles.doneSub}>Thanks — {campaign.title} has your entry.</Text>
+                  {entryId ? (
+                    <View style={styles.qrWrap}>
+                      <Image source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=460x460&margin=10&data=${entryId}` }} style={styles.qr} />
+                      <Text style={styles.qrHint}>Show this QR at the door to check in</Text>
+                    </View>
+                  ) : null}
                   <TouchableOpacity style={[styles.submitBtn, { backgroundColor: accent, marginTop: 24, alignSelf: 'stretch' }]} onPress={closeRsvp}><Text style={styles.submitText}>Done</Text></TouchableOpacity>
                 </View>
               ) : (
@@ -315,4 +325,7 @@ const styles = StyleSheet.create({
   doneIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
   doneTitle: { fontSize: 22, fontWeight: '700', color: INK },
   doneSub: { fontSize: 14, color: MUTED, marginTop: 8, textAlign: 'center' },
+  qrWrap: { alignItems: 'center', marginTop: 22 },
+  qr: { width: 220, height: 220, borderRadius: 12, backgroundColor: '#fff' },
+  qrHint: { fontSize: 12, color: MUTED, marginTop: 10 },
 });
