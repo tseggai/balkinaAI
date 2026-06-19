@@ -35,19 +35,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     .order('created_at');
 
   const userIds = ((admins ?? []) as { user_id: string }[]).map((a) => a.user_id);
-  const { data: users } = userIds.length > 0
-    ? await adminClient.auth.admin.listUsers()
-    : { data: { users: [] } };
-
-  const userMap = new Map<string, { email?: string }>();
-  for (const u of (users as { users: { id: string; email?: string }[] })?.users ?? []) {
-    userMap.set(u.id, { email: u.email });
-  }
+  // Resolve each admin's email directly (listUsers() is paginated and can miss
+  // members, which made some — including the current admin — show as Unknown).
+  const userMap = new Map<string, string>();
+  await Promise.all(userIds.map(async (uid) => {
+    try {
+      const { data } = await adminClient.auth.admin.getUserById(uid);
+      if (data?.user?.email) userMap.set(uid, data.user.email);
+    } catch { /* ignore */ }
+  }));
 
   const team = ((admins ?? []) as { id: string; user_id: string; role: string; created_at: string }[]).map((a) => ({
     id: a.id,
     user_id: a.user_id,
-    email: userMap.get(a.user_id)?.email ?? 'Unknown',
+    email: userMap.get(a.user_id) ?? 'Unknown',
     role: a.role,
     is_self: a.user_id === ctx.userId,
     created_at: a.created_at,
