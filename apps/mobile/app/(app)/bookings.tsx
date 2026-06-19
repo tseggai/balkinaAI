@@ -16,6 +16,8 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   ScrollView,
+  Image,
+  Share,
 } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -57,6 +59,28 @@ interface Appointment {
 
 type Tab = 'upcoming' | 'past';
 type SortOrder = 'date_asc' | 'date_desc';
+
+// Campaign RSVP / pass (event ticket or sign-up) with per-guest check-in.
+interface PassGuest {
+  index: number;
+  name: string;
+  checkedInAt: string | null;
+}
+interface CampaignPass {
+  entryId: string;
+  campaignId: string;
+  title: string;
+  imageUrl: string | null;
+  location: string | null;
+  startsAt: string | null;
+  createdAt: string;
+  guests: PassGuest[];
+}
+
+// QR image for a single guest ticket: encodes "<entryId>.<index>".
+function qrFor(entryId: string, index: number, size = 220): string {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=8&data=${entryId}.${index}`;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -285,6 +309,71 @@ function BookingCardRow({
   );
 }
 
+// ── Campaign Pass Card (RSVP / event ticket with per-guest QR) ────────────────
+
+function PassCard({ pass, expanded, onToggle }: { pass: CampaignPass; expanded: boolean; onToggle: () => void }) {
+  const checkedCount = pass.guests.filter((g) => g.checkedInAt).length;
+  const when = pass.startsAt ? formatDateTime(pass.startsAt) : null;
+
+  const shareGuest = async (g: PassGuest) => {
+    try {
+      await Share.share({
+        message: `${g.name} — ${pass.title}\nShow this QR at the door to check in:\n${qrFor(pass.entryId, g.index, 480)}`,
+        url: qrFor(pass.entryId, g.index, 480),
+      });
+    } catch { /* user dismissed */ }
+  };
+
+  return (
+    <View style={styles.cardWrapper}>
+      <TouchableOpacity style={styles.passCard} onPress={onToggle} activeOpacity={0.7}>
+        <View style={styles.passHeader}>
+          <View style={[styles.passIcon, { backgroundColor: ACCENT }]}>
+            <Ionicons name="ticket-outline" size={20} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.passTitle} numberOfLines={1}>{pass.title}</Text>
+            <Text style={styles.passMeta} numberOfLines={1}>
+              {when ? `${when.date} · ${when.time}` : 'RSVP confirmed'}
+              {pass.guests.length > 1 ? ` · ${pass.guests.length} tickets` : ''}
+            </Text>
+          </View>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#9ca3af" />
+        </View>
+        {checkedCount > 0 ? (
+          <Text style={styles.passChecked}>✓ {checkedCount}/{pass.guests.length} checked in</Text>
+        ) : null}
+      </TouchableOpacity>
+
+      {expanded ? (
+        <View style={styles.passBody}>
+          {pass.location ? <Text style={styles.passLocation}>📍 {pass.location}</Text> : null}
+          {pass.guests.map((g) => (
+            <View key={g.index} style={styles.ticketRow}>
+              <View style={styles.qrBox}>
+                <Image source={{ uri: qrFor(pass.entryId, g.index) }} style={styles.qrImg} />
+              </View>
+              <Text style={styles.ticketName}>{g.name}</Text>
+              {g.checkedInAt ? (
+                <View style={styles.checkedPill}>
+                  <Ionicons name="checkmark-circle" size={14} color="#059669" />
+                  <Text style={styles.checkedPillText}>Checked in</Text>
+                </View>
+              ) : (
+                <Text style={styles.ticketHint}>Show at the door</Text>
+              )}
+              <TouchableOpacity style={[styles.shareTicketBtn, { backgroundColor: ACCENT }]} onPress={() => shareGuest(g)} activeOpacity={0.85}>
+                <Ionicons name="share-outline" size={16} color="#fff" />
+                <Text style={styles.shareTicketText}>{pass.guests.length > 1 ? 'Share ticket' : 'Save / Share'}</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 // ── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function BookingsScreen() {
@@ -301,6 +390,8 @@ export default function BookingsScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [passes, setPasses] = useState<CampaignPass[]>([]);
+  const [expandedPassId, setExpandedPassId] = useState<string | null>(null);
 
   // Rating modal state
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
@@ -411,15 +502,33 @@ export default function BookingsScreen() {
     setRefreshing(false);
   }, [tab]);
 
+  // Campaign RSVPs / event passes — shown above the bookings list.
+  const fetchPasses = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setPasses([]); return; }
+    try {
+      const qp = new URLSearchParams({ userId: user.id });
+      if (PROPERTY_SLUG) qp.set('propertySlug', PROPERTY_SLUG);
+      const res = await fetch(`${API_BASE}/api/customer/campaign-entries?${qp.toString()}`);
+      if (!res.ok) { setPasses([]); return; }
+      const result = (await res.json()) as { entries?: CampaignPass[] };
+      setPasses(result.entries ?? []);
+    } catch {
+      setPasses([]);
+    }
+  }, []);
+
   useEffect(() => {
     setLoading(true);
     fetchAppointments();
-  }, [fetchAppointments]);
+    fetchPasses();
+  }, [fetchAppointments, fetchPasses]);
 
   useFocusEffect(
     useCallback(() => {
       fetchAppointments();
-    }, [fetchAppointments]),
+      fetchPasses();
+    }, [fetchAppointments, fetchPasses]),
   );
 
   // Realtime subscription for appointment status/deposit changes
@@ -454,7 +563,8 @@ export default function BookingsScreen() {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchAppointments();
-  }, [fetchAppointments]);
+    fetchPasses();
+  }, [fetchAppointments, fetchPasses]);
 
   // Filter and sort
   const filteredAppointments = appointments
@@ -805,6 +915,24 @@ export default function BookingsScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
+          ListHeaderComponent={
+            tab === 'upcoming' && passes.length > 0 ? (
+              <View style={styles.passSection}>
+                <Text style={styles.passSectionTitle}>RSVPs & Passes</Text>
+                {passes.map((p) => (
+                  <PassCard
+                    key={p.entryId}
+                    pass={p}
+                    expanded={expandedPassId === p.entryId}
+                    onToggle={() => setExpandedPassId(expandedPassId === p.entryId ? null : p.entryId)}
+                  />
+                ))}
+                {filteredAppointments.length > 0 ? (
+                  <Text style={styles.passSectionDivider}>Appointments</Text>
+                ) : null}
+              </View>
+            ) : null
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1093,6 +1221,28 @@ const styles = StyleSheet.create({
   statusDropdownText: { fontSize: 12, fontWeight: '600', color: ACCENT },
 
   list: { padding: 16, paddingBottom: 24 },
+
+  // Campaign passes section
+  passSection: { marginBottom: 4 },
+  passSectionTitle: { fontSize: 13, fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  passSectionDivider: { fontSize: 13, fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8, marginBottom: 10 },
+  passCard: { backgroundColor: '#fff', borderRadius: 14, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
+  passHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  passIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  passTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  passMeta: { fontSize: 12, color: '#6b7280', marginTop: 2 },
+  passChecked: { fontSize: 12, fontWeight: '600', color: '#059669', marginTop: 8 },
+  passBody: { backgroundColor: '#fff', borderBottomLeftRadius: 14, borderBottomRightRadius: 14, marginTop: -4, paddingHorizontal: 14, paddingBottom: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  passLocation: { fontSize: 13, color: '#6b7280', marginBottom: 10 },
+  ticketRow: { alignItems: 'center', paddingVertical: 14, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  qrBox: { backgroundColor: '#fff', padding: 8, borderRadius: 12, borderWidth: 1, borderColor: '#e5e7eb' },
+  qrImg: { width: 200, height: 200 },
+  ticketName: { fontSize: 15, fontWeight: '700', color: '#111827', marginTop: 10 },
+  ticketHint: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  checkedPill: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, backgroundColor: '#d1fae5', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
+  checkedPillText: { fontSize: 12, fontWeight: '600', color: '#059669' },
+  shareTicketBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
+  shareTicketText: { fontSize: 13, fontWeight: '600', color: '#fff' },
 
   // Booking card
   cardWrapper: { marginBottom: 12 },

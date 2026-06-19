@@ -1643,120 +1643,139 @@ function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: Pr
   );
 }
 
-interface EntryRow { id: string; data: Record<string, unknown>; created_at: string; checked_in_at: string | null }
+interface EntryRow { id: string; data: Record<string, unknown>; created_at: string; checked_in: Record<string, string> | null }
+interface GuestRow { entryId: string; index: number; name: string; party: string; partySize: number; submitted: string; checkedIn: boolean }
 
 function CampaignEntriesModal({ slug, campaign, onClose }: { slug: string; campaign: Campaign | null; onClose: () => void }) {
   const [data, setData] = useState<{ fields: string[]; entries: EntryRow[] } | null>(null);
   const [loading, setLoading] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; bad?: boolean } | null>(null);
+  const [search, setSearch] = useState('');
 
-  const checkIn = useCallback(async (entryId: string, checked: boolean) => {
-    setData((d) => d ? { ...d, entries: d.entries.map((e) => e.id === entryId ? { ...e, checked_in_at: checked ? new Date().toISOString() : null } : e) } : d);
-    await fetch(`/api/property/${slug}/campaigns/${campaign!.id}/entries`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ entryId, checked_in: checked }),
-    }).catch(() => {});
+  const refresh = useCallback(async () => {
+    const r = await fetch(`/api/property/${slug}/campaigns/${campaign!.id}/entries`);
+    const j = await r.json();
+    setData(j.error ? { fields: [], entries: [] } : j);
   }, [slug, campaign]);
-
-  const onScan = useCallback((code: string) => {
-    const entry = data?.entries.find((e) => e.id === code.trim());
-    if (!entry) { setToast('Not a valid entry for this campaign.'); setTimeout(() => setToast(null), 2500); return; }
-    if (entry.checked_in_at) { setToast('Already checked in.'); setTimeout(() => setToast(null), 2000); return; }
-    checkIn(entry.id, true);
-    const name = [entry.data.first_name, entry.data.last_name].filter(Boolean).join(' ') || 'Guest';
-    setToast(`✓ Checked in ${name}`); setTimeout(() => setToast(null), 2500);
-  }, [data, checkIn]);
 
   useEffect(() => {
     if (!campaign) { setData(null); return; }
     setLoading(true);
-    fetch(`/api/property/${slug}/campaigns/${campaign.id}/entries`)
-      .then((r) => r.json())
-      .then((j) => setData(j.error ? { fields: [], entries: [] } : j))
-      .catch(() => setData({ fields: [], entries: [] }))
-      .finally(() => setLoading(false));
+    refresh().finally(() => setLoading(false));
+    const t = setInterval(refresh, 4000); // near-realtime across check-in devices
+    return () => clearInterval(t);
+  }, [campaign, refresh]);
+
+  const flash = (msg: string, bad?: boolean) => { setToast({ msg, bad }); setTimeout(() => setToast(null), 2600); };
+
+  const checkIn = useCallback(async (entryId: string, index: number, checked: boolean) => {
+    setData((d) => d ? { ...d, entries: d.entries.map((e) => {
+      if (e.id !== entryId) return e;
+      const ci = { ...(e.checked_in ?? {}) };
+      if (checked) ci[String(index)] = new Date().toISOString(); else delete ci[String(index)];
+      return { ...e, checked_in: ci };
+    }) } : d);
+    await fetch(`/api/property/${slug}/campaigns/${campaign!.id}/entries`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ entryId, guestIndex: index, checked }),
+    }).catch(() => {});
   }, [slug, campaign]);
 
+  const onScan = useCallback((code: string) => {
+    const [entryId, idxStr] = code.trim().split('.');
+    if (!entryId) return flash('Not a valid ticket for this campaign.', true);
+    const index = Number(idxStr ?? '0') || 0;
+    const entry = data?.entries.find((e) => e.id === entryId);
+    if (!entry) return flash('Not a valid ticket for this campaign.', true);
+    const guests = (entry.data.guests as { name?: string }[] | undefined) ?? [];
+    const name = guests[index]?.name || (index === 0 ? 'Guest' : `Guest ${index}`);
+    if (entry.checked_in?.[String(index)]) return flash(`${name} is already checked in.`, true);
+    checkIn(entryId, index, true);
+    flash(`✓ Checked in ${name}`);
+  }, [data, checkIn]);
+
   if (!campaign) return null;
-  const fieldLabel = (k: string) => COLLECT_FIELDS.find((f) => f.key === k)?.label ?? k;
-  const fields = data?.fields ?? [];
   const entries = data?.entries ?? [];
+
+  const guestRows: GuestRow[] = entries.flatMap((e) => {
+    const guests = (e.data.guests as { name?: string }[] | undefined) ?? [{ name: [e.data.first_name, e.data.last_name].filter(Boolean).join(' ') || 'Guest' }];
+    const party = guests[0]?.name || 'Guest';
+    return guests.map((g, i) => ({
+      entryId: e.id, index: i,
+      name: g.name || (i === 0 ? party : `Guest ${i}`),
+      party, partySize: guests.length, submitted: e.created_at,
+      checkedIn: !!(e.checked_in?.[String(i)]),
+    }));
+  });
+  const q = search.trim().toLowerCase();
+  const visible = q ? guestRows.filter((g) => g.name.toLowerCase().includes(q) || g.party.toLowerCase().includes(q)) : guestRows;
+  const arrived = guestRows.filter((g) => g.checkedIn).length;
 
   const downloadCsv = () => {
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const header = [...fields.map(fieldLabel), 'Submitted'].map(esc).join(',');
-    const rows = entries.map((e) => [...fields.map((f) => e.data[f] ?? ''), new Date(e.created_at).toLocaleString()].map(esc).join(','));
-    const csv = [header, ...rows].join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const header = ['Name', 'Party', 'Party size', 'Arrived', 'Submitted'].map(esc).join(',');
+    const rows = guestRows.map((g) => [g.name, g.party, g.partySize, g.checkedIn ? 'Yes' : 'No', new Date(g.submitted).toLocaleString()].map(esc).join(','));
+    const url = URL.createObjectURL(new Blob([[header, ...rows].join('\n')], { type: 'text/csv' }));
     const a = document.createElement('a');
-    a.href = url; a.download = `${campaign!.title.replace(/[^a-z0-9]+/gi, '-')}-entries.csv`;
+    a.href = url; a.download = `${campaign.title.replace(/[^a-z0-9]+/gi, '-')}-guests.csv`;
     a.click(); URL.revokeObjectURL(url);
   };
-
   const printPdf = () => {
     const w = window.open('', '_blank');
     if (!w) return;
-    const th = [...fields.map(fieldLabel), 'Submitted'].map((h) => `<th>${h}</th>`).join('');
-    const trs = entries.map((e) => `<tr>${[...fields.map((f) => e.data[f] ?? '—'), new Date(e.created_at).toLocaleString()].map((c) => `<td>${String(c)}</td>`).join('')}</tr>`).join('');
-    w.document.write(`<html><head><title>${campaign!.title} — entries</title><style>body{font-family:system-ui,sans-serif;padding:24px}h1{font-size:18px}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}th,td{border:1px solid #e5e7eb;padding:6px 10px;text-align:left}th{background:#f9fafb}</style></head><body><h1>${campaign!.title} — ${entries.length} entries</h1><table><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table></body></html>`);
+    const trs = guestRows.map((g) => `<tr><td>${g.name}</td><td>${g.party}</td><td>${g.partySize}</td><td>${g.checkedIn ? 'Yes' : 'No'}</td></tr>`).join('');
+    w.document.write(`<html><head><title>${campaign.title} — guests</title><style>body{font-family:system-ui,sans-serif;padding:24px}h1{font-size:18px}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}th,td{border:1px solid #e5e7eb;padding:6px 10px;text-align:left}th{background:#f9fafb}</style></head><body><h1>${campaign.title} — ${arrived}/${guestRows.length} arrived</h1><table><thead><tr><th>Name</th><th>Party</th><th>Size</th><th>Arrived</th></tr></thead><tbody>${trs}</tbody></table></body></html>`);
     w.document.close(); w.focus(); setTimeout(() => w.print(), 250);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" onClick={onClose}>
-      <div className="my-8 w-full max-w-5xl rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900">{campaign.title} — entries</h3>
-            <p className="text-xs text-gray-500">{entries.length} {entries.length === 1 ? 'entry' : 'entries'} · <span className="font-medium text-gray-700">{entries.filter((e) => e.checked_in_at).length} arrived</span></p>
-          </div>
-          <div className="flex items-center gap-2">
-            {entries.length > 0 && (
-              <>
-                <button onClick={() => setScanOpen(true)} className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700">Scan QR</button>
-                <button onClick={downloadCsv} className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">CSV</button>
-                <button onClick={printPdf} className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Print</button>
-              </>
-            )}
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
-          </div>
+    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+      <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 sm:px-6">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-semibold text-gray-900">{campaign.title}</h3>
+          <p className="text-xs text-gray-500"><span className="font-semibold text-gray-700">{arrived}</span> / {guestRows.length} arrived</p>
         </div>
-
-        {toast && <div className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{toast}</div>}
-
-        <div className="mt-4 overflow-x-auto">
-          {loading ? (
-            <p className="py-8 text-center text-sm text-gray-400">Loading…</p>
-          ) : (data?.entries.length ?? 0) === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-400">No entries yet.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-400">
-                  <th className="py-2 pr-4 font-medium">Arrived</th>
-                  {fields.map((f) => <th key={f} className="py-2 pr-4 font-medium">{fieldLabel(f)}</th>)}
-                  <th className="py-2 font-medium">Submitted</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.entries ?? []).map((e) => {
-                  const inHere = !!e.checked_in_at;
-                  return (
-                    <tr key={e.id} className={`border-b border-gray-100 ${inHere ? 'bg-green-50/50' : ''}`}>
-                      <td className="py-2 pr-4">
-                        <button onClick={() => checkIn(e.id, !inHere)}
-                          className={`flex h-7 w-7 items-center justify-center rounded-md border text-sm ${inHere ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 text-transparent hover:bg-gray-50'}`}
-                          title={inHere ? 'Checked in — tap to undo' : 'Check in'}>✓</button>
-                      </td>
-                      {fields.map((f) => <td key={f} className="py-2 pr-4 text-gray-700">{String(e.data[f] ?? '—')}</td>)}
-                      <td className="py-2 text-gray-400">{new Date(e.created_at).toLocaleString()}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+        <div className="flex items-center gap-2">
+          <button onClick={() => setScanOpen(true)} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Scan QR</button>
+          <button onClick={downloadCsv} className="hidden rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 sm:block">CSV</button>
+          <button onClick={printPdf} className="hidden rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 sm:block">Print</button>
+          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full text-lg text-gray-500 hover:bg-gray-100">✕</button>
         </div>
+      </div>
+
+      {guestRows.length > 0 && (
+        <div className="border-b border-gray-100 px-4 py-2 sm:px-6">
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search guests…"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+        </div>
+      )}
+
+      {toast && <div className={`px-4 py-2.5 text-sm font-medium sm:px-6 ${toast.bad ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>{toast.msg}</div>}
+
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+        {loading ? (
+          <p className="py-10 text-center text-sm text-gray-400">Loading…</p>
+        ) : guestRows.length === 0 ? (
+          <p className="py-10 text-center text-sm text-gray-400">No entries yet.</p>
+        ) : visible.length === 0 ? (
+          <p className="py-10 text-center text-sm text-gray-400">No matching guests.</p>
+        ) : (
+          <div className="mx-auto grid max-w-3xl gap-2">
+            {visible.map((g) => (
+              <button key={`${g.entryId}.${g.index}`} onClick={() => checkIn(g.entryId, g.index, !g.checkedIn)}
+                className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors ${g.checkedIn ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100'}`}>
+                <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 text-lg ${g.checkedIn ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 text-transparent'}`}>✓</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium text-gray-900">{g.name}</span>
+                  <span className="block text-xs text-gray-500">
+                    {g.partySize > 1 ? `Party of ${g.partySize}${g.index > 0 ? ` · guest of ${g.party}` : ' · host'}` : 'Solo'}
+                  </span>
+                </span>
+                {g.checkedIn && <span className="flex-shrink-0 text-xs font-semibold text-green-600">Arrived</span>}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {scanOpen && <QrScanner onScan={onScan} onClose={() => setScanOpen(false)} />}
     </div>
