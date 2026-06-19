@@ -157,6 +157,7 @@ export default function PropertyDashboard() {
           slug={slug}
           propertyId={property.id}
           tenants={tenants}
+          accent={property.primary_color ?? '#6B7FC4'}
           onChange={fetchData}
           onToggleFeatured={handleToggleFeatured}
           onRemoveTenant={handleRemoveTenant}
@@ -353,6 +354,7 @@ type Filter = (typeof FILTERS)[number];
 function TenantsTab({
   slug,
   tenants,
+  accent,
   onChange,
   onToggleFeatured,
   onRemoveTenant,
@@ -360,6 +362,7 @@ function TenantsTab({
   slug: string;
   propertyId: string;
   tenants: PropertyTenant[];
+  accent: string;
   onChange: () => void;
   onToggleFeatured: (linkId: string, featured: boolean) => void;
   onRemoveTenant: (linkId: string) => void;
@@ -676,12 +679,12 @@ function TenantsTab({
         </div>
       )}
 
-      <TenantDetailModal slug={slug} tenantId={detailTenantId} onClose={() => setDetailTenantId(null)} />
+      <TenantDetailModal slug={slug} tenantId={detailTenantId} accent={accent} onClose={() => setDetailTenantId(null)} />
     </div>
   );
 }
 
-function TenantDetailModal({ slug, tenantId, onClose }: { slug: string; tenantId: string | null; onClose: () => void }) {
+function TenantDetailModal({ slug, tenantId, accent, onClose }: { slug: string; tenantId: string | null; accent: string; onClose: () => void }) {
   const [data, setData] = useState<TenantDetail | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -700,29 +703,39 @@ function TenantDetailModal({ slug, tenantId, onClose }: { slug: string; tenantId
   const s = data?.stats;
   const money = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
+  const hero = t?.cover_image_url || t?.logo_url || null;
+
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4" onClick={onClose}>
-      <div className="my-8 w-full max-w-2xl rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:p-8" onClick={onClose}>
+      <div className="my-4 w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {loading || !data ? (
-          <div className="p-10 text-center text-sm text-gray-400">{loading ? 'Loading insights…' : 'Could not load this business.'}</div>
+          <div className="p-16 text-center text-sm text-gray-400">{loading ? 'Loading insights…' : 'Could not load this business.'}</div>
         ) : (
           <>
-            <div className="relative h-32 rounded-t-xl bg-gray-100">
-              {t?.cover_image_url ? <img src={t.cover_image_url} alt="" className="h-full w-full rounded-t-xl object-cover" /> : null}
-              <button onClick={onClose} className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-sm text-gray-600 hover:bg-white">✕</button>
-            </div>
-            <div className="p-6">
-              <div className="-mt-12 flex items-end gap-3">
-                {t?.logo_url ? <img src={t.logo_url} alt="" className="h-16 w-16 rounded-xl border-4 border-white object-cover" /> : <div className="flex h-16 w-16 items-center justify-center rounded-xl border-4 border-white bg-gray-200 text-xl font-bold text-gray-500">{t?.name?.charAt(0)}</div>}
-                <div className="pb-1">
-                  <h3 className="text-lg font-bold text-gray-900">{t?.name}</h3>
-                  <p className="text-xs text-gray-500">{[t?.location_name, t?.address].filter(Boolean).join(' · ') || t?.email || ''}</p>
+            {/* Hero — blurred business image with the name/logo clearly on top */}
+            <div className="relative h-52 overflow-hidden" style={hero ? undefined : { backgroundColor: accent }}>
+              {hero ? (
+                <>
+                  <img src={hero} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-black/25" />
+                </>
+              ) : null}
+              <button onClick={onClose} className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-gray-600 hover:bg-white">✕</button>
+              <div className="absolute inset-x-0 bottom-0 flex items-end gap-4 p-7">
+                {t?.logo_url
+                  ? <img src={t.logo_url} alt="" className="h-20 w-20 flex-shrink-0 rounded-2xl border-2 border-white/80 object-cover shadow-lg" />
+                  : <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-2xl border-2 border-white/80 text-2xl font-bold text-white shadow-lg" style={{ backgroundColor: accent }}>{t?.name?.charAt(0)}</div>}
+                <div className="min-w-0 pb-1">
+                  <h3 className="text-2xl font-bold text-white drop-shadow-md">{t?.name}</h3>
+                  <p className="truncate text-sm text-white/90 drop-shadow">{[t?.location_name, t?.address].filter(Boolean).join(' · ') || t?.email || ''}</p>
                 </div>
               </div>
+            </div>
 
-              {t?.description ? <p className="mt-4 text-sm text-gray-600">{t.description}</p> : null}
+            <div className="p-8">
+              {t?.description ? <p className="mb-6 text-sm leading-relaxed text-gray-600">{t.description}</p> : null}
 
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Stat label="Revenue" value={money(s?.revenue ?? 0)} />
                 <Stat label="Bookings" value={String(s?.total_appointments ?? 0)} />
                 <Stat label="Upcoming" value={String(s?.upcoming ?? 0)} />
