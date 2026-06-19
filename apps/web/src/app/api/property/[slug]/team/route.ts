@@ -2,21 +2,29 @@ import { NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 async function getPropertyAdmin(slug: string) {
+  // Identify the signed-in user from their session…
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data: admin } = await supabase
-    .from('property_admins')
-    .select('property_id, role')
-    .eq('user_id', user.id)
-    .maybeSingle();
-  if (!admin || (admin as { role: string }).role !== 'admin') return null;
-  const { data: prop } = await supabase
+
+  // …but resolve the property + verify membership with the service-role client,
+  // so RLS scoping / multiple admin rows can't make this silently return null.
+  const adminClient = createAdminClient();
+  const { data: prop } = await adminClient
     .from('properties')
     .select('id, slug')
-    .eq('id', (admin as { property_id: string }).property_id)
-    .single();
-  if (!prop || (prop as { slug: string }).slug !== slug) return null;
+    .eq('slug', slug)
+    .maybeSingle();
+  if (!prop) return null;
+
+  const { data: membership } = await adminClient
+    .from('property_admins')
+    .select('role')
+    .eq('property_id', (prop as { id: string }).id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!membership || (membership as { role: string }).role !== 'admin') return null;
+
   return { propertyId: (prop as { id: string }).id, userId: user.id, supabase };
 }
 
