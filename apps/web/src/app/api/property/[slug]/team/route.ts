@@ -26,7 +26,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const adminClient = createAdminClient();
-  const { data: admins } = await ctx.supabase
+  // Read the full team with the service-role client (caller is already verified
+  // as an admin above) so RLS scoping never hides other members.
+  const { data: admins } = await adminClient
     .from('property_admins')
     .select('id, user_id, role, created_at')
     .eq('property_id', ctx.propertyId)

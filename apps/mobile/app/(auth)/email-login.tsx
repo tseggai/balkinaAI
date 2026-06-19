@@ -12,9 +12,15 @@ import {
   Image,
   Linking,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
 import { useGoogleAuth, googleAvailable, handleGoogleResult } from '@/lib/googleAuth';
+
+// White-label: property color/name on property builds, Balkina defaults otherwise.
+const ACCENT = (Constants.expoConfig?.extra?.primaryColor as string | undefined) ?? '#6B7FC4';
+const PROPERTY_NAME = (Constants.expoConfig?.extra?.propertyName as string | undefined) ?? null;
 
 let AppleAuthentication: { signInAsync?: (opts: unknown) => Promise<{ identityToken?: string | null }>; AppleAuthenticationScope?: { FULL_NAME: number; EMAIL: number } } | null = null;
 try { AppleAuthentication = require('expo-apple-authentication'); } catch {}
@@ -253,17 +259,30 @@ export default function EmailLoginScreen() {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      {router.canGoBack() && (
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} hitSlop={10}>
+          <Ionicons name="arrow-back" size={22} color="#111827" />
+        </TouchableOpacity>
+      )}
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Logo */}
+        {/* Logo / brand */}
         <View style={styles.logoContainer}>
-          <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+          {PROPERTY_NAME ? (
+            <View style={[styles.brandCircle, { backgroundColor: ACCENT }]}>
+              <Text style={styles.brandInitial}>{PROPERTY_NAME.charAt(0)}</Text>
+            </View>
+          ) : (
+            <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+          )}
         </View>
 
         <Text style={styles.title}>
-          {isStaffInvite ? 'Join your team' : isSignUp ? 'Create your account' : 'Welcome back'}
+          {isStaffInvite ? 'Join your team'
+            : isSignUp ? (PROPERTY_NAME ? `Join ${PROPERTY_NAME}` : 'Create your account')
+            : (PROPERTY_NAME ? `Sign in to ${PROPERTY_NAME}` : 'Welcome back')}
         </Text>
         <Text style={styles.subtitle}>
           {isStaffInvite
@@ -305,7 +324,7 @@ export default function EmailLoginScreen() {
         {/* Staff invite code field */}
         {isStaffInvite && (
           <TextInput
-            style={[styles.input, { textAlign: 'center', fontSize: 20, fontWeight: '700', letterSpacing: 6, borderWidth: 2, borderColor: '#6B7FC4' }]}
+            style={[styles.input, { textAlign: 'center', fontSize: 20, fontWeight: '700', letterSpacing: 6, borderWidth: 2, borderColor: ACCENT }]}
             value={inviteCode}
             onChangeText={setInviteCode}
             placeholder="INVITE CODE"
@@ -403,7 +422,7 @@ export default function EmailLoginScreen() {
             style={styles.switchBtn}
             onPress={() => setIsStaffInvite(true)}
           >
-            <Text style={[styles.switchText, { color: '#6B7FC4' }]}>Have a staff invite code?</Text>
+            <Text style={[styles.switchText, { color: ACCENT }]}>Have a staff invite code?</Text>
           </TouchableOpacity>
         )}
 
@@ -439,6 +458,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingVertical: 40,
   },
+  backBtn: {
+    position: 'absolute', top: 56, left: 16, zIndex: 10,
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#f3f4f6',
+    alignItems: 'center', justifyContent: 'center',
+  },
   logoContainer: {
     alignItems: 'center',
     marginBottom: 32,
@@ -447,6 +471,8 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
   },
+  brandCircle: { width: 64, height: 64, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  brandInitial: { color: '#fff', fontSize: 30, fontWeight: '700' },
   title: {
     fontSize: 26,
     fontWeight: '700',
@@ -475,7 +501,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   btn: {
-    backgroundColor: '#6B7FC4',
+    backgroundColor: ACCENT,
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
@@ -517,7 +543,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   switchText: {
-    color: '#6B7FC4',
+    color: ACCENT,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -529,7 +555,7 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   termsLink: {
-    color: '#6B7FC4',
+    color: ACCENT,
     textDecorationLine: 'underline' as const,
   },
   btnApple: {

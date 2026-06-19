@@ -246,7 +246,7 @@ export default function PropertyDashboard() {
 
       {/* Campaigns */}
       {tab === 'campaigns' && (
-        <CampaignsSection slug={slug} tenants={tenants} />
+        <CampaignsSection slug={slug} tenants={tenants} accent={property?.primary_color ?? '#6B7FC4'} />
       )}
 
       {/* Team */}
@@ -1310,6 +1310,8 @@ interface Campaign {
   cta_url: string | null;
   cta_type: string;
   cta_fields: string[];
+  cta_required: string[];
+  cta_plus_one_limit: number | null;
   is_active: boolean;
   tenant_ids: string[];
 }
@@ -1324,7 +1326,7 @@ const CAMPAIGN_TYPES = [
 const EMPTY_FORM = {
   title: '', blurb: '', description: '', image_url: '', campaign_type: 'promotion',
   starts_at: '', ends_at: '', location: '', is_property_only: true, cta_label: '', cta_url: '',
-  cta_type: 'none', cta_fields: [] as string[],
+  cta_type: 'none', cta_fields: [] as string[], cta_required: [] as string[], cta_plus_one_limit: '' as string,
   tenantIds: [] as string[],
 };
 
@@ -1351,7 +1353,7 @@ function toLocalInput(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function CampaignsSection({ slug, tenants }: { slug: string; tenants: PropertyTenant[] }) {
+function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: PropertyTenant[]; accent: string }) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -1377,6 +1379,7 @@ function CampaignsSection({ slug, tenants }: { slug: string; tenants: PropertyTe
       campaign_type: c.campaign_type, starts_at: toLocalInput(c.starts_at), ends_at: toLocalInput(c.ends_at),
       location: c.location ?? '', is_property_only: c.is_property_only, cta_label: c.cta_label ?? '',
       cta_url: c.cta_url ?? '', cta_type: c.cta_type ?? 'none', cta_fields: c.cta_fields ?? [],
+      cta_required: c.cta_required ?? [], cta_plus_one_limit: c.cta_plus_one_limit != null ? String(c.cta_plus_one_limit) : '',
       tenantIds: c.tenant_ids ?? [],
     });
     setShowForm(true);
@@ -1389,6 +1392,7 @@ function CampaignsSection({ slug, tenants }: { slug: string; tenants: PropertyTe
       ...form,
       starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : null,
       ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
+      cta_plus_one_limit: form.cta_plus_one_limit !== '' ? Number(form.cta_plus_one_limit) : null,
       tenantIds: form.is_property_only ? [] : form.tenantIds,
     };
     const res = await fetch(`/api/property/${slug}/campaigns${editId ? `/${editId}` : ''}`, {
@@ -1419,7 +1423,17 @@ function CampaignsSection({ slug, tenants }: { slug: string; tenants: PropertyTe
     setForm((f) => ({ ...f, tenantIds: f.tenantIds.includes(tid) ? f.tenantIds.filter((x) => x !== tid) : [...f.tenantIds, tid] }));
   };
   const toggleField = (key: string) => {
-    setForm((f) => ({ ...f, cta_fields: f.cta_fields.includes(key) ? f.cta_fields.filter((x) => x !== key) : [...f.cta_fields, key] }));
+    setForm((f) => {
+      const on = f.cta_fields.includes(key);
+      return {
+        ...f,
+        cta_fields: on ? f.cta_fields.filter((x) => x !== key) : [...f.cta_fields, key],
+        cta_required: on ? f.cta_required.filter((x) => x !== key) : f.cta_required,
+      };
+    });
+  };
+  const toggleRequired = (key: string) => {
+    setForm((f) => ({ ...f, cta_required: f.cta_required.includes(key) ? f.cta_required.filter((x) => x !== key) : [...f.cta_required, key] }));
   };
   const [entriesFor, setEntriesFor] = useState<Campaign | null>(null);
 
@@ -1547,12 +1561,41 @@ function CampaignsSection({ slug, tenants }: { slug: string; tenants: PropertyTe
                         const on = form.cta_fields.includes(f.key);
                         return (
                           <button key={f.key} type="button" onClick={() => toggleField(f.key)}
-                            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${on ? 'bg-brand-500 text-white' : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50'}`}>
+                            style={on ? { backgroundColor: accent, color: '#fff' } : undefined}
+                            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${on ? '' : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50'}`}>
                             {on ? '✓ ' : '+ '}{f.label}
                           </button>
                         );
                       })}
                     </div>
+
+                    {/* Required toggles + plus-one limit */}
+                    {form.cta_fields.length > 0 && (
+                      <div className="mt-3 space-y-1.5">
+                        {form.cta_fields.map((key) => {
+                          const f = COLLECT_FIELDS.find((x) => x.key === key);
+                          const req = form.cta_required.includes(key);
+                          return (
+                            <div key={key} className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5">
+                              <span className="text-xs font-medium text-gray-700">{f?.label ?? key}</span>
+                              <div className="flex items-center gap-3">
+                                {key === 'plus_ones' && (
+                                  <label className="flex items-center gap-1 text-xs text-gray-500">
+                                    Max
+                                    <input type="number" min={0} value={form.cta_plus_one_limit} onChange={(e) => setForm({ ...form, cta_plus_one_limit: e.target.value })}
+                                      placeholder="∞" className="w-14 rounded border border-gray-200 px-2 py-0.5 text-xs focus:border-brand-500 focus:outline-none" />
+                                  </label>
+                                )}
+                                <label className="flex items-center gap-1.5 text-xs text-gray-600">
+                                  <input type="checkbox" checked={req} onChange={() => toggleRequired(key)} />
+                                  Required
+                                </label>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1604,16 +1647,45 @@ function CampaignEntriesModal({ slug, campaign, onClose }: { slug: string; campa
   if (!campaign) return null;
   const fieldLabel = (k: string) => COLLECT_FIELDS.find((f) => f.key === k)?.label ?? k;
   const fields = data?.fields ?? [];
+  const entries = data?.entries ?? [];
+
+  const downloadCsv = () => {
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const header = [...fields.map(fieldLabel), 'Submitted'].map(esc).join(',');
+    const rows = entries.map((e) => [...fields.map((f) => e.data[f] ?? ''), new Date(e.created_at).toLocaleString()].map(esc).join(','));
+    const csv = [header, ...rows].join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = `${campaign!.title.replace(/[^a-z0-9]+/gi, '-')}-entries.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  const printPdf = () => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const th = [...fields.map(fieldLabel), 'Submitted'].map((h) => `<th>${h}</th>`).join('');
+    const trs = entries.map((e) => `<tr>${[...fields.map((f) => e.data[f] ?? '—'), new Date(e.created_at).toLocaleString()].map((c) => `<td>${String(c)}</td>`).join('')}</tr>`).join('');
+    w.document.write(`<html><head><title>${campaign!.title} — entries</title><style>body{font-family:system-ui,sans-serif;padding:24px}h1{font-size:18px}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}th,td{border:1px solid #e5e7eb;padding:6px 10px;text-align:left}th{background:#f9fafb}</style></head><body><h1>${campaign!.title} — ${entries.length} entries</h1><table><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table></body></html>`);
+    w.document.close(); w.focus(); setTimeout(() => w.print(), 250);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" onClick={onClose}>
-      <div className="my-8 w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="my-8 w-full max-w-5xl rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-semibold text-gray-900">{campaign.title} — entries</h3>
-            <p className="text-xs text-gray-500">{data?.entries.length ?? 0} {(data?.entries.length ?? 0) === 1 ? 'entry' : 'entries'}</p>
+            <p className="text-xs text-gray-500">{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          <div className="flex items-center gap-2">
+            {entries.length > 0 && (
+              <>
+                <button onClick={downloadCsv} className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Download CSV</button>
+                <button onClick={printPdf} className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Print / PDF</button>
+              </>
+            )}
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          </div>
         </div>
 
         <div className="mt-4 overflow-x-auto">

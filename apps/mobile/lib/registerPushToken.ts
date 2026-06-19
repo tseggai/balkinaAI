@@ -48,6 +48,8 @@ export async function registerPushToken(params: {
         recipientType: params.recipientType,
         recipientId: params.recipientId,
         platform: Platform.OS === 'ios' ? 'ios' : 'android',
+        // White-label scope: which property's app this token is from (null = base Balkina).
+        propertySlug: (Constants.expoConfig?.extra?.propertySlug as string | undefined) ?? null,
       }),
     });
     if (!response.ok) {

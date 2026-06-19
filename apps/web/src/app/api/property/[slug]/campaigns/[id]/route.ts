@@ -10,7 +10,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
   const body = await request.json() as Record<string, unknown> & { tenantIds?: string[] };
   const { tenantIds, ...fields } = body;
 
-  const allowed = ['title', 'blurb', 'description', 'image_url', 'campaign_type', 'starts_at', 'ends_at', 'location', 'is_property_only', 'cta_label', 'cta_url', 'cta_type', 'cta_fields', 'is_active'];
+  const allowed = ['title', 'blurb', 'description', 'image_url', 'campaign_type', 'starts_at', 'ends_at', 'location', 'is_property_only', 'cta_label', 'cta_url', 'cta_type', 'cta_fields', 'cta_required', 'cta_plus_one_limit', 'is_active'];
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const k of allowed) if (k in fields) update[k] = (fields as Record<string, unknown>)[k];
 
@@ -31,7 +31,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
       .maybeSingle();
     const c = camp as { id: string; title: string; blurb: string | null; is_active: boolean } | null;
     if (c && c.is_active) {
-      await notifyCampaign(ctx.admin, ctx.propertyId, { id: c.id, title: c.title, blurb: c.blurb });
+      await notifyCampaign(ctx.admin, ctx.propertyId, slug, { id: c.id, title: c.title, blurb: c.blurb });
     }
   }
 
