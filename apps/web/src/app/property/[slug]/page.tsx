@@ -1373,6 +1373,7 @@ function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: Pr
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
+  const [view, setView] = useState<'list' | 'calendar'>('list');
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -1385,6 +1386,14 @@ function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: Pr
   useEffect(() => { refresh(); }, [refresh]);
 
   const openCreate = () => { setEditId(null); setForm({ ...EMPTY_FORM }); setShowForm(true); };
+  // Create a campaign pre-dated to a calendar day the manager tapped (defaults to 6pm).
+  const openCreateOnDate = (day: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const local = `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}T18:00`;
+    setEditId(null);
+    setForm({ ...EMPTY_FORM, starts_at: local });
+    setShowForm(true);
+  };
   const openEdit = (c: Campaign) => {
     setEditId(c.id);
     setForm({
@@ -1452,14 +1461,25 @@ function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: Pr
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Campaigns</h2>
           <p className="mt-1 text-sm text-gray-500">Promotions, events and contests shown above the categories in the customer app.</p>
         </div>
-        <button onClick={openCreate} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">+ New Campaign</button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-gray-200 p-0.5">
+            <button onClick={() => setView('list')} className={`rounded-md px-3 py-1.5 text-xs font-medium ${view === 'list' ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>List</button>
+            <button onClick={() => setView('calendar')} className={`rounded-md px-3 py-1.5 text-xs font-medium ${view === 'calendar' ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Calendar</button>
+          </div>
+          <button onClick={openCreate} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">+ New</button>
+        </div>
       </div>
 
+      {view === 'calendar' ? (
+        <div className="mt-5">
+          <CampaignCalendar campaigns={campaigns} accent={accent} onPickDate={openCreateOnDate} onPickCampaign={openEdit} />
+        </div>
+      ) : (
       <div className="mt-5 space-y-3">
         {loading ? (
           <p className="text-sm text-gray-400">Loading…</p>
@@ -1468,30 +1488,35 @@ function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: Pr
             <p className="text-sm text-gray-500">No campaigns yet. Create your first promotion or event.</p>
           </div>
         ) : campaigns.map((c) => (
-          <div key={c.id} className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-3">
-            {c.image_url ? <img src={c.image_url} alt="" className="h-16 w-24 flex-shrink-0 rounded-lg object-cover" /> : <div className="flex h-16 w-24 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400">🎉</div>}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="truncate text-sm font-semibold text-gray-900">{c.title}</p>
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium capitalize text-gray-600">{c.campaign_type}</span>
-                {!c.is_active && <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[11px] text-gray-500">paused</span>}
+          <div key={c.id} className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+              {c.image_url ? <img src={c.image_url} alt="" className="h-14 w-20 flex-shrink-0 rounded-lg object-cover sm:h-16 sm:w-24" /> : <div className="flex h-14 w-20 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400 sm:h-16 sm:w-24">🎉</div>}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-semibold text-gray-900">{c.title}</p>
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium capitalize text-gray-600">{c.campaign_type}</span>
+                  {!c.is_active && <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[11px] text-gray-500">paused</span>}
+                </div>
+                {c.blurb ? <p className="truncate text-xs text-gray-500">{c.blurb}</p> : null}
+                <p className="mt-0.5 text-xs text-gray-400">
+                  {c.is_property_only ? 'Property-hosted' : `${c.tenant_ids.length} partner${c.tenant_ids.length === 1 ? '' : 's'}`}
+                  {c.starts_at ? ` · ${new Date(c.starts_at).toLocaleDateString()}` : ''}
+                  {c.ends_at ? ` – ${new Date(c.ends_at).toLocaleDateString()}` : ''}
+                </p>
               </div>
-              {c.blurb ? <p className="truncate text-xs text-gray-500">{c.blurb}</p> : null}
-              <p className="mt-0.5 text-xs text-gray-400">
-                {c.is_property_only ? 'Property-hosted' : `${c.tenant_ids.length} partner${c.tenant_ids.length === 1 ? '' : 's'}`}
-                {c.starts_at ? ` · ${new Date(c.starts_at).toLocaleDateString()}` : ''}
-                {c.ends_at ? ` – ${new Date(c.ends_at).toLocaleDateString()}` : ''}
-              </p>
             </div>
-            {c.cta_type === 'rsvp' || c.cta_type === 'signup' ? (
-              <button onClick={() => setEntriesFor(c)} className="rounded-lg px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Entries</button>
-            ) : null}
-            <button onClick={() => toggleActive(c)} className="rounded-lg px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">{c.is_active ? 'Pause' : 'Activate'}</button>
-            <button onClick={() => openEdit(c)} className="rounded-lg px-3 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50">Edit</button>
-            <button onClick={() => remove(c)} className="rounded-lg px-3 py-1 text-xs font-medium text-red-500 hover:bg-red-50">Delete</button>
+            <div className="flex flex-wrap items-center gap-1 border-t border-gray-100 pt-2 sm:border-0 sm:pt-0">
+              {c.cta_type === 'rsvp' || c.cta_type === 'signup' ? (
+                <button onClick={() => setEntriesFor(c)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100">Entries</button>
+              ) : null}
+              <button onClick={() => toggleActive(c)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-100">{c.is_active ? 'Pause' : 'Activate'}</button>
+              <button onClick={() => openEdit(c)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50">Edit</button>
+              <button onClick={() => remove(c)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50">Delete</button>
+            </div>
           </div>
         ))}
       </div>
+      )}
 
       <CampaignEntriesModal slug={slug} campaign={entriesFor} onClose={() => setEntriesFor(null)} />
 
@@ -1508,12 +1533,12 @@ function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: Pr
                 <label className="mb-1 block text-xs font-medium text-gray-600">Hero image</label>
                 <ImageUpload value={form.image_url} onChange={(url) => setForm((f) => ({ ...f, image_url: url }))} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
                   <label className="mb-1 block text-xs font-medium text-gray-600">Title *</label>
                   <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Black Friday Weekend" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
                 </div>
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className="mb-1 block text-xs font-medium text-gray-600">Short blurb (shown on the card)</label>
                   <input value={form.blurb} onChange={(e) => setForm({ ...form, blurb: e.target.value })} placeholder="Up to 40% off across the marina" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
                 </div>
@@ -1535,7 +1560,7 @@ function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: Pr
                   <label className="mb-1 block text-xs font-medium text-gray-600">Ends</label>
                   <DateTimeField value={form.ends_at} onChange={(v) => setForm({ ...form, ends_at: v })} placeholder="End date & time" />
                 </div>
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className="mb-1 block text-xs font-medium text-gray-600">Description</label>
                   <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={4} placeholder="What's happening, who it's for, how to take part…" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
                 </div>
@@ -1544,7 +1569,7 @@ function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: Pr
               {/* Call to action */}
               <div className="rounded-lg border border-gray-200 p-3">
                 <p className="mb-2 text-xs font-semibold text-gray-700">Call to action</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-gray-600">Button</label>
                     <select value={form.cta_type} onChange={(e) => setForm({ ...form, cta_type: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
@@ -1643,14 +1668,101 @@ function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: Pr
   );
 }
 
+// Month calendar for campaigns — managers tap a day to schedule, or a chip to edit.
+function CampaignCalendar({ campaigns, accent, onPickDate, onPickCampaign }: {
+  campaigns: Campaign[];
+  accent: string;
+  onPickDate: (day: Date) => void;
+  onPickCampaign: (c: Campaign) => void;
+}) {
+  const [cursor, setCursor] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // Group campaigns by local YYYY-M-D of their start date.
+  const byDay = new Map<string, Campaign[]>();
+  for (const c of campaigns) {
+    if (!c.starts_at) continue;
+    const d = new Date(c.starts_at);
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const arr = byDay.get(key) ?? [];
+    arr.push(c);
+    byDay.set(key, arr);
+  }
+
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: (Date | null)[] = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const monthLabel = cursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <button onClick={() => setCursor(new Date(year, month - 1, 1))} className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">‹</button>
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-semibold text-gray-900">{monthLabel}</h3>
+          <button onClick={() => { const d = new Date(); setCursor(new Date(d.getFullYear(), d.getMonth(), 1)); }} className="rounded-md border border-gray-200 px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-50">Today</button>
+        </div>
+        <button onClick={() => setCursor(new Date(year, month + 1, 1))} className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">›</button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium text-gray-400">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => <div key={d} className="py-1">{d.charAt(0)}<span className="hidden sm:inline">{d.slice(1)}</span></div>)}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} className="min-h-[64px] rounded-lg sm:min-h-[92px]" />;
+          const key = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
+          const dayCamps = byDay.get(key) ?? [];
+          const isToday = day.getTime() === today.getTime();
+          const isPast = day.getTime() < today.getTime();
+          return (
+            <div
+              key={i}
+              onClick={() => onPickDate(day)}
+              className={`group min-h-[64px] cursor-pointer rounded-lg border p-1 transition-colors sm:min-h-[92px] sm:p-1.5 ${isToday ? 'border-brand-400 bg-brand-50/40' : 'border-gray-100 hover:border-brand-300 hover:bg-gray-50'}`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`text-[11px] font-semibold sm:text-xs ${isToday ? 'text-brand-600' : isPast ? 'text-gray-300' : 'text-gray-500'}`}>{day.getDate()}</span>
+                <span className="hidden text-sm leading-none text-gray-300 group-hover:text-brand-400 sm:inline">+</span>
+              </div>
+              <div className="mt-1 space-y-0.5">
+                {dayCamps.slice(0, 3).map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={(e) => { e.stopPropagation(); onPickCampaign(c); }}
+                    title={c.title}
+                    style={{ backgroundColor: c.is_active ? accent : '#9ca3af' }}
+                    className="block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-medium text-white sm:text-[11px]"
+                  >
+                    {c.title}
+                  </button>
+                ))}
+                {dayCamps.length > 3 ? <span className="block px-1 text-[10px] text-gray-400">+{dayCamps.length - 3} more</span> : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-xs text-gray-400">Tap any day to schedule a campaign or event. Tap a colored chip to edit one.</p>
+    </div>
+  );
+}
+
 interface EntryRow { id: string; data: Record<string, unknown>; created_at: string; checked_in: Record<string, string> | null }
 interface GuestRow { entryId: string; index: number; name: string; party: string; partySize: number; submitted: string; checkedIn: boolean }
+type ScanOutcome = { kind: 'ok' | 'already' | 'invalid'; name?: string };
 
 function CampaignEntriesModal({ slug, campaign, onClose }: { slug: string; campaign: Campaign | null; onClose: () => void }) {
   const [data, setData] = useState<{ fields: string[]; entries: EntryRow[] } | null>(null);
   const [loading, setLoading] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; bad?: boolean } | null>(null);
   const [search, setSearch] = useState('');
 
   const refresh = useCallback(async () => {
@@ -1667,8 +1779,6 @@ function CampaignEntriesModal({ slug, campaign, onClose }: { slug: string; campa
     return () => clearInterval(t);
   }, [campaign, refresh]);
 
-  const flash = (msg: string, bad?: boolean) => { setToast({ msg, bad }); setTimeout(() => setToast(null), 2600); };
-
   const checkIn = useCallback(async (entryId: string, index: number, checked: boolean) => {
     setData((d) => d ? { ...d, entries: d.entries.map((e) => {
       if (e.id !== entryId) return e;
@@ -1681,17 +1791,17 @@ function CampaignEntriesModal({ slug, campaign, onClose }: { slug: string; campa
     }).catch(() => {});
   }, [slug, campaign]);
 
-  const onScan = useCallback((code: string) => {
+  const onScan = useCallback((code: string): ScanOutcome => {
     const [entryId, idxStr] = code.trim().split('.');
-    if (!entryId) return flash('Not a valid ticket for this campaign.', true);
+    if (!entryId) return { kind: 'invalid' };
     const index = Number(idxStr ?? '0') || 0;
     const entry = data?.entries.find((e) => e.id === entryId);
-    if (!entry) return flash('Not a valid ticket for this campaign.', true);
+    if (!entry) return { kind: 'invalid' };
     const guests = (entry.data.guests as { name?: string }[] | undefined) ?? [];
     const name = guests[index]?.name || (index === 0 ? 'Guest' : `Guest ${index}`);
-    if (entry.checked_in?.[String(index)]) return flash(`${name} is already checked in.`, true);
+    if (entry.checked_in?.[String(index)]) return { kind: 'already', name };
     checkIn(entryId, index, true);
-    flash(`✓ Checked in ${name}`);
+    return { kind: 'ok', name };
   }, [data, checkIn]);
 
   if (!campaign) return null;
@@ -1750,8 +1860,6 @@ function CampaignEntriesModal({ slug, campaign, onClose }: { slug: string; campa
         </div>
       )}
 
-      {toast && <div className={`px-4 py-2.5 text-sm font-medium sm:px-6 ${toast.bad ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>{toast.msg}</div>}
-
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         {loading ? (
           <p className="py-10 text-center text-sm text-gray-400">Loading…</p>
@@ -1782,10 +1890,15 @@ function CampaignEntriesModal({ slug, campaign, onClose }: { slug: string; campa
   );
 }
 
-function QrScanner({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) {
+function QrScanner({ onScan, onClose }: { onScan: (code: string) => ScanOutcome; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [err, setErr] = useState<string | null>(null);
-  const lastRef = useRef<{ code: string; t: number }>({ code: '', t: 0 });
+  // While a result card is shown we freeze detection so the camera doesn't flicker.
+  const pausedRef = useRef(false);
+  const [result, setResult] = useState<ScanOutcome | null>(null);
+
+  // Resume scanning the next attendee.
+  const scanNext = useCallback(() => { setResult(null); pausedRef.current = false; }, []);
 
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -1812,18 +1925,16 @@ function QrScanner({ onScan, onClose }: { onScan: (code: string) => void; onClos
         await video.play();
         const jsQR = (window as unknown as { jsQR: (d: Uint8ClampedArray, w: number, h: number) => { data: string } | null }).jsQR;
         const tick = () => {
-          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          if (!pausedRef.current && video.readyState === video.HAVE_ENOUGH_DATA) {
             canvas.width = video.videoWidth; canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d')!;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const result = jsQR(img.data, img.width, img.height);
-            if (result?.data) {
-              const now = Date.now();
-              if (result.data !== lastRef.current.code || now - lastRef.current.t > 2500) {
-                lastRef.current = { code: result.data, t: now };
-                onScan(result.data);
-              }
+            const found = jsQR(img.data, img.width, img.height);
+            if (found?.data) {
+              // Freeze and surface a clear result; the operator taps "Scan next".
+              pausedRef.current = true;
+              setResult(onScan(found.data));
             }
           }
           raf = requestAnimationFrame(tick);
@@ -1837,6 +1948,9 @@ function QrScanner({ onScan, onClose }: { onScan: (code: string) => void; onClos
     return () => { cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach((t) => t.stop()); };
   }, [onScan]);
 
+  const ok = result?.kind === 'ok';
+  const already = result?.kind === 'already';
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -1848,10 +1962,31 @@ function QrScanner({ onScan, onClose }: { onScan: (code: string) => void; onClos
           <p className="mt-4 text-sm text-red-600">{err}</p>
         ) : (
           <>
-            <div className="mt-4 overflow-hidden rounded-xl bg-black">
-              <video ref={videoRef} playsInline muted className="aspect-square w-full object-cover" />
+            {/* Camera stays mounted (so its stream survives "Scan next"); the
+                result card overlays it. */}
+            <div className={result ? 'hidden' : 'block'}>
+              <div className="mt-4 overflow-hidden rounded-xl bg-black">
+                <video ref={videoRef} playsInline muted className="aspect-square w-full object-cover" />
+              </div>
+              <p className="mt-3 text-center text-xs text-gray-500">Point at the attendee&apos;s QR — they&apos;re checked in automatically.</p>
             </div>
-            <p className="mt-3 text-center text-xs text-gray-500">Point at the attendee&apos;s QR — they&apos;re checked in automatically.</p>
+            {result ? (
+              <div className="mt-4 flex flex-col items-center py-6 text-center">
+                <div className={`flex h-24 w-24 items-center justify-center rounded-full ${ok ? 'bg-green-100' : 'bg-red-100'}`}>
+                  <span className={`text-5xl ${ok ? 'text-green-600' : 'text-red-600'}`}>{ok ? '✓' : '✕'}</span>
+                </div>
+                <p className={`mt-5 text-xl font-bold ${ok ? 'text-green-700' : 'text-red-700'}`}>
+                  {ok ? 'Checked in' : already ? 'Already checked in' : 'Invalid ticket'}
+                </p>
+                {result.name && (ok || already) ? <p className="mt-1 text-base text-gray-700">{result.name}</p> : null}
+                {already ? <p className="mt-1 text-sm text-gray-500">This QR has already been used.</p> : null}
+                {result.kind === 'invalid' ? <p className="mt-1 text-sm text-gray-500">Not a valid ticket for this campaign.</p> : null}
+                <div className="mt-6 flex w-full gap-2">
+                  <button onClick={scanNext} className="flex-1 rounded-lg bg-brand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700">Scan next</button>
+                  <button onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">Done</button>
+                </div>
+              </div>
+            ) : null}
           </>
         )}
       </div>
