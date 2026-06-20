@@ -26,7 +26,7 @@ export async function GET(
     // 1. Tenant core info
     auth.supabase
       .from('tenants')
-      .select('*, subscription_plans(id, name, price_monthly, max_staff, max_locations), categories(id, name)')
+      .select('*, subscription_plans(id, name, price_monthly, max_staff, max_locations), categories!category_id(id, name)')
       .eq('id', id)
       .single(),
 

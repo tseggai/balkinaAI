@@ -198,7 +198,7 @@ export async function POST(request: Request) {
       // Find tenants matching by name or service
       const { data: byName } = await supabase
         .from('tenants')
-        .select('id, name, logo_url, avg_rating, review_count, description, categories(name)')
+        .select('id, name, logo_url, avg_rating, review_count, description, categories!category_id(name)')
         .eq('status', 'active')
         .ilike('name', `%${searchTerm}%`)
         .limit(limit);
@@ -220,7 +220,7 @@ export async function POST(request: Request) {
       if (missingIds.length > 0) {
         const { data: extra } = await supabase
           .from('tenants')
-          .select('id, name, logo_url, avg_rating, review_count, description, categories(name)')
+          .select('id, name, logo_url, avg_rating, review_count, description, categories!category_id(name)')
           .eq('status', 'active')
           .in('id', missingIds);
         if (extra) allTenants = [...allTenants, ...(extra as typeof allTenants)];
