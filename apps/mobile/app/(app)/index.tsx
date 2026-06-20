@@ -1473,9 +1473,10 @@ export default function ChatScreen() {
       return {
         name: C.expoConfig?.extra?.propertyName as string | undefined,
         color: (C.expoConfig?.extra?.primaryColor as string | undefined) ?? '#6B7FC4',
+        splash: C.expoConfig?.extra?.splashImageUrl as string | undefined,
       };
     } catch {
-      return { name: undefined as string | undefined, color: '#6B7FC4' };
+      return { name: undefined as string | undefined, color: '#6B7FC4', splash: undefined as string | undefined };
     }
   }, []);
 
@@ -2653,13 +2654,16 @@ export default function ChatScreen() {
   if (propertySlug && !propertyData && propertyLoading && !hasMessages) {
     return (
       <View style={[styles.container, { backgroundColor: bootBrand.color, justifyContent: 'center', alignItems: 'center' }]}>
-        {bootBrand.name ? (
+        {bootBrand.splash ? (
+          // Full-bleed branded loading image (set in the white-label config).
+          <Image source={{ uri: bootBrand.splash }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : null}
+        {!bootBrand.splash && bootBrand.name ? (
           <Text style={{ fontSize: 26, fontWeight: '700', color: '#fff', letterSpacing: 0.5 }}>
             {bootBrand.name}
           </Text>
-        ) : (
-          <ActivityIndicator size="large" color="#fff" />
-        )}
+        ) : null}
+        {!bootBrand.splash ? <ActivityIndicator size="large" color="#fff" style={{ marginTop: bootBrand.name ? 24 : 0 }} /> : null}
       </View>
     );
   }

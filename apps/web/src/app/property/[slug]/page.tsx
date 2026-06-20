@@ -13,6 +13,7 @@ interface Property {
   slug: string;
   logo_url: string | null;
   cover_image_url: string | null;
+  splash_image_url: string | null;
   description: string | null;
   welcome_message: string;
   primary_color: string;
@@ -39,7 +40,20 @@ export default function PropertyDashboard() {
   const slug = params.slug as string;
   const supabase = createClient();
 
-  const [tab, setTab] = useState('dashboard');
+  const [tab, setTabState] = useState(() => {
+    if (typeof window === 'undefined') return 'dashboard';
+    return new URLSearchParams(window.location.search).get('tab') || 'dashboard';
+  });
+  // Keep the active section in the URL (?tab=…) so a refresh / shared link
+  // returns to the same place instead of always falling back to Dashboard.
+  const setTab = useCallback((next: string) => {
+    setTabState(next);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', next);
+      window.history.replaceState(null, '', url.toString());
+    }
+  }, []);
   const [property, setProperty] = useState<Property | null>(null);
   const [tenants, setTenants] = useState<PropertyTenant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,6 +200,14 @@ export default function PropertyDashboard() {
               <p className="mb-1 text-xs text-gray-500">Full-bleed hero photo shown at the top of your branded app.</p>
               <ImageUpload value={property.cover_image_url ?? ''} onChange={async (url) => {
                 await supabase.from('properties').update({ cover_image_url: url } as never).eq('id', property.id);
+                fetchData();
+              }} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">App Loading Screen</label>
+              <p className="mb-1 text-xs text-gray-500">Full-screen image shown while your branded app loads. Use a tall, full-bleed image (portrait, ~1284×2778).</p>
+              <ImageUpload value={property.splash_image_url ?? ''} onChange={async (url) => {
+                await supabase.from('properties').update({ splash_image_url: url } as never).eq('id', property.id);
                 fetchData();
               }} />
             </div>
@@ -1874,21 +1896,59 @@ function CampaignEntriesModal({ slug, campaign, onClose }: { slug: string; campa
         ) : visible.length === 0 ? (
           <p className="py-10 text-center text-sm text-gray-400">No matching guests.</p>
         ) : (
-          <div className="mx-auto grid max-w-3xl gap-2">
-            {visible.map((g) => (
-              <button key={`${g.entryId}.${g.index}`} onClick={() => checkIn(g.entryId, g.index, !g.checkedIn)}
-                className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors ${g.checkedIn ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100'}`}>
-                <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 text-lg ${g.checkedIn ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 text-transparent'}`}>✓</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-gray-900">{g.name}</span>
-                  <span className="block text-xs text-gray-500">
-                    {g.partySize > 1 ? `Party of ${g.partySize}${g.index > 0 ? ` · guest of ${g.party}` : ' · host'}` : 'Solo'}
+          <>
+            {/* Tablet / phone: big tap-to-check cards (touch-friendly at the door) */}
+            <div className="mx-auto grid max-w-3xl gap-2 lg:hidden">
+              {visible.map((g) => (
+                <button key={`${g.entryId}.${g.index}`} onClick={() => checkIn(g.entryId, g.index, !g.checkedIn)}
+                  className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors ${g.checkedIn ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100'}`}>
+                  <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 text-lg ${g.checkedIn ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 text-transparent'}`}>✓</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-gray-900">{g.name}</span>
+                    <span className="block text-xs text-gray-500">
+                      {g.partySize > 1 ? `Party of ${g.partySize}${g.index > 0 ? ` · guest of ${g.party}` : ' · host'}` : 'Solo'}
+                    </span>
                   </span>
-                </span>
-                {g.checkedIn && <span className="flex-shrink-0 text-xs font-semibold text-green-600">Arrived</span>}
-              </button>
-            ))}
-          </div>
+                  {g.checkedIn && <span className="flex-shrink-0 text-xs font-semibold text-green-600">Arrived</span>}
+                </button>
+              ))}
+            </div>
+
+            {/* Desktop: compact data table with an explicit action column */}
+            <div className="mx-auto hidden max-w-5xl overflow-hidden rounded-xl border border-gray-200 lg:block">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-4 py-2.5 font-semibold">Guest</th>
+                    <th className="px-4 py-2.5 font-semibold">Party</th>
+                    <th className="px-4 py-2.5 font-semibold">Submitted</th>
+                    <th className="px-4 py-2.5 font-semibold">Status</th>
+                    <th className="px-4 py-2.5 text-right font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {visible.map((g) => (
+                    <tr key={`${g.entryId}.${g.index}`} className={g.checkedIn ? 'bg-green-50/60' : 'bg-white hover:bg-gray-50'}>
+                      <td className="px-4 py-2.5 font-medium text-gray-900">{g.name}</td>
+                      <td className="px-4 py-2.5 text-gray-500">{g.partySize > 1 ? `Party of ${g.partySize}${g.index > 0 ? ` · guest of ${g.party}` : ' · host'}` : 'Solo'}</td>
+                      <td className="px-4 py-2.5 text-gray-500">{new Date(g.submitted).toLocaleDateString()}</td>
+                      <td className="px-4 py-2.5">
+                        {g.checkedIn
+                          ? <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">✓ Arrived</span>
+                          : <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">Not arrived</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <button onClick={() => checkIn(g.entryId, g.index, !g.checkedIn)}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${g.checkedIn ? 'border border-gray-300 text-gray-600 hover:bg-gray-100' : 'bg-brand-500 text-white hover:bg-brand-700'}`}>
+                          {g.checkedIn ? 'Undo' : 'Check in'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
       {scanOpen && <QrScanner onScan={onScan} onClose={() => setScanOpen(false)} />}

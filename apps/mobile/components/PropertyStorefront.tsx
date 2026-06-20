@@ -30,7 +30,7 @@ const DISPLAY = Platform.select({ ios: 'Avenir Next', default: undefined });
 // The storefront renders inside a SafeAreaView (top inset already applied on
 // iOS), so the header only needs a little breathing room — not a full inset.
 const TOP_INSET = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) + 4 : 8;
-const BANNER_H = 360;
+const BANNER_H = 420;
 const TABS_H = 54;
 const MINI_H = TOP_INSET + 46;
 
@@ -481,11 +481,11 @@ const styles = StyleSheet.create({
 
   banner: { height: BANNER_H, justifyContent: 'flex-end', overflow: 'hidden' },
   bannerScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.42)' },
-  bannerContent: { paddingHorizontal: 28, paddingTop: 40, paddingBottom: 40, alignItems: 'center' },
-  bannerLogo: { width: 150, height: 150, marginBottom: 10 },
+  bannerContent: { paddingHorizontal: 28, paddingTop: 36, paddingBottom: 40, alignItems: 'center' },
+  bannerLogo: { width: 300, height: 300, marginBottom: 2 },
   bannerEyebrow: { color: 'rgba(255,255,255,0.82)', fontSize: 10.5, letterSpacing: 3.5, fontWeight: '500', marginBottom: 12 },
   bannerTitle: { color: '#fff', fontSize: 30, fontFamily: DISPLAY, fontWeight: '500', letterSpacing: 0.4, textAlign: 'center' },
-  bannerSubtitle: { color: 'rgba(255,255,255,0.92)', fontSize: 14, textAlign: 'center', marginTop: 12, lineHeight: 21, maxWidth: 300 },
+  bannerSubtitle: { color: 'rgba(255,255,255,0.92)', fontSize: 14, textAlign: 'center', marginTop: 2, lineHeight: 21, maxWidth: 300 },
 
   campaignSection: { marginTop: 26 },
   campaignHeaderPad: { paddingHorizontal: 20 },

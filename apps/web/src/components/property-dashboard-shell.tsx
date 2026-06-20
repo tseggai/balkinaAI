@@ -51,8 +51,30 @@ export function PropertyDashboardShell({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const color = primaryColor || '#6B7FC4';
 
+  // Recolor every Tailwind `brand-*` utility used inside the property panel to
+  // the property's own accent — scoped to `.prop-theme` so the rest of Balkina
+  // (and other apps) keep the default brand palette. color-mix derives the
+  // hover/tint shades from the single accent.
+  const themeCss = `
+    .prop-theme .bg-brand-500 { background-color: var(--pa); }
+    .prop-theme .hover\\:bg-brand-700:hover { background-color: color-mix(in srgb, var(--pa) 82%, black); }
+    .prop-theme .bg-brand-50 { background-color: color-mix(in srgb, var(--pa) 12%, white); }
+    .prop-theme .hover\\:bg-brand-50:hover { background-color: color-mix(in srgb, var(--pa) 12%, white); }
+    .prop-theme .bg-brand-100 { background-color: color-mix(in srgb, var(--pa) 20%, white); }
+    .prop-theme .text-brand-600 { color: var(--pa); }
+    .prop-theme .text-brand-700 { color: color-mix(in srgb, var(--pa) 82%, black); }
+    .prop-theme .hover\\:text-brand-400:hover { color: var(--pa); }
+    .prop-theme .border-brand-200 { border-color: color-mix(in srgb, var(--pa) 35%, white); }
+    .prop-theme .border-brand-300 { border-color: color-mix(in srgb, var(--pa) 45%, white); }
+    .prop-theme .border-brand-400 { border-color: color-mix(in srgb, var(--pa) 60%, white); }
+    .prop-theme .border-brand-500 { border-color: var(--pa); }
+    .prop-theme .focus\\:border-brand-500:focus { border-color: var(--pa); }
+    .prop-theme .focus\\:ring-brand-500:focus { --tw-ring-color: var(--pa); }
+  `;
+
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="prop-theme flex min-h-screen bg-gray-50" style={{ '--pa': color } as React.CSSProperties}>
+      <style dangerouslySetInnerHTML={{ __html: themeCss }} />
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 transform border-r border-gray-200 bg-white transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:self-start ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-5">
