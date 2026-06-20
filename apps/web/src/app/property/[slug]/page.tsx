@@ -734,8 +734,15 @@ function TenantDetailModal({ slug, tenantId, accent, onClose }: { slug: string; 
 
             {t?.description ? <p className="mb-6 text-sm leading-relaxed text-gray-600">{t.description}</p> : null}
 
+            {!data.is_member ? (
+              <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <span>ℹ️</span>
+                <span>Added via Discover — this business isn&apos;t a property member, so its revenue and booking values are hidden. Invite them to join the property to see financials.</span>
+              </div>
+            ) : null}
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Revenue" value={money(s?.revenue ?? 0)} />
+              {data.is_member ? <Stat label="Revenue" value={money(s?.revenue ?? 0)} /> : null}
               <Stat label="Bookings" value={String(s?.total_appointments ?? 0)} />
               <Stat label="Upcoming" value={String(s?.upcoming ?? 0)} />
               <Stat label="Completed" value={String(s?.completed ?? 0)} />
@@ -757,7 +764,7 @@ function TenantDetailModal({ slug, tenantId, accent, onClose }: { slug: string; 
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs capitalize text-gray-500">{r.status}</span>
-                    <span className="text-sm font-medium text-gray-900">{money(r.total)}</span>
+                    {r.total != null ? <span className="text-sm font-medium text-gray-900">{money(r.total)}</span> : null}
                   </div>
                 </div>
               ))}
@@ -779,9 +786,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 interface TenantDetail {
+  is_member: boolean;
   tenant: { name: string; logo_url: string | null; cover_image_url: string | null; email: string | null; description: string | null; location_name: string | null; address: string | null } | null;
-  stats: { total_appointments: number; upcoming: number; completed: number; cancelled: number; revenue: number; avg_rating: number | null; review_count: number; service_count: number; staff_count: number } | null;
-  recent: { id: string; service: string; customer: string; date: string; status: string; total: number }[];
+  stats: { total_appointments: number; upcoming: number; completed: number; cancelled: number; revenue: number | null; avg_rating: number | null; review_count: number; service_count: number; staff_count: number } | null;
+  recent: { id: string; service: string; customer: string; date: string; status: string; total: number | null }[];
 }
 
 interface BillingState {

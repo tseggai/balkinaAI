@@ -25,6 +25,34 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
     .eq('id', tenantId)
     .maybeSingle();
   if (!tenant) return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+  const tenantEmail = (tenant as { email: string | null }).email;
+
+  // Member vs discover-added: a genuine member onboarded INTO this property via
+  // an accepted invite or an approved waitlist application. A business pulled in
+  // through Discover has only a bare property_tenants link — for those we hide
+  // financials (their revenue may come from the base app or other properties and
+  // isn't this property's to see). No schema change needed for this distinction.
+  const [{ data: acceptedInvite }, { data: onboardedApp }] = await Promise.all([
+    ctx.admin
+      .from('property_invites')
+      .select('id')
+      .eq('property_id', ctx.propertyId)
+      .eq('accepted_by', tenantId)
+      .eq('status', 'accepted')
+      .limit(1)
+      .maybeSingle(),
+    tenantEmail
+      ? ctx.admin
+          .from('waitlist')
+          .select('id')
+          .eq('property_id', ctx.propertyId)
+          .eq('email', tenantEmail)
+          .eq('status', 'onboarded')
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const isMember = !!acceptedInvite || !!onboardedApp;
 
   const now = new Date().toISOString();
 
@@ -45,7 +73,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   const reviewList = (reviews ?? []) as { rating: number }[];
 
   const PAID = ['completed', 'confirmed', 'approved'];
-  const revenue = list.filter((a) => PAID.includes(a.status)).reduce((s, a) => s + Number(a.total_price ?? 0), 0);
+  // Financials only for members; null = hidden in the UI for discover-added.
+  const revenue = isMember
+    ? list.filter((a) => PAID.includes(a.status)).reduce((s, a) => s + Number(a.total_price ?? 0), 0)
+    : null;
   const upcoming = list.filter((a) => a.start_time >= now && ['pending', 'approved', 'confirmed'].includes(a.status)).length;
   const completed = list.filter((a) => a.status === 'completed').length;
   const cancelled = list.filter((a) => a.status === 'cancelled' || a.status === 'no_show').length;
@@ -57,10 +88,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
     customer: a.customers?.display_name ?? 'Customer',
     date: a.start_time,
     status: a.status,
-    total: Number(a.total_price ?? 0),
+    total: isMember ? Number(a.total_price ?? 0) : null,
   }));
 
   return NextResponse.json({
+    is_member: isMember,
     tenant: {
       ...tenant,
       location_name: (location as { name?: string } | null)?.name ?? null,
