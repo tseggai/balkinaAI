@@ -17,6 +17,7 @@ import { formatPrice } from '@/lib/currency';
 import PropertySectionList from './PropertySectionList';
 import PropertySearch from './PropertySearch';
 import PropertyCampaignDetail, { Campaign } from './PropertyCampaignDetail';
+import PropertyEventsCalendar from './PropertyEventsCalendar';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const IVORY = '#F8F6F2';
@@ -128,6 +129,7 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
   const [sectionList, setSectionList] = useState<SectionTarget | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null);
+  const [eventsOpen, setEventsOpen] = useState(false);
   const campaigns = property.campaigns ?? [];
 
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -329,6 +331,12 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
         {/* Campaigns strip (above categories) */}
         {campaigns.length > 0 && (
           <View style={styles.campaignSection}>
+            <View style={styles.campaignHeader}>
+              <Text style={styles.campaignHeading}>What&apos;s On</Text>
+              <TouchableOpacity onPress={() => setEventsOpen(true)} hitSlop={8} activeOpacity={0.7}>
+                <Text style={[styles.seeAllLink, { color: accent }]}>See all</Text>
+              </TouchableOpacity>
+            </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.campaignRow}>
               {campaigns.map((c) => (
                 <TouchableOpacity key={c.id} style={styles.campaignCard} activeOpacity={0.9} onPress={() => setActiveCampaign(c)}>
@@ -440,6 +448,20 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
         customer={customer ?? { userId: null, name: null, phone: null, email: null }}
         onClose={() => setActiveCampaign(null)}
       />
+
+      {/* Full "What's On" events calendar */}
+      <PropertyEventsCalendar
+        visible={eventsOpen}
+        accent={accent}
+        campaigns={campaigns}
+        heroImage={property.cover_image_url}
+        onClose={() => setEventsOpen(false)}
+        onSelect={(c) => {
+          // iOS can't stack modals — dismiss the calendar, then open the detail.
+          setEventsOpen(false);
+          setTimeout(() => setActiveCampaign(c), 320);
+        }}
+      />
     </View>
   );
 }
@@ -469,6 +491,9 @@ const styles = StyleSheet.create({
   bannerSubtitle: { color: 'rgba(255,255,255,0.92)', fontSize: 14, textAlign: 'center', marginTop: 12, lineHeight: 21, maxWidth: 300 },
 
   campaignSection: { marginTop: 26 },
+  campaignHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 12 },
+  campaignHeading: { fontSize: 20, fontWeight: '700', color: INK, letterSpacing: 0.2 },
+  seeAllLink: { fontSize: 14, fontWeight: '600' },
   campaignRow: { gap: 14, paddingHorizontal: 20, paddingRight: 24 },
   campaignCard: { width: SCREEN_W * 0.82, maxWidth: 360, height: 104, borderRadius: 16, overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: INK },
   campaignScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },

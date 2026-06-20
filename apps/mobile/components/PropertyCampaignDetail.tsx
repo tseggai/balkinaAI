@@ -78,10 +78,11 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
   const [values, setValues] = useState<Record<string, string>>({});
   const [plusCount, setPlusCount] = useState(0);
   const [plusNames, setPlusNames] = useState<string[]>([]);
+  const [plusEmails, setPlusEmails] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [entryId, setEntryId] = useState<string | null>(null);
-  const [submittedGuests, setSubmittedGuests] = useState<{ name: string }[]>([]);
+  const [submittedGuests, setSubmittedGuests] = useState<{ name: string; email?: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const kb = useKeyboardHeight();
 
@@ -98,6 +99,7 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
     setValues({ first_name: first, last_name: last, email: customer.email ?? '', phone: customer.phone ?? '' });
     setPlusCount(0);
     setPlusNames([]);
+    setPlusEmails([]);
     setSubmitted(false);
     setEntryId(null);
     setError(null);
@@ -120,6 +122,12 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
     const required = campaign.cta_required ?? [];
     const missing = required.find((f) => f !== 'plus_ones' && !(values[f] ?? '').trim());
     if (missing) { setError(`${FIELD_LABEL[missing] ?? missing} is required.`); return; }
+    // A plus-one always needs a name (so their ticket is identifiable at the door).
+    if (campaign.cta_fields.includes('plus_ones') && plusCount > 0) {
+      for (let i = 0; i < plusCount; i++) {
+        if (!(plusNames[i] ?? '').trim()) { setError(`Please enter a name for guest ${i + 1}.`); return; }
+      }
+    }
     setError(null);
     setSubmitting(true);
     const data: Record<string, unknown> = {};
@@ -131,11 +139,15 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
         data[f] = values[f] ?? '';
       }
     }
-    // Per-guest tickets: index 0 = the RSVPer, then each plus-one.
+    // Per-guest tickets: index 0 = the RSVPer, then each plus-one. Email is
+    // optional — when present we email that guest their own QR.
     const primaryName = [values.first_name, values.last_name].filter(Boolean).join(' ').trim() || (customer.name ?? '').trim() || 'Guest';
-    const guests: { name: string }[] = [{ name: primaryName }];
+    const guests: { name: string; email?: string }[] = [{ name: primaryName, email: (values.email ?? '').trim() || undefined }];
     if (campaign.cta_fields.includes('plus_ones')) {
-      plusNames.slice(0, plusCount).forEach((n) => guests.push({ name: (n || '').trim() || 'Guest' }));
+      plusNames.slice(0, plusCount).forEach((n, i) => guests.push({
+        name: (n || '').trim() || 'Guest',
+        email: (plusEmails[i] ?? '').trim() || undefined,
+      }));
     }
     data.guests = guests;
     setSubmittedGuests(guests);
@@ -292,15 +304,27 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
                           <TouchableOpacity onPress={() => setPlusCount((c) => (campaign.cta_plus_one_limit != null && c >= campaign.cta_plus_one_limit ? c : c + 1))} style={styles.stepBtn}><Ionicons name="add" size={18} color={INK} /></TouchableOpacity>
                         </View>
                       </View>
+                      {plusCount > 0 ? <Text style={styles.plusHint}>Add each guest&apos;s email to send them their own QR ticket.</Text> : null}
                       {Array.from({ length: plusCount }).map((_, i) => (
-                        <TextInput
-                          key={i}
-                          style={[styles.input, { marginTop: 8 }]}
-                          value={plusNames[i] ?? ''}
-                          onChangeText={(v) => setPlusNames((prev) => { const n = [...prev]; n[i] = v; return n; })}
-                          placeholder={`Guest ${i + 1} name`}
-                          placeholderTextColor="#9ca3af"
-                        />
+                        <View key={i} style={styles.plusGuestCard}>
+                          <Text style={styles.plusGuestLabel}>Guest {i + 1}</Text>
+                          <TextInput
+                            style={styles.input}
+                            value={plusNames[i] ?? ''}
+                            onChangeText={(v) => setPlusNames((prev) => { const n = [...prev]; n[i] = v; return n; })}
+                            placeholder="Full name *"
+                            placeholderTextColor="#9ca3af"
+                          />
+                          <TextInput
+                            style={[styles.input, { marginTop: 8 }]}
+                            value={plusEmails[i] ?? ''}
+                            onChangeText={(v) => setPlusEmails((prev) => { const n = [...prev]; n[i] = v; return n; })}
+                            placeholder="Email (optional)"
+                            placeholderTextColor="#9ca3af"
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                          />
+                        </View>
                       ))}
                     </View>
                   ) : null}
@@ -358,6 +382,9 @@ const styles = StyleSheet.create({
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   stepBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: HAIRLINE, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
   stepVal: { fontSize: 17, fontWeight: '700', color: INK, minWidth: 22, textAlign: 'center' },
+  plusHint: { fontSize: 12, color: MUTED, marginTop: 10, marginBottom: 2 },
+  plusGuestCard: { backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 14, borderWidth: 1, borderColor: HAIRLINE, padding: 12, marginTop: 10 },
+  plusGuestLabel: { fontSize: 12, fontWeight: '700', color: MUTED, marginBottom: 8, letterSpacing: 0.4 },
 
   errorText: { color: '#dc2626', fontSize: 13, marginTop: 14 },
   submitBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 22 },
