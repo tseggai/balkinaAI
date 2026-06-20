@@ -702,69 +702,67 @@ function TenantDetailModal({ slug, tenantId, accent, onClose }: { slug: string; 
   const t = data?.tenant;
   const s = data?.stats;
   const money = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-
   const hero = t?.cover_image_url || t?.logo_url || null;
+  const subtitle = [t?.location_name, t?.address].filter(Boolean).join(' · ') || t?.email || '';
 
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:p-8" onClick={onClose}>
-      <div className="my-4 w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+      {/* Header — matches the entries view: logo + name on the left, close ✕ */}
+      <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          {t?.logo_url
+            ? <img src={t.logo_url} alt="" className="h-10 w-10 flex-shrink-0 rounded-lg object-cover" />
+            : <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: accent }}>{t?.name?.charAt(0) ?? '·'}</div>}
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold text-gray-900">{t?.name ?? 'Business'}</h3>
+            {subtitle ? <p className="truncate text-xs text-gray-500">{subtitle}</p> : null}
+          </div>
+        </div>
+        <button onClick={onClose} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-lg text-gray-500 hover:bg-gray-100">✕</button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         {loading || !data ? (
-          <div className="p-16 text-center text-sm text-gray-400">{loading ? 'Loading insights…' : 'Could not load this business.'}</div>
+          <p className="py-16 text-center text-sm text-gray-400">{loading ? 'Loading insights…' : 'Could not load this business.'}</p>
         ) : (
-          <>
-            {/* Hero — blurred business image with the name/logo clearly on top */}
-            <div className="relative h-52 overflow-hidden" style={hero ? undefined : { backgroundColor: accent }}>
-              {hero ? (
-                <>
-                  <img src={hero} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-black/25" />
-                </>
-              ) : null}
-              <button onClick={onClose} className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-gray-600 hover:bg-white">✕</button>
-              <div className="absolute inset-x-0 bottom-0 flex items-end gap-4 p-7">
-                {t?.logo_url
-                  ? <img src={t.logo_url} alt="" className="h-20 w-20 flex-shrink-0 rounded-2xl border-2 border-white/80 object-cover shadow-lg" />
-                  : <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-2xl border-2 border-white/80 text-2xl font-bold text-white shadow-lg" style={{ backgroundColor: accent }}>{t?.name?.charAt(0)}</div>}
-                <div className="min-w-0 pb-1">
-                  <h3 className="text-2xl font-bold text-white drop-shadow-md">{t?.name}</h3>
-                  <p className="truncate text-sm text-white/90 drop-shadow">{[t?.location_name, t?.address].filter(Boolean).join(' · ') || t?.email || ''}</p>
-                </div>
+          <div className="mx-auto max-w-3xl">
+            {hero ? (
+              <div className="relative mb-6 h-40 overflow-hidden rounded-2xl">
+                <img src={hero} alt="" className="absolute inset-0 h-full w-full object-cover" />
               </div>
+            ) : null}
+
+            {t?.description ? <p className="mb-6 text-sm leading-relaxed text-gray-600">{t.description}</p> : null}
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Stat label="Revenue" value={money(s?.revenue ?? 0)} />
+              <Stat label="Bookings" value={String(s?.total_appointments ?? 0)} />
+              <Stat label="Upcoming" value={String(s?.upcoming ?? 0)} />
+              <Stat label="Completed" value={String(s?.completed ?? 0)} />
+              <Stat label="Rating" value={s?.avg_rating != null ? `${s.avg_rating.toFixed(1)} (${s.review_count})` : '—'} />
+              <Stat label="Cancelled" value={String(s?.cancelled ?? 0)} />
+              <Stat label="Services" value={String(s?.service_count ?? 0)} />
+              <Stat label="Staff" value={String(s?.staff_count ?? 0)} />
             </div>
 
-            <div className="p-8">
-              {t?.description ? <p className="mb-6 text-sm leading-relaxed text-gray-600">{t.description}</p> : null}
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Stat label="Revenue" value={money(s?.revenue ?? 0)} />
-                <Stat label="Bookings" value={String(s?.total_appointments ?? 0)} />
-                <Stat label="Upcoming" value={String(s?.upcoming ?? 0)} />
-                <Stat label="Completed" value={String(s?.completed ?? 0)} />
-                <Stat label="Rating" value={s?.avg_rating != null ? `${s.avg_rating.toFixed(1)} (${s.review_count})` : '—'} />
-                <Stat label="Cancelled" value={String(s?.cancelled ?? 0)} />
-                <Stat label="Services" value={String(s?.service_count ?? 0)} />
-                <Stat label="Staff" value={String(s?.staff_count ?? 0)} />
-              </div>
-
-              <h4 className="mt-6 text-xs font-semibold uppercase tracking-wide text-gray-400">Recent bookings</h4>
-              <div className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200">
-                {(data.recent ?? []).length === 0 ? (
-                  <p className="p-4 text-center text-xs text-gray-400">No bookings yet.</p>
-                ) : data.recent.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-gray-900">{r.service}</p>
-                      <p className="truncate text-xs text-gray-500">{r.customer} · {new Date(r.date).toLocaleDateString()}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs capitalize text-gray-500">{r.status}</span>
-                      <span className="text-sm font-medium text-gray-900">{money(r.total)}</span>
-                    </div>
+            <h4 className="mt-6 text-xs font-semibold uppercase tracking-wide text-gray-400">Recent bookings</h4>
+            <div className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200">
+              {(data.recent ?? []).length === 0 ? (
+                <p className="p-4 text-center text-xs text-gray-400">No bookings yet.</p>
+              ) : data.recent.map((r) => (
+                <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-900">{r.service}</p>
+                    <p className="truncate text-xs text-gray-500">{r.customer} · {new Date(r.date).toLocaleDateString()}</p>
                   </div>
-                ))}
-              </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs capitalize text-gray-500">{r.status}</span>
+                    <span className="text-sm font-medium text-gray-900">{money(r.total)}</span>
+                  </div>
+                </div>
+              ))}
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -1897,12 +1895,19 @@ function QrScanner({ onScan, onClose }: { onScan: (code: string) => ScanOutcome;
   const pausedRef = useRef(false);
   const [result, setResult] = useState<ScanOutcome | null>(null);
 
+  // onScan changes on every entries poll (~4s). Keep it in a ref so the camera
+  // effect runs ONCE on mount — otherwise it tears down and re-acquires the
+  // camera every few seconds, which aborts play() and throws on srcObject.
+  const onScanRef = useRef(onScan);
+  useEffect(() => { onScanRef.current = onScan; }, [onScan]);
+
   // Resume scanning the next attendee.
   const scanNext = useCallback(() => { setResult(null); pausedRef.current = false; }, []);
 
   useEffect(() => {
     let stream: MediaStream | null = null;
     let raf = 0;
+    let cancelled = false;
     const canvas = document.createElement('canvas');
 
     // Load jsQR from CDN at runtime (no npm dependency / build impact).
@@ -1920,9 +1925,11 @@ function QrScanner({ onScan, onClose }: { onScan: (code: string) => ScanOutcome;
       try {
         await ensureJsQR();
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        const video = videoRef.current!;
+        const video = videoRef.current;
+        if (cancelled || !video) { stream.getTracks().forEach((t) => t.stop()); return; }
         video.srcObject = stream;
-        await video.play();
+        // play() can reject with AbortError if the element re-renders; ignore it.
+        await video.play().catch(() => {});
         const jsQR = (window as unknown as { jsQR: (d: Uint8ClampedArray, w: number, h: number) => { data: string } | null }).jsQR;
         const tick = () => {
           if (!pausedRef.current && video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -1934,19 +1941,20 @@ function QrScanner({ onScan, onClose }: { onScan: (code: string) => ScanOutcome;
             if (found?.data) {
               // Freeze and surface a clear result; the operator taps "Scan next".
               pausedRef.current = true;
-              setResult(onScan(found.data));
+              setResult(onScanRef.current(found.data));
             }
           }
           raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
       } catch (e) {
-        setErr(e instanceof Error ? e.message : 'Camera unavailable. Use the checklist instead.');
+        if (!cancelled) setErr(e instanceof Error ? e.message : 'Camera unavailable. Use the checklist instead.');
       }
     })();
 
-    return () => { cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach((t) => t.stop()); };
-  }, [onScan]);
+    return () => { cancelled = true; cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach((t) => t.stop()); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const ok = result?.kind === 'ok';
   const already = result?.kind === 'already';

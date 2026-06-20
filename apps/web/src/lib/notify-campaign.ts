@@ -85,43 +85,26 @@ export async function notifyRsvpConfirmation(
       }
     }
 
-    // Per-guest email confirmation (each guest gets their own QR ticket).
-    // guests[0] = the RSVPer; each plus-one may also supply an email.
-    if (property) {
-      const guests = (data.guests as { name?: string; email?: string }[] | undefined);
-      const recipients: { index: number; name: string; email: string }[] = [];
-      if (guests && guests.length > 0) {
-        guests.forEach((g, i) => {
-          const e = (g.email || '').trim();
-          if (e) recipients.push({ index: i, name: g.name || (i === 0 ? 'Guest' : `Guest ${i}`), email: e });
-        });
-      } else {
-        const e = ((data.email as string) || '').trim();
-        if (e) recipients.push({ index: 0, name: 'Guest', email: e });
-      }
-
-      if (recipients.length > 0) {
-        const { sendEmail } = await import('@balkina/notifications');
-        await Promise.all(recipients.map(({ index, name, email }) => {
-          const qr = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=8&data=${entryId}.${index}`;
-          const lead = index === 0
-            ? `Your spot for <strong>${c.title}</strong> at ${property.name} is confirmed.`
-            : `${name}, you've been added as a guest for <strong>${c.title}</strong> at ${property.name}.`;
-          return sendEmail({
-            to: email,
-            fromName: property.name,
-            subject: `You're confirmed — ${c.title}`,
-            html: `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px">
-              <h2 style="margin:0 0 8px">You're in! 🎉</h2>
-              <p style="color:#555">${lead}</p>
-              <p style="color:#555">Show this QR at the door to check in:</p>
-              <img src="${qr}" width="200" height="200" alt="Your check-in QR" style="display:block;margin:16px 0"/>
-              <p style="color:#999;font-size:13px">This ticket is just for ${name}. See you there.</p>
-            </div>`,
-            text: `You're confirmed for ${c.title} at ${property.name}. Show your QR at the door to check in.`,
-          }).catch((e: unknown) => console.error('[notifyRsvpConfirmation] email failed:', e));
-        }));
-      }
+    // Email confirmation to the RSVPer (with their primary QR). Each guest's
+    // own QR is shared from the confirmation sheet / My Bookings, so we only
+    // email the person who booked.
+    const email = (data.email as string) || '';
+    if (email && property) {
+      const qr = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=8&data=${entryId}.0`;
+      const { sendEmail } = await import('@balkina/notifications');
+      await sendEmail({
+        to: email,
+        fromName: property.name,
+        subject: `You're confirmed — ${c.title}`,
+        html: `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px">
+          <h2 style="margin:0 0 8px">You're in! 🎉</h2>
+          <p style="color:#555">Your spot for <strong>${c.title}</strong> at ${property.name} is confirmed.</p>
+          <p style="color:#555">Show this QR at the door to check in:</p>
+          <img src="${qr}" width="200" height="200" alt="Your check-in QR" style="display:block;margin:16px 0"/>
+          <p style="color:#999;font-size:13px">Bringing guests? Each has their own QR in the app to share.</p>
+        </div>`,
+        text: `You're confirmed for ${c.title} at ${property.name}. Show your QR in the app to check in.`,
+      });
     }
   } catch (err) {
     console.error('[notifyRsvpConfirmation] failed:', err);

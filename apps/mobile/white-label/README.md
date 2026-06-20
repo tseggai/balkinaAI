@@ -51,6 +51,23 @@ eas submit --platform ios
 Icon/splash are only applied if the referenced asset files exist under
 `white-label/assets/<slug>/`, so a variant without art still builds and runs.
 
+### Splash / loading screen image
+
+The screen shown **while the app loads** is the native Expo splash. To replace
+the default Balkina logo-on-color with a property image:
+
+1. Drop a full-resolution image at `white-label/assets/<slug>/splash.png`
+   (recommended ~1284×2778 for a full-bleed cover, or a centred logo PNG).
+2. Point `splashPath` at it in `white-label/<slug>.json`.
+3. Choose how it fills the screen with these optional keys:
+   - `"splashResizeMode": "cover"` — full-bleed image (use a full-screen art file)
+   - `"splashResizeMode": "contain"` — centre a logo (default)
+   - `"splashBackgroundColor": "#055f81"` — background behind a `contain` logo
+     (falls back to `backgroundColor`, then `primaryColor`)
+
+The splash is a **build-time** asset (it shows before any JS/network runs), so
+changing it requires a new EAS build — it can't be edited live from the portal.
+
 > `generate.js` (which writes `app.whitelabel.json`) is legacy and no longer
 > required — `app.config.js` handles variant selection directly.
 

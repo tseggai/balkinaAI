@@ -30,7 +30,7 @@ const DISPLAY = Platform.select({ ios: 'Avenir Next', default: undefined });
 // The storefront renders inside a SafeAreaView (top inset already applied on
 // iOS), so the header only needs a little breathing room — not a full inset.
 const TOP_INSET = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) + 4 : 8;
-const BANNER_H = 300;
+const BANNER_H = 360;
 const TABS_H = 54;
 const MINI_H = TOP_INSET + 46;
 
@@ -319,10 +319,10 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
             </>
           ) : null}
           <View style={styles.bannerContent}>
-            {property.logo_url ? <Image source={{ uri: property.logo_url }} style={styles.bannerLogo} /> : null}
-            <Text style={styles.bannerEyebrow}>WELCOME TO</Text>
-            <Text style={styles.bannerTitle}>{property.name}</Text>
-            <Text style={styles.bannerSubtitle}>{property.welcome_message}</Text>
+            {property.logo_url
+              ? <Image source={{ uri: property.logo_url }} style={styles.bannerLogo} resizeMode="contain" />
+              : <Text style={styles.bannerTitle}>{property.name}</Text>}
+            {property.welcome_message ? <Text style={styles.bannerSubtitle}>{property.welcome_message}</Text> : null}
           </View>
         </Animated.View>
 
@@ -331,11 +331,8 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
         {/* Campaigns strip (above categories) */}
         {campaigns.length > 0 && (
           <View style={styles.campaignSection}>
-            <View style={styles.campaignHeader}>
-              <Text style={styles.campaignHeading}>What&apos;s On</Text>
-              <TouchableOpacity onPress={() => setEventsOpen(true)} hitSlop={8} activeOpacity={0.7}>
-                <Text style={[styles.seeAllLink, { color: accent }]}>See all</Text>
-              </TouchableOpacity>
+            <View style={styles.campaignHeaderPad}>
+              <SectionHeader title="Events Calendar" onSeeAll={() => setEventsOpen(true)} count={campaigns.length} />
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.campaignRow}>
               {campaigns.map((c) => (
@@ -373,7 +370,7 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
 
       {/* Sticky nav bar */}
       {navTabs.length > 0 && (
-        <Animated.View style={[styles.tabsBar, { transform: [{ translateY: tabsTranslate }] }]}>
+        <Animated.View style={[styles.tabsBar, { backgroundColor: accent, transform: [{ translateY: tabsTranslate }] }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} alwaysBounceVertical={false} directionalLockEnabled contentContainerStyle={styles.tabsRow}>
             {navTabs.map((t) => (
               <TouchableOpacity key={t} onPress={() => scrollToSection(t)} style={styles.tab} activeOpacity={0.7}>
@@ -477,23 +474,21 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   accountBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: HAIRLINE, backgroundColor: 'rgba(255,255,255,0.92)' },
 
-  tabsBar: { position: 'absolute', top: 0, left: 0, right: 0, height: TABS_H, zIndex: 20, backgroundColor: IVORY, borderBottomWidth: 1, borderBottomColor: HAIRLINE, justifyContent: 'center' },
+  tabsBar: { position: 'absolute', top: 0, left: 0, right: 0, height: TABS_H, zIndex: 20, backgroundColor: IVORY, justifyContent: 'center' },
   tabsRow: { gap: 24, paddingHorizontal: 20, alignItems: 'center' },
   tab: { justifyContent: 'center', paddingVertical: 8 },
-  tabText: { fontSize: 12.5, fontWeight: '600', color: INK, letterSpacing: 1.3 },
+  tabText: { fontSize: 12.5, fontWeight: '700', color: '#fff', letterSpacing: 1.3 },
 
   banner: { height: BANNER_H, justifyContent: 'flex-end', overflow: 'hidden' },
   bannerScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.42)' },
-  bannerContent: { paddingHorizontal: 28, paddingTop: 40, paddingBottom: 36, alignItems: 'center' },
-  bannerLogo: { width: 70, height: 70, borderRadius: 16, marginBottom: 18 },
+  bannerContent: { paddingHorizontal: 28, paddingTop: 40, paddingBottom: 40, alignItems: 'center' },
+  bannerLogo: { width: 150, height: 150, marginBottom: 10 },
   bannerEyebrow: { color: 'rgba(255,255,255,0.82)', fontSize: 10.5, letterSpacing: 3.5, fontWeight: '500', marginBottom: 12 },
   bannerTitle: { color: '#fff', fontSize: 30, fontFamily: DISPLAY, fontWeight: '500', letterSpacing: 0.4, textAlign: 'center' },
   bannerSubtitle: { color: 'rgba(255,255,255,0.92)', fontSize: 14, textAlign: 'center', marginTop: 12, lineHeight: 21, maxWidth: 300 },
 
   campaignSection: { marginTop: 26 },
-  campaignHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 12 },
-  campaignHeading: { fontSize: 20, fontWeight: '700', color: INK, letterSpacing: 0.2 },
-  seeAllLink: { fontSize: 14, fontWeight: '600' },
+  campaignHeaderPad: { paddingHorizontal: 20 },
   campaignRow: { gap: 14, paddingHorizontal: 20, paddingRight: 24 },
   campaignCard: { width: SCREEN_W * 0.82, maxWidth: 360, height: 104, borderRadius: 16, overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: INK },
   campaignScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
