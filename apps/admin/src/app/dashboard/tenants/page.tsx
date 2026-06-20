@@ -83,6 +83,7 @@ export default function TenantsPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [planFilter, setPlanFilter] = useState('');
@@ -206,6 +207,16 @@ export default function TenantsPage() {
 
     const res = await fetch(`/api/admin/tenants?${params}`);
     const json = await res.json();
+    if (!res.ok) {
+      // Surface the real reason instead of silently showing an empty list
+      // (e.g. 403 if the session isn't a platform_admin, or a 500 query error).
+      setLoadError(json.error ? `${res.status}: ${json.error}` : `Failed to load tenants (HTTP ${res.status})`);
+      setTenants([]);
+      setTotal(0);
+      setLoading(false);
+      return;
+    }
+    setLoadError(null);
     setTenants(json.data ?? []);
     setTotal(json.total ?? 0);
     if (json.plans) setPlans(json.plans);
@@ -376,6 +387,14 @@ export default function TenantsPage() {
       )}
 
       {/* Table */}
+      {loadError ? (
+        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Couldn&apos;t load tenants — {loadError}.
+          {loadError.startsWith('403') ? ' Your session isn’t a platform_admin (this does not affect which tenants exist).' : ''}
+          {loadError.startsWith('401') ? ' Your admin session expired — sign in again.' : ''}
+        </div>
+      ) : null}
+
       {loading ? (
         <div className="mt-8 flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" /></div>
       ) : (

@@ -78,11 +78,10 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
   const [values, setValues] = useState<Record<string, string>>({});
   const [plusCount, setPlusCount] = useState(0);
   const [plusNames, setPlusNames] = useState<string[]>([]);
-  const [plusEmails, setPlusEmails] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [entryId, setEntryId] = useState<string | null>(null);
-  const [submittedGuests, setSubmittedGuests] = useState<{ name: string; email?: string }[]>([]);
+  const [submittedGuests, setSubmittedGuests] = useState<{ name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const kb = useKeyboardHeight();
 
@@ -99,7 +98,6 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
     setValues({ first_name: first, last_name: last, email: customer.email ?? '', phone: customer.phone ?? '' });
     setPlusCount(0);
     setPlusNames([]);
-    setPlusEmails([]);
     setSubmitted(false);
     setEntryId(null);
     setError(null);
@@ -139,15 +137,12 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
         data[f] = values[f] ?? '';
       }
     }
-    // Per-guest tickets: index 0 = the RSVPer, then each plus-one. Email is
-    // optional — when present we email that guest their own QR.
+    // Per-guest tickets: index 0 = the RSVPer, then each plus-one. Each guest
+    // shares their own QR from the confirmation sheet / My Bookings.
     const primaryName = [values.first_name, values.last_name].filter(Boolean).join(' ').trim() || (customer.name ?? '').trim() || 'Guest';
-    const guests: { name: string; email?: string }[] = [{ name: primaryName, email: (values.email ?? '').trim() || undefined }];
+    const guests: { name: string }[] = [{ name: primaryName }];
     if (campaign.cta_fields.includes('plus_ones')) {
-      plusNames.slice(0, plusCount).forEach((n, i) => guests.push({
-        name: (n || '').trim() || 'Guest',
-        email: (plusEmails[i] ?? '').trim() || undefined,
-      }));
+      plusNames.slice(0, plusCount).forEach((n) => guests.push({ name: (n || '').trim() || 'Guest' }));
     }
     data.guests = guests;
     setSubmittedGuests(guests);
@@ -304,27 +299,16 @@ export default function PropertyCampaignDetail({ visible, accent, apiBase, campa
                           <TouchableOpacity onPress={() => setPlusCount((c) => (campaign.cta_plus_one_limit != null && c >= campaign.cta_plus_one_limit ? c : c + 1))} style={styles.stepBtn}><Ionicons name="add" size={18} color={INK} /></TouchableOpacity>
                         </View>
                       </View>
-                      {plusCount > 0 ? <Text style={styles.plusHint}>Add each guest&apos;s email to send them their own QR ticket.</Text> : null}
+                      {plusCount > 0 ? <Text style={styles.plusHint}>Each guest gets their own QR to share from your confirmation.</Text> : null}
                       {Array.from({ length: plusCount }).map((_, i) => (
-                        <View key={i} style={styles.plusGuestCard}>
-                          <Text style={styles.plusGuestLabel}>Guest {i + 1}</Text>
-                          <TextInput
-                            style={styles.input}
-                            value={plusNames[i] ?? ''}
-                            onChangeText={(v) => setPlusNames((prev) => { const n = [...prev]; n[i] = v; return n; })}
-                            placeholder="Full name *"
-                            placeholderTextColor="#9ca3af"
-                          />
-                          <TextInput
-                            style={[styles.input, { marginTop: 8 }]}
-                            value={plusEmails[i] ?? ''}
-                            onChangeText={(v) => setPlusEmails((prev) => { const n = [...prev]; n[i] = v; return n; })}
-                            placeholder="Email (optional)"
-                            placeholderTextColor="#9ca3af"
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                          />
-                        </View>
+                        <TextInput
+                          key={i}
+                          style={[styles.input, { marginTop: 8 }]}
+                          value={plusNames[i] ?? ''}
+                          onChangeText={(v) => setPlusNames((prev) => { const n = [...prev]; n[i] = v; return n; })}
+                          placeholder={`Guest ${i + 1} name *`}
+                          placeholderTextColor="#9ca3af"
+                        />
                       ))}
                     </View>
                   ) : null}
@@ -383,8 +367,6 @@ const styles = StyleSheet.create({
   stepBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: HAIRLINE, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
   stepVal: { fontSize: 17, fontWeight: '700', color: INK, minWidth: 22, textAlign: 'center' },
   plusHint: { fontSize: 12, color: MUTED, marginTop: 10, marginBottom: 2 },
-  plusGuestCard: { backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 14, borderWidth: 1, borderColor: HAIRLINE, padding: 12, marginTop: 10 },
-  plusGuestLabel: { fontSize: 12, fontWeight: '700', color: MUTED, marginBottom: 8, letterSpacing: 0.4 },
 
   errorText: { color: '#dc2626', fontSize: 13, marginTop: 14 },
   submitBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 22 },

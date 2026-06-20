@@ -32,7 +32,16 @@ module.exports = ({ config }) => {
     scheme: wl.scheme || config.scheme,
     ...(assetExists(wl.iconPath) ? { icon: wl.iconPath } : {}),
     ...(assetExists(wl.splashPath)
-      ? { splash: { ...config.splash, image: wl.splashPath, backgroundColor: wl.primaryColor || config.splash?.backgroundColor } }
+      ? {
+          splash: {
+            ...config.splash,
+            image: wl.splashPath,
+            // 'cover' lets a property ship a full-bleed loading image; 'contain'
+            // (the default) centres a logo on the background colour.
+            resizeMode: wl.splashResizeMode || config.splash?.resizeMode || 'contain',
+            backgroundColor: wl.splashBackgroundColor || wl.backgroundColor || wl.primaryColor || config.splash?.backgroundColor,
+          },
+        }
       : {}),
     ios: { ...config.ios, ...(wl.bundleId ? { bundleIdentifier: wl.bundleId } : {}) },
     android: { ...config.android, ...(wl.androidPackage ? { package: wl.androidPackage } : {}) },

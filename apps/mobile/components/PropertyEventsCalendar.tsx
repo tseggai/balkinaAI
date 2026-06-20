@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -86,7 +86,16 @@ function timeOf(c: Campaign): string | null {
 
 export default function PropertyEventsCalendar({ visible, accent, campaigns, heroImage, onSelect, onClose }: Props) {
   const { dated, ongoing } = useMemo(() => groupByDay(campaigns), [campaigns]);
+  const [filter, setFilter] = useState<string>('all'); // 'all' | day key
   const isEmpty = dated.length === 0 && ongoing.length === 0;
+
+  // Date filter pills: All + each upcoming day. Selecting one narrows the list.
+  const pills = useMemo(() => [{ key: 'all', label: 'All' }, ...dated.map((g) => ({
+    key: g.key,
+    label: g.label === 'Today' || g.label === 'Tomorrow' ? g.label : g.sublabel,
+  }))], [dated]);
+  const shownDated = filter === 'all' ? dated : dated.filter((g) => g.key === filter);
+  const shownOngoing = filter === 'all' ? ongoing : [];
 
   const Card = ({ c }: { c: Campaign }) => {
     const time = timeOf(c);
@@ -124,9 +133,30 @@ export default function PropertyEventsCalendar({ visible, accent, campaigns, her
           <SafeAreaView>
             <TouchableOpacity onPress={onClose} style={styles.backBtn} hitSlop={10}><Ionicons name="arrow-back" size={22} color="#fff" /></TouchableOpacity>
           </SafeAreaView>
-          <Text style={styles.heroTitle}>WHAT&apos;S ON</Text>
+          <Text style={styles.heroTitle}>EVENTS CALENDAR</Text>
           <Text style={styles.heroSub}>Everything happening at the property</Text>
         </View>
+
+        {/* Date filter */}
+        {dated.length > 0 ? (
+          <View style={styles.filterBar}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {pills.map((p) => {
+                const on = filter === p.key;
+                return (
+                  <TouchableOpacity
+                    key={p.key}
+                    onPress={() => setFilter(p.key)}
+                    activeOpacity={0.8}
+                    style={[styles.pill, on ? { backgroundColor: accent, borderColor: accent } : null]}
+                  >
+                    <Text style={[styles.pillText, on ? { color: '#fff' } : null]}>{p.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           {isEmpty ? (
@@ -137,7 +167,7 @@ export default function PropertyEventsCalendar({ visible, accent, campaigns, her
             </View>
           ) : (
             <View style={styles.body}>
-              {dated.map((g) => (
+              {shownDated.map((g) => (
                 <View key={g.key} style={styles.daySection}>
                   <View style={styles.dayHeader}>
                     <Text style={styles.dayLabel}>{g.label}</Text>
@@ -147,13 +177,13 @@ export default function PropertyEventsCalendar({ visible, accent, campaigns, her
                 </View>
               ))}
 
-              {ongoing.length > 0 ? (
+              {shownOngoing.length > 0 ? (
                 <View style={styles.daySection}>
                   <View style={styles.dayHeader}>
                     <Text style={styles.dayLabel}>Ongoing</Text>
                     <Text style={styles.daySub}>Available anytime</Text>
                   </View>
-                  {ongoing.map((c) => <Card key={c.id} c={c} />)}
+                  {shownOngoing.map((c) => <Card key={c.id} c={c} />)}
                 </View>
               ) : null}
             </View>
@@ -171,6 +201,11 @@ const styles = StyleSheet.create({
   backBtn: { margin: 12, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' },
   heroTitle: { color: '#fff', fontSize: 34, fontWeight: '700', fontFamily: DISPLAY, letterSpacing: 2, textAlign: 'center', marginTop: 6 },
   heroSub: { color: 'rgba(255,255,255,0.9)', fontSize: 14, textAlign: 'center', marginTop: 6 },
+
+  filterBar: { borderBottomWidth: 1, borderBottomColor: HAIRLINE, backgroundColor: IVORY },
+  filterRow: { gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
+  pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: HAIRLINE, backgroundColor: '#fff' },
+  pillText: { fontSize: 13, fontWeight: '600', color: INK },
 
   body: { padding: 20 },
   daySection: { marginBottom: 26 },
