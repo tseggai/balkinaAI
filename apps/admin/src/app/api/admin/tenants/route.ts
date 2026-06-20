@@ -37,7 +37,7 @@ export async function GET(request: Request) {
   const from = (page - 1) * perPage;
   let query = auth.supabase
     .from('tenants')
-    .select('id, name, owner_name, email, phone, status, payments_enabled, avg_rating, review_count, logo_url, category_id, created_at, subscription_plan_id, subscription_plans(id, name), categories(id, name)', { count: 'exact' })
+    .select('id, name, owner_name, email, phone, status, payments_enabled, avg_rating, review_count, logo_url, category_id, created_at, subscription_plan_id, subscription_plans(id, name), categories!category_id(id, name)', { count: 'exact' })
     .range(from, from + perPage - 1);
 
   // Filters
@@ -154,7 +154,7 @@ export async function PATCH(request: Request) {
     .from('tenants')
     .update(updates)
     .eq('id', id)
-    .select('*, subscription_plans(id, name), categories(id, name)')
+    .select('*, subscription_plans(id, name), categories!category_id(id, name)')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

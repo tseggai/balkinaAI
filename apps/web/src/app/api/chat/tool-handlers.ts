@@ -256,7 +256,7 @@ async function handlePropertyFindBusinesses(
 
   let tq = supabase
     .from('tenants')
-    .select('id, name, logo_url, avg_rating, review_count, category_id, categories(name)')
+    .select('id, name, logo_url, avg_rating, review_count, category_id, categories!category_id(name)')
     .in('id', ids)
     .eq('status', 'active');
   if (categoryId) tq = tq.eq('category_id', categoryId);
@@ -354,7 +354,7 @@ async function handleFindBusinessesInner(
   if (categoryId) {
     const { data: catTenants, error: catError } = await supabase
       .from('tenants')
-      .select('id, name, logo_url, avg_rating, review_count, categories(name)')
+      .select('id, name, logo_url, avg_rating, review_count, categories!category_id(name)')
       .eq('status', 'active')
       // Hospitality businesses are discoverable only inside their property's
       // white-label portal — never in the global Balkina discovery pool.
@@ -510,7 +510,7 @@ async function handleFindBusinessesInner(
     // even when their service names don't contain the category keywords
     const { data: categoryTenants } = await supabase
       .from('tenants')
-      .select('id, name, logo_url, category_id, categories(name)')
+      .select('id, name, logo_url, category_id, categories!category_id(name)')
       .eq('status', 'active')
       .neq('business_type', 'hospitality')
       .not('category_id', 'is', null);
@@ -632,7 +632,7 @@ async function handleFindBusinessesInner(
       // Step 2: Fetch those tenants with their details
       const { data: tenants, error: tenantError } = await supabase
         .from('tenants')
-        .select('id, name, logo_url, avg_rating, review_count, categories(name)')
+        .select('id, name, logo_url, avg_rating, review_count, categories!category_id(name)')
         .in('id', matchingTenantIds)
         .eq('status', 'active')
         .neq('business_type', 'hospitality');
@@ -773,7 +773,7 @@ async function handleFindBusinessesInner(
     // Return all active businesses when no query is provided
     const { data, error } = await supabase
       .from('tenants')
-      .select('id, name, logo_url, avg_rating, review_count, categories(name)')
+      .select('id, name, logo_url, avg_rating, review_count, categories!category_id(name)')
       .eq('status', 'active')
       .neq('business_type', 'hospitality')
       .limit(200);
@@ -898,7 +898,7 @@ async function handleFindBusinessesInner(
   // 1. Search tenants by name
   const { data: tenantsByName } = await supabase
     .from('tenants')
-    .select('id, name, logo_url, avg_rating, review_count, categories(name)')
+    .select('id, name, logo_url, avg_rating, review_count, categories!category_id(name)')
     .eq('status', 'active')
     .neq('business_type', 'hospitality')
     .ilike('name', `%${sanitized}%`)
@@ -937,7 +937,7 @@ async function handleFindBusinessesInner(
 
   const { data: serviceMatches } = await supabase
     .from('services')
-    .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name, logo_url, categories(name))')
+    .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name, logo_url, categories!category_id(name))')
     .or(uniquePatterns.join(','))
     .eq('tenants.status', 'active')
     .neq('tenants.business_type', 'hospitality')
