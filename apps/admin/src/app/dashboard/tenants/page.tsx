@@ -227,6 +227,12 @@ export default function TenantsPage() {
 
   useEffect(() => { fetchTenants(); }, [fetchTenants]);
 
+  // Reset to the first page whenever a filter/search/sort changes, so you never
+  // land on an out-of-range page (e.g. stuck on "21–40 of 55" after narrowing).
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, planFilter, paymentsFilter, categoryFilter, cityFilter, sortOption]);
+
   // Quick status change (inline)
   async function handleStatusChange(id: string, newStatus: string) {
     setSaving(true);

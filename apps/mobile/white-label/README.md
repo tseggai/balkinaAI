@@ -68,6 +68,17 @@ the default Balkina logo-on-color with a property image:
 The splash is a **build-time** asset (it shows before any JS/network runs), so
 changing it requires a new EAS build — it can't be edited live from the portal.
 
+#### In-app boot loader (portal-uploadable)
+
+After the native splash, there's a brief **in-app** loading screen while the
+storefront fetches its data. This one shows a full-bleed image from a **remote
+URL** and is managed in the portal: **Branding → App Loading Screen** saves to
+`properties.splash_image_url`. To have it appear on that first in-app frame,
+mirror the same URL into the variant as `"splashImageUrl": "https://…"` (read at
+runtime via `Constants.expoConfig.extra.splashImageUrl`). Unlike the native
+splash, updating the property's `splash_image_url` takes effect without a new
+build the next time the app boots.
+
 > `generate.js` (which writes `app.whitelabel.json`) is legacy and no longer
 > required — `app.config.js` handles variant selection directly.
 

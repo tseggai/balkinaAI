@@ -50,6 +50,9 @@ module.exports = ({ config }) => {
       propertySlug: wl.propertySlug,
       propertyName: wl.appName,
       primaryColor: wl.primaryColor,
+      // Remote URL for the full-bleed in-app boot loader (set to the property's
+      // splash_image_url so the loading screen matches the portal upload).
+      splashImageUrl: wl.splashImageUrl,
     },
   };
 };
