@@ -2056,9 +2056,14 @@ export async function handleBookAppointment(
 
   // Update appointment total if adjustments were made
   const finalTotal = eventBase + extrasTotal - couponDiscount - loyaltyDiscount;
+  // A percentage deposit is taken on the FULL total (incl. extras, less discounts),
+  // not just the service base — recompute now that extras/discounts are known.
+  if (paymentsEnabled && svc.deposit_enabled && svc.deposit_amount && svc.deposit_type === 'percentage') {
+    depositAmount = Math.round((finalTotal * svc.deposit_amount) / 100 * 100) / 100;
+  }
   if (extrasTotal > 0 || couponDiscount > 0 || loyaltyDiscount > 0) {
     await supabase.from('appointments').update({
-      total_price: finalTotal, balance_due: finalTotal - (depositAmount ?? 0),
+      total_price: finalTotal, balance_due: finalTotal - (depositAmount ?? 0), deposit_amount_paid: depositAmount,
     } as never).eq('id', appointmentId);
   }
 

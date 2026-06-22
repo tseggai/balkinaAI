@@ -167,7 +167,7 @@ function ServiceSheet({
           </View>
 
           <View style={styles.sheetMetaRow}>
-            {!service.hide_price ? <Text style={styles.sheetPrice}>{formatPrice(base)}{perPerson ? ' / guest' : ''}</Text> : null}
+            {!service.hide_price ? <Text style={styles.sheetPrice}>{formatPrice(base, service.currency)}{perPerson ? ' / guest' : ''}</Text> : null}
             {service.service_type !== 'event' ? <Text style={styles.sheetMeta}>{service.duration_minutes} min</Text> : null}
           </View>
 
@@ -190,7 +190,7 @@ function ServiceSheet({
                           <Text style={styles.optionName}>{p.name}</Text>
                           {p.description ? <Text style={styles.optionDesc} numberOfLines={2}>{p.description}</Text> : null}
                         </View>
-                        <Text style={styles.optionPrice}>{formatPrice(Number(p.price))}</Text>
+                        <Text style={styles.optionPrice}>{formatPrice(Number(p.price), service.currency)}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -206,7 +206,7 @@ function ServiceSheet({
                       <TouchableOpacity key={e.name} style={[styles.option, active && { borderColor: accent }]} activeOpacity={0.8} onPress={() => toggleExtra(e.name)}>
                         <View style={[styles.check, active && { backgroundColor: accent, borderColor: accent }]}>{active ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}</View>
                         <Text style={[styles.optionName, { flex: 1 }]}>{e.name}</Text>
-                        <Text style={styles.optionPrice}>+{formatPrice(Number(e.price))}</Text>
+                        <Text style={styles.optionPrice}>+{formatPrice(Number(e.price), service.currency)}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -222,7 +222,7 @@ function ServiceSheet({
           onPress={() => onBook(service, { extras: Array.from(selExtras), packageName: selPackage ?? undefined, addOnTotal: extrasTotal + pkgTotal })}
         >
           <Ionicons name="calendar-outline" size={18} color="#fff" />
-          <Text style={styles.fabText}>{service.hide_price ? 'Book' : `Book · ${formatPrice(total)}`}</Text>
+          <Text style={styles.fabText}>{service.hide_price ? 'Book' : `Book · ${formatPrice(total, service.currency)}`}</Text>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -268,7 +268,7 @@ export default function PropertyBusinessPage({ visible, apiBase, accent, busines
   const hours = deriveHours(services);
 
   const priceLabel = (s: BookingService) =>
-    s.hide_price ? '' : `${formatPrice(Number(s.price))}${s.pricing_type === 'per_person' ? ' / guest' : ''}`;
+    s.hide_price ? '' : `${formatPrice(Number(s.price), s.currency)}${s.pricing_type === 'per_person' ? ' / guest' : ''}`;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>

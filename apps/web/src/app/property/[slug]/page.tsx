@@ -955,11 +955,21 @@ interface SentMessage {
 function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTenant[] }) {
   const [history, setHistory] = useState<SentMessage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [viewMsg, setViewMsg] = useState<SentMessage | null>(null);
+
+  // Compose state
   const [recipient, setRecipient] = useState('all'); // 'all' or a tenant_id
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  // Filters
+  const [search, setSearch] = useState('');
+  const [filterRecipient, setFilterRecipient] = useState('all'); // 'all' or recipient label
+  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
@@ -971,10 +981,11 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
+  const openCompose = () => { setRecipient('all'); setSubject(''); setBody(''); setConfirming(false); setResult(null); setComposeOpen(true); };
+  const recipientLabel = recipient === 'all' ? `all ${tenants.length} businesses` : (tenants.find((t) => t.tenant_id === recipient)?.tenant_name ?? 'business');
+
   const handleSend = async () => {
     if (!subject.trim() || !body.trim()) return;
-    const recipientLabel = recipient === 'all' ? `all ${tenants.length} businesses` : tenants.find((t) => t.tenant_id === recipient)?.tenant_name;
-    if (!confirm(`Send "${subject.trim()}" to ${recipientLabel}?`)) return;
     setSending(true);
     setResult(null);
     const res = await fetch(`/api/property/${slug}/messages`, {
@@ -984,66 +995,142 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
     });
     const json = await res.json();
     setSending(false);
+    setConfirming(false);
     if (!res.ok) { setResult({ ok: false, message: json.error ?? 'Failed to send' }); return; }
-    setResult({ ok: true, message: json.message ?? 'Sent.' });
-    setSubject(''); setBody('');
+    setComposeOpen(false);
     fetchHistory();
   };
 
+  // Recipient labels present in history (for the filter dropdown).
+  const recipientOptions = Array.from(new Set(history.map((m) => m.recipient))).sort();
+  const q = search.trim().toLowerCase();
+  const visible = history
+    .filter((m) => filterRecipient === 'all' || m.recipient === filterRecipient)
+    .filter((m) => !q || m.subject.toLowerCase().includes(q) || m.body.toLowerCase().includes(q) || m.recipient.toLowerCase().includes(q))
+    .sort((a, b) => sortDir === 'desc'
+      ? new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      : new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
   return (
     <div>
-      <h2 className="text-xl font-bold text-gray-900">Messages</h2>
-      <p className="mt-1 text-sm text-gray-500">Email an announcement to all your businesses, or message one directly — sent under your property&apos;s name via Balkina AI.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Messages</h2>
+          <p className="mt-1 text-sm text-gray-500">Email an announcement to all your businesses, or message one directly — sent under your property&apos;s name via Balkina AI.</p>
+        </div>
+        <button onClick={openCompose} className="self-start rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">+ New Message</button>
+      </div>
 
-      {/* Compose */}
-      <div className="mt-4 max-w-2xl space-y-3 rounded-lg border border-gray-200 bg-white p-5">
-        <div>
-          <label className="block text-xs font-medium text-gray-500">Recipient</label>
-          <select value={recipient} onChange={(e) => setRecipient(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
-            <option value="all">📣 All businesses ({tenants.length})</option>
-            {tenants.map((t) => (
-              <option key={t.tenant_id} value={t.tenant_id}>{t.tenant_name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500">Subject</label>
-          <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Summer hours & marina event"
-            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500">Message</label>
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={5} placeholder="Write your announcement…"
-            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-        </div>
-        {result && (
-          <div className={`rounded-lg px-3 py-2 text-xs ${result.ok ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>{result.message}</div>
-        )}
-        <button onClick={handleSend} disabled={sending || !subject.trim() || !body.trim()}
-          className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-          {sending ? 'Sending…' : recipient === 'all' ? 'Send to all' : 'Send'}
+      {/* Filters */}
+      <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search messages…"
+          className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+        <select value={filterRecipient} onChange={(e) => setFilterRecipient(e.target.value)}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+          <option value="all">All recipients</option>
+          {recipientOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <button onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">
+          {sortDir === 'desc' ? 'Newest' : 'Oldest'}
         </button>
       </div>
 
-      {/* History */}
-      <h3 className="mt-8 text-sm font-semibold text-gray-900">Sent history</h3>
-      {loading ? (
-        <p className="mt-3 text-sm text-gray-400">Loading…</p>
-      ) : history.length === 0 ? (
-        <p className="mt-3 text-sm text-gray-400">No messages sent yet.</p>
-      ) : (
-        <div className="mt-3 max-w-2xl space-y-2">
-          {history.map((m) => (
-            <div key={m.id} className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium text-gray-900 truncate">{m.subject}</p>
-                <span className="flex-shrink-0 text-xs text-gray-400">{new Date(m.created_at).toLocaleDateString()}</span>
-              </div>
-              <p className="mt-1 line-clamp-2 text-xs text-gray-500">{m.body}</p>
-              <p className="mt-1.5 text-xs text-gray-400">To {m.recipient} · {m.email_sent_count}/{m.recipients_count} delivered</p>
+      {/* List */}
+      <div className="mt-4 space-y-2">
+        {loading ? (
+          <p className="text-sm text-gray-400">Loading…</p>
+        ) : history.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
+            <p className="text-sm text-gray-500">No messages sent yet. Send your first announcement.</p>
+          </div>
+        ) : visible.length === 0 ? (
+          <p className="py-6 text-center text-sm text-gray-400">No matching messages.</p>
+        ) : visible.map((m) => (
+          <button key={m.id} onClick={() => setViewMsg(m)}
+            className="block w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-left hover:border-brand-300 hover:bg-gray-50">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-sm font-medium text-gray-900">{m.subject}</p>
+              <span className="flex-shrink-0 text-xs text-gray-400">{new Date(m.created_at).toLocaleDateString()}</span>
             </div>
-          ))}
+            <p className="mt-1 line-clamp-2 text-xs text-gray-500">{m.body}</p>
+            <p className="mt-1.5 text-xs text-gray-400">To {m.recipient} · {m.email_sent_count}/{m.recipients_count} delivered</p>
+          </button>
+        ))}
+      </div>
+
+      {/* View message modal */}
+      {viewMsg && (
+        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8" onClick={() => setViewMsg(null)}>
+          <div className="my-4 w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-lg font-semibold text-gray-900">{viewMsg.subject}</h3>
+                <p className="mt-1 text-xs text-gray-500">To {viewMsg.recipient} · {new Date(viewMsg.created_at).toLocaleString()} · {viewMsg.email_sent_count}/{viewMsg.recipients_count} delivered</p>
+              </div>
+              <button onClick={() => setViewMsg(null)} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-lg text-gray-500 hover:bg-gray-100">✕</button>
+            </div>
+            <div className="mt-4 whitespace-pre-wrap rounded-lg bg-gray-50 p-4 text-sm leading-relaxed text-gray-700">{viewMsg.body}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Compose modal */}
+      {composeOpen && (
+        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8" onClick={() => !sending && setComposeOpen(false)}>
+          <div className="my-4 w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-gray-900">New message</h3>
+              <button onClick={() => setComposeOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500">Recipient</label>
+                <select value={recipient} onChange={(e) => setRecipient(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+                  <option value="all">📣 All businesses ({tenants.length})</option>
+                  {tenants.map((t) => <option key={t.tenant_id} value={t.tenant_id}>{t.tenant_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500">Subject</label>
+                <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Summer hours & marina event"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500">Message</label>
+                <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} placeholder="Write your announcement…"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+              </div>
+              {result && !result.ok && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{result.message}</div>
+              )}
+
+              {/* In-app confirmation (replaces the browser confirm dialog) */}
+              {confirming ? (
+                <div className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3">
+                  <p className="text-sm text-gray-700">Send <span className="font-semibold">&ldquo;{subject.trim()}&rdquo;</span> to {recipientLabel}?</p>
+                  <div className="mt-3 flex gap-2">
+                    <button onClick={handleSend} disabled={sending}
+                      className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                      {sending ? 'Sending…' : 'Confirm & Send'}
+                    </button>
+                    <button onClick={() => setConfirming(false)} disabled={sending}
+                      className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-end gap-2 pt-1">
+                  <button onClick={() => setComposeOpen(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">Cancel</button>
+                  <button onClick={() => setConfirming(true)} disabled={!subject.trim() || !body.trim()}
+                    className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                    {recipient === 'all' ? 'Send to all' : 'Send'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

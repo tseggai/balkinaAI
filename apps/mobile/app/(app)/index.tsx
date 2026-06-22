@@ -2579,10 +2579,22 @@ export default function ChatScreen() {
               const items = cardData.items as { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage' }[];
               if (items?.length) {
                 const tenantIdFromBody = (body as { tenantId?: string }).tenantId;
-                lastDisplayedServices.current = items.map((s) => ({
-                  ...s,
-                  tenantId: tenantIdFromBody,
-                }));
+                // Merge with the authoritative tool data — the AI sometimes echoes a
+                // card that drops deposit_type/amount, which would otherwise make a
+                // percentage deposit display as a flat dollar amount.
+                const prior = lastDisplayedServices.current;
+                lastDisplayedServices.current = items.map((s) => {
+                  const p = prior.find((x) => x.id === s.id);
+                  return {
+                    ...p,
+                    ...s,
+                    deposit_enabled: s.deposit_enabled ?? p?.deposit_enabled ?? false,
+                    deposit_amount: s.deposit_amount ?? p?.deposit_amount,
+                    deposit_type: s.deposit_type ?? p?.deposit_type,
+                    currency: (s as { currency?: string }).currency ?? p?.currency,
+                    tenantId: tenantIdFromBody ?? p?.tenantId,
+                  };
+                });
                 if (tenantIdFromBody) {
                   setBookingState((prev) => ({ ...prev, tenantId: tenantIdFromBody }));
                 }

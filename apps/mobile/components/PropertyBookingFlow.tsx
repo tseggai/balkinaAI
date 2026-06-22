@@ -31,6 +31,7 @@ export interface BookingService {
   capacity: number | null;
   deposit_enabled: boolean;
   hide_price: boolean;
+  currency?: string;
   event_dates?: { date: string; start_time: string | null }[];
   timesheet?: Record<string, { enabled?: boolean; start?: string; end?: string }> | null;
 }
@@ -45,6 +46,7 @@ interface Props {
   extras?: string[];
   packageName?: string;
   addOnTotal?: number;
+  currency?: string;
   customer: { userId: string | null; name: string | null; phone: string | null; email: string | null };
   onClose: () => void;
 }
@@ -104,8 +106,9 @@ function tableTimes(service: BookingService, dateStr: string): string[] {
 }
 
 export default function PropertyBookingFlow({
-  visible, apiBase, accent, tenantId, businessName, initialService, extras, packageName, addOnTotal, customer, onClose,
+  visible, apiBase, accent, tenantId, businessName, initialService, extras, packageName, addOnTotal, currency: currencyProp, customer, onClose,
 }: Props) {
+  const [currency, setCurrency] = useState(currencyProp ?? 'USD');
   const [services, setServices] = useState<BookingService[]>([]);
   const [servicesLoading, setServicesLoading] = useState(false);
   const [selected, setSelected] = useState<BookingService | null>(null);
@@ -160,8 +163,9 @@ export default function PropertyBookingFlow({
     setServicesLoading(true);
     try {
       const res = await fetch(`${apiBase}/api/booking/services?tenantId=${tenantId}`);
-      const data = (await res.json()) as { services?: BookingService[] };
+      const data = (await res.json()) as { services?: BookingService[]; currency?: string };
       setServices(data.services ?? []);
+      if (data.currency) setCurrency(data.currency);
     } catch {
       setServices([]);
     } finally {
@@ -265,7 +269,7 @@ export default function PropertyBookingFlow({
   }
 
   const priceLabel = (s: BookingService) =>
-    s.hide_price ? '' : `${formatPrice(Number(s.price))}${s.pricing_type === 'per_person' ? ' / guest' : ''}`;
+    s.hide_price ? '' : `${formatPrice(Number(s.price), s.currency ?? currency)}${s.pricing_type === 'per_person' ? ' / guest' : ''}`;
 
   const canBack = step !== 'done' && !(step === 'services');
   const goBack = () => {
@@ -468,7 +472,7 @@ export default function PropertyBookingFlow({
                 <View style={styles.totalRow}>
                   <Text style={styles.label}>Total</Text>
                   <Text style={styles.totalVal}>
-                    {formatPrice(Number(selected.price) * (selected.pricing_type === 'per_person' ? partySize : 1) + (addOnTotal ?? 0))}
+                    {formatPrice(Number(selected.price) * (selected.pricing_type === 'per_person' ? partySize : 1) + (addOnTotal ?? 0), selected.currency ?? currency)}
                   </Text>
                 </View>
               )}

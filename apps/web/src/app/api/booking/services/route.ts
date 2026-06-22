@@ -66,7 +66,22 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500, headers: CORS_HEADERS });
     }
 
-    const services = (data ?? []) as unknown as { id: string; service_type?: string; timesheet?: unknown }[];
+    const services = (data ?? []) as unknown as { id: string; tenant_id: string; service_type?: string; timesheet?: unknown }[];
+
+    // Currency is per-location — attach each tenant's currency so the storefront
+    // formats prices correctly (e.g. GBP for a Tivat location) instead of $.
+    const { data: locs } = await supabase
+      .from('tenant_locations')
+      .select('tenant_id, currency')
+      .in('tenant_id', tenantIds);
+    const currencyByTenant = new Map<string, string>();
+    for (const l of (locs ?? []) as { tenant_id: string; currency: string | null }[]) {
+      if (!currencyByTenant.has(l.tenant_id)) currencyByTenant.set(l.tenant_id, l.currency ?? 'USD');
+    }
+    for (const s of services) {
+      (s as Record<string, unknown>).currency = currencyByTenant.get(s.tenant_id) ?? 'USD';
+    }
+    const topCurrency = tenantId ? (currencyByTenant.get(tenantId) ?? 'USD') : undefined;
 
     // Attach upcoming seatings (service_special_days) to event services so the
     // storefront booking flow can offer dates without a second round-trip.
@@ -92,7 +107,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ services }, { headers: CORS_HEADERS });
+    return NextResponse.json({ services, currency: topCurrency }, { headers: CORS_HEADERS });
   } catch (err) {
     console.error('[booking/services] error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: CORS_HEADERS });

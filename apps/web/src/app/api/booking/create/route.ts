@@ -303,14 +303,8 @@ export async function POST(request: Request) {
 
     const end = new Date(start.getTime() + svc.duration_minutes * 60000);
 
-    // 3. Calculate deposit (skip if payments not enabled for this tenant)
-    let depositAmount: number | null = null;
-    if (paymentsEnabled && svc.deposit_enabled && svc.deposit_amount) {
-      depositAmount =
-        svc.deposit_type === 'percentage' ? (perGuestBase * svc.deposit_amount) / 100 : svc.deposit_amount;
-    }
-
-    // 7a. Look up extras prices and package price
+    // 7a. Look up extras prices and package price (needed before the deposit so a
+    // percentage deposit is taken on the FULL total, not just the service base).
     let extrasTotal = 0;
     let packagePrice = 0;
     const extrasNames = extras ?? [];
@@ -339,6 +333,15 @@ export async function POST(request: Request) {
     // Calculate final total: package price if selected, else per-guest/service base, plus extras
     const basePrice = packagePrice > 0 ? packagePrice : perGuestBase;
     const finalTotal = basePrice + extrasTotal;
+
+    // 3. Calculate deposit (skip if payments not enabled for this tenant).
+    // Percentage deposits are taken on the full total (service + extras).
+    let depositAmount: number | null = null;
+    if (paymentsEnabled && svc.deposit_enabled && svc.deposit_amount) {
+      depositAmount = svc.deposit_type === 'percentage'
+        ? Math.round((finalTotal * svc.deposit_amount) / 100 * 100) / 100
+        : svc.deposit_amount;
+    }
 
     // 6b. Check for conflicting appointments (overlapping time, not cancelled).
     // Skip for restaurant booking types — table requests can legitimately overlap
