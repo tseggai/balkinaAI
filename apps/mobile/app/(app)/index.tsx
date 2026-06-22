@@ -28,6 +28,7 @@ import { useStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
+import * as SplashScreen from 'expo-splash-screen';
 import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
 import PropertyStorefront, { StorefrontTenant } from '@/components/PropertyStorefront';
@@ -1500,6 +1501,16 @@ export default function ChatScreen() {
     })();
     return () => { active = false; clearTimeout(timer); };
   }, [propertySlug]);
+
+  // Hide the native splash exactly when the JS loading image is ready (or when
+  // loading is done with no image), so the property app goes native splash →
+  // loading image → storefront with no intermediate blue flash.
+  useEffect(() => {
+    if (!propertySlug) return;
+    if (bootSplash || !propertyLoading) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [propertySlug, bootSplash, propertyLoading]);
 
   useEffect(() => {
     if (!propertySlug) return;
