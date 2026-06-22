@@ -27,6 +27,7 @@ import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import { useStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
+import * as SecureStore from 'expo-secure-store';
 import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
 import PropertyStorefront, { StorefrontTenant } from '@/components/PropertyStorefront';
@@ -1480,6 +1481,26 @@ export default function ChatScreen() {
     }
   }, []);
 
+  // Full-bleed loading image. The boot loader runs before /api/properties
+  // returns, so we show the value cached from the last launch (SecureStore),
+  // falling back to any build-time variant value. Updated on every fetch.
+  const [bootSplash, setBootSplash] = useState<string | undefined>(bootBrand.splash);
+  // Minimum on-screen time so a freshly-fetched splash (first launch after an
+  // upload, before it's cached) is actually perceptible rather than flashing by.
+  const [minSplashDone, setMinSplashDone] = useState(false);
+  useEffect(() => {
+    if (!propertySlug) return;
+    let active = true;
+    const timer = setTimeout(() => { if (active) setMinSplashDone(true); }, 1200);
+    (async () => {
+      try {
+        const cached = await SecureStore.getItemAsync(`splash_${propertySlug}`);
+        if (active && cached) setBootSplash(cached);
+      } catch { /* ignore */ }
+    })();
+    return () => { active = false; clearTimeout(timer); };
+  }, [propertySlug]);
+
   useEffect(() => {
     if (!propertySlug) return;
     (async () => {
@@ -1497,6 +1518,14 @@ export default function ChatScreen() {
           tenants: data.tenants ?? [],
           campaigns: data.campaigns ?? [],
         });
+        // Cache the loading image so it shows full-bleed on the next boot.
+        const splash = (data.property.splash_image_url as string | null) ?? null;
+        if (splash) {
+          setBootSplash(splash);
+          try { await SecureStore.setItemAsync(`splash_${propertySlug}`, splash); } catch { /* ignore */ }
+        } else {
+          try { await SecureStore.deleteItemAsync(`splash_${propertySlug}`); } catch { /* ignore */ }
+        }
       } catch { /* ignore */ } finally {
         setPropertyLoading(false);
       }
@@ -2663,19 +2692,21 @@ export default function ChatScreen() {
 
   // While a white-label property is still loading, show a property-branded
   // loader rather than flashing the generic Balkina welcome screen.
-  if (propertySlug && !propertyData && propertyLoading && !hasMessages) {
+  // Keep the loader up while fetching, and briefly hold once we have a splash
+  // image so it's visible even on the first launch after it was uploaded.
+  if (propertySlug && !hasMessages && (propertyLoading || (!minSplashDone && !!bootSplash)) && !(propertyData && minSplashDone)) {
     return (
       <View style={[styles.container, { backgroundColor: bootBrand.color, justifyContent: 'center', alignItems: 'center' }]}>
-        {bootBrand.splash ? (
-          // Full-bleed branded loading image (set in the white-label config).
-          <Image source={{ uri: bootBrand.splash }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        {bootSplash ? (
+          // Full-bleed branded loading image (property's uploaded splash, cached).
+          <Image source={{ uri: bootSplash }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         ) : null}
-        {!bootBrand.splash && bootBrand.name ? (
+        {!bootSplash && bootBrand.name ? (
           <Text style={{ fontSize: 26, fontWeight: '700', color: '#fff', letterSpacing: 0.5 }}>
             {bootBrand.name}
           </Text>
         ) : null}
-        {!bootBrand.splash ? <ActivityIndicator size="large" color="#fff" style={{ marginTop: bootBrand.name ? 24 : 0 }} /> : null}
+        {!bootSplash ? <ActivityIndicator size="large" color="#fff" style={{ marginTop: bootBrand.name ? 24 : 0 }} /> : null}
       </View>
     );
   }
