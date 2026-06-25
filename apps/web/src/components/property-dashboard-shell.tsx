@@ -27,7 +27,7 @@ const ICONS: Record<string, string> = {
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'tenants', label: 'Tenants' },
-  { key: 'members', label: 'Members' },
+  { key: 'members', label: 'Residents' },
   { key: 'campaigns', label: 'Campaigns' },
   { key: 'messages', label: 'Messages' },
   { key: 'branding', label: 'Branding' },

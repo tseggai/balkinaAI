@@ -965,6 +965,8 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
   const [viewMsg, setViewMsg] = useState<SentMessage | null>(null);
 
   // Compose state
+  const [channel, setChannel] = useState<'businesses' | 'residents'>('businesses');
+  const [memberAudience, setMemberAudience] = useState<'all' | 'homeowner' | 'renter' | 'commercial_owner'>('all');
   const [recipientMode, setRecipientMode] = useState<'all' | 'select' | 'category'>('all');
   const [selectedTenantIds, setSelectedTenantIds] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -1001,14 +1003,16 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
     : tenants.map((t) => ({ id: t.tenant_id, name: t.tenant_name, category: null as string | null }));
 
   const openCompose = () => {
+    setChannel('businesses'); setMemberAudience('all');
     setRecipientMode('all'); setSelectedTenantIds([]); setSelectedCategory('');
     setSubject(''); setBody(''); setConfirming(false); setResult(null); setComposeOpen(true);
   };
+  const AUDIENCE_LABEL: Record<string, string> = { all: 'all residents', homeowner: 'Homeowners', renter: 'Renters', commercial_owner: 'Commercial owners' };
   const toggleTenant = (id: string) =>
     setSelectedTenantIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const categoryCount = (cat: string) => tenantList.filter((t) => t.category === cat).length;
 
-  const recipientLabel =
+  const businessLabel =
     recipientMode === 'all'
       ? `all ${tenantList.length} businesses`
       : recipientMode === 'category'
@@ -1016,8 +1020,10 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
         : selectedTenantIds.length === 1
           ? (tenantList.find((t) => t.id === selectedTenantIds[0])?.name ?? 'business')
           : `${selectedTenantIds.length} selected businesses`;
+  const recipientLabel = channel === 'residents' ? AUDIENCE_LABEL[memberAudience] : businessLabel;
 
   const canSend = !!subject.trim() && !!body.trim() && (
+    channel === 'residents' ||
     recipientMode === 'all' ||
     (recipientMode === 'select' && selectedTenantIds.length > 0) ||
     (recipientMode === 'category' && !!selectedCategory)
@@ -1027,15 +1033,24 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
     if (!canSend) return;
     setSending(true);
     setResult(null);
-    const target =
-      recipientMode === 'all' ? {}
-        : recipientMode === 'category' ? { category: selectedCategory }
-          : { tenantIds: selectedTenantIds };
-    const res = await fetch(`/api/property/${slug}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject: subject.trim(), body: body.trim(), ...target }),
-    });
+    let res: Response;
+    if (channel === 'residents') {
+      res = await fetch(`/api/property/${slug}/messages/residents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: subject.trim(), body: body.trim(), audience: memberAudience }),
+      });
+    } else {
+      const target =
+        recipientMode === 'all' ? {}
+          : recipientMode === 'category' ? { category: selectedCategory }
+            : { tenantIds: selectedTenantIds };
+      res = await fetch(`/api/property/${slug}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: subject.trim(), body: body.trim(), ...target }),
+      });
+    }
     const json = await res.json();
     setSending(false);
     setConfirming(false);
@@ -1059,7 +1074,7 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Messages</h2>
-          <p className="mt-1 text-sm text-gray-500">Email an announcement to all your businesses, or message one directly — sent under your property&apos;s name via Balkina AI.</p>
+          <p className="mt-1 text-sm text-gray-500">Email your businesses (all, a selection, or by category), or push an announcement to your residents — under your property&apos;s name.</p>
         </div>
         <button onClick={openCompose} className="self-start rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">+ New Message</button>
       </div>
@@ -1129,8 +1144,31 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
 
             <div className="mt-4 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500">Recipients</label>
+                <label className="block text-xs font-medium text-gray-500">Send to</label>
                 <div className="mt-1 flex rounded-lg border border-gray-200 p-0.5">
+                  {([['businesses', 'Businesses'], ['residents', 'Residents']] as const).map(([ch, label]) => (
+                    <button key={ch} type="button" onClick={() => setChannel(ch)}
+                      className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium ${channel === ch ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {channel === 'residents' ? (
+                  <>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {([['all', 'All members'], ['homeowner', 'Homeowners'], ['renter', 'Renters'], ['commercial_owner', 'Commercial owners']] as const).map(([a, label]) => (
+                        <button key={a} type="button" onClick={() => setMemberAudience(a)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${memberAudience === a ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">🔔 Sends a push notification to verified {AUDIENCE_LABEL[memberAudience]} who have the app.</p>
+                  </>
+                ) : (
+                <>
+                <div className="mt-2 flex rounded-lg border border-gray-200 p-0.5">
                   {([['all', 'All'], ['select', 'Select businesses'], ['category', 'By category']] as const).map(([mode, label]) => (
                     <button key={mode} type="button" onClick={() => setRecipientMode(mode)}
                       className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium ${recipientMode === mode ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
@@ -1140,7 +1178,7 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
                 </div>
 
                 {recipientMode === 'all' && (
-                  <p className="mt-2 text-xs text-gray-500">📣 Goes to all {tenantList.length} businesses.</p>
+                  <p className="mt-2 text-xs text-gray-500">📣 Emails all {tenantList.length} businesses.</p>
                 )}
 
                 {recipientMode === 'select' && (
@@ -1167,6 +1205,8 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
                       {recCategories.map((c) => <option key={c} value={c}>{c} ({categoryCount(c)})</option>)}
                     </select>
                   )
+                )}
+                </>
                 )}
               </div>
               <div>
@@ -1238,6 +1278,7 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
   const [invEmail, setInvEmail] = useState('');
   const [invPhone, setInvPhone] = useState('');
   const [invUnit, setInvUnit] = useState('');
+  const [invChannel, setInvChannel] = useState<'sms' | 'whatsapp'>('sms');
   const [inviting, setInviting] = useState(false);
   const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -1289,12 +1330,12 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
     setInviteMsg(null);
     const res = await fetch(`/api/property/${slug}/members/invites`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_type: invType, email: invEmail.trim() || null, phone: invPhone.trim() || null, unit: invUnit.trim() || null }),
+      body: JSON.stringify({ member_type: invType, email: invEmail.trim() || null, phone: invPhone.trim() || null, unit: invUnit.trim() || null, channel: invChannel }),
     });
     const json = await res.json().catch(() => ({}));
     setInviting(false);
     if (!res.ok) { setInviteMsg({ ok: false, text: json.error ?? 'Could not send invite.' }); return; }
-    const ch = [json.delivery?.email && 'email', json.delivery?.sms && 'SMS'].filter(Boolean).join(' & ');
+    const ch = [json.delivery?.email && 'email', json.delivery?.sms && (invChannel === 'whatsapp' ? 'WhatsApp' : 'SMS')].filter(Boolean).join(' & ');
     setInviteMsg({ ok: true, text: ch ? `Invite sent by ${ch}.` : 'Invite created, but delivery failed — check the contact details.' });
     setInvEmail(''); setInvPhone(''); setInvUnit('');
     setView('invites');
@@ -1350,7 +1391,7 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Members</h2>
+          <h2 className="text-xl font-bold text-gray-900">Residents</h2>
           <p className="mt-1 max-w-xl text-sm text-gray-500">
             Flag your residents — homeowners, renters and commercial owners. They verify once in the app and unlock
             resident-only announcements and access.
@@ -1370,7 +1411,7 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
 
       {/* Segmented list switch */}
       <div className="mt-4 flex flex-wrap gap-2">
-        {([['members', `Members (${activeCount})`], ['invites', `Invites (${invites.length})`], ['codes', `Codes (${sharedCodes.length})`]] as const).map(([key, label]) => (
+        {([['members', `Residents (${activeCount})`], ['invites', `Invites (${invites.length})`], ['codes', `Codes (${sharedCodes.length})`]] as const).map(([key, label]) => (
           <button key={key} onClick={() => setView(key)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${view === key ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
             {label}
@@ -1382,7 +1423,7 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
       {view === 'members' && (
         members.length === 0 ? (
           <p className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
-            No verified members yet. Invite a resident or share a code to get started.
+            No verified residents yet. Invite a resident or share a code to get started.
           </p>
         ) : (
           <div className="mt-4 space-y-2">
@@ -1480,7 +1521,17 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
                   className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600">Phone <span className="text-gray-400">(SMS)</span></label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-gray-600">Phone</label>
+                  <div className="flex rounded-lg border border-gray-200 p-0.5">
+                    {([['sms', 'SMS'], ['whatsapp', 'WhatsApp']] as const).map(([ch, label]) => (
+                      <button key={ch} type="button" onClick={() => setInvChannel(ch)}
+                        className={`rounded-md px-2.5 py-1 text-xs font-medium ${invChannel === ch ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <input value={invPhone} onChange={(e) => setInvPhone(e.target.value)} placeholder="+382…"
                   className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
               </div>
