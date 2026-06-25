@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, StatusBar, Linking } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import Constants from 'expo-constants';
+import * as SplashScreen from 'expo-splash-screen';
 import { SafeStripeProvider } from '@/lib/stripe';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured, getAuthenticatedRole } from '@/lib/supabase';
@@ -11,6 +12,12 @@ import { parseTenantFromUrl, setPendingDeepLinkTenant } from '@/lib/deepLink';
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 const PROPERTY_NAME = (Constants.expoConfig?.extra?.propertyName as string | undefined) ?? null;
 const PROPERTY_PRIMARY = (Constants.expoConfig?.extra?.primaryColor as string | undefined) ?? '#6B7FC4';
+
+// Keep the native splash up until the first real screen is painted, so the app
+// goes splash → first screen without flashing the intermediate JS loaders.
+// On property builds the storefront screen hides it once its loading image is
+// ready (see (app)/index.tsx); other flows hide it here.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function RootLayoutContent() {
   const [session, setSession] = useState<Session | null>(null);
@@ -87,6 +94,22 @@ function RootLayoutContent() {
       });
     }
   }, [session, initialized, deepLinkReady, segments, router]);
+
+  // Hide the native splash. The property storefront hides it itself once its
+  // full-bleed loading image is ready; every other flow hides it here as soon
+  // as auth/deep-link init is done. A failsafe ensures it never gets stuck.
+  useEffect(() => {
+    const failsafe = setTimeout(() => { SplashScreen.hideAsync().catch(() => {}); }, 5000);
+    return () => clearTimeout(failsafe);
+  }, []);
+  useEffect(() => {
+    if (!initialized || !deepLinkReady) return;
+    // Property builds route to the storefront, which hides the splash itself
+    // once its loading image is ready; base builds hide it here.
+    if (!PROPERTY_NAME) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [initialized, deepLinkReady]);
 
   if (!initialized) {
     return (
