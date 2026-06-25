@@ -27,7 +27,6 @@ import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 import { useStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
-import * as SecureStore from 'expo-secure-store';
 import * as SplashScreen from 'expo-splash-screen';
 import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
@@ -36,6 +35,7 @@ import PropertyBookingFlow, { BookingService } from '@/components/PropertyBookin
 import PropertyBusinessPage, { BusinessSummary } from '@/components/PropertyBusinessPage';
 import PropertyAccountDrawer from '@/components/PropertyAccountDrawer';
 import { Campaign } from '@/components/PropertyCampaignDetail';
+import { BootSplash } from '@/lib/bootSplash';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
 import { consumePendingDeepLinkTenant, parseTenantFromUrl } from '@/lib/deepLink';
 import { formatPrice, currencySymbol } from '@/lib/currency';
@@ -1468,55 +1468,26 @@ export default function ChatScreen() {
   const [propertyLoading, setPropertyLoading] = useState<boolean>(!!propertySlug);
   const router = useRouter();
 
-  // Branding shown on the boot loader before propertyData has been fetched.
-  const bootBrand = useMemo(() => {
-    try {
-      const C = require('expo-constants').default;
-      return {
-        name: C.expoConfig?.extra?.propertyName as string | undefined,
-        color: (C.expoConfig?.extra?.primaryColor as string | undefined) ?? '#6B7FC4',
-        splash: C.expoConfig?.extra?.splashImageUrl as string | undefined,
-      };
-    } catch {
-      return { name: undefined as string | undefined, color: '#6B7FC4', splash: undefined as string | undefined };
-    }
+  // Boot bridge: keep a frame identical to the native splash on screen until the
+  // landing screen's data is ready (BootSplash), so the app reads as one
+  // continuous splash → landing with no intermediate colour/text card. A short
+  // minimum hold gives the splash art a beat even when the landing is instant
+  // (e.g. the base chat screen, which has no network gate).
+  const [minHoldDone, setMinHoldDone] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMinHoldDone(true), 600);
+    return () => clearTimeout(t);
   }, []);
 
-  // Full-bleed loading image. The boot loader runs before /api/properties
-  // returns, so we show the value cached from the last launch (SecureStore),
-  // falling back to any build-time variant value. Updated on every fetch.
-  const [bootSplash, setBootSplash] = useState<string | undefined>(bootBrand.splash);
-  // Hold the loading image on screen for a beat once it appears, so it doesn't
-  // flash by just before the storefront. The timer starts when the image is
-  // first shown (not at mount), so a late-arriving image still gets its moment.
-  const [minSplashDone, setMinSplashDone] = useState(false);
+  // Hide the native splash on first paint — by now BootSplash (a pixel-match of
+  // the native splash) is rendered underneath, so the hand-off is invisible.
   useEffect(() => {
-    if (!propertySlug) return;
-    let active = true;
-    (async () => {
-      try {
-        const cached = await SecureStore.getItemAsync(`splash_${propertySlug}`);
-        if (active && cached) setBootSplash(cached);
-      } catch { /* ignore */ }
-    })();
-    return () => { active = false; };
-  }, [propertySlug]);
-  useEffect(() => {
-    if (!bootSplash) return;
-    Image.prefetch(bootSplash).catch(() => {});
-    const t = setTimeout(() => setMinSplashDone(true), 1000);
-    return () => clearTimeout(t);
-  }, [bootSplash]);
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
-  // Hide the native splash exactly when the JS loading image is ready (or when
-  // loading is done with no image), so the property app goes native splash →
-  // loading image → storefront with no intermediate blue flash.
-  useEffect(() => {
-    if (!propertySlug) return;
-    if (bootSplash || !propertyLoading) {
-      SplashScreen.hideAsync().catch(() => {});
-    }
-  }, [propertySlug, bootSplash, propertyLoading]);
+  // The bridge stays up until the landing is ready: for a property that means
+  // the storefront fetch has resolved; for the base app just the minimum hold.
+  const bootReady = propertySlug ? !propertyLoading && minHoldDone : minHoldDone;
 
   useEffect(() => {
     if (!propertySlug) return;
@@ -1535,14 +1506,6 @@ export default function ChatScreen() {
           tenants: data.tenants ?? [],
           campaigns: data.campaigns ?? [],
         });
-        // Cache the loading image so it shows full-bleed on the next boot.
-        const splash = (data.property.splash_image_url as string | null) ?? null;
-        if (splash) {
-          setBootSplash(splash);
-          try { await SecureStore.setItemAsync(`splash_${propertySlug}`, splash); } catch { /* ignore */ }
-        } else {
-          try { await SecureStore.deleteItemAsync(`splash_${propertySlug}`); } catch { /* ignore */ }
-        }
       } catch { /* ignore */ } finally {
         setPropertyLoading(false);
       }
@@ -2707,34 +2670,12 @@ export default function ChatScreen() {
   // Service-type buttons per category slug (Option 2 — horizontal tabs)
   const activeCategories = categories;
 
-  // While a white-label property is still loading, show a property-branded
-  // loader rather than flashing the generic Balkina welcome screen.
-  // Keep the loader up while fetching, and hold the loading image for a beat
-  // once it appears so it doesn't flash by before the storefront.
-  if (propertySlug && !hasMessages && (propertyLoading || (!!bootSplash && !minSplashDone))) {
-    return (
-      <View style={[styles.container, { backgroundColor: bootBrand.color, justifyContent: 'center', alignItems: 'center' }]}>
-        {bootSplash ? (
-          <Image source={{ uri: bootSplash }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-        ) : null}
-        {bootBrand.name ? (
-          <Text
-            style={{
-              fontSize: 28,
-              fontWeight: '700',
-              color: '#fff',
-              letterSpacing: 0.5,
-              textShadowColor: 'rgba(0,0,0,0.45)',
-              textShadowOffset: { width: 0, height: 1 },
-              textShadowRadius: 8,
-            }}
-          >
-            {bootBrand.name}
-          </Text>
-        ) : null}
-        {!bootSplash ? <ActivityIndicator size="large" color="#fff" style={{ marginTop: bootBrand.name ? 24 : 0 }} /> : null}
-      </View>
-    );
+  // Until the landing screen's data is ready, keep the boot bridge on screen —
+  // a frame identical to the native splash (same art, plus the property name for
+  // white-label builds) — so the boot reads as one continuous splash with no
+  // generic Balkina flash and no colour/text card.
+  if (!hasMessages && !bootReady) {
+    return <BootSplash />;
   }
 
   // ── White-label property storefront (browse-first, Soho House style) ──

@@ -9,6 +9,6 @@
   "splashPath": "./white-label/assets/portonovi/splash.png",
   "splashResizeMode": "contain",
   "splashBackgroundColor": "#ffffff",
-  "splashImageUrl": "",
+  "splashShowName": true,
   "scheme": "portonovi"
 }

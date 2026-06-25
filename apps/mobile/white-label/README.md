@@ -68,16 +68,27 @@ the default Balkina logo-on-color with a property image:
 The splash is a **build-time** asset (it shows before any JS/network runs), so
 changing it requires a new EAS build — it can't be edited live from the portal.
 
-#### In-app boot loader (portal-uploadable)
+#### In-app boot bridge
 
-After the native splash, there's a brief **in-app** loading screen while the
-storefront fetches its data. This one shows a full-bleed image from a **remote
-URL** and is managed in the portal: **Branding → App Loading Screen** saves to
-`properties.splash_image_url`. To have it appear on that first in-app frame,
-mirror the same URL into the variant as `"splashImageUrl": "https://…"` (read at
-runtime via `Constants.expoConfig.extra.splashImageUrl`). Unlike the native
-splash, updating the property's `splash_image_url` takes effect without a new
-build the next time the app boots.
+After the native splash, there's a brief **in-app** bridge frame (`BootSplash`,
+in `lib/bootSplash.tsx`) held until the landing screen's data is ready — the
+storefront fetch for a property, or just a short minimum hold for the base chat
+app. It is **pixel-matched to the native splash**: it reuses the same bundled
+`splashPath` art and reads `resizeMode`/`backgroundColor` from
+`Constants.expoConfig.splash`, so hiding the native splash reveals an identical
+frame (no colour/text card, no Balkina flash).
+
+- **Name overlay** — the property name is drawn over the art by default, so a
+  plain branded-colour `splash.png` still shows its name. If your splash art
+  already bakes in the name/logo, set `"splashShowName": false` in the variant
+  JSON to suppress it. The base Balkina app never overlays text (its splash art
+  carries the logo).
+- **New properties** — add the variant's splash to the static `require` map in
+  `lib/bootSplash.tsx` (`VARIANT_BOOT_IMAGES`) keyed by slug; Metro needs a
+  static `require`, so this can't be data-driven.
+
+This bridge is **build-time** art (same file as the native splash), so changing
+it requires a new EAS build — it can't be edited live from the portal.
 
 > `generate.js` (which writes `app.whitelabel.json`) is legacy and no longer
 > required — `app.config.js` handles variant selection directly.
