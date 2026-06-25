@@ -7,5 +7,7 @@
   "backgroundColor": "#ffffff",
   "iconPath": "./white-label/assets/portonovi/icon.png",
   "splashPath": "./white-label/assets/portonovi/splash.png",
+  "splashResizeMode": "cover",
+  "splashBackgroundColor": "#055f81",
   "scheme": "portonovi"
 }

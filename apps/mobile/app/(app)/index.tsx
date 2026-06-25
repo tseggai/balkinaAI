@@ -1486,21 +1486,27 @@ export default function ChatScreen() {
   // returns, so we show the value cached from the last launch (SecureStore),
   // falling back to any build-time variant value. Updated on every fetch.
   const [bootSplash, setBootSplash] = useState<string | undefined>(bootBrand.splash);
-  // Minimum on-screen time so a freshly-fetched splash (first launch after an
-  // upload, before it's cached) is actually perceptible rather than flashing by.
+  // Hold the loading image on screen for a beat once it appears, so it doesn't
+  // flash by just before the storefront. The timer starts when the image is
+  // first shown (not at mount), so a late-arriving image still gets its moment.
   const [minSplashDone, setMinSplashDone] = useState(false);
   useEffect(() => {
     if (!propertySlug) return;
     let active = true;
-    const timer = setTimeout(() => { if (active) setMinSplashDone(true); }, 1200);
     (async () => {
       try {
         const cached = await SecureStore.getItemAsync(`splash_${propertySlug}`);
         if (active && cached) setBootSplash(cached);
       } catch { /* ignore */ }
     })();
-    return () => { active = false; clearTimeout(timer); };
+    return () => { active = false; };
   }, [propertySlug]);
+  useEffect(() => {
+    if (!bootSplash) return;
+    Image.prefetch(bootSplash).catch(() => {});
+    const t = setTimeout(() => setMinSplashDone(true), 1000);
+    return () => clearTimeout(t);
+  }, [bootSplash]);
 
   // Hide the native splash exactly when the JS loading image is ready (or when
   // loading is done with no image), so the property app goes native splash →
@@ -2703,17 +2709,26 @@ export default function ChatScreen() {
 
   // While a white-label property is still loading, show a property-branded
   // loader rather than flashing the generic Balkina welcome screen.
-  // Keep the loader up while fetching, and briefly hold once we have a splash
-  // image so it's visible even on the first launch after it was uploaded.
-  if (propertySlug && !hasMessages && (propertyLoading || (!minSplashDone && !!bootSplash)) && !(propertyData && minSplashDone)) {
+  // Keep the loader up while fetching, and hold the loading image for a beat
+  // once it appears so it doesn't flash by before the storefront.
+  if (propertySlug && !hasMessages && (propertyLoading || (!!bootSplash && !minSplashDone))) {
     return (
       <View style={[styles.container, { backgroundColor: bootBrand.color, justifyContent: 'center', alignItems: 'center' }]}>
         {bootSplash ? (
-          // Full-bleed branded loading image (property's uploaded splash, cached).
           <Image source={{ uri: bootSplash }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         ) : null}
-        {!bootSplash && bootBrand.name ? (
-          <Text style={{ fontSize: 26, fontWeight: '700', color: '#fff', letterSpacing: 0.5 }}>
+        {bootBrand.name ? (
+          <Text
+            style={{
+              fontSize: 28,
+              fontWeight: '700',
+              color: '#fff',
+              letterSpacing: 0.5,
+              textShadowColor: 'rgba(0,0,0,0.45)',
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 8,
+            }}
+          >
             {bootBrand.name}
           </Text>
         ) : null}
