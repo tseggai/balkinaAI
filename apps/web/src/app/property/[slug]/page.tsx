@@ -965,12 +965,18 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
   const [viewMsg, setViewMsg] = useState<SentMessage | null>(null);
 
   // Compose state
-  const [recipient, setRecipient] = useState('all'); // 'all' or a tenant_id
+  const [recipientMode, setRecipientMode] = useState<'all' | 'select' | 'category'>('all');
+  const [selectedTenantIds, setSelectedTenantIds] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  // Recipient metadata (businesses with their category) from the API.
+  const [recTenants, setRecTenants] = useState<{ id: string; name: string; category: string | null }[]>([]);
+  const [recCategories, setRecCategories] = useState<string[]>([]);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -982,22 +988,53 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
     const res = await fetch(`/api/property/${slug}/messages`);
     const json = await res.json();
     setHistory(json.data ?? []);
+    setRecTenants(json.recipients?.tenants ?? []);
+    setRecCategories(json.recipients?.categories ?? []);
     setLoading(false);
   }, [slug]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
-  const openCompose = () => { setRecipient('all'); setSubject(''); setBody(''); setConfirming(false); setResult(null); setComposeOpen(true); };
-  const recipientLabel = recipient === 'all' ? `all ${tenants.length} businesses` : (tenants.find((t) => t.tenant_id === recipient)?.tenant_name ?? 'business');
+  // Prefer the API's category-enriched list; fall back to the prop before it loads.
+  const tenantList = recTenants.length
+    ? recTenants
+    : tenants.map((t) => ({ id: t.tenant_id, name: t.tenant_name, category: null as string | null }));
+
+  const openCompose = () => {
+    setRecipientMode('all'); setSelectedTenantIds([]); setSelectedCategory('');
+    setSubject(''); setBody(''); setConfirming(false); setResult(null); setComposeOpen(true);
+  };
+  const toggleTenant = (id: string) =>
+    setSelectedTenantIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const categoryCount = (cat: string) => tenantList.filter((t) => t.category === cat).length;
+
+  const recipientLabel =
+    recipientMode === 'all'
+      ? `all ${tenantList.length} businesses`
+      : recipientMode === 'category'
+        ? selectedCategory ? `${selectedCategory} (${categoryCount(selectedCategory)})` : 'a category'
+        : selectedTenantIds.length === 1
+          ? (tenantList.find((t) => t.id === selectedTenantIds[0])?.name ?? 'business')
+          : `${selectedTenantIds.length} selected businesses`;
+
+  const canSend = !!subject.trim() && !!body.trim() && (
+    recipientMode === 'all' ||
+    (recipientMode === 'select' && selectedTenantIds.length > 0) ||
+    (recipientMode === 'category' && !!selectedCategory)
+  );
 
   const handleSend = async () => {
-    if (!subject.trim() || !body.trim()) return;
+    if (!canSend) return;
     setSending(true);
     setResult(null);
+    const target =
+      recipientMode === 'all' ? {}
+        : recipientMode === 'category' ? { category: selectedCategory }
+          : { tenantIds: selectedTenantIds };
     const res = await fetch(`/api/property/${slug}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject: subject.trim(), body: body.trim(), tenantId: recipient === 'all' ? undefined : recipient }),
+      body: JSON.stringify({ subject: subject.trim(), body: body.trim(), ...target }),
     });
     const json = await res.json();
     setSending(false);
@@ -1092,12 +1129,45 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
 
             <div className="mt-4 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500">Recipient</label>
-                <select value={recipient} onChange={(e) => setRecipient(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
-                  <option value="all">📣 All businesses ({tenants.length})</option>
-                  {tenants.map((t) => <option key={t.tenant_id} value={t.tenant_id}>{t.tenant_name}</option>)}
-                </select>
+                <label className="block text-xs font-medium text-gray-500">Recipients</label>
+                <div className="mt-1 flex rounded-lg border border-gray-200 p-0.5">
+                  {([['all', 'All'], ['select', 'Select businesses'], ['category', 'By category']] as const).map(([mode, label]) => (
+                    <button key={mode} type="button" onClick={() => setRecipientMode(mode)}
+                      className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium ${recipientMode === mode ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {recipientMode === 'all' && (
+                  <p className="mt-2 text-xs text-gray-500">📣 Goes to all {tenantList.length} businesses.</p>
+                )}
+
+                {recipientMode === 'select' && (
+                  <div className="mt-2 max-h-44 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-2">
+                    {tenantList.length === 0 ? (
+                      <p className="px-1 py-2 text-xs text-gray-400">No businesses yet.</p>
+                    ) : tenantList.map((t) => (
+                      <label key={t.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                        <input type="checkbox" checked={selectedTenantIds.includes(t.id)} onChange={() => toggleTenant(t.id)} />
+                        <span className="flex-1">{t.name}</span>
+                        {t.category && <span className="text-xs text-gray-400">{t.category}</span>}
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {recipientMode === 'category' && (
+                  recCategories.length === 0 ? (
+                    <p className="mt-2 text-xs text-gray-400">Your businesses aren&apos;t categorised yet.</p>
+                  ) : (
+                    <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+                      <option value="">Choose a category…</option>
+                      {recCategories.map((c) => <option key={c} value={c}>{c} ({categoryCount(c)})</option>)}
+                    </select>
+                  )
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500">Subject</label>
@@ -1129,9 +1199,9 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
               ) : (
                 <div className="flex justify-end gap-2 pt-1">
                   <button onClick={() => setComposeOpen(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">Cancel</button>
-                  <button onClick={() => setConfirming(true)} disabled={!subject.trim() || !body.trim()}
+                  <button onClick={() => setConfirming(true)} disabled={!canSend}
                     className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-                    {recipient === 'all' ? 'Send to all' : 'Send'}
+                    {recipientMode === 'all' ? 'Send to all' : 'Send'}
                   </button>
                 </div>
               )}
