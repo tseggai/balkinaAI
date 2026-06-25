@@ -1,27 +1,46 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Push-notify a property's customers (anyone who has booked at one of its
- * businesses) about a new or updated campaign. Best-effort; never throws.
+ * Push-notify a property's customers about a new or updated campaign.
+ * Best-effort; never throws.
+ *
+ * Audience targeting:
+ *  - 'all' (default): anyone who has booked at one of the property's businesses.
+ *  - 'residents': active members who are homeowners / renters / commercial owners.
+ *  - a single member_type: active members of that type only.
  */
 export async function notifyCampaign(
   admin: SupabaseClient,
   propertyId: string,
   propertySlug: string,
-  campaign: { id: string; title: string; blurb: string | null },
+  campaign: { id: string; title: string; blurb: string | null; audience?: string | null },
 ): Promise<void> {
   try {
-    const { data: pts } = await admin.from('property_tenants').select('tenant_id').eq('property_id', propertyId);
-    const tenantIds = ((pts ?? []) as { tenant_id: string }[]).map((r) => r.tenant_id);
-    if (tenantIds.length === 0) return;
+    const audience = campaign.audience ?? 'all';
+    let customerIds: string[];
 
-    const { data: appts } = await admin
-      .from('appointments')
-      .select('customer_id')
-      .in('tenant_id', tenantIds)
-      .not('customer_id', 'is', null)
-      .limit(5000);
-    const customerIds = Array.from(new Set(((appts ?? []) as { customer_id: string }[]).map((a) => a.customer_id)));
+    if (audience === 'all') {
+      const { data: pts } = await admin.from('property_tenants').select('tenant_id').eq('property_id', propertyId);
+      const tenantIds = ((pts ?? []) as { tenant_id: string }[]).map((r) => r.tenant_id);
+      if (tenantIds.length === 0) return;
+
+      const { data: appts } = await admin
+        .from('appointments')
+        .select('customer_id')
+        .in('tenant_id', tenantIds)
+        .not('customer_id', 'is', null)
+        .limit(5000);
+      customerIds = Array.from(new Set(((appts ?? []) as { customer_id: string }[]).map((a) => a.customer_id)));
+    } else {
+      const types = audience === 'residents' ? ['homeowner', 'renter', 'commercial_owner'] : [audience];
+      const { data: members } = await admin
+        .from('property_members')
+        .select('customer_id')
+        .eq('property_id', propertyId)
+        .eq('status', 'active')
+        .in('member_type', types);
+      customerIds = Array.from(new Set(((members ?? []) as { customer_id: string }[]).map((m) => m.customer_id)));
+    }
     if (customerIds.length === 0) return;
 
     // Only this property's app tokens — never the base Balkina app.

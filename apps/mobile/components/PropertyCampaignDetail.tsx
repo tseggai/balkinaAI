@@ -43,6 +43,7 @@ export interface Campaign {
   cta_fields: string[];
   cta_required?: string[];
   cta_plus_one_limit?: number | null;
+  audience?: string;
   tenant_ids: string[];
 }
 

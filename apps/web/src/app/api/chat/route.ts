@@ -9,7 +9,7 @@
  * discover businesses first via the find_businesses tool.
  */
 import OpenAI from 'openai';
-import { getLabels, normalizeBusinessType } from '@balkina/shared';
+import { getLabels, normalizeBusinessType, memberTypeLabel } from '@balkina/shared';
 import { createAdminClient } from '@/lib/supabase/server';
 import { executeTool } from './tool-handlers';
 
@@ -600,6 +600,22 @@ export async function POST(request: Request) {
       const names = rows.map((r) => r.tenants?.name).filter(Boolean) as string[];
       tenantName = prop.name;
       propertyContext = `\n\n## Property Context\nYou are the booking concierge for ${prop.name}. ONLY recommend and book businesses that belong to ${prop.name}. When the customer searches, use find_businesses (it is already restricted to this property's businesses). Do not mention or suggest any business outside ${prop.name}.${names.length ? ` The businesses available here are: ${names.join(', ')}.` : ''}`;
+
+      // Resident awareness: if this customer is a verified member of the
+      // property, tell the concierge so it can greet/treat them accordingly.
+      if (userId) {
+        const { data: memberRow } = await supabase
+          .from('property_members')
+          .select('member_type, unit, status')
+          .eq('property_id', prop.id)
+          .eq('customer_id', userId)
+          .maybeSingle();
+        const member = memberRow as { member_type: string; unit: string | null; status: string } | null;
+        if (member && member.status === 'active') {
+          const typeLabel = memberTypeLabel(member.member_type);
+          propertyContext += `\n\nThis customer is a verified ${typeLabel}${member.unit ? ` (unit ${member.unit})` : ''} at ${prop.name}. Acknowledge their residency warmly when relevant, and prioritise resident perks/availability where applicable.`;
+        }
+      }
     }
   }
 

@@ -18,6 +18,7 @@ interface CampaignBody {
   cta_fields?: string[];
   cta_required?: string[];
   cta_plus_one_limit?: number | null;
+  audience?: string;
   is_active?: boolean;
   tenantIds?: string[];
 }
@@ -80,6 +81,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       cta_fields: body.cta_fields ?? [],
       cta_required: body.cta_required ?? [],
       cta_plus_one_limit: body.cta_plus_one_limit ?? null,
+      audience: body.audience ?? 'all',
       is_active: body.is_active ?? true,
     } as never)
     .select('id')
@@ -95,7 +97,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   }
 
   if (body.is_active ?? true) {
-    await notifyCampaign(ctx.admin, ctx.propertyId, slug, { id: campaignId, title: body.title.trim(), blurb: body.blurb ?? null });
+    await notifyCampaign(ctx.admin, ctx.propertyId, slug, { id: campaignId, title: body.title.trim(), blurb: body.blurb ?? null, audience: body.audience ?? 'all' });
   }
 
   return NextResponse.json({ id: campaignId, status: 'created' }, { status: 201 });

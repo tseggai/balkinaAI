@@ -1630,6 +1630,7 @@ interface Campaign {
   cta_fields: string[];
   cta_required: string[];
   cta_plus_one_limit: number | null;
+  audience: string;
   is_active: boolean;
   tenant_ids: string[];
 }
@@ -1645,6 +1646,7 @@ const EMPTY_FORM = {
   title: '', blurb: '', description: '', image_url: '', campaign_type: 'promotion',
   starts_at: '', ends_at: '', location: '', is_property_only: true, cta_label: '', cta_url: '',
   cta_type: 'none', cta_fields: [] as string[], cta_required: [] as string[], cta_plus_one_limit: '' as string,
+  audience: 'all',
   tenantIds: [] as string[],
 };
 
@@ -1707,6 +1709,7 @@ function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: Pr
       location: c.location ?? '', is_property_only: c.is_property_only, cta_label: c.cta_label ?? '',
       cta_url: c.cta_url ?? '', cta_type: c.cta_type ?? 'none', cta_fields: c.cta_fields ?? [],
       cta_required: c.cta_required ?? [], cta_plus_one_limit: c.cta_plus_one_limit != null ? String(c.cta_plus_one_limit) : '',
+      audience: c.audience ?? 'all',
       tenantIds: c.tenant_ids ?? [],
     });
     setShowForm(true);
@@ -1941,6 +1944,19 @@ function CampaignsSection({ slug, tenants, accent }: { slug: string; tenants: Pr
                     )}
                   </div>
                 )}
+              </div>
+
+              <div className="rounded-lg border border-gray-200 p-3">
+                <label className="block text-sm font-medium text-gray-700">Audience</label>
+                <p className="mt-0.5 text-xs text-gray-500">Who sees this and gets notified. Resident options only reach verified members.</p>
+                <select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}
+                  className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+                  <option value="all">Everyone</option>
+                  <option value="residents">Residents only (homeowners, renters, commercial owners)</option>
+                  <option value="homeowner">Homeowners only</option>
+                  <option value="renter">Renters only</option>
+                  <option value="commercial_owner">Commercial owners only</option>
+                </select>
               </div>
 
               <div className="rounded-lg border border-gray-200 p-3">

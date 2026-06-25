@@ -35,7 +35,7 @@ import PropertyBookingFlow, { BookingService } from '@/components/PropertyBookin
 import PropertyBusinessPage, { BusinessSummary } from '@/components/PropertyBusinessPage';
 import PropertyAccountDrawer from '@/components/PropertyAccountDrawer';
 import PropertyMemberVerifyModal from '@/components/PropertyMemberVerifyModal';
-import { memberTypeLabel } from '@balkina/shared';
+import { memberTypeLabel, isResidentType } from '@balkina/shared';
 import { Campaign } from '@/components/PropertyCampaignDetail';
 import { BootSplash } from '@/lib/bootSplash';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
@@ -1587,6 +1587,19 @@ export default function ChatScreen() {
     ? `${memberTypeLabel(membership.member_type)}${membership.unit ? ` · ${membership.unit}` : ''}`
     : null;
 
+  // Hide resident-targeted campaigns from non-matching customers. `membership`
+  // is non-null only for active members (the status endpoint filters revoked).
+  const storefrontProperty = useMemo(() => {
+    if (!propertyData) return null;
+    const visible = (propertyData.campaigns ?? []).filter((c) => {
+      const audience = c.audience ?? 'all';
+      if (audience === 'all') return true;
+      if (!membership) return false;
+      return audience === 'residents' ? isResidentType(membership.member_type) : membership.member_type === audience;
+    });
+    return { ...propertyData, campaigns: visible };
+  }, [propertyData, membership]);
+
   // Realtime subscription: update confirmed cards when appointment status changes
   useEffect(() => {
     if (!userId) return;
@@ -2714,7 +2727,7 @@ export default function ChatScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: '#F7F4EF' }]}>
         <View style={[styles.flex, { paddingBottom: kbPadding }]}>
           <PropertyStorefront
-            property={propertyData}
+            property={storefrontProperty ?? propertyData}
             apiBase={API_BASE}
             isLoggedIn={!!userId}
             onAccountPress={() => setAccountDrawerOpen(true)}
