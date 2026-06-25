@@ -1468,26 +1468,28 @@ export default function ChatScreen() {
   const [propertyLoading, setPropertyLoading] = useState<boolean>(!!propertySlug);
   const router = useRouter();
 
-  // Boot bridge: keep a frame identical to the native splash on screen until the
-  // landing screen's data is ready (BootSplash), so the app reads as one
-  // continuous splash → landing with no intermediate colour/text card. A short
-  // minimum hold gives the splash art a beat even when the landing is instant
-  // (e.g. the base chat screen, which has no network gate).
+  // Keep the native splash up until the landing screen is actually ready, then
+  // hide it — so the app goes native splash → storefront directly, with no
+  // intermediate JS loader (and none of expo-router's slide between the root
+  // and (app) routes, which is only ever visible if the splash is dropped too
+  // early). A short minimum hold gives the splash a beat even when the landing
+  // is instant (e.g. the base chat screen, which has no network gate).
   const [minHoldDone, setMinHoldDone] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setMinHoldDone(true), 600);
+    const t = setTimeout(() => setMinHoldDone(true), 400);
     return () => clearTimeout(t);
   }, []);
 
-  // Hide the native splash on first paint — by now BootSplash (a pixel-match of
-  // the native splash) is rendered underneath, so the hand-off is invisible.
-  useEffect(() => {
-    SplashScreen.hideAsync().catch(() => {});
-  }, []);
-
-  // The bridge stays up until the landing is ready: for a property that means
-  // the storefront fetch has resolved; for the base app just the minimum hold.
+  // The landing is ready once the storefront fetch has resolved (property) or
+  // the minimum hold has elapsed (base app).
   const bootReady = propertySlug ? !propertyLoading && minHoldDone : minHoldDone;
+
+  // Hide the native splash exactly when the landing is ready — the storefront is
+  // already painted underneath, so the splash → storefront hand-off is clean.
+  useEffect(() => {
+    if (bootReady) SplashScreen.hideAsync().catch(() => {});
+  }, [bootReady]);
+
 
   useEffect(() => {
     if (!propertySlug) return;

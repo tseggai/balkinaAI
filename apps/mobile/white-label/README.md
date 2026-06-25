@@ -68,27 +68,24 @@ the default Balkina logo-on-color with a property image:
 The splash is a **build-time** asset (it shows before any JS/network runs), so
 changing it requires a new EAS build — it can't be edited live from the portal.
 
-#### In-app boot bridge
+#### Boot → landing hand-off
 
-After the native splash, there's a brief **in-app** bridge frame (`BootSplash`,
-in `lib/bootSplash.tsx`) held until the landing screen's data is ready — the
-storefront fetch for a property, or just a short minimum hold for the base chat
-app. It is **pixel-matched to the native splash**: it reuses the same bundled
-`splashPath` art and reads `resizeMode`/`backgroundColor` from
-`Constants.expoConfig.splash`, so hiding the native splash reveals an identical
-frame (no colour/text card, no Balkina flash).
+There is **no separate in-app loading screen**. The native splash is kept on
+screen (via `expo-splash-screen`) until the landing screen's data is ready — the
+storefront fetch for a property, or a short minimum hold for the base chat app —
+then hidden, so the app goes **native splash → storefront** directly with no
+intermediate frame or route-transition slide.
 
-- **Name overlay** — the property name is drawn over the art by default, so a
-  plain branded-colour `splash.png` still shows its name. If your splash art
-  already bakes in the name/logo, set `"splashShowName": false` in the variant
-  JSON to suppress it. The base Balkina app never overlays text (its splash art
-  carries the logo).
-- **New properties** — add the variant's splash to the static `require` map in
-  `lib/bootSplash.tsx` (`VARIANT_BOOT_IMAGES`) keyed by slug; Metro needs a
-  static `require`, so this can't be data-driven.
-
-This bridge is **build-time** art (same file as the native splash), so changing
-it requires a new EAS build — it can't be edited live from the portal.
+- **Put branding in the splash art.** The native splash is a static image, so any
+  logo/wordmark must be baked into `splash.png` itself (composite it over the
+  photo). There is no text overlay.
+- `lib/bootSplash.tsx` (`BootSplash`) renders only *underneath* the still-visible
+  native splash as a graceful fallback if the splash is ever dropped early (e.g.
+  the safety timeout on a very slow network); it is normally never seen. It is
+  painted to match the native splash (same bundled art, `resizeMode` and
+  `backgroundColor` from `Constants.expoConfig.splash`). Add a new property's
+  splash to the static `require` map (`VARIANT_BOOT_IMAGES`) keyed by slug;
+  Metro needs a static `require`, so this can't be data-driven.
 
 > `generate.js` (which writes `app.whitelabel.json`) is legacy and no longer
 > required — `app.config.js` handles variant selection directly.
