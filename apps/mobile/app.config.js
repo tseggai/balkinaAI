@@ -50,9 +50,10 @@ module.exports = ({ config }) => {
       propertySlug: wl.propertySlug,
       propertyName: wl.appName,
       primaryColor: wl.primaryColor,
-      // Remote URL for the full-bleed in-app boot loader (set to the property's
-      // splash_image_url so the loading screen matches the portal upload).
-      splashImageUrl: wl.splashImageUrl,
+      // Overlay the property name on the JS boot bridge (BootSplash). Defaults
+      // to on; set "splashShowName": false when the splash art already bakes in
+      // the name/logo so it isn't drawn twice.
+      splashShowName: wl.splashShowName,
     },
   };
 };

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, StatusBar, Linking } from 'react-native';
+import { StatusBar, Linking } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import Constants from 'expo-constants';
 import * as SplashScreen from 'expo-splash-screen';
@@ -7,11 +7,16 @@ import { SafeStripeProvider } from '@/lib/stripe';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured, getAuthenticatedRole } from '@/lib/supabase';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { BootSplash } from '@/lib/bootSplash';
 import { parseTenantFromUrl, setPendingDeepLinkTenant } from '@/lib/deepLink';
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
-const PROPERTY_NAME = (Constants.expoConfig?.extra?.propertyName as string | undefined) ?? null;
-const PROPERTY_PRIMARY = (Constants.expoConfig?.extra?.primaryColor as string | undefined) ?? '#6B7FC4';
+
+// Landing groups that own their own native-splash hide. The (app) landing
+// (storefront / chat) keeps the splash up behind its BootSplash bridge until
+// its data is ready, so the root layout must NOT hide the splash on the way
+// there — only when routing settles on a different terminal group.
+const SPLASH_HIDE_GROUPS = ['(auth)', '(tenant)', '(staff)'];
 
 // Keep the native splash up until the first real screen is painted, so the app
 // goes splash → first screen without flashing the intermediate JS loaders.
@@ -95,28 +100,25 @@ function RootLayoutContent() {
     }
   }, [session, initialized, deepLinkReady, segments, router]);
 
-  // Hide the native splash. The property storefront hides it itself once its
-  // full-bleed loading image is ready; every other flow hides it here as soon
-  // as auth/deep-link init is done. A failsafe ensures it never gets stuck.
+  // Hide the native splash. The (app) landing (storefront / chat) hides it
+  // itself once its BootSplash bridge is painted and its data is ready; every
+  // other destination (auth / tenant / staff) hides it here once routing
+  // settles there. A failsafe ensures it never gets stuck.
   useEffect(() => {
     const failsafe = setTimeout(() => { SplashScreen.hideAsync().catch(() => {}); }, 5000);
     return () => clearTimeout(failsafe);
   }, []);
   useEffect(() => {
     if (!initialized || !deepLinkReady) return;
-    // Property builds route to the storefront, which hides the splash itself
-    // once its loading image is ready; base builds hide it here.
-    if (!PROPERTY_NAME) {
+    if (SPLASH_HIDE_GROUPS.includes(segments[0] as string)) {
       SplashScreen.hideAsync().catch(() => {});
     }
-  }, [initialized, deepLinkReady]);
+  }, [initialized, deepLinkReady, segments]);
 
+  // Before init settles the native splash is still up; render the matching
+  // BootSplash underneath so any reveal is an identical frame, never a flash.
   if (!initialized) {
-    return (
-      <View style={[styles.loading, PROPERTY_NAME ? { backgroundColor: PROPERTY_PRIMARY } : null]}>
-        <Text style={[styles.loadingText, { color: PROPERTY_NAME ? '#fff' : PROPERTY_PRIMARY }]}>{PROPERTY_NAME ?? 'Balkina AI'}</Text>
-      </View>
-    );
+    return <BootSplash />;
   }
 
   return (
@@ -145,17 +147,3 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
-
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  loadingText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#6B7FC4',
-  },
-});
