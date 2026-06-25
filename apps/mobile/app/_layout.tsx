@@ -20,9 +20,17 @@ const SPLASH_HIDE_GROUPS = ['(auth)', '(tenant)', '(staff)'];
 
 // Keep the native splash up until the first real screen is painted, so the app
 // goes splash → first screen without flashing the intermediate JS loaders.
-// On property builds the storefront screen hides it once its loading image is
-// ready (see (app)/index.tsx); other flows hide it here.
+// On property builds the storefront screen hides it once its data is ready
+// (see (app)/index.tsx); other flows hide it here.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+// Cross-fade the splash → landing hand-off instead of an instant cut. Applies to
+// every hideAsync() call below (property storefront and base chat alike). The
+// fade is iOS-only in expo-splash-screen; Android keeps the instant hide.
+try {
+  SplashScreen.setOptions({ duration: 450, fade: true });
+} catch {
+  /* older runtimes without setOptions — fall back to instant hide */
+}
 
 function RootLayoutContent() {
   const [session, setSession] = useState<Session | null>(null);
