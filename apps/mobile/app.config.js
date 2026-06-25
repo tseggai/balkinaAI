@@ -50,10 +50,6 @@ module.exports = ({ config }) => {
       propertySlug: wl.propertySlug,
       propertyName: wl.appName,
       primaryColor: wl.primaryColor,
-      // Overlay the property name on the JS boot bridge (BootSplash). Defaults
-      // to on; set "splashShowName": false when the splash art already bakes in
-      // the name/logo so it isn't drawn twice.
-      splashShowName: wl.splashShowName,
     },
   };
 };
