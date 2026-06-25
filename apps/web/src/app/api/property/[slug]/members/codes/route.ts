@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPropertyAdmin } from '@/lib/property-admin';
+import { generateUniqueMemberCode } from '@/lib/member-code';
 import { PROPERTY_MEMBER_TYPES, type PropertyMemberType } from '@balkina/shared';
 
 interface CodeBody {
@@ -13,20 +14,6 @@ interface CodeBody {
 interface PatchBody extends CodeBody {
   id?: string;
   is_active?: boolean;
-}
-
-// A readable, hard-to-mistype suffix (no 0/O/1/I).
-function randomSuffix(len = 4): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out = '';
-  for (let i = 0; i < len; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
-  return out;
-}
-
-function buildCode(slug: string, type: string): string {
-  const base = slug.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
-  const typeTag = type === 'commercial_owner' ? 'RETAIL' : type.toUpperCase();
-  return `${base}-${typeTag}-${randomSuffix()}`;
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
@@ -54,17 +41,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     return NextResponse.json({ error: 'Invalid member type' }, { status: 400 });
   }
 
-  // Generate a unique code (retry on the rare collision).
-  let code = buildCode(slug, member_type);
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const { data: existing } = await ctx.admin
-      .from('property_member_codes')
-      .select('id')
-      .eq('code', code)
-      .maybeSingle();
-    if (!existing) break;
-    code = buildCode(slug, member_type);
-  }
+  const code = await generateUniqueMemberCode(ctx.admin, slug, member_type);
 
   const { data, error } = await ctx.admin
     .from('property_member_codes')

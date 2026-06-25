@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getPropertyAdmin } from '@/lib/property-admin';
+import { getPropertyTenantsWithCategory } from '@/lib/property-tenant-categories';
 import { sendPropertyMessageEmail } from '@balkina/notifications';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Db = any;
 
 /**
- * GET /api/property/[slug]/messages — history of sent messages/broadcasts.
+ * GET /api/property/[slug]/messages — history of sent messages/broadcasts, plus
+ * the recipient metadata (tenants with category) the compose form needs to
+ * offer multi-select and category targeting.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -15,16 +18,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
 
   const { data } = await (ctx.admin as Db)
     .from('property_messages')
-    .select('id, tenant_id, subject, body, recipients_count, email_sent_count, created_at, tenants(name)')
+    .select('id, tenant_id, subject, body, recipient_label, recipients_count, email_sent_count, created_at, tenants(name)')
     .eq('property_id', ctx.propertyId)
     .order('created_at', { ascending: false })
     .limit(100);
 
-  const messages = ((data ?? []) as { id: string; tenant_id: string | null; subject: string; body: string; recipients_count: number; email_sent_count: number; created_at: string; tenants: { name: string } | null }[])
+  const messages = ((data ?? []) as { id: string; tenant_id: string | null; subject: string; body: string; recipient_label: string | null; recipients_count: number; email_sent_count: number; created_at: string; tenants: { name: string } | null }[])
     .map((m) => ({
       id: m.id,
       tenant_id: m.tenant_id,
-      recipient: m.tenant_id ? (m.tenants?.name ?? 'Tenant') : 'All tenants',
+      recipient: m.recipient_label || (m.tenant_id ? (m.tenants?.name ?? 'Tenant') : 'All tenants'),
       subject: m.subject,
       body: m.body,
       recipients_count: m.recipients_count,
@@ -32,7 +35,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       created_at: m.created_at,
     }));
 
-  return NextResponse.json({ data: messages });
+  const tenants = await getPropertyTenantsWithCategory(ctx.admin, ctx.propertyId);
+  const categories = Array.from(new Set(tenants.map((t) => t.category).filter(Boolean) as string[])).sort();
+
+  return NextResponse.json({ data: messages, recipients: { tenants, categories } });
 }
 
 /**
@@ -44,31 +50,45 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   const ctx = await getPropertyAdmin(slug);
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const body = await request.json() as { subject?: string; body?: string; tenantId?: string };
+  const body = await request.json() as { subject?: string; body?: string; tenantId?: string; tenantIds?: string[]; category?: string };
   const subject = (body.subject || '').trim();
   const messageBody = (body.body || '').trim();
-  const tenantId = body.tenantId || null;
   if (!subject || !messageBody) return NextResponse.json({ error: 'Subject and message are required' }, { status: 400 });
 
   const supabase: Db = ctx.admin;
 
-  // Resolve recipients: a single tenant, or every tenant linked to the property.
+  // Every business linked to the property, with its category — the universe we
+  // resolve recipients against (so a tenant can never be messaged from a
+  // property it doesn't belong to).
+  const propertyTenants = await getPropertyTenantsWithCategory(ctx.admin, ctx.propertyId);
+  const validIds = new Set(propertyTenants.map((t) => t.id));
+
+  // Resolve recipients across the supported targeting modes.
   let recipientTenantIds: string[];
-  if (tenantId) {
-    const { data: link } = await supabase
-      .from('property_tenants')
-      .select('tenant_id')
-      .eq('property_id', ctx.propertyId)
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-    if (!link) return NextResponse.json({ error: 'That business is not part of this property' }, { status: 400 });
-    recipientTenantIds = [tenantId];
+  let recipientLabel: string | null = null;
+  let singleTenantId: string | null = null;
+
+  if (body.category) {
+    const inCat = propertyTenants.filter((t) => t.category === body.category);
+    recipientTenantIds = inCat.map((t) => t.id);
+    recipientLabel = `${body.category} (${recipientTenantIds.length})`;
+    if (recipientTenantIds.length === 0) return NextResponse.json({ error: `No businesses in “${body.category}” yet` }, { status: 400 });
+  } else if (Array.isArray(body.tenantIds) && body.tenantIds.length > 0) {
+    recipientTenantIds = body.tenantIds.filter((id) => validIds.has(id));
+    if (recipientTenantIds.length === 0) return NextResponse.json({ error: 'None of those businesses are part of this property' }, { status: 400 });
+    if (recipientTenantIds.length === 1) {
+      singleTenantId = recipientTenantIds[0]!;
+      recipientLabel = propertyTenants.find((t) => t.id === singleTenantId)?.name ?? null;
+    } else {
+      recipientLabel = `${recipientTenantIds.length} selected businesses`;
+    }
+  } else if (body.tenantId) {
+    if (!validIds.has(body.tenantId)) return NextResponse.json({ error: 'That business is not part of this property' }, { status: 400 });
+    singleTenantId = body.tenantId;
+    recipientTenantIds = [body.tenantId];
+    recipientLabel = propertyTenants.find((t) => t.id === body.tenantId)?.name ?? null;
   } else {
-    const { data: links } = await supabase
-      .from('property_tenants')
-      .select('tenant_id')
-      .eq('property_id', ctx.propertyId);
-    recipientTenantIds = ((links ?? []) as { tenant_id: string }[]).map((l) => l.tenant_id);
+    recipientTenantIds = propertyTenants.map((t) => t.id);
   }
 
   if (recipientTenantIds.length === 0) {
@@ -109,9 +129,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   // Record the send.
   await supabase.from('property_messages').insert({
     property_id: ctx.propertyId,
-    tenant_id: tenantId,
+    tenant_id: singleTenantId,
     subject,
     body: messageBody,
+    recipient_label: recipientLabel,
     created_by: ctx.userId,
     recipients_count: recipients.length,
     email_sent_count: emailSent,
