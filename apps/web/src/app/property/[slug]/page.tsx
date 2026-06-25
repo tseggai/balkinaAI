@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { ImageUpload } from '@/components/image-upload';
 import { DateTimeField } from '@/components/datetime-field';
 import { PropertyDashboardShell } from '@/components/property-dashboard-shell';
-import { PROPERTY_MEMBER_TYPES, PROPERTY_MEMBER_TYPE_LABELS, memberTypeLabel, isResidentType } from '@balkina/shared';
+import { PROPERTY_MEMBER_TYPES, PROPERTY_MEMBER_TYPE_LABELS, memberTypeLabel } from '@balkina/shared';
 
 interface Property {
   id: string;
@@ -965,6 +965,8 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
   const [viewMsg, setViewMsg] = useState<SentMessage | null>(null);
 
   // Compose state
+  const [channel, setChannel] = useState<'businesses' | 'residents'>('businesses');
+  const [memberAudience, setMemberAudience] = useState<'all' | 'homeowner' | 'renter' | 'commercial_owner'>('all');
   const [recipientMode, setRecipientMode] = useState<'all' | 'select' | 'category'>('all');
   const [selectedTenantIds, setSelectedTenantIds] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -1001,14 +1003,16 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
     : tenants.map((t) => ({ id: t.tenant_id, name: t.tenant_name, category: null as string | null }));
 
   const openCompose = () => {
+    setChannel('businesses'); setMemberAudience('all');
     setRecipientMode('all'); setSelectedTenantIds([]); setSelectedCategory('');
     setSubject(''); setBody(''); setConfirming(false); setResult(null); setComposeOpen(true);
   };
+  const AUDIENCE_LABEL: Record<string, string> = { all: 'all residents', homeowner: 'Homeowners', renter: 'Renters', commercial_owner: 'Commercial owners' };
   const toggleTenant = (id: string) =>
     setSelectedTenantIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const categoryCount = (cat: string) => tenantList.filter((t) => t.category === cat).length;
 
-  const recipientLabel =
+  const businessLabel =
     recipientMode === 'all'
       ? `all ${tenantList.length} businesses`
       : recipientMode === 'category'
@@ -1016,8 +1020,10 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
         : selectedTenantIds.length === 1
           ? (tenantList.find((t) => t.id === selectedTenantIds[0])?.name ?? 'business')
           : `${selectedTenantIds.length} selected businesses`;
+  const recipientLabel = channel === 'residents' ? AUDIENCE_LABEL[memberAudience] : businessLabel;
 
   const canSend = !!subject.trim() && !!body.trim() && (
+    channel === 'residents' ||
     recipientMode === 'all' ||
     (recipientMode === 'select' && selectedTenantIds.length > 0) ||
     (recipientMode === 'category' && !!selectedCategory)
@@ -1027,15 +1033,24 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
     if (!canSend) return;
     setSending(true);
     setResult(null);
-    const target =
-      recipientMode === 'all' ? {}
-        : recipientMode === 'category' ? { category: selectedCategory }
-          : { tenantIds: selectedTenantIds };
-    const res = await fetch(`/api/property/${slug}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject: subject.trim(), body: body.trim(), ...target }),
-    });
+    let res: Response;
+    if (channel === 'residents') {
+      res = await fetch(`/api/property/${slug}/messages/residents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: subject.trim(), body: body.trim(), audience: memberAudience }),
+      });
+    } else {
+      const target =
+        recipientMode === 'all' ? {}
+          : recipientMode === 'category' ? { category: selectedCategory }
+            : { tenantIds: selectedTenantIds };
+      res = await fetch(`/api/property/${slug}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: subject.trim(), body: body.trim(), ...target }),
+      });
+    }
     const json = await res.json();
     setSending(false);
     setConfirming(false);
@@ -1059,7 +1074,7 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Messages</h2>
-          <p className="mt-1 text-sm text-gray-500">Email an announcement to all your businesses, or message one directly — sent under your property&apos;s name via Balkina AI.</p>
+          <p className="mt-1 text-sm text-gray-500">Email your businesses (all, a selection, or by category), or push an announcement to your residents — under your property&apos;s name.</p>
         </div>
         <button onClick={openCompose} className="self-start rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">+ New Message</button>
       </div>
@@ -1129,8 +1144,31 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
 
             <div className="mt-4 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500">Recipients</label>
+                <label className="block text-xs font-medium text-gray-500">Send to</label>
                 <div className="mt-1 flex rounded-lg border border-gray-200 p-0.5">
+                  {([['businesses', 'Businesses'], ['residents', 'Residents']] as const).map(([ch, label]) => (
+                    <button key={ch} type="button" onClick={() => setChannel(ch)}
+                      className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium ${channel === ch ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {channel === 'residents' ? (
+                  <>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {([['all', 'All members'], ['homeowner', 'Homeowners'], ['renter', 'Renters'], ['commercial_owner', 'Commercial owners']] as const).map(([a, label]) => (
+                        <button key={a} type="button" onClick={() => setMemberAudience(a)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${memberAudience === a ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">🔔 Sends a push notification to verified {AUDIENCE_LABEL[memberAudience]} who have the app.</p>
+                  </>
+                ) : (
+                <>
+                <div className="mt-2 flex rounded-lg border border-gray-200 p-0.5">
                   {([['all', 'All'], ['select', 'Select businesses'], ['category', 'By category']] as const).map(([mode, label]) => (
                     <button key={mode} type="button" onClick={() => setRecipientMode(mode)}
                       className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium ${recipientMode === mode ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
@@ -1140,7 +1178,7 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
                 </div>
 
                 {recipientMode === 'all' && (
-                  <p className="mt-2 text-xs text-gray-500">📣 Goes to all {tenantList.length} businesses.</p>
+                  <p className="mt-2 text-xs text-gray-500">📣 Emails all {tenantList.length} businesses.</p>
                 )}
 
                 {recipientMode === 'select' && (
@@ -1167,6 +1205,8 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
                       {recCategories.map((c) => <option key={c} value={c}>{c} ({categoryCount(c)})</option>)}
                     </select>
                   )
+                )}
+                </>
                 )}
               </div>
               <div>
@@ -1238,8 +1278,14 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
   const [invEmail, setInvEmail] = useState('');
   const [invPhone, setInvPhone] = useState('');
   const [invUnit, setInvUnit] = useState('');
+  const [invChannel, setInvChannel] = useState<'sms' | 'whatsapp'>('sms');
   const [inviting, setInviting] = useState(false);
   const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Layout: which list is shown, and which create panel is open.
+  const [view, setView] = useState<'members' | 'invites' | 'codes'>('members');
+  const [showInvite, setShowInvite] = useState(false);
+  const [showCode, setShowCode] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -1266,6 +1312,8 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
     setNewUnit(''); setNewLabel('');
     await fetchAll();
     setCreating(false);
+    setShowCode(false);
+    setView('codes');
   };
 
   const toggleCode = async (c: MemberCode) => {
@@ -1282,14 +1330,15 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
     setInviteMsg(null);
     const res = await fetch(`/api/property/${slug}/members/invites`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_type: invType, email: invEmail.trim() || null, phone: invPhone.trim() || null, unit: invUnit.trim() || null }),
+      body: JSON.stringify({ member_type: invType, email: invEmail.trim() || null, phone: invPhone.trim() || null, unit: invUnit.trim() || null, channel: invChannel }),
     });
     const json = await res.json().catch(() => ({}));
     setInviting(false);
     if (!res.ok) { setInviteMsg({ ok: false, text: json.error ?? 'Could not send invite.' }); return; }
-    const ch = [json.delivery?.email && 'email', json.delivery?.sms && 'SMS'].filter(Boolean).join(' & ');
+    const ch = [json.delivery?.email && 'email', json.delivery?.sms && (invChannel === 'whatsapp' ? 'WhatsApp' : 'SMS')].filter(Boolean).join(' & ');
     setInviteMsg({ ok: true, text: ch ? `Invite sent by ${ch}.` : 'Invite created, but delivery failed — check the contact details.' });
     setInvEmail(''); setInvPhone(''); setInvUnit('');
+    setView('invites');
     fetchAll();
   };
 
@@ -1327,168 +1376,213 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
   if (loading) return <div className="text-center py-10 text-gray-500">Loading members...</div>;
 
   const activeCount = members.filter((m) => m.status === 'active').length;
-  const residentCount = members.filter((m) => m.status === 'active' && isResidentType(m.member_type)).length;
   // A code bound to an email/phone is a personal invite; the rest are shared codes.
   const invites = codes.filter((c) => c.email || c.phone);
   const sharedCodes = codes.filter((c) => !c.email && !c.phone);
 
+  const TYPE_SELECT = (value: string, onChange: (v: string) => void) => (
+    <select value={value} onChange={(e) => onChange(e.target.value)}
+      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+      {PROPERTY_MEMBER_TYPES.map((t) => <option key={t} value={t}>{PROPERTY_MEMBER_TYPE_LABELS[t]}</option>)}
+    </select>
+  );
+
   return (
     <div>
-      <h2 className="text-xl font-bold text-gray-900">Members</h2>
-      <p className="mt-1 text-sm text-gray-500">
-        Flag your residents — homeowners, renters and commercial owners — by handing them a code. They verify once in
-        the app and unlock resident-only announcements and access. <strong className="text-gray-700">{activeCount}</strong> active
-        {' '}({residentCount} residents).
-      </p>
-
-      {/* Invite a specific person by email / SMS */}
-      <div className="mt-5 rounded-lg border border-gray-200 bg-white p-4">
-        <h3 className="text-sm font-semibold text-gray-900">Invite a resident</h3>
-        <p className="mt-1 text-xs text-gray-500">Send a single-use code to one person by email or SMS. They tap into the app and verify — instantly active, no approval.</p>
-        <div className="mt-3 flex flex-wrap items-end gap-2">
-          <div>
-            <label className="block text-xs font-medium text-gray-600">Type</label>
-            <select value={invType} onChange={(e) => setInvType(e.target.value)}
-              className="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-              {PROPERTY_MEMBER_TYPES.map((t) => (
-                <option key={t} value={t}>{PROPERTY_MEMBER_TYPE_LABELS[t]}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex-1 min-w-[160px]">
-            <label className="block text-xs font-medium text-gray-600">Email</label>
-            <input value={invEmail} onChange={(e) => setInvEmail(e.target.value)} placeholder="resident@email.com" type="email"
-              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-          </div>
-          <div className="min-w-[140px]">
-            <label className="block text-xs font-medium text-gray-600">Phone <span className="text-gray-400">(SMS)</span></label>
-            <input value={invPhone} onChange={(e) => setInvPhone(e.target.value)} placeholder="+382…"
-              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-          </div>
-          <div className="min-w-[110px]">
-            <label className="block text-xs font-medium text-gray-600">Unit <span className="text-gray-400">(opt.)</span></label>
-            <input value={invUnit} onChange={(e) => setInvUnit(e.target.value)} placeholder="Villa 12"
-              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-          </div>
-          <button onClick={sendInvite} disabled={inviting}
-            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-            {inviting ? 'Sending…' : 'Send invite'}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Residents</h2>
+          <p className="mt-1 max-w-xl text-sm text-gray-500">
+            Flag your residents — homeowners, renters and commercial owners. They verify once in the app and unlock
+            resident-only announcements and access.
+          </p>
+        </div>
+        <div className="flex flex-shrink-0 gap-2">
+          <button onClick={() => { setShowCode(true); }}
+            className="rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50">
+            Create code
           </button>
-        </div>
-        {inviteMsg && <p className={`mt-2 text-xs ${inviteMsg.ok ? 'text-green-600' : 'text-red-500'}`}>{inviteMsg.text}</p>}
-      </div>
-
-      {/* Invites list */}
-      {invites.length > 0 && (
-        <div className="mt-4 space-y-2">
-          <h3 className="text-sm font-semibold text-gray-900">Invites ({invites.length})</h3>
-          {invites.map((c) => {
-            const accepted = c.redemption_count > 0;
-            return (
-              <div key={c.id} className={`flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 ${c.is_active || accepted ? 'bg-white' : 'bg-gray-50 opacity-70'}`}>
-                <span className="text-sm font-medium text-gray-900">{c.email || c.phone}</span>
-                <span className="rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: `${accent}1A`, color: accent }}>
-                  {memberTypeLabel(c.member_type)}
-                </span>
-                {c.unit && <span className="text-xs text-gray-500">Unit: {c.unit}</span>}
-                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${accepted ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                  {accepted ? 'Accepted' : 'Invited'}
-                </span>
-                {!accepted && (
-                  <button onClick={() => resendInvite(c.id)} className="ml-auto text-xs font-medium hover:underline" style={{ color: accent }}>Resend</button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Create a shared code */}
-      <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
-        <h3 className="text-sm font-semibold text-gray-900">Issue a shared code</h3>
-        <p className="mt-1 text-xs text-gray-500">For a whole group (e.g. all homeowners). Anyone who enters it becomes an active member of the chosen type — instantly. Rotate or deactivate it any time.</p>
-        <div className="mt-3 flex flex-wrap items-end gap-2">
-          <div>
-            <label className="block text-xs font-medium text-gray-600">Type</label>
-            <select value={newType} onChange={(e) => setNewType(e.target.value)}
-              className="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-              {PROPERTY_MEMBER_TYPES.map((t) => (
-                <option key={t} value={t}>{PROPERTY_MEMBER_TYPE_LABELS[t]}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600">Default unit <span className="text-gray-400">(optional)</span></label>
-            <input value={newUnit} onChange={(e) => setNewUnit(e.target.value)} placeholder="e.g. Villa 12"
-              className="mt-1 w-36 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-          </div>
-          <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs font-medium text-gray-600">Note <span className="text-gray-400">(optional)</span></label>
-            <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="e.g. Homeowners 2026"
-              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-          </div>
-          <button onClick={createCode} disabled={creating}
-            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-            {creating ? 'Creating...' : 'Generate code'}
+          <button onClick={() => { setShowInvite(true); setInviteMsg(null); }}
+            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+            + Invite resident
           </button>
         </div>
       </div>
 
-      {/* Shared codes list */}
-      {sharedCodes.length > 0 && (
-        <div className="mt-4 space-y-2">
-          {sharedCodes.map((c) => (
-            <div key={c.id} className={`flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 ${c.is_active ? 'border-gray-200 bg-white' : 'border-gray-200 bg-gray-50 opacity-70'}`}>
-              <button onClick={() => copyCode(c.code)} title="Copy code"
-                className="rounded-md bg-gray-900 px-3 py-1.5 font-mono text-sm font-semibold text-white hover:bg-gray-700">
-                {copied === c.code ? 'Copied!' : c.code}
-              </button>
-              <span className="rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: `${accent}1A`, color: accent }}>
-                {memberTypeLabel(c.member_type)}
-              </span>
-              {c.unit && <span className="text-xs text-gray-500">Unit: {c.unit}</span>}
-              {c.label && <span className="text-xs text-gray-400">· {c.label}</span>}
-              <span className="text-xs text-gray-400">{c.redemption_count}{c.max_redemptions ? `/${c.max_redemptions}` : ''} redeemed</span>
-              <button onClick={() => toggleCode(c)} className="ml-auto text-xs font-medium text-gray-500 hover:underline">
-                {c.is_active ? 'Deactivate' : 'Reactivate'}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Segmented list switch */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {([['members', `Residents (${activeCount})`], ['invites', `Invites (${invites.length})`], ['codes', `Codes (${sharedCodes.length})`]] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setView(key)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${view === key ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
 
       {/* Members list */}
-      <h3 className="mt-8 text-sm font-semibold text-gray-900">Verified members ({activeCount})</h3>
-      {members.length === 0 ? (
-        <p className="mt-2 text-sm text-gray-500">No one has verified yet. Share a code above to get started.</p>
-      ) : (
-        <div className="mt-3 space-y-2">
-          {members.map((m) => (
-            <div key={m.id} className={`flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3 ${m.status === 'revoked' ? 'opacity-60' : ''}`}>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: `${accent}1A`, color: accent }}>
-                {(m.customer.name || m.customer.email || '?').charAt(0).toUpperCase()}
+      {view === 'members' && (
+        members.length === 0 ? (
+          <p className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+            No verified residents yet. Invite a resident or share a code to get started.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {members.map((m) => (
+              <div key={m.id} className={`flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3 ${m.status === 'revoked' ? 'opacity-60' : ''}`}>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: `${accent}1A`, color: accent }}>
+                  {(m.customer.name || m.customer.email || '?').charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-[160px] flex-1">
+                  <p className="text-sm font-medium text-gray-900">{m.customer.name || m.customer.email || 'Member'}</p>
+                  <p className="text-xs text-gray-500">{m.customer.email || m.customer.phone || ''}{m.unit ? ` · ${m.unit}` : ''}</p>
+                </div>
+                {m.status === 'active' ? (
+                  <select value={m.member_type} onChange={(e) => changeMemberType(m.id, e.target.value)}
+                    className="rounded-lg border border-gray-200 px-2 py-1 text-xs">
+                    {PROPERTY_MEMBER_TYPES.map((t) => <option key={t} value={t}>{PROPERTY_MEMBER_TYPE_LABELS[t]}</option>)}
+                  </select>
+                ) : (
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-500">Revoked</span>
+                )}
+                {m.status === 'active' ? (
+                  <button onClick={() => setMemberStatus(m.id, 'revoked')} className="text-xs text-red-500 hover:underline">Revoke</button>
+                ) : (
+                  <button onClick={() => setMemberStatus(m.id, 'active')} className="text-xs text-brand-600 hover:underline">Restore</button>
+                )}
               </div>
-              <div className="min-w-[160px] flex-1">
-                <p className="text-sm font-medium text-gray-900">{m.customer.name || m.customer.email || 'Member'}</p>
-                <p className="text-xs text-gray-500">{m.customer.email || m.customer.phone || ''}{m.unit ? ` · ${m.unit}` : ''}</p>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Invites list */}
+      {view === 'invites' && (
+        invites.length === 0 ? (
+          <p className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+            No invites yet. Use <strong>Invite resident</strong> to send one by email or SMS.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {invites.map((c) => {
+              const accepted = c.redemption_count > 0;
+              return (
+                <div key={c.id} className={`flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 ${c.is_active || accepted ? 'bg-white' : 'bg-gray-50 opacity-70'}`}>
+                  <span className="text-sm font-medium text-gray-900">{c.email || c.phone}</span>
+                  <span className="rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: `${accent}1A`, color: accent }}>{memberTypeLabel(c.member_type)}</span>
+                  {c.unit && <span className="text-xs text-gray-500">Unit: {c.unit}</span>}
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${accepted ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{accepted ? 'Accepted' : 'Invited'}</span>
+                  {!accepted && <button onClick={() => resendInvite(c.id)} className="ml-auto text-xs font-medium hover:underline" style={{ color: accent }}>Resend</button>}
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {/* Shared codes list */}
+      {view === 'codes' && (
+        sharedCodes.length === 0 ? (
+          <p className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+            No shared codes yet. Use <strong>Create code</strong> to make one for a whole group.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {sharedCodes.map((c) => (
+              <div key={c.id} className={`flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 ${c.is_active ? 'border-gray-200 bg-white' : 'border-gray-200 bg-gray-50 opacity-70'}`}>
+                <button onClick={() => copyCode(c.code)} title="Copy code"
+                  className="rounded-md bg-gray-900 px-3 py-1.5 font-mono text-sm font-semibold text-white hover:bg-gray-700">
+                  {copied === c.code ? 'Copied!' : c.code}
+                </button>
+                <span className="rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: `${accent}1A`, color: accent }}>{memberTypeLabel(c.member_type)}</span>
+                {c.unit && <span className="text-xs text-gray-500">Unit: {c.unit}</span>}
+                {c.label && <span className="text-xs text-gray-400">· {c.label}</span>}
+                <span className="text-xs text-gray-400">{c.redemption_count}{c.max_redemptions ? `/${c.max_redemptions}` : ''} redeemed</span>
+                <button onClick={() => toggleCode(c)} className="ml-auto text-xs font-medium text-gray-500 hover:underline">{c.is_active ? 'Deactivate' : 'Reactivate'}</button>
               </div>
-              {m.status === 'active' ? (
-                <select value={m.member_type} onChange={(e) => changeMemberType(m.id, e.target.value)}
-                  className="rounded-lg border border-gray-200 px-2 py-1 text-xs">
-                  {PROPERTY_MEMBER_TYPES.map((t) => (
-                    <option key={t} value={t}>{PROPERTY_MEMBER_TYPE_LABELS[t]}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-500">Revoked</span>
-              )}
-              {m.status === 'active' ? (
-                <button onClick={() => setMemberStatus(m.id, 'revoked')} className="text-xs text-red-500 hover:underline">Revoke</button>
-              ) : (
-                <button onClick={() => setMemberStatus(m.id, 'active')} className="text-xs text-brand-600 hover:underline">Restore</button>
-              )}
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Invite modal */}
+      {showInvite && (
+        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8" onClick={() => setShowInvite(false)}>
+          <div className="my-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900">Invite a resident</h3>
+            <p className="mt-1 text-xs text-gray-500">Send a single-use code by email or SMS. They verify in the app — instantly active, no approval.</p>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600">Type</label>
+                {TYPE_SELECT(invType, setInvType)}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600">Email</label>
+                <input value={invEmail} onChange={(e) => setInvEmail(e.target.value)} placeholder="resident@email.com" type="email"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-gray-600">Phone</label>
+                  <div className="flex rounded-lg border border-gray-200 p-0.5">
+                    {([['sms', 'SMS'], ['whatsapp', 'WhatsApp']] as const).map(([ch, label]) => (
+                      <button key={ch} type="button" onClick={() => setInvChannel(ch)}
+                        className={`rounded-md px-2.5 py-1 text-xs font-medium ${invChannel === ch ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <input value={invPhone} onChange={(e) => setInvPhone(e.target.value)} placeholder="+382…"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600">Unit <span className="text-gray-400">(optional)</span></label>
+                <input value={invUnit} onChange={(e) => setInvUnit(e.target.value)} placeholder="Villa 12"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+              </div>
+              {inviteMsg && <p className={`text-xs ${inviteMsg.ok ? 'text-green-600' : 'text-red-500'}`}>{inviteMsg.text}</p>}
+              <div className="flex justify-end gap-2 pt-1">
+                <button onClick={() => setShowInvite(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">Close</button>
+                <button onClick={sendInvite} disabled={inviting}
+                  className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                  {inviting ? 'Sending…' : 'Send invite'}
+                </button>
+              </div>
             </div>
-          ))}
+          </div>
+        </div>
+      )}
+
+      {/* Create shared code modal */}
+      {showCode && (
+        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8" onClick={() => setShowCode(false)}>
+          <div className="my-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900">Create a shared code</h3>
+            <p className="mt-1 text-xs text-gray-500">For a whole group (e.g. all homeowners). Anyone who enters it becomes an active member of the chosen type — instantly.</p>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600">Type</label>
+                {TYPE_SELECT(newType, setNewType)}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600">Default unit <span className="text-gray-400">(optional)</span></label>
+                <input value={newUnit} onChange={(e) => setNewUnit(e.target.value)} placeholder="e.g. Villa 12"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600">Note <span className="text-gray-400">(optional)</span></label>
+                <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="e.g. Homeowners 2026"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button onClick={() => setShowCode(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">Cancel</button>
+                <button onClick={createCode} disabled={creating}
+                  className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                  {creating ? 'Creating…' : 'Generate code'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

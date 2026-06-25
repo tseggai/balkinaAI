@@ -23,6 +23,8 @@ export const twilioClient = null as unknown as ReturnType<typeof twilio>;
 export interface SendSmsParams {
   to: string;
   body: string;
+  /** Delivery channel. 'whatsapp' routes via Twilio's WhatsApp sender. */
+  channel?: 'sms' | 'whatsapp';
 }
 
 export interface SmsResult {
@@ -31,14 +33,32 @@ export interface SmsResult {
 }
 
 /**
- * Send an SMS message via Twilio.
+ * Send an SMS or WhatsApp message via Twilio.
+ *
+ * WhatsApp requires a WhatsApp-enabled sender (TWILIO_WHATSAPP_NUMBER, falling
+ * back to TWILIO_PHONE_NUMBER) and — for business-initiated messages outside the
+ * 24h customer-care window — an approved message template.
  */
-export async function sendSms({ to, body }: SendSmsParams): Promise<SmsResult> {
+export async function sendSms({ to, body, channel = 'sms' }: SendSmsParams): Promise<SmsResult> {
+  const client = getTwilioClient();
+
+  if (channel === 'whatsapp') {
+    const waFrom = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER;
+    if (!waFrom) {
+      throw new Error('TWILIO_WHATSAPP_NUMBER not configured');
+    }
+    const message = await client.messages.create({
+      from: waFrom.startsWith('whatsapp:') ? waFrom : `whatsapp:${waFrom}`,
+      to: to.startsWith('whatsapp:') ? to : `whatsapp:${to}`,
+      body,
+    });
+    return { sid: message.sid, status: message.status };
+  }
+
   const from = process.env.TWILIO_PHONE_NUMBER;
   if (!from) {
     throw new Error('TWILIO_PHONE_NUMBER not configured');
   }
-  const client = getTwilioClient();
   const message = await client.messages.create({ from, to, body });
   return { sid: message.sid, status: message.status };
 }

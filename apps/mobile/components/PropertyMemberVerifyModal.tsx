@@ -82,7 +82,7 @@ export default function PropertyMemberVerifyModal({
               </View>
               <Text style={styles.title}>You're verified</Text>
               <Text style={styles.subtitle}>{success}</Text>
-              <TouchableOpacity style={[styles.submit, { backgroundColor: accent, marginTop: 20 }]} onPress={close} activeOpacity={0.9}>
+              <TouchableOpacity style={[styles.submit, { backgroundColor: accent, marginTop: 20, alignSelf: 'stretch' }]} onPress={close} activeOpacity={0.9}>
                 <Text style={styles.submitText}>Done</Text>
               </TouchableOpacity>
             </View>
