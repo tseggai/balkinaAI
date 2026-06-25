@@ -24,16 +24,19 @@ interface Props {
   isLoggedIn: boolean;
   customerName: string | null;
   customerEmail: string | null;
+  /** Resident badge text, e.g. "Homeowner · Villa 12". Null when not a member. */
+  membershipLabel?: string | null;
   onClose: () => void;
   onBookings: () => void;
   onProfile: () => void;
+  onVerifyResidence?: () => void;
   onSignIn: () => void;
   onSignOut: () => void;
 }
 
 export default function PropertyAccountDrawer({
-  visible, accent, isLoggedIn, customerName, customerEmail,
-  onClose, onBookings, onProfile, onSignIn, onSignOut,
+  visible, accent, isLoggedIn, customerName, customerEmail, membershipLabel,
+  onClose, onBookings, onProfile, onVerifyResidence, onSignIn, onSignOut,
 }: Props) {
   const slide = useRef(new Animated.Value(DRAWER_W)).current;
   const fade = useRef(new Animated.Value(0)).current;
@@ -96,6 +99,22 @@ export default function PropertyAccountDrawer({
             <View style={styles.menu}>
               <MenuItem icon="calendar-outline" label="My Bookings" onPress={() => { close(); setTimeout(onBookings, 220); }} />
               <MenuItem icon="person-outline" label="My Profile" onPress={() => { close(); setTimeout(onProfile, 220); }} />
+              {isLoggedIn && onVerifyResidence ? (
+                membershipLabel ? (
+                  <View style={styles.memberRow}>
+                    <Ionicons name="shield-checkmark" size={22} color={accent} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.memberLabel}>{membershipLabel}</Text>
+                      <Text style={styles.memberSub}>Verified resident</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => { close(); setTimeout(onVerifyResidence, 220); }} hitSlop={8}>
+                      <Text style={[styles.memberAction, { color: accent }]}>Update</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <MenuItem icon="shield-checkmark-outline" label="Verify your residence" onPress={() => { close(); setTimeout(onVerifyResidence, 220); }} />
+                )
+              ) : null}
             </View>
 
             <View style={{ flex: 1 }} />
@@ -145,6 +164,10 @@ const styles = StyleSheet.create({
   menu: { paddingTop: 8 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 22, paddingVertical: 17, borderBottomWidth: 1, borderBottomColor: HAIRLINE },
   menuLabel: { fontSize: 16, fontWeight: '600', color: INK },
+  memberRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 22, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: HAIRLINE },
+  memberLabel: { fontSize: 15, fontWeight: '700', color: INK },
+  memberSub: { fontSize: 12, color: MUTED, marginTop: 1 },
+  memberAction: { fontSize: 13, fontWeight: '700' },
 
   footer: { padding: 20, borderTopWidth: 1, borderTopColor: HAIRLINE },
   signOut: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },

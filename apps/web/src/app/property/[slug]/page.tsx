@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { ImageUpload } from '@/components/image-upload';
 import { DateTimeField } from '@/components/datetime-field';
 import { PropertyDashboardShell } from '@/components/property-dashboard-shell';
+import { PROPERTY_MEMBER_TYPES, PROPERTY_MEMBER_TYPE_LABELS, memberTypeLabel, isResidentType } from '@balkina/shared';
 
 interface Property {
   id: string;
@@ -260,6 +261,11 @@ export default function PropertyDashboard() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Members */}
+      {tab === 'members' && (
+        <MembersSection slug={slug} accent={property?.primary_color ?? '#6B7FC4'} />
       )}
 
       {/* Messages */}
@@ -1131,6 +1137,190 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
               )}
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface MemberCode {
+  id: string; code: string; member_type: string; unit: string | null; label: string | null;
+  max_redemptions: number | null; redemption_count: number; expires_at: string | null; is_active: boolean;
+}
+interface MemberRow {
+  id: string; member_type: string; unit: string | null; status: string; verified_at: string;
+  customer: { name: string | null; email: string | null; phone: string | null };
+}
+
+function MembersSection({ slug, accent }: { slug: string; accent: string }) {
+  const [codes, setCodes] = useState<MemberCode[]>([]);
+  const [members, setMembers] = useState<MemberRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newType, setNewType] = useState<string>('homeowner');
+  const [newUnit, setNewUnit] = useState('');
+  const [newLabel, setNewLabel] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    const [cRes, mRes] = await Promise.all([
+      fetch(`/api/property/${slug}/members/codes`),
+      fetch(`/api/property/${slug}/members`),
+    ]);
+    const cJson = await cRes.json().catch(() => ({}));
+    const mJson = await mRes.json().catch(() => ({}));
+    setCodes(cJson.data ?? []);
+    setMembers(mJson.data ?? []);
+    setLoading(false);
+  }, [slug]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const createCode = async () => {
+    setCreating(true);
+    await fetch(`/api/property/${slug}/members/codes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_type: newType, unit: newUnit.trim() || null, label: newLabel.trim() || null }),
+    });
+    setNewUnit(''); setNewLabel('');
+    await fetchAll();
+    setCreating(false);
+  };
+
+  const toggleCode = async (c: MemberCode) => {
+    await fetch(`/api/property/${slug}/members/codes`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: c.id, is_active: !c.is_active }),
+    });
+    fetchAll();
+  };
+
+  const copyCode = (code: string) => {
+    navigator.clipboard?.writeText(code).then(() => {
+      setCopied(code);
+      setTimeout(() => setCopied((cur) => (cur === code ? null : cur)), 1500);
+    }).catch(() => {});
+  };
+
+  const changeMemberType = async (id: string, member_type: string) => {
+    await fetch(`/api/property/${slug}/members`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, member_type }),
+    });
+    fetchAll();
+  };
+
+  const setMemberStatus = async (id: string, status: 'active' | 'revoked') => {
+    if (status === 'revoked' && !confirm('Revoke this member? They lose resident access until they re-verify.')) return;
+    await fetch(`/api/property/${slug}/members`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status }),
+    });
+    fetchAll();
+  };
+
+  if (loading) return <div className="text-center py-10 text-gray-500">Loading members...</div>;
+
+  const activeCount = members.filter((m) => m.status === 'active').length;
+  const residentCount = members.filter((m) => m.status === 'active' && isResidentType(m.member_type)).length;
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold text-gray-900">Members</h2>
+      <p className="mt-1 text-sm text-gray-500">
+        Flag your residents — homeowners, renters and commercial owners — by handing them a code. They verify once in
+        the app and unlock resident-only announcements and access. <strong className="text-gray-700">{activeCount}</strong> active
+        {' '}({residentCount} residents).
+      </p>
+
+      {/* Create a code */}
+      <div className="mt-5 rounded-lg border border-gray-200 bg-white p-4">
+        <h3 className="text-sm font-semibold text-gray-900">Issue a member code</h3>
+        <p className="mt-1 text-xs text-gray-500">Anyone who enters this code in the app becomes an active member of the chosen type — instantly. Rotate or deactivate it any time.</p>
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <div>
+            <label className="block text-xs font-medium text-gray-600">Type</label>
+            <select value={newType} onChange={(e) => setNewType(e.target.value)}
+              className="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              {PROPERTY_MEMBER_TYPES.map((t) => (
+                <option key={t} value={t}>{PROPERTY_MEMBER_TYPE_LABELS[t]}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600">Default unit <span className="text-gray-400">(optional)</span></label>
+            <input value={newUnit} onChange={(e) => setNewUnit(e.target.value)} placeholder="e.g. Villa 12"
+              className="mt-1 w-36 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+          </div>
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-xs font-medium text-gray-600">Note <span className="text-gray-400">(optional)</span></label>
+            <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="e.g. Homeowners 2026"
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+          </div>
+          <button onClick={createCode} disabled={creating}
+            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+            {creating ? 'Creating...' : 'Generate code'}
+          </button>
+        </div>
+      </div>
+
+      {/* Codes list */}
+      {codes.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {codes.map((c) => (
+            <div key={c.id} className={`flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 ${c.is_active ? 'border-gray-200 bg-white' : 'border-gray-200 bg-gray-50 opacity-70'}`}>
+              <button onClick={() => copyCode(c.code)} title="Copy code"
+                className="rounded-md bg-gray-900 px-3 py-1.5 font-mono text-sm font-semibold text-white hover:bg-gray-700">
+                {copied === c.code ? 'Copied!' : c.code}
+              </button>
+              <span className="rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: `${accent}1A`, color: accent }}>
+                {memberTypeLabel(c.member_type)}
+              </span>
+              {c.unit && <span className="text-xs text-gray-500">Unit: {c.unit}</span>}
+              {c.label && <span className="text-xs text-gray-400">· {c.label}</span>}
+              <span className="text-xs text-gray-400">{c.redemption_count}{c.max_redemptions ? `/${c.max_redemptions}` : ''} redeemed</span>
+              <button onClick={() => toggleCode(c)} className="ml-auto text-xs font-medium text-gray-500 hover:underline">
+                {c.is_active ? 'Deactivate' : 'Reactivate'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Members list */}
+      <h3 className="mt-8 text-sm font-semibold text-gray-900">Verified members ({activeCount})</h3>
+      {members.length === 0 ? (
+        <p className="mt-2 text-sm text-gray-500">No one has verified yet. Share a code above to get started.</p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {members.map((m) => (
+            <div key={m.id} className={`flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3 ${m.status === 'revoked' ? 'opacity-60' : ''}`}>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: `${accent}1A`, color: accent }}>
+                {(m.customer.name || m.customer.email || '?').charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-[160px] flex-1">
+                <p className="text-sm font-medium text-gray-900">{m.customer.name || m.customer.email || 'Member'}</p>
+                <p className="text-xs text-gray-500">{m.customer.email || m.customer.phone || ''}{m.unit ? ` · ${m.unit}` : ''}</p>
+              </div>
+              {m.status === 'active' ? (
+                <select value={m.member_type} onChange={(e) => changeMemberType(m.id, e.target.value)}
+                  className="rounded-lg border border-gray-200 px-2 py-1 text-xs">
+                  {PROPERTY_MEMBER_TYPES.map((t) => (
+                    <option key={t} value={t}>{PROPERTY_MEMBER_TYPE_LABELS[t]}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-500">Revoked</span>
+              )}
+              {m.status === 'active' ? (
+                <button onClick={() => setMemberStatus(m.id, 'revoked')} className="text-xs text-red-500 hover:underline">Revoke</button>
+              ) : (
+                <button onClick={() => setMemberStatus(m.id, 'active')} className="text-xs text-brand-600 hover:underline">Restore</button>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

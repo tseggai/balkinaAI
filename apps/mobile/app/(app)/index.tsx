@@ -34,6 +34,8 @@ import PropertyStorefront, { StorefrontTenant } from '@/components/PropertyStore
 import PropertyBookingFlow, { BookingService } from '@/components/PropertyBookingFlow';
 import PropertyBusinessPage, { BusinessSummary } from '@/components/PropertyBusinessPage';
 import PropertyAccountDrawer from '@/components/PropertyAccountDrawer';
+import PropertyMemberVerifyModal from '@/components/PropertyMemberVerifyModal';
+import { memberTypeLabel } from '@balkina/shared';
 import { Campaign } from '@/components/PropertyCampaignDetail';
 import { BootSplash } from '@/lib/bootSplash';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
@@ -1463,6 +1465,9 @@ export default function ChatScreen() {
   const [bookingTarget, setBookingTarget] = useState<{ tenantId: string; businessName: string; service: BookingService | null; extras?: string[]; packageName?: string; addOnTotal?: number } | null>(null);
   const [businessTarget, setBusinessTarget] = useState<{ summary: BusinessSummary; initialServiceId?: string } | null>(null);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
+  // Property membership (resident flag), shown in the account drawer.
+  const [membership, setMembership] = useState<{ member_type: string; unit: string | null } | null>(null);
+  const [verifyOpen, setVerifyOpen] = useState(false);
   // True while the white-label property is still loading, so we never flash the
   // generic Balkina welcome before the branded storefront appears.
   const [propertyLoading, setPropertyLoading] = useState<boolean>(!!propertySlug);
@@ -1560,6 +1565,27 @@ export default function ChatScreen() {
     };
     fetchLocation();
   }, []);
+
+  // Property membership (resident flag) for the account drawer badge.
+  useEffect(() => {
+    if (!propertySlug || !userId) { setMembership(null); return; }
+    let active = true;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(`${API_BASE}/api/member/status?slug=${propertySlug}&userId=${userId}`, {
+          headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+        });
+        const json = await res.json().catch(() => ({}));
+        if (active) setMembership(json.data ?? null);
+      } catch { /* ignore */ }
+    })();
+    return () => { active = false; };
+  }, [propertySlug, userId]);
+
+  const membershipLabel = membership
+    ? `${memberTypeLabel(membership.member_type)}${membership.unit ? ` · ${membership.unit}` : ''}`
+    : null;
 
   // Realtime subscription: update confirmed cards when appointment status changes
   useEffect(() => {
@@ -2727,11 +2753,23 @@ export default function ChatScreen() {
             isLoggedIn={!!userId}
             customerName={customerName}
             customerEmail={customerEmail}
+            membershipLabel={membershipLabel}
             onClose={() => setAccountDrawerOpen(false)}
             onBookings={() => (userId ? router.navigate('/(app)/bookings') : router.navigate('/(auth)/email-login'))}
             onProfile={() => (userId ? router.navigate('/(app)/profile') : router.navigate('/(auth)/email-login'))}
+            onVerifyResidence={() => setVerifyOpen(true)}
             onSignIn={() => router.navigate('/(auth)/email-login')}
             onSignOut={() => { void supabase.auth.signOut(); }}
+          />
+          <PropertyMemberVerifyModal
+            visible={verifyOpen}
+            accent={propertyData.primary_color}
+            propertyName={propertyData.name}
+            propertySlug={propertySlug ?? ''}
+            apiBase={API_BASE}
+            current={membership}
+            onClose={() => setVerifyOpen(false)}
+            onVerified={(m) => setMembership(m)}
           />
           <PropertyBusinessPage
             visible={!!businessTarget}
