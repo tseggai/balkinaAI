@@ -1216,6 +1216,7 @@ function MessagesSection({ slug, tenants }: { slug: string; tenants: PropertyTen
 interface MemberCode {
   id: string; code: string; member_type: string; unit: string | null; label: string | null;
   max_redemptions: number | null; redemption_count: number; expires_at: string | null; is_active: boolean;
+  email: string | null; phone: string | null; sent_at: string | null;
 }
 interface MemberRow {
   id: string; member_type: string; unit: string | null; status: string; verified_at: string;
@@ -1231,6 +1232,14 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
   const [newLabel, setNewLabel] = useState('');
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+
+  // Per-person invite form.
+  const [invType, setInvType] = useState<string>('homeowner');
+  const [invEmail, setInvEmail] = useState('');
+  const [invPhone, setInvPhone] = useState('');
+  const [invUnit, setInvUnit] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -1267,6 +1276,30 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
     fetchAll();
   };
 
+  const sendInvite = async () => {
+    if (!invEmail.trim() && !invPhone.trim()) { setInviteMsg({ ok: false, text: 'Enter an email or phone number.' }); return; }
+    setInviting(true);
+    setInviteMsg(null);
+    const res = await fetch(`/api/property/${slug}/members/invites`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_type: invType, email: invEmail.trim() || null, phone: invPhone.trim() || null, unit: invUnit.trim() || null }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setInviting(false);
+    if (!res.ok) { setInviteMsg({ ok: false, text: json.error ?? 'Could not send invite.' }); return; }
+    const ch = [json.delivery?.email && 'email', json.delivery?.sms && 'SMS'].filter(Boolean).join(' & ');
+    setInviteMsg({ ok: true, text: ch ? `Invite sent by ${ch}.` : 'Invite created, but delivery failed — check the contact details.' });
+    setInvEmail(''); setInvPhone(''); setInvUnit('');
+    fetchAll();
+  };
+
+  const resendInvite = async (id: string) => {
+    await fetch(`/api/property/${slug}/members/invites`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resendId: id }),
+    });
+    fetchAll();
+  };
+
   const copyCode = (code: string) => {
     navigator.clipboard?.writeText(code).then(() => {
       setCopied(code);
@@ -1295,6 +1328,9 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
 
   const activeCount = members.filter((m) => m.status === 'active').length;
   const residentCount = members.filter((m) => m.status === 'active' && isResidentType(m.member_type)).length;
+  // A code bound to an email/phone is a personal invite; the rest are shared codes.
+  const invites = codes.filter((c) => c.email || c.phone);
+  const sharedCodes = codes.filter((c) => !c.email && !c.phone);
 
   return (
     <div>
@@ -1305,10 +1341,72 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
         {' '}({residentCount} residents).
       </p>
 
-      {/* Create a code */}
+      {/* Invite a specific person by email / SMS */}
       <div className="mt-5 rounded-lg border border-gray-200 bg-white p-4">
-        <h3 className="text-sm font-semibold text-gray-900">Issue a member code</h3>
-        <p className="mt-1 text-xs text-gray-500">Anyone who enters this code in the app becomes an active member of the chosen type — instantly. Rotate or deactivate it any time.</p>
+        <h3 className="text-sm font-semibold text-gray-900">Invite a resident</h3>
+        <p className="mt-1 text-xs text-gray-500">Send a single-use code to one person by email or SMS. They tap into the app and verify — instantly active, no approval.</p>
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <div>
+            <label className="block text-xs font-medium text-gray-600">Type</label>
+            <select value={invType} onChange={(e) => setInvType(e.target.value)}
+              className="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              {PROPERTY_MEMBER_TYPES.map((t) => (
+                <option key={t} value={t}>{PROPERTY_MEMBER_TYPE_LABELS[t]}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[160px]">
+            <label className="block text-xs font-medium text-gray-600">Email</label>
+            <input value={invEmail} onChange={(e) => setInvEmail(e.target.value)} placeholder="resident@email.com" type="email"
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+          </div>
+          <div className="min-w-[140px]">
+            <label className="block text-xs font-medium text-gray-600">Phone <span className="text-gray-400">(SMS)</span></label>
+            <input value={invPhone} onChange={(e) => setInvPhone(e.target.value)} placeholder="+382…"
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+          </div>
+          <div className="min-w-[110px]">
+            <label className="block text-xs font-medium text-gray-600">Unit <span className="text-gray-400">(opt.)</span></label>
+            <input value={invUnit} onChange={(e) => setInvUnit(e.target.value)} placeholder="Villa 12"
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+          </div>
+          <button onClick={sendInvite} disabled={inviting}
+            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+            {inviting ? 'Sending…' : 'Send invite'}
+          </button>
+        </div>
+        {inviteMsg && <p className={`mt-2 text-xs ${inviteMsg.ok ? 'text-green-600' : 'text-red-500'}`}>{inviteMsg.text}</p>}
+      </div>
+
+      {/* Invites list */}
+      {invites.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <h3 className="text-sm font-semibold text-gray-900">Invites ({invites.length})</h3>
+          {invites.map((c) => {
+            const accepted = c.redemption_count > 0;
+            return (
+              <div key={c.id} className={`flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 ${c.is_active || accepted ? 'bg-white' : 'bg-gray-50 opacity-70'}`}>
+                <span className="text-sm font-medium text-gray-900">{c.email || c.phone}</span>
+                <span className="rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: `${accent}1A`, color: accent }}>
+                  {memberTypeLabel(c.member_type)}
+                </span>
+                {c.unit && <span className="text-xs text-gray-500">Unit: {c.unit}</span>}
+                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${accepted ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {accepted ? 'Accepted' : 'Invited'}
+                </span>
+                {!accepted && (
+                  <button onClick={() => resendInvite(c.id)} className="ml-auto text-xs font-medium hover:underline" style={{ color: accent }}>Resend</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create a shared code */}
+      <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
+        <h3 className="text-sm font-semibold text-gray-900">Issue a shared code</h3>
+        <p className="mt-1 text-xs text-gray-500">For a whole group (e.g. all homeowners). Anyone who enters it becomes an active member of the chosen type — instantly. Rotate or deactivate it any time.</p>
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <div>
             <label className="block text-xs font-medium text-gray-600">Type</label>
@@ -1336,10 +1434,10 @@ function MembersSection({ slug, accent }: { slug: string; accent: string }) {
         </div>
       </div>
 
-      {/* Codes list */}
-      {codes.length > 0 && (
+      {/* Shared codes list */}
+      {sharedCodes.length > 0 && (
         <div className="mt-4 space-y-2">
-          {codes.map((c) => (
+          {sharedCodes.map((c) => (
             <div key={c.id} className={`flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 ${c.is_active ? 'border-gray-200 bg-white' : 'border-gray-200 bg-gray-50 opacity-70'}`}>
               <button onClick={() => copyCode(c.code)} title="Copy code"
                 className="rounded-md bg-gray-900 px-3 py-1.5 font-mono text-sm font-semibold text-white hover:bg-gray-700">
