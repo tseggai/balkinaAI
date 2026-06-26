@@ -52,6 +52,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        # eas build evaluates the app config locally before uploading, which needs
+        # node_modules to resolve config plugins (e.g. expo-router) in this monorepo.
+        run: npm ci --legacy-peer-deps
 
       - name: Set up EAS
         uses: expo/expo-github-action@v8
@@ -62,6 +68,7 @@ jobs:
       - name: Build & submit
         working-directory: apps/mobile
         env:
+          EAS_BUILD_NO_EXPO_GO_WARNING: "true"
           # Empty on a tag push (no inputs) → defaults applied below.
           INPUT_PROFILE: ${{ inputs.profile }}
           INPUT_PLATFORM: ${{ inputs.platform }}
