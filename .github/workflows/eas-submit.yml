@@ -1,0 +1,84 @@
+name: Mobile — EAS build & submit
+
+# Two triggers:
+#  - Push a release tag (v1.2.0, v1.2.1, …) → production iOS build + App Store submit.
+#  - Manual run (Actions → Run workflow) → choose profile / platform / variant / submit.
+# iOS submit uses the App Store Connect API key stored in EAS; Android submit uses
+# a Google Play service account in EAS. See docs/releases/ci-eas-submit.md.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        type: choice
+        default: production
+        options:
+          - production
+          - preview
+          - preview-portonovi
+      platform:
+        description: Platform to build
+        type: choice
+        default: ios
+        options:
+          - ios
+          - android
+          - all
+      variant:
+        description: "APP_VARIANT white-label slug (leave blank for base Balkina AI)"
+        type: string
+        default: ""
+      submit:
+        description: Submit to the store after building
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: eas-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: EAS build & submit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build & submit
+        working-directory: apps/mobile
+        env:
+          # Empty on a tag push (no inputs) → defaults applied below.
+          INPUT_PROFILE: ${{ inputs.profile }}
+          INPUT_PLATFORM: ${{ inputs.platform }}
+          INPUT_SUBMIT: ${{ inputs.submit }}
+          # White-label variant is read by app.config.js. Blank = base Balkina AI.
+          APP_VARIANT: ${{ inputs.variant }}
+        run: |
+          set -euo pipefail
+          # A tag push is a production iOS App Store release by default.
+          PROFILE="${INPUT_PROFILE:-production}"
+          PLATFORM="${INPUT_PLATFORM:-ios}"
+          SUBMIT="${INPUT_SUBMIT:-true}"
+          EXTRA=""
+          if [ "$SUBMIT" = "true" ]; then EXTRA="--auto-submit"; fi
+          echo "profile=$PROFILE platform=$PLATFORM submit=$SUBMIT variant=${APP_VARIANT:-<base>}"
+          eas build \
+            --non-interactive \
+            --profile "$PROFILE" \
+            --platform "$PLATFORM" \
+            $EXTRA
