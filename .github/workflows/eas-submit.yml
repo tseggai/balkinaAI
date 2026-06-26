@@ -1,0 +1,70 @@
+name: Mobile — EAS build & submit
+
+# Manual release trigger. Builds the Expo app on EAS and (optionally) submits it
+# to the store. iOS submit uses the App Store Connect API key stored in EAS
+# (see docs/releases/ci-eas-submit.md for one-time setup).
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        type: choice
+        default: production
+        options:
+          - production
+          - preview
+          - preview-portonovi
+      platform:
+        description: Platform to build
+        type: choice
+        default: ios
+        options:
+          - ios
+          - android
+          - all
+      variant:
+        description: "APP_VARIANT white-label slug (leave blank for base Balkina AI)"
+        type: string
+        default: ""
+      submit:
+        description: Submit to the store after building
+        type: boolean
+        default: true
+
+concurrency:
+  group: eas-${{ github.ref }}-${{ inputs.profile }}-${{ inputs.platform }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: EAS build & submit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build${{ inputs.submit && ' and submit' || '' }}
+        working-directory: apps/mobile
+        env:
+          # White-label variant selection is read by app.config.js. Blank = base app.
+          APP_VARIANT: ${{ inputs.variant }}
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [ "${{ inputs.submit }}" = "true" ]; then EXTRA="--auto-submit"; fi
+          eas build \
+            --non-interactive \
+            --profile "${{ inputs.profile }}" \
+            --platform "${{ inputs.platform }}" \
+            $EXTRA
