@@ -1,5 +1,16 @@
 # CI: EAS build & submit
 
+## Status / next action items
+- [x] **iOS build + submit** — signing creds + App Store Connect API key in EAS.
+- [ ] **Play submit (Android)** — convert the Play account Personal → **Organization**
+      using the deBreeze Interactive, LLC **D‑U‑N‑S** (in progress), then: create a
+      Google Play **service account**, register its JSON in EAS, and do the
+      one-time manual internal upload (§3a–3b). Unblocks `eas submit` for Android.
+- [ ] **Android push** — set up **FCM V1**: Firebase Android app
+      (`com.tseggaid.balkinaai`) + `google-services.json` (+ `expo.android.googleServicesFile`)
+      and upload the FCM V1 service-account key to EAS (§3c). Without it, resident /
+      campaign / booking push won't deliver on Android (iOS push already works).
+
 The **Mobile — EAS build & submit** workflow (`.github/workflows/eas-submit.yml`)
 builds the Expo app on EAS and optionally submits it to the store. Two ways to
 run it:
