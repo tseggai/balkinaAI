@@ -239,7 +239,8 @@ The /api/chat endpoint accepts tenantId as OPTIONAL. When no tenantId is provide
 - Once user picks a business, proceeds with normal booking flow
 
 ## Deployment
-- **Tenant Panel (apps/web)**: Deployed to Vercel as `balkina-ai` project. Live at balkina-ai.vercel.app.
+- **Marketing site (apps/marketing)**: Serves the root domain **balkina.ai** (separate Vercel project, root directory `apps/marketing`). Public pages: landing, pricing, `/b/<business>` web booking, `/p/` property portals (custom domains), `/deck` pitch deck.
+- **Tenant Panel (apps/web)**: Deployed to Vercel as `balkina-ai` project. Live at **app.balkina.ai** (also balkina-ai.vercel.app).
 - **Admin Panel (apps/admin)**: Deployed to Vercel as a separate project, root directory `apps/admin`. Env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_MAPS_API_KEY`.
 
 ## When Stuck

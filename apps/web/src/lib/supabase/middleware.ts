@@ -41,8 +41,6 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/api/') ||
     pathname.startsWith('/widget/') ||
     pathname.startsWith('/pay/') ||
-    pathname === '/deck' ||
-    pathname === '/deck.html' ||
     pathname === '/';
 
   // Redirect helper that copies Set-Cookie headers from supabaseResponse
