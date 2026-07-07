@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balkina AI — White-Label for Property Owners</title>
+</head>
+<body>
+<style>
+  :root{
+    --ink:#0B131F;
+    --panel:#111D2E;
+    --panel-2:#0E1826;
+    --ivory:#F2EDE2;
+    --ivory-dim:#CDC8BC;
+    --slate:#8C97A6;
+    --gold:#C5A55F;
+    --gold-soft:rgba(197,165,95,.38);
+    --gold-faint:rgba(197,165,95,.14);
+    --hairline:rgba(242,237,226,.12);
+    --display:"Didot","Bodoni MT","Bodoni 72",Georgia,"Times New Roman",serif;
+    --body:"Optima","Gill Sans","Gill Sans MT","Avenir Next","Segoe UI",system-ui,sans-serif;
+  }
+  html,body{height:100%;}
+  body{
+    margin:0;background:var(--ink);color:var(--ivory);
+    font-family:var(--body);font-size:25px;line-height:1.55;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* ---------- deck chrome ---------- */
+  .progress{position:fixed;top:0;left:0;height:2px;background:var(--gold);width:0%;z-index:40;transition:width .5s ease;}
+  .chrome{
+    position:fixed;left:0;right:0;bottom:0;z-index:40;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 34px;pointer-events:none;
+  }
+  .wordmark{font-family:var(--body);font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--slate);}
+  .wordmark b{color:var(--gold);font-weight:600;}
+  .nav{display:flex;align-items:center;gap:18px;pointer-events:auto;}
+  .counter{font-size:11px;letter-spacing:.28em;color:var(--slate);font-variant-numeric:tabular-nums;}
+  .counter b{color:var(--gold);font-weight:600;}
+  .arrow{
+    background:none;border:1px solid var(--hairline);color:var(--ivory-dim);
+    width:42px;height:42px;border-radius:50%;cursor:pointer;font-size:16px;line-height:1;
+    transition:border-color .25s,color .25s;
+  }
+  .arrow:hover{border-color:var(--gold);color:var(--gold);}
+  .arrow:focus-visible{outline:2px solid var(--gold);outline-offset:3px;}
+  /* ---------- slides ---------- */
+  .slide{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    padding:72px 8vw 96px;box-sizing:border-box;
+    opacity:0;visibility:hidden;transform:translateY(14px);
+    transition:opacity .6s ease,transform .6s ease,visibility 0s linear .6s;
+  }
+  .slide.active{opacity:1;visibility:visible;transform:none;transition:opacity .6s ease,transform .6s ease;}
+  .inner{width:min(1060px,100%);}
+  .eyebrow{
+    font-size:11px;letter-spacing:.36em;text-transform:uppercase;color:var(--gold);
+    margin:0 0 26px;font-weight:600;
+  }
+  .eyebrow::after{content:"";display:block;width:52px;height:1px;background:var(--gold-soft);margin-top:14px;}
+  h1,h2{font-family:var(--display);font-weight:400;letter-spacing:.005em;text-wrap:balance;margin:0;}
+  h1{font-size:clamp(42px,6.2vw,84px);line-height:1.04;}
+  h2{font-size:clamp(34px,4.6vw,60px);line-height:1.08;}
+  .lede{font-size:clamp(20px,1.9vw,27px);color:var(--ivory);max-width:34em;margin:26px 0 0;}
+  .kicker{
+    margin-top:40px;padding-top:24px;border-top:1px solid var(--hairline);
+    font-family:var(--display);font-style:italic;font-size:clamp(26px,2.6vw,36px);color:var(--gold);
+    max-width:30em;text-wrap:balance;
+  }
+  .muted{color:var(--slate);}
+  em.gd{font-style:italic;color:var(--gold);}
+  /* two-column slide bodies */
+  .cols{display:grid;grid-template-columns:1.1fr .9fr;gap:64px;align-items:center;margin-top:8px;}
+  .points{list-style:none;margin:34px 0 0;padding:0;display:flex;flex-direction:column;gap:22px;}
+  .points li{padding-left:26px;position:relative;color:var(--ivory);max-width:32em;font-size:clamp(19px,1.7vw,24px);}
+  .points li::before{content:"";position:absolute;left:0;top:.72em;width:12px;height:1px;background:var(--gold);}
+  .points li strong{color:var(--ivory);font-weight:600;}
+  /* premise inline list */
+  .catalogue{margin-top:38px;display:flex;flex-wrap:wrap;gap:12px 0;font-size:12px;letter-spacing:.26em;text-transform:uppercase;color:var(--slate);}
+  .catalogue span{white-space:nowrap;}
+  .catalogue span+span::before{content:"·";color:var(--gold);margin:0 16px;}
+  /* gaps slide */
+  .gaps{display:grid;grid-template-columns:repeat(3,1fr);gap:40px;margin-top:46px;}
+  .gap .n{font-family:var(--display);font-size:15px;color:var(--gold);letter-spacing:.2em;}
+  .gap h3{font-family:var(--display);font-weight:700;font-size:clamp(26px,2.6vw,34px);margin:10px 0 12px;}
+  .gap p{margin:0;color:var(--ivory);font-size:clamp(18px,1.6vw,22px);}
+  /* thesis cards */
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:44px;}
+  .card{
+    background:var(--panel);border:1px solid var(--hairline);padding:34px 34px 30px;
+    display:flex;flex-direction:column;gap:12px;
+  }
+  .card .rn{font-family:var(--display);font-size:30px;color:var(--gold);line-height:1;}
+  .card h3{font-family:var(--display);font-weight:700;font-size:clamp(28px,2.6vw,34px);margin:2px 0 0;}
+  .card p{margin:0;color:var(--ivory);font-size:clamp(18px,1.6vw,22px);}
+  /* dividers */
+  .divider{text-align:center;position:relative;}
+  .divider .big{
+    font-family:var(--display);font-size:clamp(110px,16vw,190px);line-height:.9;color:transparent;
+    -webkit-text-stroke:1.5px var(--gold);
+    display:block;margin:0 auto 30px;user-select:none;
+  }
+  .divider .chapter{font-size:11px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold);margin-bottom:26px;font-weight:600;}
+  .divider h2{font-size:clamp(38px,5.4vw,70px);}
+  .divider .lede{margin:24px auto 0;}
+  /* chat mock */
+  .chat{display:flex;flex-direction:column;gap:14px;}
+  .bubble{max-width:88%;padding:16px 20px;font-size:19px;line-height:1.55;border:1px solid var(--hairline);}
+  .bubble.guest{align-self:flex-end;background:var(--gold);color:#151004;border-color:transparent;border-radius:18px 18px 4px 18px;}
+  .bubble.concierge{align-self:flex-start;background:var(--panel);color:var(--ivory);border-radius:18px 18px 18px 4px;}
+  .bubble .who{display:block;font-size:10px;letter-spacing:.3em;text-transform:uppercase;margin-bottom:6px;opacity:.75;}
+  .slide .chat .bubble{opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease;}
+  .slide.active .chat .bubble{opacity:1;transform:none;}
+  .slide.active .chat .bubble:nth-child(1){transition-delay:.5s;}
+  .slide.active .chat .bubble:nth-child(2){transition-delay:1.15s;}
+  .slide.active .chat .bubble:nth-child(3){transition-delay:1.8s;}
+  /* comparison */
+  .compare{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:44px;}
+  .option{border:1px solid var(--hairline);padding:30px 28px;background:var(--panel-2);}
+  .option.best{border-color:var(--gold-soft);background:var(--panel);position:relative;}
+  .option.best::before{
+    content:"THE BALKINA WAY";position:absolute;top:-16px;left:24px;background:var(--ivory);
+    padding:5px 14px;font-size:13px;letter-spacing:.24em;color:var(--ink);font-weight:700;
+  }
+  .option h3{font-family:var(--display);font-weight:700;font-size:clamp(27px,2.4vw,32px);margin:0 0 16px;}
+  .option ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;font-size:clamp(17px,1.5vw,20px);color:var(--ivory);}
+  .option.best ul{color:var(--ivory);}
+  .option li{padding-left:18px;position:relative;}
+  .option li::before{content:"—";position:absolute;left:0;color:var(--gold-soft);}
+  .option.best li::before{color:var(--gold);}
+  /* pricing + timeline */
+  .plans{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:40px;}
+  .plan{border:1px solid var(--hairline);padding:26px 24px 24px;background:var(--panel-2);}
+  .plan.hi{border-color:var(--gold-soft);background:var(--panel);}
+  .plan .name{font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--gold);font-weight:600;}
+  .plan .price{font-family:var(--display);font-size:clamp(30px,3vw,40px);margin:12px 0 2px;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .plan .price small{font-family:var(--body);font-size:14px;color:var(--slate);letter-spacing:.06em;}
+  .plan p{margin:8px 0 0;color:var(--ivory);font-size:clamp(16px,1.3vw,19px);}
+  .timeline{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:38px;padding-top:30px;border-top:1px solid var(--hairline);}
+  .week .w{font-size:10.5px;letter-spacing:.32em;color:var(--gold);text-transform:uppercase;font-weight:600;}
+  .week h4{font-family:var(--display);font-weight:400;font-size:20px;margin:8px 0 6px;}
+  .week p{margin:0;color:var(--ivory);font-size:17px;}
+  /* CTA */
+  .cta-row{display:flex;gap:18px;margin-top:44px;flex-wrap:wrap;}
+  .btn{
+    display:inline-block;padding:15px 34px;font-size:12px;letter-spacing:.3em;text-transform:uppercase;
+    text-decoration:none;font-weight:600;
+  }
+  .btn.gold{background:var(--gold);color:#151004;}
+  .btn.line{border:1px solid var(--gold-soft);color:var(--gold);}
+  .btn:focus-visible{outline:2px solid var(--gold);outline-offset:3px;}
+  /* cover flourishes */
+  .cover-mark{font-size:12px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold);margin-bottom:34px;font-weight:600;}
+  .cover-rule{width:64px;height:1px;background:var(--gold-soft);margin:38px 0;}
+  .cover-sub{color:var(--ivory);max-width:36em;font-size:clamp(19px,1.7vw,25px);}
+  /* responsive */
+  @media (max-width:900px){
+    body{overflow:auto;}
+    .slide{position:static;min-height:100svh;opacity:1;visibility:visible;transform:none;padding:72px 7vw;}
+    .cols,.duo,.gaps,.compare,.plans,.timeline{grid-template-columns:1fr;}
+    .cols{gap:40px;}
+    .chrome,.progress,.arrow{display:none;}
+    .divider .big{font-size:100px;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .slide,.slide .chat .bubble,.progress{transition:none !important;}
+  }
+</style>
+
+<div class="progress" id="progress"></div>
+
+<!-- 1 · COVER -->
+<section class="slide active" aria-label="Cover">
+  <div class="inner">
+    <div class="cover-mark">Balkina AI · White Label</div>
+    <h1>Your property.<br>Your app.<br><em class="gd">One concierge.</em></h1>
+    <div class="cover-rule"></div>
+    <p class="cover-sub">A private, branded booking &amp; community platform for resorts, marinas, and mixed-use destinations — serving the two audiences every great property depends on: its tenants and its residents.</p>
+  </div>
+</section>
+
+<!-- 2 · PREMISE -->
+<section class="slide" aria-label="The premise">
+  <div class="inner">
+    <p class="eyebrow">The Premise</p>
+    <h2>You built a destination.</h2>
+    <p class="lede">Restaurants and cafés, a spa and a marina, boutiques, events, private residences — dozens of experiences at one address. And your guests deserve to experience it as one seamless thread — not a phone number here, a walk-in there, a website that doesn’t follow through.</p>
+    <div class="catalogue">
+      <span>Restaurants</span><span>Spa &amp; Wellness</span><span>Marina</span><span>Boutiques</span><span>Fitness</span><span>Events</span><span>Residences</span>
+    </div>
+  </div>
+</section>
+
+<!-- 3 · THE GAPS -->
+<section class="slide" aria-label="What fragmentation costs">
+  <div class="inner">
+    <p class="eyebrow">What Fragmentation Costs</p>
+    <h2>Existing challenges.</h2>
+    <div class="gaps">
+      <div class="gap">
+        <div class="n">I</div>
+        <h3>Discovery</h3>
+        <p>Guests don’t know what events and services are on-site — or how to book them.</p>
+      </div>
+      <div class="gap">
+        <div class="n">II</div>
+        <h3>Engagement</h3>
+        <p>You own the address — not the relationship with your residents and guests.</p>
+      </div>
+      <div class="gap">
+        <div class="n">III</div>
+        <h3>Control</h3>
+        <p>No unified booking for tenants — no visibility and data for the property owner.</p>
+      </div>
+    </div>
+    <p class="kicker">Empty slots, under-filled evenings — a premium destination with a fragmented digital experience.</p>
+  </div>
+</section>
+
+<!-- 4 · THESIS -->
+<section class="slide" aria-label="Our thesis">
+  <div class="inner">
+    <p class="eyebrow">Our Thesis</p>
+    <h2>A great property serves two audiences.</h2>
+    <div class="duo">
+      <div class="card">
+        <div class="rn">I</div>
+        <h3>Your tenants</h3>
+        <p>The businesses that fill your destination with life. They need customers and calm operations — not another piece of software to wrestle.</p>
+      </div>
+      <div class="card">
+        <div class="rn">II</div>
+        <h3>Your residents</h3>
+        <p>The people who chose to live in your world. They deserve recognition, a direct line to you, and a calendar worth staying for.</p>
+      </div>
+    </div>
+    <p class="kicker">One branded app — your name on it — serves both. Balkina runs quietly underneath.</p>
+  </div>
+</section>
+
+<!-- 5 · DIVIDER I -->
+<section class="slide" aria-label="Chapter one divider">
+  <div class="inner divider">
+    <div class="big" aria-hidden="true">I</div>
+    <div class="chapter">Chapter One</div>
+    <h2>Tenant support<br>&amp; management</h2>
+    <p class="lede" style="max-width:30em">Bookings as a service — provided by you, to every business on your property.</p>
+  </div>
+</section>
+
+<!-- 6 · BOOKABLE -->
+<section class="slide" aria-label="Seamless bookability">
+  <div class="inner">
+    <p class="eyebrow">I · Seamless Bookability</p>
+    <div class="cols">
+      <div>
+        <h2>Every tenant, seamlessly bookable.</h2>
+        <ul class="points">
+          <li><strong>One app for the whole property.</strong> Restaurants, spa, activities, services — every business listed, browsed, and booked in seconds.</li>
+          <li><strong>Real-time availability</strong> with instant confirmation, approvals and deposits where the business wants them.</li>
+          <li><strong>Your world only.</strong> Guests discover and book what’s inside your property — never a competitor.</li>
+          <li><strong>And when they’d rather just ask</strong> — the AI concierge takes it from there.</li>
+        </ul>
+      </div>
+      <div class="chat" aria-label="Example conversation">
+        <div class="bubble guest"><span class="who">Guest</span>A massage after our sail on Saturday — and dinner for four at eight.</div>
+        <div class="bubble concierge"><span class="who">Concierge</span>With pleasure. Spa Azure has 5:30 free after your charter, and I’m holding a table for four at Terrace at 8:00.</div>
+        <div class="bubble guest"><span class="who">Guest</span>Book both.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 · BACK-OFFICE -->
+<section class="slide" aria-label="Tenant back-office">
+  <div class="inner">
+    <p class="eyebrow">I · Management</p>
+    <h2>A five-star back-office, included.</h2>
+    <ul class="points">
+      <li><strong>A full dashboard for every business</strong> — services, staff, schedules, approvals, customers — with calendar sync to Google, iCal, and the travel platforms they already sell on.</li>
+      <li><strong>Onboarding in minutes.</strong> Invite a business, or approve its application; staff, hours and a storefront are provisioned automatically.</li>
+      <li><strong>Nothing to learn twice.</strong> No new hardware, no POS migration, no IT project.</li>
+    </ul>
+    <p class="kicker">You’re not selling your tenants software. You’re providing them customers.</p>
+  </div>
+</section>
+
+<!-- 8 · TENANT COMMS -->
+<section class="slide" aria-label="Tenant communication">
+  <div class="inner">
+    <p class="eyebrow">I · One Community of Businesses</p>
+    <h2>Speak to every business at once — or precisely.</h2>
+    <ul class="points">
+      <li><strong>Message all tenants, a selection, or a whole category</strong> — every restaurant before the regatta; the wellness group before the retreat.</li>
+      <li><strong>Under your name.</strong> Announcements, seasonal pushes, and operational notices arrive from the property, elegantly.</li>
+      <li><strong>One view of the destination.</strong> Bookings, campaigns, and activity across every business — finally in one place.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 9 · DIVIDER II -->
+<section class="slide" aria-label="Chapter two divider">
+  <div class="inner divider">
+    <div class="big" aria-hidden="true">II</div>
+    <div class="chapter">Chapter Two</div>
+    <h2>Resident support<br>&amp; management</h2>
+    <p class="lede" style="max-width:28em">Turn an address into a community.</p>
+  </div>
+</section>
+
+<!-- 10 · RECOGNITION -->
+<section class="slide" aria-label="Resident recognition">
+  <div class="inner">
+    <p class="eyebrow">II · Recognition</p>
+    <h2>Your residents, known by name.</h2>
+    <ul class="points">
+      <li><strong>Verified in seconds.</strong> A private code — or a personal invitation by email, SMS, or WhatsApp. No paperwork, no approval queue.</li>
+      <li><strong>Each kind of resident, recognized as such:</strong> homeowners, renters, commercial owners.</li>
+      <li><strong>The concierge greets them accordingly.</strong> <em class="gd">“Welcome back — Villa 12.”</em></li>
+    </ul>
+  </div>
+</section>
+
+<!-- 11 · CONNECTION -->
+<section class="slide" aria-label="Resident communication">
+  <div class="inner">
+    <p class="eyebrow">II · Connection</p>
+    <h2>A direct line to the people who matter most.</h2>
+    <ul class="points">
+      <li><strong>Resident-only announcements</strong> — visible to your community, invisible to passing visitors.</li>
+      <li><strong>Reach exactly who you mean.</strong> All members, or homeowners, renters, or commercial owners alone — by push, to their pocket.</li>
+      <li><strong>News, notices, and privileges,</strong> delivered under your brand rather than a printed flyer in a lobby.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 12 · TOGETHERNESS -->
+<section class="slide" aria-label="Resident events">
+  <div class="inner">
+    <p class="eyebrow">II · Togetherness</p>
+    <h2>Bring them together, beautifully.</h2>
+    <ul class="points">
+      <li><strong>Brunches, galas, tastings, regattas</strong> — ticketed events with capacity, seatings, and deposits.</li>
+      <li><strong>One-tap RSVP,</strong> per-guest QR passes, and door check-in from an iPad.</li>
+      <li><strong>Resident-only guest lists</strong> when the evening calls for it.</li>
+    </ul>
+    <p class="kicker">The difference between an address and a community is a calendar.</p>
+  </div>
+</section>
+
+<!-- 13 · ALTERNATIVES -->
+<section class="slide" aria-label="The alternatives">
+  <div class="inner">
+    <p class="eyebrow">The Alternatives</p>
+    <h2>Build it, patch it — or brand it.</h2>
+    <div class="compare">
+      <div class="option">
+        <h3>Build your own</h3>
+        <ul>
+          <li>Six to twelve months</li>
+          <li>Six-figure budget</li>
+          <li>Then you maintain it, forever</li>
+        </ul>
+      </div>
+      <div class="option">
+        <h3>Generic tools</h3>
+        <ul>
+          <li>A different app per tenant</li>
+          <li>Someone else’s brand</li>
+          <li>No concierge, no community</li>
+        </ul>
+      </div>
+      <div class="option best">
+        <h3>Balkina, white-label</h3>
+        <ul>
+          <li>Live in weeks</li>
+          <li>Your name, your world only</li>
+          <li>Concierge, residents &amp; events included</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 14 · ENGAGEMENT -->
+<section class="slide" aria-label="Pricing and launch">
+  <div class="inner">
+    <p class="eyebrow">The Engagement</p>
+    <h2>A boutique platform, at a subscription.</h2>
+    <div class="plans">
+      <div class="plan">
+        <div class="name">Petite</div>
+        <div class="price">€899 <small>/ month</small></div>
+        <p>For boutique properties. The full concierge, resident membership, events, and your management panel.</p>
+      </div>
+      <div class="plan">
+        <div class="name">Grande</div>
+        <div class="price">€2,500 <small>/ month</small></div>
+        <p>For established destinations with a broad collection of businesses and an active events calendar.</p>
+      </div>
+      <div class="plan hi">
+        <div class="name">Estate</div>
+        <div class="price">€5,600 <small>/ month</small></div>
+        <p>Up to fifty businesses. Full destination scale — concierge, residents, and events across the property.</p>
+      </div>
+      <div class="plan">
+        <div class="name">Bespoke</div>
+        <div class="price">Custom</div>
+        <p>Beyond fifty businesses, multi-property portfolios, and bespoke integrations — composed to measure.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 15 · PROOF + CTA -->
+<section class="slide" aria-label="Proof and next step">
+  <div class="inner">
+    <p class="eyebrow">In the World</p>
+    <h2>See it live at <em class="gd">Portonovi</em>.</h2>
+    <p class="lede">A branded concierge app for a luxury marina resort on the Adriatic — on-property booking, verified residents, private events. Your property could be next, in three weeks.</p>
+    <div class="cta-row">
+      <a class="btn gold" href="mailto:hello@balkina.ai?subject=Private%20walkthrough%20—%20Balkina%20White%20Label">Book a private walkthrough</a>
+      <a class="btn line" href="https://balkina.ai" target="_blank" rel="noopener">Experience Portonovi live</a>
+    </div>
+  </div>
+</section>
+
+<div class="chrome">
+  <div class="wordmark"><b>Balkina AI</b> · White Label</div>
+  <div class="nav">
+    <span class="counter" id="counter"><b>01</b> / 15</span>
+    <button class="arrow" id="prev" aria-label="Previous slide">←</button>
+    <button class="arrow" id="next" aria-label="Next slide">→</button>
+  </div>
+</div>
+
+<script>
+  const slides=[...document.querySelectorAll(".slide")];
+  const counter=document.getElementById("counter");
+  const progress=document.getElementById("progress");
+  const pad=n=>String(n).padStart(2,"0");
+  let i=Math.min(Math.max((parseInt(location.hash.slice(1),10)||1)-1,0),slides.length-1);
+
+  function show(n){
+    i=Math.min(Math.max(n,0),slides.length-1);
+    slides.forEach((s,k)=>s.classList.toggle("active",k===i));
+    counter.innerHTML="<b>"+pad(i+1)+"</b> / "+pad(slides.length);
+    progress.style.width=((i+1)/slides.length*100)+"%";
+    history.replaceState(null,"","#"+(i+1));
+  }
+  document.getElementById("next").addEventListener("click",()=>show(i+1));
+  document.getElementById("prev").addEventListener("click",()=>show(i-1));
+  addEventListener("keydown",e=>{
+    if(["ArrowRight","PageDown"," "].includes(e.key)){e.preventDefault();show(i+1);}
+    else if(["ArrowLeft","PageUp"].includes(e.key)){e.preventDefault();show(i-1);}
+    else if(e.key==="Home")show(0);
+    else if(e.key==="End")show(slides.length-1);
+  });
+  let x0=null;
+  addEventListener("touchstart",e=>{x0=e.touches[0].clientX},{passive:true});
+  addEventListener("touchend",e=>{
+    if(x0===null)return;
+    const dx=e.changedTouches[0].clientX-x0;
+    if(Math.abs(dx)>60)show(i+(dx<0?1:-1));
+    x0=null;
+  },{passive:true});
+  show(i);
+</script>
+</body>
+</html>
