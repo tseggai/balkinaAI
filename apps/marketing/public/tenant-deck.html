@@ -5,6 +5,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Balkina AI — Za vaš biznis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
 </head>
 <body>
 <style>
@@ -19,13 +22,13 @@
     --sun:#FFE300;
     --sun-soft:rgba(255,227,0,.55);
     --hairline:rgba(255,255,255,.32);
-    --display:"Avenir Next","Avenir","Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
-    --body:"Avenir Next","Avenir","Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
+    --display:"Quicksand","Avenir Next","Segoe UI",system-ui,Arial,sans-serif;
+    --body:"Quicksand","Avenir Next","Segoe UI",system-ui,Arial,sans-serif;
   }
   html,body{height:100%;}
   body{
     margin:0;background:var(--ink);color:var(--paper);
-    font-family:var(--body);font-size:25px;line-height:1.55;
+    font-family:var(--body);font-size:25px;font-weight:500;line-height:1.55;
     overflow:hidden;
     -webkit-font-smoothing:antialiased;
   }
@@ -40,7 +43,7 @@
   }
   .langswitch button{
     background:none;border:0;border-radius:999px;cursor:pointer;
-    font-family:var(--body);font-size:11px;letter-spacing:.22em;font-weight:700;
+    font-family:var(--body);font-size:11px;letter-spacing:.1em;font-weight:700;
     color:var(--slate);padding:7px 14px;text-transform:uppercase;
   }
   .langswitch button.on{background:var(--sun);color:var(--navy);}
@@ -52,11 +55,11 @@
     display:flex;align-items:center;justify-content:space-between;
     padding:18px 34px;pointer-events:none;
   }
-  .wordmark{font-family:var(--body);font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--slate);display:flex;align-items:center;gap:10px;}
+  .wordmark{font-family:var(--body);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);display:flex;align-items:center;gap:10px;}
   .wordmark b{color:var(--paper);font-weight:700;}
   .wordmark img{height:18px;width:auto;opacity:.95;}
   .nav{display:flex;align-items:center;gap:18px;pointer-events:auto;}
-  .counter{font-size:11px;letter-spacing:.28em;color:var(--slate);font-variant-numeric:tabular-nums;}
+  .counter{font-size:11px;letter-spacing:.12em;color:var(--slate);font-variant-numeric:tabular-nums;}
   .counter b{color:var(--paper);font-weight:700;}
   .arrow{
     background:none;border:1px solid var(--hairline);color:var(--paper-dim);
@@ -75,11 +78,11 @@
   .slide.active{opacity:1;visibility:visible;transform:none;transition:opacity .6s ease,transform .6s ease;}
   .inner{width:min(1060px,100%);}
   .eyebrow{
-    font-size:22px;letter-spacing:.3em;text-transform:uppercase;color:var(--sun);
+    font-size:22px;letter-spacing:.14em;text-transform:uppercase;color:var(--sun);
     margin:0 0 26px;font-weight:700;
   }
   .eyebrow::after{content:"";display:block;width:52px;height:1px;background:var(--sun-soft);margin-top:14px;}
-  h1,h2{font-family:var(--display);font-weight:700;letter-spacing:-.01em;text-wrap:balance;margin:0;}
+  h1,h2{font-family:var(--display);font-weight:700;letter-spacing:0;text-wrap:balance;margin:0;}
   h1{font-size:clamp(42px,6.2vw,84px);line-height:1.04;}
   h2{font-size:clamp(34px,4.6vw,60px);line-height:1.08;}
   .lede{font-size:clamp(20px,1.9vw,27px);color:var(--paper);max-width:34em;margin:26px 0 0;}
@@ -97,7 +100,7 @@
   .points li::before{content:"";position:absolute;left:0;top:.72em;width:12px;height:1px;background:var(--sun);}
   .points li strong{display:block;color:var(--paper);font-weight:700;margin-bottom:5px;}
   /* premise inline list */
-  .catalogue{margin-top:38px;display:flex;flex-wrap:wrap;gap:12px 0;font-size:15px;letter-spacing:.26em;text-transform:uppercase;color:var(--slate);}
+  .catalogue{margin-top:38px;display:flex;flex-wrap:wrap;gap:12px 0;font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);}
   .catalogue span{white-space:nowrap;}
   .catalogue span+span::before{content:"·";color:var(--sun);margin:0 16px;}
   /* gaps slide */
@@ -111,7 +114,7 @@
   .bubble{max-width:88%;padding:16px 20px;font-size:19px;line-height:1.55;border:1px solid var(--hairline);}
   .bubble.guest{align-self:flex-end;background:var(--paper);color:var(--navy);border-color:transparent;border-radius:18px 18px 4px 18px;}
   .bubble.concierge{align-self:flex-start;background:var(--panel);color:var(--paper);border-radius:18px 18px 18px 4px;}
-  .bubble .who{display:block;font-size:10px;letter-spacing:.3em;text-transform:uppercase;margin-bottom:6px;opacity:.75;}
+  .bubble .who{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;opacity:.75;}
   .slide .chat .bubble{opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease;}
   .slide.active .chat .bubble{opacity:1;transform:none;}
   .slide.active .chat .bubble:nth-child(1){transition-delay:.5s;}
@@ -121,13 +124,13 @@
   .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:40px;}
   .plan{border:1px solid var(--hairline);padding:26px 24px 24px;background:var(--panel-2);}
   .plan.hi{border-color:var(--sun-soft);background:var(--panel);}
-  .plan .name{font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--sun);font-weight:700;}
+  .plan .name{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--sun);font-weight:700;}
   .plan .price{font-family:var(--display);font-size:clamp(28px,2.8vw,38px);margin:12px 0 2px;font-variant-numeric:tabular-nums;}
   .plan p{margin:8px 0 0;color:var(--paper);font-size:clamp(18px,1.6vw,22px);}
   /* CTA */
   .cta-row{display:flex;gap:18px;margin-top:44px;flex-wrap:wrap;}
   .btn{
-    display:inline-block;padding:15px 34px;font-size:12px;letter-spacing:.3em;text-transform:uppercase;
+    display:inline-block;padding:15px 34px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;
     text-decoration:none;font-weight:700;
   }
   .btn.gold{background:var(--sun);color:var(--navy);}
@@ -135,7 +138,7 @@
   .btn:focus-visible{outline:2px solid var(--sun);outline-offset:3px;}
   /* cover flourishes */
   .cover-logo{height:64px;width:auto;margin-bottom:30px;display:block;}
-  .cover-mark{font-size:24px;letter-spacing:.4em;text-transform:uppercase;color:var(--sun);margin-bottom:34px;font-weight:700;}
+  .cover-mark{font-size:24px;letter-spacing:.16em;text-transform:uppercase;color:var(--sun);margin-bottom:34px;font-weight:700;}
   .cover-rule{width:64px;height:1px;background:var(--hairline);margin:38px 0;}
   .cover-sub{color:var(--paper);max-width:36em;font-size:clamp(19px,1.7vw,25px);}
   /* responsive — phones keep the full-screen swipe deck */
@@ -145,7 +148,7 @@
     .inner{max-height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;}
     h1{font-size:33px;}
     h2{font-size:25px;}
-    .eyebrow{font-size:13px;letter-spacing:.26em;margin:0 0 12px;}
+    .eyebrow{font-size:13px;letter-spacing:.12em;margin:0 0 12px;}
     .eyebrow::after{margin-top:8px;width:40px;}
     .lede,.cover-sub{font-size:16px;margin-top:14px;}
     .kicker{font-size:17px;margin-top:18px;padding-top:14px;max-width:none;}
@@ -165,16 +168,16 @@
     .plan p{font-size:14px;margin-top:4px;}
     .chat{gap:8px;}
     .bubble{font-size:14px;padding:10px 14px;}
-    .catalogue{font-size:13px;letter-spacing:.18em;margin-top:14px;}
+    .catalogue{font-size:13px;letter-spacing:.1em;margin-top:14px;}
     .catalogue span+span::before{margin:0 8px;}
     .cover-logo{height:42px;margin-bottom:14px;}
-    .cover-mark{font-size:14px;letter-spacing:.3em;margin-bottom:14px;}
+    .cover-mark{font-size:14px;letter-spacing:.14em;margin-bottom:14px;}
     .cover-rule{margin:16px 0;}
     .cta-row{margin-top:20px;gap:10px;}
-    .btn{padding:12px 20px;font-size:11px;letter-spacing:.2em;}
+    .btn{padding:12px 20px;font-size:12px;letter-spacing:.1em;}
     .arrow{display:none;}
     .chrome{padding:12px 16px;}
-    .wordmark{font-size:9px;letter-spacing:.24em;gap:7px;}
+    .wordmark{font-size:9px;letter-spacing:.1em;gap:7px;}
     .wordmark img{height:13px;}
     .counter{font-size:10px;}
     .brandbar{top:10px;left:14px;}
