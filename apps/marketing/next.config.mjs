@@ -2,8 +2,11 @@
 const nextConfig = {
   output: 'standalone',
   async rewrites() {
-    // White-label pitch deck (static file in /public).
-    return [{ source: '/deck', destination: '/deck.html' }];
+    // Pitch decks (static files in /public).
+    return [
+      { source: '/deck', destination: '/deck.html' },
+      { source: '/tenant-deck', destination: '/tenant-deck.html' },
+    ];
   },
 };
 
