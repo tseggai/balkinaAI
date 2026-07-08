@@ -9,17 +9,15 @@
 <body>
 <style>
   :root{
-    --ink:#1C2249;
-    --panel:#252C5E;
-    --panel-2:#20264F;
-    --paper:#F4F5FB;
-    --paper-dim:#D9DCF0;
-    --slate:#A9B0D6;
-    --accent:#A5B4FC;
-    --brand:#6B7FC4;
-    --accent-soft:rgba(165,180,252,.4);
-    --accent-faint:rgba(165,180,252,.14);
-    --hairline:rgba(244,245,251,.14);
+    --ink:#6B7FC4;
+    --panel:#5F72B8;
+    --panel-2:#6577BC;
+    --paper:#FFFFFF;
+    --paper-dim:#EBEFFC;
+    --slate:#DDE3F8;
+    --navy:#232B5E;
+    --navy-soft:rgba(35,43,94,.5);
+    --hairline:rgba(255,255,255,.32);
     --display:"Didot","Bodoni MT","Bodoni 72",Georgia,"Times New Roman",serif;
     --body:"Optima","Gill Sans","Gill Sans MT","Avenir Next","Segoe UI",system-ui,sans-serif;
   }
@@ -31,25 +29,25 @@
     -webkit-font-smoothing:antialiased;
   }
   /* ---------- deck chrome ---------- */
-  .progress{position:fixed;top:0;left:0;height:2px;background:var(--accent);width:0%;z-index:40;transition:width .5s ease;}
+  .progress{position:fixed;top:0;left:0;height:2px;background:var(--paper);width:0%;z-index:40;transition:width .5s ease;}
   .chrome{
     position:fixed;left:0;right:0;bottom:0;z-index:40;
     display:flex;align-items:center;justify-content:space-between;
     padding:18px 34px;pointer-events:none;
   }
   .wordmark{font-family:var(--body);font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--slate);display:flex;align-items:center;gap:10px;}
-  .wordmark b{color:var(--accent);font-weight:600;}
-  .wordmark img{height:18px;width:auto;opacity:.9;}
+  .wordmark b{color:var(--paper);font-weight:700;}
+  .wordmark img{height:18px;width:auto;opacity:.95;}
   .nav{display:flex;align-items:center;gap:18px;pointer-events:auto;}
   .counter{font-size:11px;letter-spacing:.28em;color:var(--slate);font-variant-numeric:tabular-nums;}
-  .counter b{color:var(--accent);font-weight:600;}
+  .counter b{color:var(--paper);font-weight:700;}
   .arrow{
     background:none;border:1px solid var(--hairline);color:var(--paper-dim);
     width:42px;height:42px;border-radius:50%;cursor:pointer;font-size:16px;line-height:1;
     transition:border-color .25s,color .25s;
   }
-  .arrow:hover{border-color:var(--accent);color:var(--accent);}
-  .arrow:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+  .arrow:hover{border-color:var(--paper);color:var(--paper);}
+  .arrow:focus-visible{outline:2px solid var(--paper);outline-offset:3px;}
   /* ---------- slides ---------- */
   .slide{
     position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
@@ -60,40 +58,40 @@
   .slide.active{opacity:1;visibility:visible;transform:none;transition:opacity .6s ease,transform .6s ease;}
   .inner{width:min(1060px,100%);}
   .eyebrow{
-    font-size:11px;letter-spacing:.36em;text-transform:uppercase;color:var(--accent);
-    margin:0 0 26px;font-weight:600;
+    font-size:11px;letter-spacing:.36em;text-transform:uppercase;color:var(--navy);
+    margin:0 0 26px;font-weight:700;
   }
-  .eyebrow::after{content:"";display:block;width:52px;height:1px;background:var(--accent-soft);margin-top:14px;}
+  .eyebrow::after{content:"";display:block;width:52px;height:1px;background:var(--navy-soft);margin-top:14px;}
   h1,h2{font-family:var(--display);font-weight:400;letter-spacing:.005em;text-wrap:balance;margin:0;}
   h1{font-size:clamp(42px,6.2vw,84px);line-height:1.04;}
   h2{font-size:clamp(34px,4.6vw,60px);line-height:1.08;}
   .lede{font-size:clamp(20px,1.9vw,27px);color:var(--paper);max-width:34em;margin:26px 0 0;}
   .kicker{
     margin-top:40px;padding-top:24px;border-top:1px solid var(--hairline);
-    font-family:var(--display);font-style:italic;font-size:clamp(26px,2.6vw,36px);color:var(--accent);
+    font-family:var(--display);font-style:italic;font-size:clamp(26px,2.6vw,36px);color:var(--navy);
     max-width:30em;text-wrap:balance;
   }
   .muted{color:var(--slate);}
-  em.gd{font-style:italic;color:var(--accent);}
+  em.gd{font-style:italic;color:var(--navy);}
   /* two-column slide bodies */
   .cols{display:grid;grid-template-columns:1.1fr .9fr;gap:64px;align-items:center;margin-top:8px;}
   .points{list-style:none;margin:34px 0 0;padding:0;display:flex;flex-direction:column;gap:22px;}
   .points li{padding-left:26px;position:relative;color:var(--paper);max-width:32em;font-size:clamp(19px,1.7vw,24px);}
-  .points li::before{content:"";position:absolute;left:0;top:.72em;width:12px;height:1px;background:var(--accent);}
-  .points li strong{color:var(--paper);font-weight:600;}
+  .points li::before{content:"";position:absolute;left:0;top:.72em;width:12px;height:1px;background:var(--paper);}
+  .points li strong{color:var(--paper);font-weight:700;}
   /* premise inline list */
   .catalogue{margin-top:38px;display:flex;flex-wrap:wrap;gap:12px 0;font-size:12px;letter-spacing:.26em;text-transform:uppercase;color:var(--slate);}
   .catalogue span{white-space:nowrap;}
-  .catalogue span+span::before{content:"·";color:var(--accent);margin:0 16px;}
+  .catalogue span+span::before{content:"·";color:var(--paper);margin:0 16px;}
   /* gaps slide */
   .gaps{display:grid;grid-template-columns:repeat(3,1fr);gap:40px;margin-top:46px;}
-  .gap .n{font-family:var(--display);font-size:15px;color:var(--accent);letter-spacing:.2em;}
+  .gap .n{font-family:var(--display);font-size:15px;color:var(--navy);letter-spacing:.2em;}
   .gap h3{font-family:var(--display);font-weight:700;font-size:clamp(26px,2.6vw,34px);margin:10px 0 12px;}
   .gap p{margin:0;color:var(--paper);font-size:clamp(18px,1.6vw,22px);}
   /* chat mock */
   .chat{display:flex;flex-direction:column;gap:14px;}
   .bubble{max-width:88%;padding:16px 20px;font-size:19px;line-height:1.55;border:1px solid var(--hairline);}
-  .bubble.guest{align-self:flex-end;background:var(--brand);color:#fff;border-color:transparent;border-radius:18px 18px 4px 18px;}
+  .bubble.guest{align-self:flex-end;background:var(--paper);color:var(--navy);border-color:transparent;border-radius:18px 18px 4px 18px;}
   .bubble.concierge{align-self:flex-start;background:var(--panel);color:var(--paper);border-radius:18px 18px 18px 4px;}
   .bubble .who{display:block;font-size:10px;letter-spacing:.3em;text-transform:uppercase;margin-bottom:6px;opacity:.75;}
   .slide .chat .bubble{opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease;}
@@ -104,8 +102,8 @@
   /* pricing */
   .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:40px;}
   .plan{border:1px solid var(--hairline);padding:26px 24px 24px;background:var(--panel-2);}
-  .plan.hi{border-color:var(--accent-soft);background:var(--panel);}
-  .plan .name{font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+  .plan.hi{border-color:var(--paper);background:var(--panel);}
+  .plan .name{font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--navy);font-weight:700;}
   .plan .price{font-family:var(--display);font-size:clamp(28px,2.8vw,38px);margin:12px 0 2px;font-variant-numeric:tabular-nums;}
   .plan p{margin:8px 0 0;color:var(--paper);font-size:clamp(16px,1.3vw,19px);}
   /* CTA */
@@ -114,13 +112,13 @@
     display:inline-block;padding:15px 34px;font-size:12px;letter-spacing:.3em;text-transform:uppercase;
     text-decoration:none;font-weight:700;
   }
-  .btn.gold{background:var(--paper);color:var(--ink);}
-  .btn.line{border:1px solid var(--accent-soft);color:var(--accent);}
-  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+  .btn.gold{background:var(--paper);color:var(--navy);}
+  .btn.line{border:1px solid var(--hairline);color:var(--paper);}
+  .btn:focus-visible{outline:2px solid var(--paper);outline-offset:3px;}
   /* cover flourishes */
   .cover-logo{height:64px;width:auto;margin-bottom:30px;display:block;}
-  .cover-mark{font-size:12px;letter-spacing:.5em;text-transform:uppercase;color:var(--accent);margin-bottom:34px;font-weight:600;}
-  .cover-rule{width:64px;height:1px;background:var(--accent-soft);margin:38px 0;}
+  .cover-mark{font-size:12px;letter-spacing:.5em;text-transform:uppercase;color:var(--navy);margin-bottom:34px;font-weight:700;}
+  .cover-rule{width:64px;height:1px;background:var(--hairline);margin:38px 0;}
   .cover-sub{color:var(--paper);max-width:36em;font-size:clamp(19px,1.7vw,25px);}
   /* responsive */
   @media (max-width:900px){
@@ -144,7 +142,7 @@
     <div class="cover-mark">Balkina AI · For Your Business</div>
     <h1>Your calendar, filled.<br>Your front desk, <em class="gd">automated.</em></h1>
     <div class="cover-rule"></div>
-    <p class="cover-sub">Balkina AI is the booking platform where customers simply chat — and your appointments, deposits, and reminders take care of themselves.</p>
+    <p class="cover-sub">Balkina AI is the booking platform where customers simply chat — new customers find you, regulars rebook more often, and your schedule takes care of itself.</p>
   </div>
 </section>
 
@@ -161,8 +159,8 @@
       </div>
       <div class="gap">
         <div class="n">II</div>
-        <h3>No-shows</h3>
-        <p>An empty chair still costs the full hour. Unprotected bookings make your revenue optional.</p>
+        <h3>Forgotten regulars</h3>
+        <p>Your best customers drift — not because they left you, but because nobody reminded them they’re due.</p>
       </div>
       <div class="gap">
         <div class="n">III</div>
@@ -196,35 +194,51 @@
   </div>
 </section>
 
-<!-- 4 · YOUR TOOLKIT -->
+<!-- 4 · NEW CUSTOMERS -->
+<section class="slide" aria-label="New customers find you">
+  <div class="inner">
+    <p class="eyebrow">Grow</p>
+    <h2>New customers will find you.</h2>
+    <ul class="points">
+      <li><strong>Discovered in the app.</strong> When people nearby ask the AI for “a barber tomorrow,” your open slots are the answer.</li>
+      <li><strong>Your own booking link</strong> — balkina.ai/b/your-business — for Instagram bios, Google profiles, and WhatsApp replies. Customers book on the web, no app needed.</li>
+      <li><strong>Reviews build your reputation</strong> right where the next customer is already searching.</li>
+    </ul>
+    <div class="catalogue">
+      <span>Salons</span><span>Barbershops</span><span>Spas</span><span>Trainers</span><span>Clinics</span><span>Restaurants</span><span>Experiences</span>
+    </div>
+  </div>
+</section>
+
+<!-- 5 · REGULARS REBOOK -->
+<section class="slide" aria-label="Regulars rebook more often">
+  <div class="inner">
+    <p class="eyebrow">Retain</p>
+    <h2>Regulars will rebook — more often.</h2>
+    <ul class="points">
+      <li><strong>Balkina learns each customer’s rhythm</strong> — and when a regular is due, it nudges them to book again before they drift.</li>
+      <li><strong>Automatic reminders</strong> by push and SMS keep appointments on time and no-shows down.</li>
+      <li><strong>Every customer, remembered</strong> — history, preferences, and visits in one profile, so returning feels effortless.</li>
+    </ul>
+    <p class="kicker">New customers find you. Regulars keep coming back.</p>
+  </div>
+</section>
+
+<!-- 6 · YOUR TOOLKIT -->
 <section class="slide" aria-label="Business toolkit">
   <div class="inner">
     <p class="eyebrow">Your Command Center</p>
     <h2>A booking suite that rivals the big names.</h2>
     <ul class="points">
       <li><strong>Services, staff, and schedules</strong> — durations, buffer times, days off, per-staff availability, multiple locations.</li>
-      <li><strong>Appointments managed end to end</strong> — approve, reschedule, and message customers by call, text, WhatsApp, or email.</li>
+      <li><strong>Appointments managed end to end</strong> — approve, reschedule, and reach customers by call, text, WhatsApp, or email.</li>
       <li><strong>Coupons, reviews, and customer profiles</strong> — the tools of a full CRM, without the complexity.</li>
     </ul>
     <p class="kicker">Set it up in an afternoon. No hardware, no IT project, nothing to install.</p>
   </div>
 </section>
 
-<!-- 5 · DEPOSITS -->
-<section class="slide" aria-label="Deposits and no-show protection">
-  <div class="inner">
-    <p class="eyebrow">No-Show Protection</p>
-    <h2>Protect every hour on your calendar.</h2>
-    <ul class="points">
-      <li><strong>Take a deposit at booking</strong> — fixed or percentage, per service. Paid in-app, powered by Stripe.</li>
-      <li><strong>The balance settles at the visit.</strong> Customers see the full price before they ever confirm.</li>
-      <li><strong>Automatic reminders</strong> by push and SMS keep the appointment — and the customer — on time.</li>
-    </ul>
-    <p class="kicker">Serious bookings from serious customers.</p>
-  </div>
-</section>
-
-<!-- 6 · CALENDAR SYNC + OTA -->
+<!-- 7 · CALENDAR SYNC + OTA -->
 <section class="slide" aria-label="Calendar sync and OTA">
   <div class="inner">
     <p class="eyebrow">One Source of Truth</p>
@@ -237,22 +251,6 @@
   </div>
 </section>
 
-<!-- 7 · GET FOUND -->
-<section class="slide" aria-label="Discovery and web booking">
-  <div class="inner">
-    <p class="eyebrow">New Customers</p>
-    <h2>Be found. Be booked. Everywhere.</h2>
-    <ul class="points">
-      <li><strong>Discovered in the app.</strong> When people nearby ask the AI for “a barber tomorrow,” your open slots are the answer.</li>
-      <li><strong>Your own booking link</strong> — balkina.ai/b/your-business — for Instagram bios, Google profiles, and WhatsApp replies. Customers book on the web, no app needed.</li>
-      <li><strong>Reviews build your reputation</strong> right where the next customer is already searching.</li>
-    </ul>
-    <div class="catalogue">
-      <span>Salons</span><span>Barbershops</span><span>Spas</span><span>Trainers</span><span>Clinics</span><span>Restaurants</span><span>Experiences</span>
-    </div>
-  </div>
-</section>
-
 <!-- 8 · RESTAURANTS & EVENTS -->
 <section class="slide" aria-label="Restaurants and events">
   <div class="inner">
@@ -260,7 +258,7 @@
     <h2>Tables and ticketed evenings, too.</h2>
     <ul class="points">
       <li><strong>Table reservations</strong> with party size, your open hours, and your confirmation — you stay in control of the floor.</li>
-      <li><strong>Ticketed experiences</strong> — brunches, tastings, holiday dinners — with per-person pricing, capacity, and prepayment.</li>
+      <li><strong>Ticketed experiences</strong> — brunches, tastings, holiday dinners — with per-person pricing, capacity, and RSVPs.</li>
       <li><strong>The same one dashboard</strong> runs it all, from a single table for two to a sold-out New Year’s Eve.</li>
     </ul>
   </div>
@@ -283,12 +281,11 @@
         <p>Sized from a solo chair to multi-location teams. Additional staff from €6/month.</p>
       </div>
       <div class="plan">
-        <div class="name">Online Payments</div>
-        <div class="price">+€14</div>
-        <p>Add deposits and in-app payment when you’re ready — powered by Stripe.</p>
+        <div class="name">No Contracts</div>
+        <div class="price">Cancel anytime</div>
+        <p>Month to month, no lock-in. Current plans at balkina.ai/pricing.</p>
       </div>
     </div>
-    <p class="kicker">Current plans at balkina.ai/pricing — no contracts, cancel any time.</p>
   </div>
 </section>
 
