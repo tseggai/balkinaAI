@@ -98,9 +98,12 @@
   .points li::before{content:"";position:absolute;left:0;top:.5em;width:12px;height:12px;border-radius:50%;background:var(--sun);}
   .points li strong{display:block;color:var(--paper);font-weight:700;margin-bottom:6px;font-size:clamp(20px,2vw,28px);line-height:1.25;}
   /* business types slide */
-  .types{margin-top:6px;display:flex;flex-direction:column;gap:4px;}
-  .types .t{font-weight:300;font-size:clamp(36px,5.4vw,68px);line-height:1.18;}
-  .types .t b{font-weight:700;color:var(--sun);}
+  .slide.centered{align-items:center;text-align:center;}
+  .slide.centered .eyebrow::after{margin-left:auto;margin-right:auto;}
+  .types{margin-top:8px;display:flex;flex-wrap:wrap;justify-content:center;column-gap:0;row-gap:8px;max-width:940px;margin-left:auto;margin-right:auto;}
+  .types .t{font-weight:300;font-size:clamp(24px,3.4vw,44px);line-height:1.3;white-space:nowrap;}
+  .types .t.y{color:var(--sun);}
+  .types .t+.t::before{content:"·";color:var(--sun-soft);margin:0 22px;}
   /* gaps (problem items) */
   .gaps{display:flex;flex-direction:column;gap:30px;}
   .gap{display:grid;grid-template-columns:48px 1fr;align-items:baseline;row-gap:6px;}
@@ -128,10 +131,22 @@
   .slide.active .chat .msg:nth-child(2){transition-delay:1.15s;}
   .slide.active .chat .msg:nth-child(3){transition-delay:1.8s;}
   /* phone mock (bookings screen) */
-  .phone{
-    background:#F3F5FA;border-radius:26px;padding:18px 14px 14px;max-width:430px;margin-left:auto;
-    box-shadow:0 24px 60px rgba(18,24,58,.30);color:#1C2333;
-  }
+  /* device mockups (cover) */
+  .devices{position:relative;max-width:580px;margin-left:auto;padding:0 0 52px 56px;color:#1C2333;}
+  .ipad{background:#0F1730;border-radius:26px;padding:12px;box-shadow:0 24px 60px rgba(18,24,58,.35);}
+  .ipad .scr{background:#F3F5FA;border-radius:16px;padding:14px;height:340px;overflow:hidden;box-sizing:border-box;}
+  .iphone{position:absolute;left:0;bottom:0;width:205px;background:#0F1730;border-radius:30px;padding:9px;box-shadow:0 24px 50px rgba(18,24,58,.4);}
+  .iphone .scr{background:#F3F5FA;border-radius:22px;padding:12px 10px;height:315px;overflow:hidden;box-sizing:border-box;}
+  .dash-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;color:#101528;margin:0 2px 10px;}
+  .dash-top span{color:#6B7FC4;}
+  .week{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;height:calc(100% - 30px);}
+  .day{background:#fff;border-radius:10px;padding:5px 4px;overflow:hidden;}
+  .day b{font-size:9px;color:#3A4260;display:block;text-align:center;margin-bottom:5px;font-weight:700;}
+  .evt{border-radius:6px;margin:0 1px 5px;font-size:8px;line-height:1.25;padding:4px 5px;color:#fff;font-weight:700;overflow:hidden;}
+  .evt.a{background:#6B7FC4;}
+  .evt.b{background:#8B9BD8;}
+  .evt.c{background:#4C5FA8;}
+  .evt.y{background:#FFE300;color:#232B5E;}
   .ph-title{font-weight:700;font-size:16px;text-align:center;margin:0 0 12px;color:#101528;}
   .ph-tabs{display:flex;gap:8px;margin-bottom:12px;}
   .ph-tab{flex:1;text-align:center;font-size:12px;font-weight:700;padding:8px 0;border-radius:10px;background:#E9ECF5;color:#3A4260;}
@@ -149,7 +164,19 @@
   .ph-act.r{background:#FBE2E2;color:#B3261E;}
   /* section dividers */
   .divider{align-items:center;text-align:center;}
-  .divider .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .appbg{position:absolute;inset:-12%;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .appbg .board{width:100%;max-width:1200px;background:#F3F5FA;border-radius:28px;padding:28px;transform:rotate(-4deg);color:#1C2333;}
+  .appbg .week{grid-template-columns:repeat(7,1fr);gap:12px;height:64vh;}
+  .appbg .day b{font-size:12px;}
+  .appbg .evt{font-size:10px;padding:6px 7px;border-radius:8px;}
+  .appbg .bookmock{width:74%;max-width:780px;background:#F3F5FA;border-radius:26px;padding:26px;transform:rotate(3deg);color:#1C2333;}
+  .bm-head{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:15px;color:#101528;}
+  .bm-head span{font-size:12px;color:#6B7FC4;}
+  .bm-svc{display:flex;justify-content:space-between;background:#fff;border-radius:12px;padding:12px 14px;margin-top:12px;font-size:13px;font-weight:700;color:#3A4260;}
+  .bm-svc i{font-style:normal;color:#8A90A6;font-weight:500;}
+  .slots{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;}
+  .slot{padding:9px 16px;border-radius:999px;background:#fff;color:#3A4260;font-weight:700;font-size:12.5px;border:1px solid #E2E6F2;}
+  .slot.on{background:#6B7FC4;color:#fff;border-color:#6B7FC4;}
   .divider .shade{position:absolute;inset:0;background:linear-gradient(160deg,rgba(78,95,160,.88),rgba(107,127,196,.94));}
   .divider .inner{position:relative;z-index:1;}
   .divider h2{font-size:clamp(40px,5.4vw,72px);}
@@ -205,7 +232,18 @@
     .avatar{flex-basis:28px;width:28px;height:28px;}
     .avatar.user svg{width:15px;height:15px;}
     .avatar.bot img{width:15px;height:15px;}
-    .phone{max-width:100%;margin:6px auto 0;border-radius:20px;padding:14px 10px 10px;}
+    .devices{max-width:100%;margin:6px 0 0;padding:0 0 36px 34px;}
+    .ipad .scr{height:225px;padding:10px;}
+    .iphone{width:135px;padding:7px;border-radius:22px;}
+    .iphone .scr{height:205px;padding:9px 7px;border-radius:16px;}
+    .week{gap:5px;}
+    .evt{font-size:6.5px;padding:3px 4px;margin-bottom:4px;}
+    .day b{font-size:7.5px;}
+    .types .t{font-size:19px;}
+    .types .t+.t::before{margin:0 10px;}
+    .appbg .board{padding:16px;border-radius:18px;}
+    .appbg .week{height:70vh;gap:6px;}
+    .appbg .bookmock{width:92%;padding:16px;}
     .cover-mark{font-size:14px;letter-spacing:.12em;margin-bottom:12px;}
     .cover-rule{margin:16px 0;}
     .cta-col{height:auto;gap:10px;margin-top:8px;}
@@ -248,40 +286,43 @@
         <p class="lede sr">uz Balkinu — AI platformu za zakazivanje na kojoj vas novi klijenti pronalaze, stalni se vraćaju češće, a raspored se vodi sam.</p>
       </div>
       <div>
-        <div class="phone" aria-label="Bookings screen preview">
-          <p class="ph-title"><span class="en">Bookings</span><span class="sr">Rezervacije</span></p>
-          <div class="ph-tabs">
-            <div class="ph-tab"><span class="en">Today</span><span class="sr">Danas</span></div>
-            <div class="ph-tab on"><span class="en">All</span><span class="sr">Sve</span></div>
-          </div>
-          <div class="ph-card">
-            <div class="ph-row">
-              <span class="ph-nm">Ana P.</span>
-              <span class="ph-chip"><span class="en">Confirmed</span><span class="sr">Potvrđeno</span></span>
-            </div>
-            <div class="ph-svc"><span class="en">Cut &amp; beard trim — 45 min · with Marko</span><span class="sr">Šišanje i brada — 45 min · kod Marka</span></div>
-            <div class="ph-meta"><span class="en">Tomorrow at 5:30 PM · Old Town</span><span class="sr">Sutra u 17:30 · Stari grad</span></div>
-            <div class="ph-actions">
-              <span class="ph-act g"><span class="en">Complete</span><span class="sr">Završi</span></span>
-              <span class="ph-act n"><span class="en">No show</span><span class="sr">Nije došao</span></span>
-              <span class="ph-act r"><span class="en">Cancel</span><span class="sr">Otkaži</span></span>
+        <div class="devices" aria-label="App preview">
+          <div class="ipad">
+            <div class="scr">
+              <div class="dash-top"><b>Balkina</b><span class="en">This week</span><span class="sr">Ova nedelja</span></div>
+              <div class="week">
+                <div class="day"><b class="en">Mon</b><b class="sr">Pon</b><div class="evt a">Ana · 9:00</div><div class="evt b">Luka · 10:30</div><div class="evt c">Mia · 13:00</div></div>
+                <div class="day"><b class="en">Tue</b><b class="sr">Uto</b><div class="evt b">Ivan · 9:30</div><div class="evt y">Team · 12:00</div><div class="evt a">Sara · 15:00</div><div class="evt c">Nik · 17:30</div></div>
+                <div class="day"><b class="en">Wed</b><b class="sr">Sre</b><div class="evt c">Maja · 10:00</div><div class="evt a">Vuk · 11:30</div></div>
+                <div class="day"><b class="en">Thu</b><b class="sr">Čet</b><div class="evt a">Ena · 9:00</div><div class="evt b">Filip · 12:30</div><div class="evt y">VIP · 16:00</div></div>
+                <div class="day"><b class="en">Fri</b><b class="sr">Pet</b><div class="evt b">Tara · 10:00</div><div class="evt c">Aleks · 13:30</div><div class="evt a">Lena · 18:00</div></div>
+              </div>
             </div>
           </div>
-          <div class="ph-card">
-            <div class="ph-row">
-              <span class="ph-nm">Milica J.</span>
-              <span class="ph-chip"><span class="en">Confirmed</span><span class="sr">Potvrđeno</span></span>
+          <div class="iphone">
+            <div class="scr">
+              <p class="ph-title"><span class="en">Bookings</span><span class="sr">Rezervacije</span></p>
+              <div class="ph-card">
+                <div class="ph-row">
+                  <span class="ph-nm">Ana P.</span>
+                  <span class="ph-chip"><span class="en">Confirmed</span><span class="sr">Potvrđeno</span></span>
+                </div>
+                <div class="ph-svc"><span class="en">Cut &amp; beard — 45 min</span><span class="sr">Šišanje i brada — 45 min</span></div>
+                <div class="ph-meta"><span class="en">Tomorrow 5:30 PM</span><span class="sr">Sutra 17:30</span></div>
+                <div class="ph-actions">
+                  <span class="ph-act g"><span class="en">Complete</span><span class="sr">Završi</span></span>
+                  <span class="ph-act r"><span class="en">Cancel</span><span class="sr">Otkaži</span></span>
+                </div>
+              </div>
+              <div class="ph-card">
+                <div class="ph-row">
+                  <span class="ph-nm">Stefan K.</span>
+                  <span class="ph-chip"><span class="en">Pending</span><span class="sr">Na čekanju</span></span>
+                </div>
+                <div class="ph-svc"><span class="en">Haircut — 60 min</span><span class="sr">Šišanje — 60 min</span></div>
+                <div class="ph-meta"><span class="en">Fri 8:30 PM</span><span class="sr">Pet 20:30</span></div>
+              </div>
             </div>
-            <div class="ph-svc"><span class="en">Neck massage — 30 min · with Keti</span><span class="sr">Masaža vrata — 30 min · kod Keti</span></div>
-            <div class="ph-meta"><span class="en">Tomorrow at 6:15 PM · Old Town</span><span class="sr">Sutra u 18:15 · Stari grad</span></div>
-          </div>
-          <div class="ph-card">
-            <div class="ph-row">
-              <span class="ph-nm">Stefan K.</span>
-              <span class="ph-chip"><span class="en">Pending</span><span class="sr">Na čekanju</span></span>
-            </div>
-            <div class="ph-svc"><span class="en">Haircut — 60 min · with Marko</span><span class="sr">Šišanje — 60 min · kod Marka</span></div>
-            <div class="ph-meta"><span class="en">Fri at 8:30 PM · Old Town</span><span class="sr">Pet u 20:30 · Stari grad</span></div>
           </div>
         </div>
       </div>
@@ -290,16 +331,24 @@
 </section>
 
 <!-- 2 · BUILT FOR -->
-<section class="slide" aria-label="Built for">
+<section class="slide centered" aria-label="Built for">
   <div class="inner">
     <p class="eyebrow"><span class="en">Built For</span><span class="sr">Napravljeno za</span></p>
     <div class="types">
       <div class="t"><span class="en">Salons</span><span class="sr">Salone</span></div>
-      <div class="t"><b><span class="en">Barbershops</span><span class="sr">Berbernice</span></b></div>
+      <div class="t y"><span class="en">Barbershops</span><span class="sr">Berbernice</span></div>
       <div class="t"><span class="en">Spas</span><span class="sr">Spa centre</span></div>
-      <div class="t"><b><span class="en">Trainers</span><span class="sr">Trenere</span></b></div>
+      <div class="t y"><span class="en">Trainers</span><span class="sr">Trenere</span></div>
       <div class="t"><span class="en">Clinics</span><span class="sr">Ordinacije</span></div>
-      <div class="t"><b><span class="en">Restaurants</span><span class="sr">Restorane</span></b></div>
+      <div class="t y"><span class="en">Dentists</span><span class="sr">Stomatologe</span></div>
+      <div class="t"><span class="en">Physiotherapists</span><span class="sr">Fizioterapeute</span></div>
+      <div class="t y"><span class="en">Nail studios</span><span class="sr">Nail studije</span></div>
+      <div class="t"><span class="en">Massage</span><span class="sr">Masaže</span></div>
+      <div class="t y"><span class="en">Yoga studios</span><span class="sr">Joga studije</span></div>
+      <div class="t"><span class="en">Gyms</span><span class="sr">Teretane</span></div>
+      <div class="t y"><span class="en">Restaurants</span><span class="sr">Restorane</span></div>
+      <div class="t"><span class="en">Cafés</span><span class="sr">Kafiće</span></div>
+      <div class="t y"><span class="en">Tour operators</span><span class="sr">Turističke agencije</span></div>
       <div class="t"><span class="en">Experiences</span><span class="sr">Doživljaje</span></div>
     </div>
   </div>
@@ -439,7 +488,20 @@
 
 <!-- 7 · DIVIDER · PLATFORM -->
 <section class="slide divider" aria-label="Section: The Platform">
-  <img class="bg" src="https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=1600&q=70" alt="" onerror="this.style.display='none'">
+  <div class="appbg" aria-hidden="true">
+    <div class="board">
+      <div class="dash-top"><b>Balkina</b><span class="en">This week</span><span class="sr">Ova nedelja</span></div>
+      <div class="week">
+        <div class="day"><b class="en">Mon</b><b class="sr">Pon</b><div class="evt a">Ana · 9:00</div><div class="evt b">Luka · 10:30</div><div class="evt c">Mia · 13:00</div><div class="evt b">Iva · 16:00</div></div>
+        <div class="day"><b class="en">Tue</b><b class="sr">Uto</b><div class="evt b">Ivan · 9:30</div><div class="evt y">Team · 12:00</div><div class="evt a">Sara · 15:00</div></div>
+        <div class="day"><b class="en">Wed</b><b class="sr">Sre</b><div class="evt c">Maja · 10:00</div><div class="evt a">Vuk · 11:30</div><div class="evt b">Nik · 14:00</div><div class="evt a">Ema · 17:00</div></div>
+        <div class="day"><b class="en">Thu</b><b class="sr">Čet</b><div class="evt a">Ena · 9:00</div><div class="evt b">Filip · 12:30</div><div class="evt y">VIP · 16:00</div></div>
+        <div class="day"><b class="en">Fri</b><b class="sr">Pet</b><div class="evt b">Tara · 10:00</div><div class="evt c">Aleks · 13:30</div><div class="evt a">Lena · 18:00</div></div>
+        <div class="day"><b class="en">Sat</b><b class="sr">Sub</b><div class="evt y">Brunch · 11:00</div><div class="evt a">Mila · 14:00</div><div class="evt b">Ognjen · 16:30</div></div>
+        <div class="day"><b class="en">Sun</b><b class="sr">Ned</b><div class="evt c">Đorđe · 12:00</div><div class="evt a">Nina · 15:30</div></div>
+      </div>
+    </div>
+  </div>
   <div class="shade"></div>
   <div class="inner">
     <h2 class="en">The Platform</h2>
@@ -522,7 +584,17 @@
 
 <!-- 11 · DIVIDER · GET STARTED -->
 <section class="slide divider" aria-label="Section: Get Started">
-  <img class="bg" src="https://images.unsplash.com/photo-1556740738-b6a63e27c4df?w=1600&q=70" alt="" onerror="this.style.display='none'">
+  <div class="appbg" aria-hidden="true">
+    <div class="bookmock">
+      <div class="bm-head"><span class="en">Old Town Barbers</span><span class="sr">Berbernica Stari grad</span><span>★ 4.9 (127)</span></div>
+      <div class="bm-svc"><span class="en">Cut &amp; beard trim · 45 min</span><span class="sr">Šišanje i brada · 45 min</span><i>€18</i></div>
+      <div class="bm-svc"><span class="en">Haircut · 60 min</span><span class="sr">Šišanje · 60 min</span><i>€15</i></div>
+      <div class="slots">
+        <span class="slot">15:00</span><span class="slot">15:45</span><span class="slot on">17:30</span>
+        <span class="slot">18:15</span><span class="slot">19:00</span><span class="slot">19:45</span>
+      </div>
+    </div>
+  </div>
   <div class="shade"></div>
   <div class="inner">
     <h2 class="en">Get Started</h2>
