@@ -628,7 +628,7 @@ function Confirmation({ result, currency, onBookAnother }: {
   onBookAnother: () => void;
 }) {
   const isPending = result.status === 'pending' || result.status === 'pending_approval';
-  const appStoreUrl = 'https://apps.apple.com/app/balkina-ai/id6742752682';
+  const appStoreUrl = 'https://apps.apple.com/us/app/balkina-ai/id6761651423';
 
   return (
     <div className="text-center">

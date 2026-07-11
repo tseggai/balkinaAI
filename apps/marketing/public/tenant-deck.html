@@ -182,12 +182,21 @@
   .divider h2{font-size:clamp(40px,5.4vw,72px);}
   .divider .lede{margin:20px auto 0;}
   /* pricing */
-  .plans{display:flex;flex-direction:column;gap:16px;}
-  .plan{border:1px solid var(--hairline);padding:20px 22px 18px;background:var(--panel-2);border-radius:14px;}
+  .plans{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .plan{position:relative;border:1px solid var(--hairline);padding:18px 20px 16px;background:var(--panel-2);border-radius:14px;}
   .plan.hi{border-color:var(--sun-soft);background:var(--panel);}
-  .plan .name{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--sun);font-weight:700;}
-  .plan .price{font-weight:700;font-size:clamp(24px,2.2vw,30px);margin:6px 0 0;font-variant-numeric:tabular-nums;}
-  .plan p{margin:6px 0 0;color:var(--paper);font-weight:400;font-size:clamp(16px,1.4vw,19px);}
+  .pop{position:absolute;top:-11px;right:14px;background:var(--sun);color:var(--navy);font-size:10px;font-weight:700;letter-spacing:.08em;padding:4px 11px;border-radius:999px;text-transform:uppercase;}
+  .plan .name{font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--sun);font-weight:700;}
+  .plan .price{font-weight:700;font-size:clamp(22px,2vw,28px);margin:4px 0 0;font-variant-numeric:tabular-nums;}
+  .plan .price small{font-size:13px;font-weight:400;color:var(--slate);}
+  .plan .aud{margin:2px 0 0;color:var(--slate);font-weight:400;font-size:clamp(13px,1.1vw,15px);}
+  .plan p{margin:8px 0 0;color:var(--paper);font-weight:400;font-size:clamp(14px,1.25vw,17px);line-height:1.45;}
+  /* store badges + download note */
+  .dl-note{margin:26px 0 0;font-size:clamp(16px,1.5vw,20px);font-weight:400;color:var(--paper-dim);text-align:center;max-width:24em;}
+  .store-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:16px;}
+  .store{display:inline-flex;align-items:center;gap:9px;background:#101528;color:#fff;border-radius:999px;padding:13px 24px;text-decoration:none;font-weight:700;font-size:15px;}
+  .store svg{width:19px;height:19px;fill:#fff;}
+  .store:focus-visible{outline:2px solid var(--sun);outline-offset:3px;}
   /* CTA */
   .cta-col{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
   .cta-col .btn{width:300px;box-sizing:border-box;}
@@ -222,11 +231,16 @@
     .gap .n{font-size:15px;}
     .gap h3{font-size:17px;}
     .gap p{font-size:14px;}
-    .plans{gap:10px;}
-    .plan{padding:13px 16px 12px;}
+    .plans{grid-template-columns:1fr;gap:10px;}
+    .plan{padding:12px 14px 11px;}
     .plan .name{font-size:11px;}
-    .plan .price{font-size:20px;}
-    .plan p{font-size:14px;margin-top:3px;}
+    .plan .price{font-size:18px;}
+    .plan .aud{font-size:12px;}
+    .plan p{font-size:13px;margin-top:4px;}
+    .pop{top:-9px;font-size:9px;padding:3px 9px;}
+    .dl-note{font-size:15px;margin-top:16px;}
+    .store{padding:11px 18px;font-size:13px;}
+    .store svg{width:16px;height:16px;}
     .chat{gap:10px;margin-top:16px;}
     .bubble{font-size:14px;padding:10px 14px;}
     .avatar{flex-basis:28px;width:28px;height:28px;}
@@ -637,26 +651,43 @@
       <div>
         <h2 class="en">Start free. Grow when you do</h2>
         <h2 class="sr">Počnite besplatno. Rastite svojim tempom</h2>
+        <p class="kicker en">7-day free trial on every plan — no credit card, cancel anytime</p>
+        <p class="kicker sr">7 dana besplatne probe uz svaki plan — bez kartice, otkažite bilo kad</p>
       </div>
       <div>
         <div class="plans">
+          <div class="plan">
+            <div class="name">Solo</div>
+            <div class="price">€5 <small><span class="en">/mo</span><span class="sr">/mes</span></small></div>
+            <p class="aud en">For individuals getting started</p>
+            <p class="aud sr">Za pojedince na početku</p>
+            <p class="en">1 staff · 1 location · 20 bookings/mo</p>
+            <p class="sr">1 zaposleni · 1 lokacija · 20 rezervacija/mes</p>
+          </div>
+          <div class="plan">
+            <div class="name">Solo Pro</div>
+            <div class="price">€19 <small><span class="en">/mo</span><span class="sr">/mes</span></small></div>
+            <p class="aud en">For serious solo professionals</p>
+            <p class="aud sr">Za ozbiljne solo profesionalce</p>
+            <p class="en">1 staff · 1 location · Unlimited bookings</p>
+            <p class="sr">1 zaposleni · 1 lokacija · Neograničene rezervacije</p>
+          </div>
           <div class="plan hi">
-            <div class="name"><span class="en">Free Trial</span><span class="sr">Besplatna proba</span></div>
-            <div class="price"><span class="en">7 days</span><span class="sr">7 dana</span></div>
-            <p class="en">Every plan starts with a week on us — no credit card required</p>
-            <p class="sr">Svaki plan počinje nedeljom dana na naš račun — bez kreditne kartice</p>
+            <span class="pop"><span class="en">Most Popular</span><span class="sr">Najpopularniji</span></span>
+            <div class="name">Team</div>
+            <div class="price">€49 <small><span class="en">/mo</span><span class="sr">/mes</span></small></div>
+            <p class="aud en">For small teams</p>
+            <p class="aud sr">Za male timove</p>
+            <p class="en">Up to 5 staff · 2 locations · +€6/additional staff</p>
+            <p class="sr">Do 5 zaposlenih · 2 lokacije · +6 €/dodatni zaposleni</p>
           </div>
           <div class="plan">
-            <div class="name"><span class="en">Monthly Plans</span><span class="sr">Mesečni planovi</span></div>
-            <div class="price"><span class="en">From €29</span><span class="sr">Od 29 €</span></div>
-            <p class="en">Sized from a solo chair to multi-location teams. Additional staff from €6/month</p>
-            <p class="sr">Za sve veličine — od samostalne stolice do tima na više lokacija. Dodatno osoblje od 6 €/mesečno</p>
-          </div>
-          <div class="plan">
-            <div class="name"><span class="en">No Contracts</span><span class="sr">Bez ugovora</span></div>
-            <div class="price"><span class="en">Cancel anytime</span><span class="sr">Otkažite bilo kad</span></div>
-            <p class="en">Month to month, no lock-in. Current plans at balkina.ai/pricing</p>
-            <p class="sr">Iz meseca u mesec, bez obaveza. Aktuelni planovi na balkina.ai/pricing</p>
+            <div class="name">Scale</div>
+            <div class="price">€99 <small><span class="en">/mo</span><span class="sr">/mes</span></small></div>
+            <p class="aud en">For growing businesses</p>
+            <p class="aud sr">Za rastuće biznise</p>
+            <p class="en">Up to 15 staff · 5 locations · +€6/additional staff</p>
+            <p class="sr">Do 15 zaposlenih · 5 lokacija · +6 €/dodatni zaposleni</p>
           </div>
         </div>
       </div>
@@ -678,7 +709,12 @@
       <div>
         <div class="cta-col">
           <a class="btn gold" href="https://balkina.ai/join" target="_blank" rel="noopener"><span class="en">Start your free trial</span><span class="sr">Započnite besplatnu probu</span></a>
-          <a class="btn dark" href="https://balkina.ai/pricing" target="_blank" rel="noopener"><span class="en">See pricing</span><span class="sr">Pogledajte cene</span></a>
+          <p class="dl-note en">Download our app to see how your customers will experience it</p>
+          <p class="dl-note sr">Preuzmite našu aplikaciju i pogledajte kako će je vaši klijenti doživeti</p>
+          <div class="store-row">
+            <a class="store" href="https://apps.apple.com/us/app/balkina-ai/id6761651423" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>App Store</a>
+            <a class="store" href="https://play.google.com/store/apps/details?id=com.tseggaid.balkinaai" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-1.292l2.545 1.473c.68.394.68 1.03 0 1.424l-2.545 1.473-2.534-2.534 2.534-2.536zM5.864 2.658L16.8 8.99l-2.302 2.302-8.634-8.634z"/></svg>Google Play</a>
+          </div>
         </div>
       </div>
     </div>
