@@ -169,12 +169,35 @@
   @media (prefers-reduced-motion:reduce){
     .slide,.slide .chat .bubble,.progress{transition:none !important;}
   }
+
+  /* ---------- uploadable imagery wells ---------- */
+  [data-slot]{position:relative;}
+  [data-slot].has-media>*:not(.da-media):not(.da-tools){display:none!important;}
+  [data-slot][data-fit="cover"] .da-media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  [data-slot][data-fit="flow"] .da-media{display:block;width:100%;max-height:32vh;object-fit:cover;border-radius:3px;}
+  .img-well{margin-top:22px;}
+  .img-well:not(.has-media){display:none;}
+  .bgwell{position:absolute;inset:0;z-index:0;overflow:hidden;}
+  .bgwell.has-media::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(11,19,31,.78),rgba(11,19,31,.92));}
+  .slide>.inner{position:relative;z-index:1;}
+  .da-busy{opacity:.55;}
+  body.deck-edit [data-slot]{outline:2px dashed rgba(197,165,95,.6);outline-offset:4px;}
+  body.deck-edit .img-well:not(.has-media){display:flex;min-height:110px;align-items:center;justify-content:center;background:rgba(127,127,127,.16);}
+  body.deck-edit .img-well:not(.has-media)::before{content:attr(data-label);font-size:14px;opacity:.85;padding:0 16px;text-align:center;letter-spacing:.02em;text-transform:none;font-style:normal;}
+  body.deck-edit .bgwell,body.deck-edit .appbg{z-index:30;}
+  .da-tools{position:absolute;top:10px;right:10px;z-index:80;display:none;gap:8px;}
+  body.deck-edit .da-tools{display:flex;}
+  .da-tools button{background:rgba(10,14,30,.92);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:999px;font-size:12px;padding:7px 14px;cursor:pointer;font-family:inherit;}
+  .da-tools button:hover{border-color:rgba(197,165,95,.6);color:rgba(197,165,95,.6);}
+  .da-hint{position:fixed;left:50%;transform:translateX(-50%);bottom:76px;z-index:90;background:rgba(10,14,30,.94);color:#fff;font-size:13px;padding:10px 18px;border-radius:999px;border:1px solid rgba(255,255,255,.25);display:none;max-width:88vw;text-align:center;}
+  body.deck-edit .da-hint{display:block;}
 </style>
 
 <div class="progress" id="progress"></div>
 
 <!-- 1 · COVER -->
 <section class="slide active" aria-label="Cover">
+  <div class="bgwell" data-slot="cover-bg" data-fit="cover" data-label="Photography: property hero, marina at dusk (full-bleed)"></div>
   <div class="inner">
     <div class="cover-mark">Balkina AI · White Label</div>
     <h1>Your property.<br>Your app.<br><em class="gd">One concierge.</em></h1>
@@ -192,6 +215,7 @@
     <div class="catalogue">
       <span>Restaurants</span><span>Spa &amp; Wellness</span><span>Marina</span><span>Boutiques</span><span>Fitness</span><span>Events</span><span>Residences</span>
     </div>
+    <div class="img-well" data-slot="premise-photo" data-fit="flow" data-label="Photography: wide destination shot - promenade with venues"></div>
   </div>
 </section>
 
@@ -231,11 +255,13 @@
         <div class="rn">I</div>
         <h3>Your tenants</h3>
         <p>The businesses that fill your destination with life. They need customers and calm operations — not another piece of software to wrestle.</p>
+        <div class="img-well" data-slot="thesis-tenants" data-fit="flow" data-label="Photo: a tenant at work (barista, therapist, chef)"></div>
       </div>
       <div class="card">
         <div class="rn">II</div>
         <h3>Your residents</h3>
         <p>The people who chose to live in your world. They deserve recognition, a direct line to you, and a calendar worth staying for.</p>
+        <div class="img-well" data-slot="thesis-residents" data-fit="flow" data-label="Photo: residents at leisure on the property"></div>
       </div>
     </div>
     <p class="kicker">One branded app — your name on it — serves both. Balkina runs quietly underneath.</p>
@@ -244,6 +270,7 @@
 
 <!-- 5 · DIVIDER I -->
 <section class="slide" aria-label="Chapter one divider">
+  <div class="bgwell" data-slot="ch1-bg" data-fit="cover" data-label="Photography: the property by day (full-bleed)"></div>
   <div class="inner divider">
     <div class="big" aria-hidden="true">I</div>
     <div class="chapter">Chapter One</div>
@@ -266,7 +293,7 @@
           <li><strong>And when they’d rather just ask</strong> — the AI concierge takes it from there.</li>
         </ul>
       </div>
-      <div class="chat" aria-label="Example conversation">
+      <div class="chat" aria-label="Example conversation" data-slot="bookability-media" data-fit="flow" data-label="Screen recording: booking spa + dinner in the branded app">
         <div class="bubble guest"><span class="who">Guest</span>A massage after our sail on Saturday — and dinner for four at eight.</div>
         <div class="bubble concierge"><span class="who">Concierge</span>With pleasure. Spa Azure has 5:30 free after your charter, and I’m holding a table for four at Terrace at 8:00.</div>
         <div class="bubble guest"><span class="who">Guest</span>Book both.</div>
@@ -285,6 +312,7 @@
       <li><strong>Onboarding in minutes.</strong> Invite a business, or approve its application; staff, hours and a storefront are provisioned automatically.</li>
       <li><strong>Nothing to learn twice.</strong> No new hardware, no POS migration, no IT project.</li>
     </ul>
+    <div class="img-well" data-slot="backoffice-shot" data-fit="flow" data-label="Screenshot: tenant dashboard in a browser"></div>
     <p class="kicker">You’re not selling your tenants software. You’re providing them customers.</p>
   </div>
 </section>
@@ -299,11 +327,13 @@
       <li><strong>Under your name.</strong> Announcements, seasonal pushes, and operational notices arrive from the property, elegantly.</li>
       <li><strong>One view of the destination.</strong> Bookings, campaigns, and activity across every business — finally in one place.</li>
     </ul>
+    <div class="img-well" data-slot="comms-shot" data-fit="flow" data-label="Screenshot: property broadcast composer / received push"></div>
   </div>
 </section>
 
 <!-- 9 · DIVIDER II -->
 <section class="slide" aria-label="Chapter two divider">
+  <div class="bgwell" data-slot="ch2-bg" data-fit="cover" data-label="Photography: golden-hour event (full-bleed)"></div>
   <div class="inner divider">
     <div class="big" aria-hidden="true">II</div>
     <div class="chapter">Chapter Two</div>
@@ -322,6 +352,7 @@
       <li><strong>Each kind of resident, recognized as such:</strong> homeowners, renters, commercial owners.</li>
       <li><strong>The concierge greets them accordingly.</strong> <em class="gd">“Welcome back — Villa 12.”</em></li>
     </ul>
+    <div class="img-well" data-slot="recognition-shot" data-fit="flow" data-label="Screenshot: personalized “Welcome back - Villa 12” home screen"></div>
   </div>
 </section>
 
@@ -335,6 +366,7 @@
       <li><strong>Reach exactly who you mean.</strong> All members, or homeowners, renters, or commercial owners alone — by push, to their pocket.</li>
       <li><strong>News, notices, and privileges,</strong> delivered under your brand rather than a printed flyer in a lobby.</li>
     </ul>
+    <div class="img-well" data-slot="connection-shot" data-fit="flow" data-label="Screenshot: resident-only announcement push"></div>
   </div>
 </section>
 
@@ -348,6 +380,7 @@
       <li><strong>One-tap RSVP,</strong> per-guest QR passes, and door check-in from an iPad.</li>
       <li><strong>Resident-only guest lists</strong> when the evening calls for it.</li>
     </ul>
+    <div class="img-well" data-slot="events-photo" data-fit="flow" data-label="Photo: gala or brunch table / event card with QR pass"></div>
     <p class="kicker">The difference between an address and a community is a calendar.</p>
   </div>
 </section>
@@ -422,6 +455,7 @@
     <p class="eyebrow">In the World</p>
     <h2>See it live at <em class="gd">Portonovi</em>.</h2>
     <p class="lede">A branded concierge app for a luxury marina resort on the Adriatic — on-property booking, verified residents, private events. Your property could be next, in three weeks.</p>
+    <div class="img-well" data-slot="proof-photo" data-fit="flow" data-label="Photography: Portonovi + branded app screenshot"></div>
     <div class="cta-row">
       <a class="btn gold" href="https://calendly.com/balkina" target="_blank" rel="noopener">Book a private walkthrough</a>
       <a class="btn line" href="https://balkina.ai" target="_blank" rel="noopener">Experience Portonovi live</a>
@@ -469,6 +503,73 @@
     x0=null;
   },{passive:true});
   show(i);
+</script>
+<script>
+(function(){
+  var DECK="whitelabel", API="/api/deck-assets";
+  var wells=[].slice.call(document.querySelectorAll("[data-slot]"));
+  function apply(w,url){
+    var old=w.querySelector(".da-media"); if(old) old.remove();
+    var isBlob=/^blob:/.test(url);
+    var vid=/\.(mp4|webm)(\?|$)/i.test(url)||(isBlob&&w._isVid);
+    var el;
+    if(vid){el=document.createElement("video");el.autoplay=true;el.muted=true;el.loop=true;el.setAttribute("playsinline","");}
+    else{el=document.createElement("img");el.alt="";}
+    el.src=url; el.className="da-media";
+    w.classList.add("has-media"); w.appendChild(el);
+  }
+  function clear(w){var m=w.querySelector(".da-media");if(m)m.remove();w.classList.remove("has-media");}
+  fetch(API+"?deck="+DECK).then(function(r){return r.json();}).then(function(m){
+    wells.forEach(function(w){var a=m.assets&&m.assets[w.getAttribute("data-slot")];if(a)apply(w,a.url);});
+  }).catch(function(){});
+  if(!/[?&]edit(=|&|$)/.test(location.search))return;
+  document.body.classList.add("deck-edit");
+  var KEY=localStorage.getItem("deck_upload_key")||"";
+  if(!KEY){KEY=prompt("Deck upload key:")||"";if(KEY)localStorage.setItem("deck_upload_key",KEY);}
+  if(!KEY)return;
+  var hint=document.createElement("div");hint.className="da-hint";
+  hint.textContent="Edit mode - click Upload on any dashed area. PNG/JPG/WebP images or MP4/WebM loops.";
+  document.body.appendChild(hint);
+  var input=document.createElement("input");input.type="file";
+  input.accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm";
+  input.style.display="none";document.body.appendChild(input);
+  var target=null;
+  function badKey(){localStorage.removeItem("deck_upload_key");alert("Upload key rejected - reload the page and enter it again.");}
+  wells.forEach(function(w){
+    var t=document.createElement("div");t.className="da-tools";
+    var up=document.createElement("button");up.type="button";up.textContent="Upload";
+    var del=document.createElement("button");del.type="button";del.textContent="\u2715";
+    t.appendChild(up);t.appendChild(del);w.appendChild(t);
+    up.addEventListener("click",function(e){e.stopPropagation();target=w;input.click();});
+    del.addEventListener("click",function(e){
+      e.stopPropagation();
+      if(!confirm("Remove this image?"))return;
+      fetch(API,{method:"DELETE",headers:{"content-type":"application/json","x-deck-key":KEY},
+        body:JSON.stringify({deck:DECK,slot:w.getAttribute("data-slot")})})
+        .then(function(r){if(r.status===401){badKey();return;}clear(w);});
+    });
+  });
+  input.addEventListener("change",function(){
+    var f=input.files[0];input.value="";
+    if(!f||!target)return;
+    var w=target,ext=(f.name.split(".").pop()||"").toLowerCase();
+    w.classList.add("da-busy");
+    fetch(API,{method:"POST",headers:{"content-type":"application/json","x-deck-key":KEY},
+      body:JSON.stringify({deck:DECK,slot:w.getAttribute("data-slot"),ext:ext})})
+      .then(function(r){
+        if(r.status===401){badKey();throw 0;}
+        return r.json().then(function(j){if(!r.ok){alert(j.error||"Upload refused");throw 0;}return j;});
+      })
+      .then(function(j){return fetch(j.signedUrl,{method:"PUT",headers:{"content-type":f.type||"application/octet-stream","x-upsert":"true"},body:f});})
+      .then(function(up){
+        if(!up.ok){alert("Storage upload failed ("+up.status+")");throw 0;}
+        w._isVid=/^video\//.test(f.type);
+        apply(w,URL.createObjectURL(f));
+      })
+      .catch(function(){})
+      .then(function(){w.classList.remove("da-busy");});
+  });
+})();
 </script>
 </body>
 </html>
