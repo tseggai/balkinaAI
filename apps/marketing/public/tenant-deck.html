@@ -276,6 +276,28 @@
   @media (prefers-reduced-motion:reduce){
     .slide,.slide .chat .msg,.progress{transition:none !important;}
   }
+
+  /* ---------- uploadable imagery wells ---------- */
+  [data-slot]{position:relative;}
+  [data-slot].has-media>*:not(.da-media):not(.da-tools){display:none!important;}
+  [data-slot][data-fit="cover"] .da-media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  [data-slot][data-fit="flow"] .da-media{display:block;width:100%;max-height:32vh;object-fit:cover;border-radius:16px;}
+  .img-well{margin-top:22px;}
+  .img-well:not(.has-media){display:none;}
+  .bgwell{position:absolute;inset:0;z-index:0;overflow:hidden;}
+  .bgwell.has-media::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(24,31,74,.55),rgba(24,31,74,.8));}
+  .slide>.inner{position:relative;z-index:1;}
+  .da-busy{opacity:.55;}
+  body.deck-edit [data-slot]{outline:2px dashed rgba(255,227,0,.65);outline-offset:4px;}
+  body.deck-edit .img-well:not(.has-media){display:flex;min-height:110px;align-items:center;justify-content:center;background:rgba(127,127,127,.16);}
+  body.deck-edit .img-well:not(.has-media)::before{content:attr(data-label);font-size:14px;opacity:.85;padding:0 16px;text-align:center;letter-spacing:.02em;text-transform:none;font-style:normal;}
+  body.deck-edit .bgwell,body.deck-edit .appbg{z-index:30;}
+  .da-tools{position:absolute;top:10px;right:10px;z-index:80;display:none;gap:8px;}
+  body.deck-edit .da-tools{display:flex;}
+  .da-tools button{background:rgba(10,14,30,.92);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:999px;font-size:12px;padding:7px 14px;cursor:pointer;font-family:inherit;}
+  .da-tools button:hover{border-color:rgba(255,227,0,.65);color:rgba(255,227,0,.65);}
+  .da-hint{position:fixed;left:50%;transform:translateX(-50%);bottom:76px;z-index:90;background:rgba(10,14,30,.94);color:#fff;font-size:13px;padding:10px 18px;border-radius:999px;border:1px solid rgba(255,255,255,.25);display:none;max-width:88vw;text-align:center;}
+  body.deck-edit .da-hint{display:block;}
 </style>
 
 <div class="progress" id="progress"></div>
@@ -302,7 +324,7 @@
       <div>
         <div class="devices" aria-label="App preview">
           <div class="ipad">
-            <div class="scr">
+            <div class="scr" data-slot="cover-ipad" data-fit="cover" data-label="Screenshot: week calendar (iPad)">
               <div class="dash-top"><b>Balkina</b><span class="en">This week</span><span class="sr">Ova nedelja</span></div>
               <div class="week">
                 <div class="day"><b class="en">Mon</b><b class="sr">Pon</b><div class="evt a">Ana · 9:00</div><div class="evt b">Luka · 10:30</div><div class="evt c">Mia · 13:00</div></div>
@@ -314,7 +336,7 @@
             </div>
           </div>
           <div class="iphone">
-            <div class="scr">
+            <div class="scr" data-slot="cover-iphone" data-fit="cover" data-label="Screenshot: bookings list (iPhone)">
               <p class="ph-title"><span class="en">Bookings</span><span class="sr">Rezervacije</span></p>
               <div class="ph-card">
                 <div class="ph-row">
@@ -376,6 +398,7 @@
       <div>
         <h2 class="en">Bookings you never even saw are going to someone else</h2>
         <h2 class="sr">Rezervacije koje niste ni videli odlaze nekom drugom</h2>
+        <div class="img-well" data-slot="challenges-photo" data-fit="flow" data-label="Photo: busy owner mid-service, phone ringing unanswered"></div>
       </div>
       <div>
         <div class="gaps">
@@ -431,7 +454,7 @@
           <li class="en"><strong>Every booking lands in one calendar:</strong> with the customer's details and history attached</li>
           <li class="sr"><strong>Svaka rezervacija stiže u jedan kalendar:</strong> sa podacima i istorijom klijenta</li>
         </ul>
-        <div class="chat" aria-label="Example conversation">
+        <div class="chat" aria-label="Example conversation" data-slot="solution-media" data-fit="flow" data-label="Screen recording: chat booking, 6-8s loop">
           <div class="msg guest">
             <div class="bubble"><span class="en">Any openings for a cut and beard trim tomorrow after 5?</span><span class="sr">Ima li termina za šišanje i bradu sutra posle 17h?</span></div>
             <div class="avatar user" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 12c2.65 0 4.8-2.15 4.8-4.8S14.65 2.4 12 2.4 7.2 4.55 7.2 7.2 9.35 12 12 12Zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8Z"/></svg></div>
@@ -468,6 +491,7 @@
           <li class="en"><strong>Reviews build your reputation:</strong> good reviews mean you are presented with priority when customers search</li>
           <li class="sr"><strong>Recenzije grade vašu reputaciju:</strong> dobre recenzije znače prioritet kada klijenti pretražuju</li>
         </ul>
+        <div class="img-well" data-slot="discovery-shot" data-fit="flow" data-label="Screenshot: AI discovery results in the customer app"></div>
         <p class="kicker en">Let new customers find you easily</p>
         <p class="kicker sr">Neka vas novi klijenti lako pronađu</p>
       </div>
@@ -493,6 +517,7 @@
           <li class="en"><strong>Remember every customer:</strong> make returning seamless by learning their history and preferences in one profile</li>
           <li class="sr"><strong>Zapamtite svakog klijenta:</strong> povratak je bez napora uz istoriju i navike u jednom profilu</li>
         </ul>
+        <div class="img-well" data-slot="rebook-shot" data-fit="flow" data-label="Screenshot: reminder push notification on a lock screen"></div>
         <p class="kicker en">Let your loyal customers come back often</p>
         <p class="kicker sr">Neka se verni klijenti često vraćaju</p>
       </div>
@@ -502,7 +527,7 @@
 
 <!-- 7 · DIVIDER · PLATFORM -->
 <section class="slide divider" aria-label="Section: The Platform">
-  <div class="appbg" aria-hidden="true">
+  <div class="appbg" aria-hidden="true" data-slot="divider-platform-bg" data-fit="cover" data-label="Screenshot: real dashboard week calendar (background)">
     <div class="board">
       <div class="dash-top"><b>Balkina</b><span class="en">This week</span><span class="sr">Ova nedelja</span></div>
       <div class="week">
@@ -543,6 +568,7 @@
           <li class="en"><strong>Offer coupons and package deals:</strong> entice customers with coupons and upsell with package deals</li>
           <li class="sr"><strong>Ponudite kupone i pakete:</strong> privucite klijente kuponima i povećajte prodaju paketima</li>
         </ul>
+        <div class="img-well" data-slot="toolkit-shot" data-fit="flow" data-label="Screenshot: tenant dashboard (services or appointments)"></div>
         <p class="kicker en">CRM suite, without the complexity</p>
         <p class="kicker sr">CRM alati, bez komplikacija</p>
       </div>
@@ -568,6 +594,7 @@
           <li class="en"><strong>Sell on the travel platforms?</strong> connect Bokun and your Viator, GetYourGuide, and Airbnb Experiences bookings flow straight in</li>
           <li class="sr"><strong>Prodajete na turističkim platformama?</strong> povežite Bokun i rezervacije s Viator-a, GetYourGuide-a i Airbnb Experiences-a stižu same</li>
         </ul>
+        <div class="img-well" data-slot="sync-shot" data-fit="flow" data-label="Screenshot: calendar sync settings / Google Calendar side-by-side"></div>
       </div>
     </div>
   </div>
@@ -591,6 +618,7 @@
           <li class="en"><strong>The same one dashboard:</strong> runs it all, from a single table for two to a sold-out New Year's Eve</li>
           <li class="sr"><strong>Ista jedna tabla:</strong> vodi sve — od stola za dvoje do rasprodatog dočeka Nove godine</li>
         </ul>
+        <div class="img-well" data-slot="events-shot" data-fit="flow" data-label="Screenshot: ticketed event card with QR pass"></div>
       </div>
     </div>
   </div>
@@ -598,7 +626,7 @@
 
 <!-- 11 · DIVIDER · GET STARTED -->
 <section class="slide divider" aria-label="Section: Get Started">
-  <div class="appbg" aria-hidden="true">
+  <div class="appbg" aria-hidden="true" data-slot="divider-start-bg" data-fit="cover" data-label="Screenshot: public booking page (background)">
     <div class="bookmock">
       <div class="bm-head"><span class="en">Old Town Barbers</span><span class="sr">Berbernica Stari grad</span><span>★ 4.9 (127)</span></div>
       <div class="bm-svc"><span class="en">Cut &amp; beard trim · 45 min</span><span class="sr">Šišanje i brada · 45 min</span><i>€18</i></div>
@@ -636,6 +664,7 @@
           <li class="en"><strong>Share your link and go live:</strong> your first booking can arrive the same day</li>
           <li class="sr"><strong>Podelite svoj link i krenite:</strong> prva rezervacija može stići istog dana</li>
         </ul>
+        <div class="img-well" data-slot="setup-media" data-fit="flow" data-label="Screen recording: onboarding sped up 4x"></div>
         <p class="kicker en">No hardware and nothing to install</p>
         <p class="kicker sr">Bez opreme i bez instalacija</p>
       </div>
@@ -777,6 +806,73 @@
     x0=y0=null;
   },{passive:true});
   show(i);
+</script>
+<script>
+(function(){
+  var DECK="tenant", API="/api/deck-assets";
+  var wells=[].slice.call(document.querySelectorAll("[data-slot]"));
+  function apply(w,url){
+    var old=w.querySelector(".da-media"); if(old) old.remove();
+    var isBlob=/^blob:/.test(url);
+    var vid=/\.(mp4|webm)(\?|$)/i.test(url)||(isBlob&&w._isVid);
+    var el;
+    if(vid){el=document.createElement("video");el.autoplay=true;el.muted=true;el.loop=true;el.setAttribute("playsinline","");}
+    else{el=document.createElement("img");el.alt="";}
+    el.src=url; el.className="da-media";
+    w.classList.add("has-media"); w.appendChild(el);
+  }
+  function clear(w){var m=w.querySelector(".da-media");if(m)m.remove();w.classList.remove("has-media");}
+  fetch(API+"?deck="+DECK).then(function(r){return r.json();}).then(function(m){
+    wells.forEach(function(w){var a=m.assets&&m.assets[w.getAttribute("data-slot")];if(a)apply(w,a.url);});
+  }).catch(function(){});
+  if(!/[?&]edit(=|&|$)/.test(location.search))return;
+  document.body.classList.add("deck-edit");
+  var KEY=localStorage.getItem("deck_upload_key")||"";
+  if(!KEY){KEY=prompt("Deck upload key:")||"";if(KEY)localStorage.setItem("deck_upload_key",KEY);}
+  if(!KEY)return;
+  var hint=document.createElement("div");hint.className="da-hint";
+  hint.textContent="Edit mode - click Upload on any dashed area. PNG/JPG/WebP images or MP4/WebM loops.";
+  document.body.appendChild(hint);
+  var input=document.createElement("input");input.type="file";
+  input.accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm";
+  input.style.display="none";document.body.appendChild(input);
+  var target=null;
+  function badKey(){localStorage.removeItem("deck_upload_key");alert("Upload key rejected - reload the page and enter it again.");}
+  wells.forEach(function(w){
+    var t=document.createElement("div");t.className="da-tools";
+    var up=document.createElement("button");up.type="button";up.textContent="Upload";
+    var del=document.createElement("button");del.type="button";del.textContent="\u2715";
+    t.appendChild(up);t.appendChild(del);w.appendChild(t);
+    up.addEventListener("click",function(e){e.stopPropagation();target=w;input.click();});
+    del.addEventListener("click",function(e){
+      e.stopPropagation();
+      if(!confirm("Remove this image?"))return;
+      fetch(API,{method:"DELETE",headers:{"content-type":"application/json","x-deck-key":KEY},
+        body:JSON.stringify({deck:DECK,slot:w.getAttribute("data-slot")})})
+        .then(function(r){if(r.status===401){badKey();return;}clear(w);});
+    });
+  });
+  input.addEventListener("change",function(){
+    var f=input.files[0];input.value="";
+    if(!f||!target)return;
+    var w=target,ext=(f.name.split(".").pop()||"").toLowerCase();
+    w.classList.add("da-busy");
+    fetch(API,{method:"POST",headers:{"content-type":"application/json","x-deck-key":KEY},
+      body:JSON.stringify({deck:DECK,slot:w.getAttribute("data-slot"),ext:ext})})
+      .then(function(r){
+        if(r.status===401){badKey();throw 0;}
+        return r.json().then(function(j){if(!r.ok){alert(j.error||"Upload refused");throw 0;}return j;});
+      })
+      .then(function(j){return fetch(j.signedUrl,{method:"PUT",headers:{"content-type":f.type||"application/octet-stream","x-upsert":"true"},body:f});})
+      .then(function(up){
+        if(!up.ok){alert("Storage upload failed ("+up.status+")");throw 0;}
+        w._isVid=/^video\//.test(f.type);
+        apply(w,URL.createObjectURL(f));
+      })
+      .catch(function(){})
+      .then(function(){w.classList.remove("da-busy");});
+  });
+})();
 </script>
 </body>
 </html>
