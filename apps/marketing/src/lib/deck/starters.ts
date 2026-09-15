@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Original seeded slide content — lets the admin 'Restore from starter' a slide.
-// Generated from packages/db/migrations/064_deck_slides.sql.
+// Generated from packages/db/migrations/064 (white-label) and 066 (tenant).
 import type { DeckId } from './types';
 
 export interface Starter {
@@ -188,12 +188,152 @@ export const STARTERS: Record<DeckId, Starter[]> = {
    }
   },
   {
-   "template": "points-chat",
-   "label": "04 · Balkina AI receptionist that never sleeps",
+   "template": "overview",
+   "label": "04 · Run your business end to end with one tool",
    "content": {
     "eyebrow": {
-     "en": "The Solution",
-     "sr": "Rešenje"
+     "en": "The Platform",
+     "sr": "Platforma"
+    },
+    "title": {
+     "en": "Run your business end to end with one tool",
+     "sr": "Vodite svoj biznis od početka do kraja uz jedan alat"
+    },
+    "lede": {
+     "en": "Every module below is included. The next slides go through each one.",
+     "sr": "Svaki modul ispod je uključen. Naredni slajdovi prolaze kroz svaki od njih."
+    },
+    "features": [
+     {
+      "name": {
+       "en": "AI receptionist",
+       "sr": "AI recepcioner"
+      },
+      "desc": {
+       "en": "books for you 24/7 in chat — instant or with your approval",
+       "sr": "zakazuje umesto vas 24/7 u chatu — odmah ili uz vaše odobrenje"
+      }
+     },
+     {
+      "name": {
+       "en": "Discovery in the app",
+       "sr": "Otkrivanje u aplikaciji"
+      },
+      "desc": {
+       "en": "nearby customers find you with open slots",
+       "sr": "klijenti u blizini vas pronalaze sa slobodnim terminima"
+      }
+     },
+     {
+      "name": {
+       "en": "Your booking link",
+       "sr": "Vaš link za rezervacije"
+      },
+      "desc": {
+       "en": "Instagram, Google, WhatsApp — one link, direct bookings",
+       "sr": "Instagram, Google, WhatsApp — jedan link, direktne rezervacije"
+      }
+     },
+     {
+      "name": {
+       "en": "Smart rebooking",
+       "sr": "Pametno ponovno zakazivanje"
+      },
+      "desc": {
+       "en": "AI nudges regulars when they're due",
+       "sr": "AI podseća stalne klijente kada im je vreme"
+      }
+     },
+     {
+      "name": {
+       "en": "Reminders",
+       "sr": "Podsetnici"
+      },
+      "desc": {
+       "en": "AI and SMS reminders cut no-shows",
+       "sr": "AI i SMS podsetnici smanjuju nedolaske"
+      }
+     },
+     {
+      "name": {
+       "en": "Customer CRM",
+       "sr": "CRM klijenata"
+      },
+      "desc": {
+       "en": "history and preferences in one profile",
+       "sr": "istorija i navike u jednom profilu"
+      }
+     },
+     {
+      "name": {
+       "en": "Services, staff & schedules",
+       "sr": "Usluge, osoblje i rasporedi"
+      },
+      "desc": {
+       "en": "durations, buffers, days off, locations",
+       "sr": "trajanja, pauze, slobodni dani, lokacije"
+      }
+     },
+     {
+      "name": {
+       "en": "Appointments",
+       "sr": "Termini"
+      },
+      "desc": {
+       "en": "approve, reschedule, reach customers in one tap",
+       "sr": "odobrite, pomerite, kontaktirajte klijente jednim dodirom"
+      }
+     },
+     {
+      "name": {
+       "en": "Coupons & packages",
+       "sr": "Kuponi i paketi"
+      },
+      "desc": {
+       "en": "entice new customers, upsell regulars",
+       "sr": "privucite nove, prodajte više stalnima"
+      }
+     },
+     {
+      "name": {
+       "en": "Calendar sync",
+       "sr": "Sinhronizacija kalendara"
+      },
+      "desc": {
+       "en": "Google two-way, iCal, Airbnb, Calendly",
+       "sr": "Google dvosmerno, iCal, Airbnb, Calendly"
+      }
+     },
+     {
+      "name": {
+       "en": "Travel platforms",
+       "sr": "Turističke platforme"
+      },
+      "desc": {
+       "en": "Bokun: Viator, GetYourGuide, Airbnb Experiences",
+       "sr": "Bokun: Viator, GetYourGuide, Airbnb Experiences"
+      }
+     },
+     {
+      "name": {
+       "en": "Restaurants & events",
+       "sr": "Restorani i događaji"
+      },
+      "desc": {
+       "en": "tables and ticketed evenings, same dashboard",
+       "sr": "stolovi i večeri s ulaznicama, ista tabla"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "template": "points-chat",
+   "label": "05 · Balkina AI receptionist that never sleeps",
+   "content": {
+    "eyebrow": {
+     "en": "AI Receptionist",
+     "sr": "AI recepcioner"
     },
     "title": {
      "en": "Balkina AI receptionist that never sleeps",
@@ -258,45 +398,45 @@ export const STARTERS: Record<DeckId, Starter[]> = {
   },
   {
    "template": "points",
-   "label": "05 · Grow your business by helping new customers find you",
+   "label": "06 · New customers find you in the app",
    "content": {
     "eyebrow": {
-     "en": "New Customers",
-     "sr": "Novi klijenti"
+     "en": "Discovery",
+     "sr": "Otkrivanje"
     },
     "title": {
-     "en": "Grow your business by helping new customers find you",
-     "sr": "Rastite tako što vas novi klijenti lako pronalaze"
+     "en": "New customers find you in the app",
+     "sr": "Novi klijenti vas pronalaze u aplikaciji"
     },
     "points": [
      {
       "strong": {
-       "en": "You'll be discovered in the app:",
-       "sr": "Bićete otkriveni u aplikaciji:"
+       "en": "Found when it matters:",
+       "sr": "Pronađeni kada je važno:"
       },
       "text": {
-       "en": "when people nearby search for you, our AI will display your services with open time slots",
-       "sr": "kada ljudi u blizini traže vašu uslugu, naš AI prikazuje vaše usluge sa slobodnim terminima"
+       "en": "when people nearby search for your service, our AI shows you with open time slots",
+       "sr": "kada ljudi u blizini traže vašu uslugu, naš AI prikazuje vas sa slobodnim terminima"
       }
      },
      {
       "strong": {
-       "en": "Your own booking link:",
-       "sr": "Vaš lični link za rezervacije:"
+       "en": "Reviews build your ranking:",
+       "sr": "Recenzije grade vaš rang:"
       },
       "text": {
-       "en": "add your private Balkina link on Instagram, Google profiles, and WhatsApp replies. Customers book you directly",
-       "sr": "dodajte svoj Balkina link na Instagram, Google profil i u WhatsApp odgovore. Klijenti vas rezervišu direktno"
-      }
-     },
-     {
-      "strong": {
-       "en": "Reviews build your reputation:",
-       "sr": "Recenzije grade vašu reputaciju:"
-      },
-      "text": {
-       "en": "good reviews mean you are presented with priority when customers search",
+       "en": "good reviews mean priority placement when customers search",
        "sr": "dobre recenzije znače prioritet kada klijenti pretražuju"
+      }
+     },
+     {
+      "strong": {
+       "en": "No ads to buy:",
+       "sr": "Bez plaćenih oglasa:"
+      },
+      "text": {
+       "en": "discovery comes with your listing — nothing extra to run",
+       "sr": "otkrivanje dolazi uz vaš profil — ništa dodatno ne vodite"
       }
      }
     ],
@@ -308,45 +448,95 @@ export const STARTERS: Record<DeckId, Starter[]> = {
   },
   {
    "template": "points",
-   "label": "06 · Retain loyal customers by making it easy to rebook",
+   "label": "07 · One link that books you everywhere",
+   "content": {
+    "eyebrow": {
+     "en": "Booking Link",
+     "sr": "Link za rezervacije"
+    },
+    "title": {
+     "en": "One link that books you everywhere",
+     "sr": "Jedan link koji vas zakazuje svuda"
+    },
+    "points": [
+     {
+      "strong": {
+       "en": "Put it where customers already are:",
+       "sr": "Stavite ga gde su klijenti već:"
+      },
+      "text": {
+       "en": "Instagram bio, Google profile, WhatsApp replies",
+       "sr": "Instagram bio, Google profil, WhatsApp odgovori"
+      }
+     },
+     {
+      "strong": {
+       "en": "A booking page built for you:",
+       "sr": "Stranica za rezervacije napravljena za vas:"
+      },
+      "text": {
+       "en": "services, prices and live availability — customers book without the app",
+       "sr": "usluge, cene i dostupnost uživo — klijenti rezervišu i bez aplikacije"
+      }
+     },
+     {
+      "strong": {
+       "en": "Every booking lands in one calendar:",
+       "sr": "Svaka rezervacija stiže u jedan kalendar:"
+      },
+      "text": {
+       "en": "with the customer's details attached",
+       "sr": "sa podacima klijenta"
+      }
+     }
+    ],
+    "kicker": {
+     "en": "",
+     "sr": ""
+    }
+   }
+  },
+  {
+   "template": "points",
+   "label": "08 · Regulars come back before they drift",
    "content": {
     "eyebrow": {
      "en": "Regular Customers",
      "sr": "Stalni klijenti"
     },
     "title": {
-     "en": "Retain loyal customers by making it easy to rebook",
-     "sr": "Zadržite verne klijente uz lako ponovno zakazivanje"
+     "en": "Regulars come back before they drift",
+     "sr": "Stalni klijenti se vraćaju pre nego što se izgube"
     },
     "points": [
      {
       "strong": {
-       "en": "Use Balkina to learn their rhythm:",
+       "en": "Balkina learns their rhythm:",
        "sr": "Balkina uči njihov ritam:"
       },
       "text": {
-       "en": "when a regular is due, AI nudges them to book again before they drift",
-       "sr": "kada je stalnom klijentu vreme, AI ga podseti da zakaže pre nego što se izgubi"
+       "en": "every four weeks, every summer — the AI knows when a regular is due",
+       "sr": "svake četiri nedelje, svakog leta — AI zna kada je stalnom klijentu vreme"
       }
      },
      {
       "strong": {
-       "en": "Automatic reminders:",
-       "sr": "Automatski podsetnici:"
+       "en": "A nudge at the right moment:",
+       "sr": "Podsticaj u pravom trenutku:"
       },
       "text": {
-       "en": "AI and SMS reminders keep appointments on time and reduce no-shows",
-       "sr": "AI i SMS podsetnici drže termine na vremenu i smanjuju nedolaske"
+       "en": "a friendly push notification with a one-tap rebook",
+       "sr": "prijateljska notifikacija sa ponovnim zakazivanjem jednim dodirom"
       }
      },
      {
       "strong": {
-       "en": "Remember every customer:",
-       "sr": "Zapamtite svakog klijenta:"
+       "en": "You do nothing:",
+       "sr": "Vi ne radite ništa:"
       },
       "text": {
-       "en": "make returning seamless by learning their history and preferences in one profile",
-       "sr": "povratak je bez napora uz istoriju i navike u jednom profilu"
+       "en": "it runs in the background for every customer",
+       "sr": "radi u pozadini za svakog klijenta"
       }
      }
     ],
@@ -357,77 +547,262 @@ export const STARTERS: Record<DeckId, Starter[]> = {
    }
   },
   {
-   "template": "divider",
-   "label": "07 · The Platform",
-   "content": {
-    "title": {
-     "en": "The Platform",
-     "sr": "Platforma"
-    },
-    "lede": {
-     "en": "Everything behind the counter, in one place",
-     "sr": "Sve iza pulta, na jednom mestu"
-    },
-    "mock": "calendar"
-   }
-  },
-  {
    "template": "points",
-   "label": "08 · A booking suite that fits businesses of all sizes",
+   "label": "09 · Fewer no-shows, without the phone calls",
    "content": {
     "eyebrow": {
-     "en": "A Central Command",
-     "sr": "Centralna komanda"
+     "en": "Reminders",
+     "sr": "Podsetnici"
     },
     "title": {
-     "en": "A booking suite that fits businesses of all sizes",
-     "sr": "Sistem za zakazivanje za biznise svih veličina"
+     "en": "Fewer no-shows, without the phone calls",
+     "sr": "Manje nedolazaka, bez telefonskih poziva"
     },
     "points": [
      {
       "strong": {
-       "en": "Manage services, staff, and schedules:",
-       "sr": "Upravljajte uslugama, osobljem i rasporedima:"
+       "en": "Automatic reminders:",
+       "sr": "Automatski podsetnici:"
       },
       "text": {
-       "en": "durations, buffer times, days off, per-staff availability, multiple locations",
-       "sr": "trajanja, pauze, slobodni dani, dostupnost po zaposlenom, više lokacija"
+       "en": "AI and SMS reminders before every appointment",
+       "sr": "AI i SMS podsetnici pre svakog termina"
       }
      },
      {
       "strong": {
-       "en": "Manage appointments end to end:",
-       "sr": "Vodite termine od početka do kraja:"
+       "en": "Confirm or reschedule in one tap:",
+       "sr": "Potvrda ili pomeranje jednim dodirom:"
       },
       "text": {
-       "en": "approve, reschedule, and reach customers by call, text, WhatsApp, or email",
-       "sr": "odobrite, pomerite i kontaktirajte klijente pozivom, porukom, WhatsApp-om ili mejlom"
+       "en": "customers fix their own plans — your calendar stays accurate",
+       "sr": "klijenti sami sređuju svoje planove — vaš kalendar ostaje tačan"
       }
      },
      {
       "strong": {
-       "en": "Offer coupons and package deals:",
-       "sr": "Ponudite kupone i pakete:"
+       "en": "Your rules:",
+       "sr": "Vaša pravila:"
       },
       "text": {
-       "en": "entice customers with coupons and upsell with package deals",
-       "sr": "privucite klijente kuponima i povećajte prodaju paketima"
+       "en": "choose when reminders go out and what they say",
+       "sr": "izaberite kada podsetnici idu i šta piše u njima"
       }
      }
     ],
     "kicker": {
-     "en": "CRM suite, without the complexity",
-     "sr": "CRM alati, bez komplikacija"
+     "en": "",
+     "sr": ""
     }
    }
   },
   {
    "template": "points",
-   "label": "09 · Keep all your existing calendars in sync",
+   "label": "10 · Remember every customer",
    "content": {
     "eyebrow": {
-     "en": "No More Double Booking",
-     "sr": "Bez duplih rezervacija"
+     "en": "Customer CRM",
+     "sr": "CRM klijenata"
+    },
+    "title": {
+     "en": "Remember every customer",
+     "sr": "Zapamtite svakog klijenta"
+    },
+    "points": [
+     {
+      "strong": {
+       "en": "One profile per customer:",
+       "sr": "Jedan profil po klijentu:"
+      },
+      "text": {
+       "en": "history, preferences, notes and no-shows",
+       "sr": "istorija, navike, beleške i nedolasci"
+      }
+     },
+     {
+      "strong": {
+       "en": "Context before they walk in:",
+       "sr": "Kontekst pre nego što uđu:"
+      },
+      "text": {
+       "en": "see what they had last time and who did it",
+       "sr": "vidite šta su imali prošli put i ko je radio"
+      }
+     },
+     {
+      "strong": {
+       "en": "Reach them directly:",
+       "sr": "Kontaktirajte ih direktno:"
+      },
+      "text": {
+       "en": "call, text, WhatsApp or email from the profile",
+       "sr": "poziv, poruka, WhatsApp ili mejl iz profila"
+      }
+     }
+    ],
+    "kicker": {
+     "en": "",
+     "sr": ""
+    }
+   }
+  },
+  {
+   "template": "points",
+   "label": "11 · Services, staff and schedules — set once",
+   "content": {
+    "eyebrow": {
+     "en": "Set Up Your Business",
+     "sr": "Podesite svoj biznis"
+    },
+    "title": {
+     "en": "Services, staff and schedules — set once",
+     "sr": "Usluge, osoblje i rasporedi — podesite jednom"
+    },
+    "points": [
+     {
+      "strong": {
+       "en": "Services the way you sell them:",
+       "sr": "Usluge onako kako ih prodajete:"
+      },
+      "text": {
+       "en": "durations, prices, buffer times, add-ons",
+       "sr": "trajanja, cene, pauze, dodaci"
+      }
+     },
+     {
+      "strong": {
+       "en": "Staff and their hours:",
+       "sr": "Osoblje i njihovo radno vreme:"
+      },
+      "text": {
+       "en": "per-person availability, days off, who does what",
+       "sr": "dostupnost po osobi, slobodni dani, ko šta radi"
+      }
+     },
+     {
+      "strong": {
+       "en": "One location or many:",
+       "sr": "Jedna lokacija ili više njih:"
+      },
+      "text": {
+       "en": "each with its own hours and team",
+       "sr": "svaka sa svojim radnim vremenom i timom"
+      }
+     }
+    ],
+    "kicker": {
+     "en": "",
+     "sr": ""
+    }
+   }
+  },
+  {
+   "template": "points",
+   "label": "12 · Manage every appointment end to end",
+   "content": {
+    "eyebrow": {
+     "en": "Appointments",
+     "sr": "Termini"
+    },
+    "title": {
+     "en": "Manage every appointment end to end",
+     "sr": "Vodite svaki termin od početka do kraja"
+    },
+    "points": [
+     {
+      "strong": {
+       "en": "Approve or auto-confirm:",
+       "sr": "Odobrite ili automatski potvrdite:"
+      },
+      "text": {
+       "en": "you decide which bookings need a yes from you",
+       "sr": "vi odlučujete koje rezervacije traže vaš pristanak"
+      }
+     },
+     {
+      "strong": {
+       "en": "Reschedule in seconds:",
+       "sr": "Pomerite za par sekundi:"
+      },
+      "text": {
+       "en": "drag to a new slot — the customer is notified",
+       "sr": "prevucite na novi termin — klijent dobija obaveštenje"
+      }
+     },
+     {
+      "strong": {
+       "en": "On your phone or desktop:",
+       "sr": "Na telefonu ili računaru:"
+      },
+      "text": {
+       "en": "the same calendar behind the counter and on the go",
+       "sr": "isti kalendar iza pulta i u pokretu"
+      }
+     }
+    ],
+    "kicker": {
+     "en": "",
+     "sr": ""
+    }
+   }
+  },
+  {
+   "template": "points",
+   "label": "13 · Entice new customers, upsell regulars",
+   "content": {
+    "eyebrow": {
+     "en": "Coupons & Packages",
+     "sr": "Kuponi i paketi"
+    },
+    "title": {
+     "en": "Entice new customers, upsell regulars",
+     "sr": "Privucite nove klijente, prodajte više stalnima"
+    },
+    "points": [
+     {
+      "strong": {
+       "en": "Coupons:",
+       "sr": "Kuponi:"
+      },
+      "text": {
+       "en": "discount codes with limits and expiry, redeemed at booking",
+       "sr": "kodovi za popust sa ograničenjima i rokom, iskorišćeni pri rezervaciji"
+      }
+     },
+     {
+      "strong": {
+       "en": "Package deals:",
+       "sr": "Paketi:"
+      },
+      "text": {
+       "en": "bundle services or sessions at a better price",
+       "sr": "spojite usluge ili sesije po boljoj ceni"
+      }
+     },
+     {
+      "strong": {
+       "en": "Tracked automatically:",
+       "sr": "Praćeno automatski:"
+      },
+      "text": {
+       "en": "usage and revenue per offer, in your dashboard",
+       "sr": "korišćenje i prihod po ponudi, u vašoj tabli"
+      }
+     }
+    ],
+    "kicker": {
+     "en": "",
+     "sr": ""
+    }
+   }
+  },
+  {
+   "template": "points",
+   "label": "14 · Keep all your existing calendars in sync",
+   "content": {
+    "eyebrow": {
+     "en": "Calendar Sync",
+     "sr": "Sinhronizacija kalendara"
     },
     "title": {
      "en": "Keep all your existing calendars in sync",
@@ -450,18 +825,18 @@ export const STARTERS: Record<DeckId, Starter[]> = {
        "sr": "iCal svuda:"
       },
       "text": {
-       "en": "export to Apple Calendar and Outlook; import Airbnb, Calendly, and others to stay double-booking-proof",
-       "sr": "izvezite u Apple Calendar i Outlook; uvezite Airbnb, Calendly i druge — bez duplih rezervacija"
+       "en": "export to Apple Calendar and Outlook; import Airbnb, Calendly and others",
+       "sr": "izvezite u Apple Calendar i Outlook; uvezite Airbnb, Calendly i druge"
       }
      },
      {
       "strong": {
-       "en": "Sell on the travel platforms?",
-       "sr": "Prodajete na turističkim platformama?"
+       "en": "Double-booking-proof:",
+       "sr": "Bez duplih rezervacija:"
       },
       "text": {
-       "en": "connect Bokun and your Viator, GetYourGuide, and Airbnb Experiences bookings flow straight in",
-       "sr": "povežite Bokun i rezervacije s Viator-a, GetYourGuide-a i Airbnb Experiences-a stižu same"
+       "en": "a busy slot anywhere is a busy slot everywhere",
+       "sr": "zauzet termin bilo gde je zauzet svuda"
       }
      }
     ],
@@ -473,7 +848,57 @@ export const STARTERS: Record<DeckId, Starter[]> = {
   },
   {
    "template": "points",
-   "label": "10 · Balkina AI books tables and ticketed evenings, too",
+   "label": "15 · Sell on Viator and GetYourGuide — bookings flow straight in",
+   "content": {
+    "eyebrow": {
+     "en": "Travel Platforms",
+     "sr": "Turističke platforme"
+    },
+    "title": {
+     "en": "Sell on Viator and GetYourGuide — bookings flow straight in",
+     "sr": "Prodajete na Viator-u i GetYourGuide-u — rezervacije stižu same"
+    },
+    "points": [
+     {
+      "strong": {
+       "en": "Connect Bokun once:",
+       "sr": "Povežite Bokun jednom:"
+      },
+      "text": {
+       "en": "your Viator, GetYourGuide and Airbnb Experiences bookings appear in Balkina",
+       "sr": "vaše rezervacije s Viator-a, GetYourGuide-a i Airbnb Experiences-a se pojavljuju u Balkini"
+      }
+     },
+     {
+      "strong": {
+       "en": "One capacity, everywhere:",
+       "sr": "Jedan kapacitet, svuda:"
+      },
+      "text": {
+       "en": "no overselling a tour that's already full",
+       "sr": "bez preprodaje ture koja je već puna"
+      }
+     },
+     {
+      "strong": {
+       "en": "Direct bookings too:",
+       "sr": "I direktne rezervacije:"
+      },
+      "text": {
+       "en": "locals and repeat guests book you commission-free",
+       "sr": "lokalni i stalni gosti vas rezervišu bez provizije"
+      }
+     }
+    ],
+    "kicker": {
+     "en": "",
+     "sr": ""
+    }
+   }
+  },
+  {
+   "template": "points",
+   "label": "16 · Balkina AI books tables and ticketed evenings, too",
    "content": {
     "eyebrow": {
      "en": "Hospitality",
@@ -523,7 +948,7 @@ export const STARTERS: Record<DeckId, Starter[]> = {
   },
   {
    "template": "divider",
-   "label": "11 · Get Started",
+   "label": "17 · Get Started",
    "content": {
     "title": {
      "en": "Get Started",
@@ -538,7 +963,7 @@ export const STARTERS: Record<DeckId, Starter[]> = {
   },
   {
    "template": "points",
-   "label": "12 · Free to start. Live in an afternoon",
+   "label": "18 · Free to start. Live in an afternoon",
    "content": {
     "eyebrow": {
      "en": "Easy Setup",
@@ -588,7 +1013,7 @@ export const STARTERS: Record<DeckId, Starter[]> = {
   },
   {
    "template": "pricing",
-   "label": "13 · Start free. Grow when you do",
+   "label": "19 · Start free. Grow when you do",
    "content": {
     "eyebrow": {
      "en": "Pricing",
@@ -692,7 +1117,7 @@ export const STARTERS: Record<DeckId, Starter[]> = {
   },
   {
    "template": "cta",
-   "label": "14 · Put your bookings on",
+   "label": "20 · Put your bookings on",
    "content": {
     "eyebrow": {
      "en": "Get Started",

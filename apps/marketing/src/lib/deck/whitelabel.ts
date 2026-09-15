@@ -217,7 +217,7 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
   {
     id: 'wl-points',
     category: 'FEATURE',
-    name: 'Title + bullet points',
+    name: 'Feature (text left, image right)',
     fields: [
       { key: 'eyebrow', label: 'Eyebrow', kind: 'text', bilingual: true },
       { key: 'title', label: 'Title', kind: 'text', bilingual: true },
@@ -229,10 +229,16 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
     render: (c) => `<section class="slide" aria-label="${esc(bi0(c.eyebrow))}">
   <div class="inner">
     ${eyebrow(c.eyebrow)}
-    ${dual('h2', c.title, '', 'title', true)}
-    ${pointsList(c.points)}
-    ${flowWell('shot', 'Screenshot / photo', c)}
-    ${kicker(c.kicker)}
+    <div class="cols">
+      <div>
+        ${dual('h2', c.title, '', 'title', true)}
+        ${pointsList(c.points)}
+        ${kicker(c.kicker)}
+      </div>
+      <div class="feature-media">
+        ${flowWell('shot', 'Screenshot / photo', c)}
+      </div>
+    </div>
   </div>
 </section>`,
   },
