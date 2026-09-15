@@ -13,6 +13,7 @@ export async function GET() {
       .from('deck_slides')
       .select('id, deck, position, template, content')
       .eq('deck', 'tenant')
+      .eq('visible', true)
       .order('position', { ascending: true });
     if (error) throw error;
     const html = buildDeckHtml('tenant', (data ?? []) as SlideRow[]);
