@@ -241,6 +241,7 @@ The /api/chat endpoint accepts tenantId as OPTIONAL. When no tenantId is provide
 ## Deployment
 - **Marketing site (apps/marketing)**: Serves the root domain **balkina.ai** (separate Vercel project, root directory `apps/marketing`). Public pages: landing, pricing, `/b/<business>` web booking, `/p/` property portals (custom domains), `/deck` pitch deck.
 - **Tenant Panel (apps/web)**: Deployed to Vercel as `balkina-ai` project. Live at **app.balkina.ai** (also balkina-ai.vercel.app).
+- **Deck CMS**: `/deck` (white-label) and `/tenant-deck` are rendered server-side from the `deck_slides` table (Migration 064; deck, position, template, content jsonb). Templates + render fns + field schemas live in `apps/marketing/src/lib/deck/`. PowerPoint-style editors at `/deck/admin` and `/tenant-deck/admin` (slide list, add/reorder/duplicate/delete, live preview, click-to-upload image wells into the `deck-assets` storage bucket). All writes are gated by the `DECK_UPLOAD_KEY` env var (marketing Vercel project) via the `x-deck-key` header; media URLs are stored in `content.media`. Do NOT recreate static `public/deck.html` / `public/tenant-deck.html` — they would shadow the dynamic routes.
 - **Admin Panel (apps/admin)**: Deployed to Vercel as a separate project, root directory `apps/admin`. Env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_MAPS_API_KEY`.
 
 ## When Stuck

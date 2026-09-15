@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 const BUCKET = 'deck-assets';
 const DECKS = new Set(['tenant', 'whitelabel']);
-const SLOT_RE = /^[a-z0-9-]{3,40}$/;
+const SLOT_RE = /^[a-z0-9-]{3,64}$/;
 const EXT_TYPES: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -88,7 +88,8 @@ export async function POST(request: Request) {
     const path = `${deck}/${slot}.${cleanExt}`;
     const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path);
     if (error) throw error;
-    return Response.json({ signedUrl: data.signedUrl, path });
+    const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}?v=${Date.now()}`;
+    return Response.json({ signedUrl: data.signedUrl, path, publicUrl });
   } catch (err) {
     console.error('deck-assets POST error:', err);
     return Response.json({ error: 'Failed to prepare upload.' }, { status: 500 });
