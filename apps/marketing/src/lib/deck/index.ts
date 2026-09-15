@@ -68,20 +68,29 @@ const NAV_JS = `
   show(i);
 `;
 
-const LANG_JS = `
+function langJs(def: 'en' | 'sr', storageKey: string): string {
+  return `
   const root=document.documentElement;
   function setLang(l){
     root.setAttribute("data-lang",l);
     document.getElementById("lang-sr").classList.toggle("on",l==="sr");
     document.getElementById("lang-en").classList.toggle("on",l==="en");
-    try{localStorage.setItem("deck-lang",l);}catch(e){}
+    try{localStorage.setItem("${storageKey}",l);}catch(e){}
   }
   document.getElementById("lang-sr").addEventListener("click",()=>setLang("sr"));
   document.getElementById("lang-en").addEventListener("click",()=>setLang("en"));
-  let saved="sr";
-  try{saved=localStorage.getItem("deck-lang")||"sr";}catch(e){}
+  let saved="${def}";
+  try{saved=localStorage.getItem("${storageKey}")||"${def}";}catch(e){}
   setLang(saved==="en"?"en":"sr");
 `;
+}
+
+function langSwitch(def: 'en' | 'sr'): string {
+  return `<div class="langswitch" role="group" aria-label="Language">
+  <button id="lang-en" class="${def === 'en' ? 'on' : ''}" type="button">EN</button>
+  <button id="lang-sr" class="${def === 'sr' ? 'on' : ''}" type="button">CG</button>
+</div>`;
+}
 
 export function buildDeckHtml(deck: DeckId, slides: SlideRow[]): string {
   const sections = slides
@@ -110,10 +119,7 @@ export function buildDeckHtml(deck: DeckId, slides: SlideRow[]): string {
 
 <div class="brandbar"><img src="${LOGO_WHITE}" alt="Balkina AI"></div>
 
-<div class="langswitch" role="group" aria-label="Language">
-  <button id="lang-sr" class="on" type="button">CG</button>
-  <button id="lang-en" type="button">EN</button>
-</div>
+${langSwitch('sr')}
 
 ${sections}
 
@@ -126,13 +132,13 @@ ${sections}
   </div>
 </div>
 
-<script>${LANG_JS}${NAV_JS}</script>
+<script>${langJs('sr', 'deck-lang')}${NAV_JS}</script>
 </body>
 </html>`;
   }
 
   return `<!doctype html>
-<html lang="en">
+<html lang="en" data-lang="en">
 <head>
 <meta name="robots" content="noindex">
 <meta charset="utf-8">
@@ -143,6 +149,8 @@ ${sections}
 <style>${WHITELABEL_CSS}</style>
 
 <div class="progress" id="progress"></div>
+
+${langSwitch('en')}
 
 ${sections}
 
@@ -155,7 +163,7 @@ ${sections}
   </div>
 </div>
 
-<script>${NAV_JS}</script>
+<script>${langJs('en', 'deck-lang-wl')}${NAV_JS}</script>
 </body>
 </html>`;
 }

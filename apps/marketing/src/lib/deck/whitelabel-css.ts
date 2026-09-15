@@ -173,4 +173,12 @@ export const WHITELABEL_CSS = `
   .bgwell.has-media::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(11,19,31,.78),rgba(11,19,31,.92));}
   .slide>.inner{position:relative;z-index:1;}
   .da-busy{opacity:.55;}
+  /* ---------- language switch ---------- */
+  html[data-lang="sr"] .en{display:none !important;}
+  html[data-lang="en"] .sr{display:none !important;}
+  .langswitch{position:fixed;top:18px;right:34px;z-index:50;display:flex;gap:6px;border:1px solid var(--hairline);border-radius:999px;padding:4px;}
+  .langswitch button{background:none;border:0;border-radius:999px;cursor:pointer;font-family:var(--body);font-size:11px;letter-spacing:.1em;font-weight:600;color:var(--slate);padding:7px 14px;text-transform:uppercase;}
+  .langswitch button.on{background:var(--gold);color:#151004;}
+  .langswitch button:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+  @media (max-width:900px){.langswitch{top:10px;right:12px;padding:3px;}.langswitch button{padding:5px 10px;font-size:10px;}}
 `;

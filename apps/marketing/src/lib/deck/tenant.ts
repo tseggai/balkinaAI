@@ -2,7 +2,7 @@
 // Tenant deck (balkina.ai/tenant-deck) — bilingual EN/SR, navy/yellow Quicksand look.
 // Render functions reproduce the hand-built static deck markup exactly.
 import type { TemplateDef } from './types';
-import { esc, bi, ed, dual, dualSpan, wellAttrs, LOGO_WHITE, USER_AVATAR_SVG, APPLE_SVG, GPLAY_SVG } from './html';
+import { esc, bi, ed, dual, dualSpan, wellAttrs, wellHidden, wellLabel, LOGO_WHITE, USER_AVATAR_SVG, APPLE_SVG, GPLAY_SVG } from './html';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 
@@ -86,9 +86,10 @@ function pointsList(points: any[], key = 'points'): string {
     .join('\n          ')}</ul>`;
 }
 
-function flowWell(name: string, label: string, media: Record<string, string> | undefined): string {
-  const w = wellAttrs(name, 'flow', media, 'img-well');
-  return `<div class="${w.cls}"${w.attrs} data-label="${esc(label)}">${w.media}</div>`;
+function flowWell(name: string, label: string, c: any): string {
+  if (wellHidden(c, name)) return '';
+  const w = wellAttrs(name, 'flow', c?.media, 'img-well');
+  return `<div class="${w.cls}"${w.attrs} data-label="${esc(wellLabel(c, name, label))}">${w.media}</div>`;
 }
 
 function kicker(v: any, key = 'kicker'): string {
@@ -113,6 +114,7 @@ const POINT_ITEM = [
 export const TENANT_TEMPLATES: TemplateDef[] = [
   {
     id: 'cover',
+    category: 'COVER',
     name: 'Cover (device mockups)',
     fields: [
       { key: 'mark', label: 'Top mark', kind: 'text', bilingual: true },
@@ -157,6 +159,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
   },
   {
     id: 'types',
+    category: 'LIST',
     name: 'Centered list (Built for)',
     fields: [
       { key: 'eyebrow', label: 'Header', kind: 'text', bilingual: true },
@@ -183,6 +186,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
   },
   {
     id: 'problem',
+    category: 'PROBLEM',
     name: 'Numbered gaps (Problem)',
     fields: [
       { key: 'eyebrow', label: 'Header', kind: 'text', bilingual: true },
@@ -206,7 +210,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
     <div class="split">
       <div>
         ${dual('h2', c.title, '', 'title')}
-        ${flowWell('challenges-photo', 'Photo', c.media)}
+        ${flowWell('challenges-photo', 'Photo', c)}
       </div>
       <div>
         <div class="gaps">
@@ -227,6 +231,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
   },
   {
     id: 'points',
+    category: 'FEATURE',
     name: 'Title + bullet points',
     fields: [
       { key: 'eyebrow', label: 'Header', kind: 'text', bilingual: true },
@@ -245,7 +250,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
       </div>
       <div>
         ${pointsList(c.points)}
-        ${flowWell('shot', 'Screenshot / video', c.media)}
+        ${flowWell('shot', 'Screenshot / video', c)}
         ${kicker(c.kicker)}
       </div>
     </div>
@@ -254,6 +259,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
   },
   {
     id: 'points-chat',
+    category: 'FEATURE',
     name: 'Points + chat conversation',
     fields: [
       { key: 'eyebrow', label: 'Header', kind: 'text', bilingual: true },
@@ -307,6 +313,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
   },
   {
     id: 'divider',
+    category: 'SECTION',
     name: 'Section divider (app background)',
     fields: [
       { key: 'title', label: 'Title', kind: 'text', bilingual: true },
@@ -330,6 +337,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
   },
   {
     id: 'pricing',
+    category: 'PRICING',
     name: 'Pricing plans',
     fields: [
       { key: 'eyebrow', label: 'Header', kind: 'text', bilingual: true },
@@ -387,6 +395,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
   },
   {
     id: 'cta',
+    category: 'CLOSING',
     name: 'Closing CTA (trial + store badges)',
     fields: [
       { key: 'eyebrow', label: 'Header', kind: 'text', bilingual: true },
