@@ -26,6 +26,7 @@ export interface FieldDef {
   bilingual?: boolean;
   options?: string[]; // kind: select
   item?: FieldDef[]; // kind: list — subfields of each entry
+  itemLabel?: string; // kind: list — singular noun for "+ add" chips ("bullet", "plan")
   optional?: boolean;
 }
 
@@ -46,4 +47,5 @@ export interface SlideRow {
   position: number;
   template: string;
   content: Record<string, any>;
+  visible?: boolean;
 }

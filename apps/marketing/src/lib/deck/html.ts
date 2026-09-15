@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Small HTML helpers shared by both deck template modules.
+// `data-edit="<field>"` / `data-edit="<list>.<index>"` markers let the admin
+// map a click in the preview to the field being edited; they are inert publicly.
 import type { Bi } from './types';
 
 export function esc(s: unknown): string {
@@ -10,6 +12,15 @@ export function esc(s: unknown): string {
     .replace(/"/g, '&quot;');
 }
 
+/** Escape + preserve intentional line breaks. */
+export function escBr(s: unknown): string {
+  return esc(s).replace(/\n/g, '<br>');
+}
+
+export function ed(path?: string): string {
+  return path ? ` data-edit="${esc(path)}"` : '';
+}
+
 export function bi(v: unknown): Bi {
   if (v && typeof v === 'object') {
     const o = v as Record<string, unknown>;
@@ -18,11 +29,11 @@ export function bi(v: unknown): Bi {
   return { en: String(v ?? ''), sr: String(v ?? '') };
 }
 
-/** <tag class="en">..</tag><tag class="sr">..</tag> pair for a bilingual value. */
-export function dual(tag: string, v: unknown, cls = ''): string {
+/** <tag class="cls en">..</tag><tag class="cls sr">..</tag> pair for a bilingual value. */
+export function dual(tag: string, v: unknown, cls = '', edit?: string): string {
   const { en, sr } = bi(v);
-  const extra = cls ? ` ${cls}` : '';
-  return `<${tag} class="en${extra}">${esc(en)}</${tag}><${tag} class="sr${extra}">${esc(sr)}</${tag}>`;
+  const c = cls ? `${cls} ` : '';
+  return `<${tag} class="${c}en"${ed(edit)}>${esc(en)}</${tag}><${tag} class="${c}sr"${ed(edit)}>${esc(sr)}</${tag}>`;
 }
 
 /** Inline <span class="en">..</span><span class="sr">..</span> pair. */

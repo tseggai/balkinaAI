@@ -2,7 +2,7 @@
 // Tenant deck (balkina.ai/tenant-deck) — bilingual EN/SR, navy/yellow Quicksand look.
 // Render functions reproduce the hand-built static deck markup exactly.
 import type { TemplateDef } from './types';
-import { esc, bi, dual, dualSpan, wellAttrs, LOGO_WHITE, USER_AVATAR_SVG, APPLE_SVG, GPLAY_SVG } from './html';
+import { esc, bi, ed, dual, dualSpan, wellAttrs, LOGO_WHITE, USER_AVATAR_SVG, APPLE_SVG, GPLAY_SVG } from './html';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 
@@ -73,15 +73,15 @@ const BOOKING_BOARD = `
 /* ------------------------------------------------------------------ */
 
 function eyebrow(v: unknown): string {
-  return `<p class="eyebrow">${dualSpan(v)}</p>`;
+  return `<p class="eyebrow"${ed('eyebrow')}>${dualSpan(v)}</p>`;
 }
 
-function pointsList(points: any[]): string {
+function pointsList(points: any[], key = 'points'): string {
   return `<ul class="points">${(points || [])
     .map(
-      (p) =>
-        `<li class="en"><strong>${esc(p?.strong?.en)}</strong> ${esc(p?.text?.en)}</li>` +
-        `<li class="sr"><strong>${esc(p?.strong?.sr)}</strong> ${esc(p?.text?.sr)}</li>`
+      (p, i) =>
+        `<li class="en"${ed(`${key}.${i}`)}><strong>${esc(p?.strong?.en)}</strong> ${esc(p?.text?.en)}</li>` +
+        `<li class="sr"${ed(`${key}.${i}`)}><strong>${esc(p?.strong?.sr)}</strong> ${esc(p?.text?.sr)}</li>`
     )
     .join('\n          ')}</ul>`;
 }
@@ -91,10 +91,20 @@ function flowWell(name: string, label: string, media: Record<string, string> | u
   return `<div class="${w.cls}"${w.attrs} data-label="${esc(label)}">${w.media}</div>`;
 }
 
-function kicker(v: any): string {
+function kicker(v: any, key = 'kicker'): string {
   if (!v || (!v.en && !v.sr)) return '';
-  return dual('p', v, 'kicker').replace(/class="(en|sr) kicker"/g, 'class="kicker $1"');
+  return dual('p', v, 'kicker', key);
 }
+
+function bi0(v: unknown): string {
+  const b = bi(v);
+  return b.en || b.sr;
+}
+
+const POINT_ITEM = [
+  { key: 'strong', label: 'Bold lead', kind: 'text' as const, bilingual: true },
+  { key: 'text', label: 'Text', kind: 'area' as const, bilingual: true },
+];
 
 /* ------------------------------------------------------------------ */
 /* Templates                                                          */
@@ -123,12 +133,12 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
       const iphone = wellAttrs('cover-iphone', 'cover', c.media, 'scr');
       return `<section class="slide" aria-label="Cover">
   <div class="inner">
-    <div class="cover-mark">${dualSpan(c.mark)}</div>
+    <div class="cover-mark"${ed('mark')}>${dualSpan(c.mark)}</div>
     <div class="split">
       <div>
-        ${dual('h1', c.title)}
+        ${dual('h1', c.title, '', 'title')}
         <div class="cover-rule"></div>
-        ${dual('p', c.lede, 'lede').replace(/class="(en|sr) lede"/g, 'class="lede $1"')}
+        ${dual('p', c.lede, 'lede', 'lede')}
       </div>
       <div>
         <div class="devices" aria-label="App preview">
@@ -154,6 +164,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
         key: 'items',
         label: 'Items (alternate white/yellow automatically)',
         kind: 'list',
+        itemLabel: 'item',
         item: [{ key: 'label', label: 'Item', kind: 'text', bilingual: true }],
       },
     ],
@@ -164,7 +175,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
     ${eyebrow(c.eyebrow)}
     <div class="types">
       ${(c.items || [])
-        .map((it: any, i: number) => `<div class="t${i % 2 === 1 ? ' y' : ''}">${dualSpan(it?.label)}</div>`)
+        .map((it: any, i: number) => `<div class="t${i % 2 === 1 ? ' y' : ''}"${ed(`items.${i}`)}>${dualSpan(it?.label)}</div>`)
         .join('\n      ')}
     </div>
   </div>
@@ -180,6 +191,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
         key: 'gaps',
         label: 'Numbered items',
         kind: 'list',
+        itemLabel: 'item',
         item: [
           { key: 'heading', label: 'Heading', kind: 'text', bilingual: true },
           { key: 'text', label: 'Text', kind: 'area', bilingual: true },
@@ -193,14 +205,14 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
     ${eyebrow(c.eyebrow)}
     <div class="split">
       <div>
-        ${dual('h2', c.title)}
+        ${dual('h2', c.title, '', 'title')}
         ${flowWell('challenges-photo', 'Photo', c.media)}
       </div>
       <div>
         <div class="gaps">
           ${(c.gaps || [])
             .map(
-              (g: any, i: number) => `<div class="gap">
+              (g: any, i: number) => `<div class="gap"${ed(`gaps.${i}`)}>
             <div class="n">${ROMAN[i] || i + 1}</div>
             ${dual('h3', g?.heading)}
             ${dual('p', g?.text)}
@@ -219,15 +231,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
     fields: [
       { key: 'eyebrow', label: 'Header', kind: 'text', bilingual: true },
       { key: 'title', label: 'Title', kind: 'area', bilingual: true },
-      {
-        key: 'points',
-        label: 'Points',
-        kind: 'list',
-        item: [
-          { key: 'strong', label: 'Bold lead', kind: 'text', bilingual: true },
-          { key: 'text', label: 'Text', kind: 'area', bilingual: true },
-        ],
-      },
+      { key: 'points', label: 'Points', kind: 'list', itemLabel: 'bullet', item: POINT_ITEM },
       { key: 'kicker', label: 'Yellow kicker (optional)', kind: 'text', bilingual: true, optional: true },
     ],
     wells: [{ name: 'shot', fit: 'flow', label: 'Screenshot / short video for this slide' }],
@@ -237,7 +241,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
     ${eyebrow(c.eyebrow)}
     <div class="split">
       <div>
-        ${dual('h2', c.title)}
+        ${dual('h2', c.title, '', 'title')}
       </div>
       <div>
         ${pointsList(c.points)}
@@ -254,19 +258,12 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
     fields: [
       { key: 'eyebrow', label: 'Header', kind: 'text', bilingual: true },
       { key: 'title', label: 'Title', kind: 'area', bilingual: true },
-      {
-        key: 'points',
-        label: 'Points',
-        kind: 'list',
-        item: [
-          { key: 'strong', label: 'Bold lead', kind: 'text', bilingual: true },
-          { key: 'text', label: 'Text', kind: 'area', bilingual: true },
-        ],
-      },
+      { key: 'points', label: 'Points', kind: 'list', itemLabel: 'bullet', item: POINT_ITEM },
       {
         key: 'msgs',
         label: 'Chat messages',
         kind: 'list',
+        itemLabel: 'message',
         item: [
           { key: 'who', label: 'Sender', kind: 'select', options: ['guest', 'bot'] },
           { key: 'text', label: 'Message', kind: 'area', bilingual: true },
@@ -278,13 +275,13 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
     render: (c) => {
       const w = wellAttrs('solution-media', 'flow', c.media, 'chat');
       const msgs = (c.msgs || [])
-        .map((m: any) =>
+        .map((m: any, i: number) =>
           m?.who === 'bot'
-            ? `<div class="msg bot">
+            ? `<div class="msg bot"${ed(`msgs.${i}`)}>
             <div class="avatar bot" aria-hidden="true"><img src="${LOGO_WHITE}" alt=""></div>
             <div class="bubble">${dualSpan(m?.text)}</div>
           </div>`
-            : `<div class="msg guest">
+            : `<div class="msg guest"${ed(`msgs.${i}`)}>
             <div class="bubble">${dualSpan(m?.text)}</div>
             <div class="avatar user" aria-hidden="true">${USER_AVATAR_SVG}</div>
           </div>`
@@ -295,7 +292,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
     ${eyebrow(c.eyebrow)}
     <div class="split">
       <div>
-        ${dual('h2', c.title)}
+        ${dual('h2', c.title, '', 'title')}
       </div>
       <div>
         ${pointsList(c.points)}
@@ -325,8 +322,8 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
   <div class="${w.cls}"${w.attrs} aria-hidden="true">${board}${w.media}</div>
   <div class="shade"></div>
   <div class="inner">
-    ${dual('h2', c.title)}
-    ${dual('p', c.lede, 'lede').replace(/class="(en|sr) lede"/g, 'class="lede $1"')}
+    ${dual('h2', c.title, '', 'title')}
+    ${dual('p', c.lede, 'lede', 'lede')}
   </div>
 </section>`;
     },
@@ -342,6 +339,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
         key: 'plans',
         label: 'Plans',
         kind: 'list',
+        itemLabel: 'plan',
         item: [
           { key: 'name', label: 'Name', kind: 'text' },
           { key: 'price', label: 'Price (e.g. €49)', kind: 'text' },
@@ -365,18 +363,18 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
     ${eyebrow(c.eyebrow)}
     <div class="split">
       <div>
-        ${dual('h2', c.title)}
+        ${dual('h2', c.title, '', 'title')}
         ${kicker(c.kicker)}
       </div>
       <div>
         <div class="plans">
           ${(c.plans || [])
             .map(
-              (p: any) => `<div class="plan${p?.popular ? ' hi' : ''}">
+              (p: any, i: number) => `<div class="plan${p?.popular ? ' hi' : ''}"${ed(`plans.${i}`)}>
             ${p?.popular ? `<span class="pop">${dualSpan(p?.badge)}</span>` : ''}
             <div class="name">${esc(p?.name)}</div>
             <div class="price">${esc(p?.price)} <small>${dualSpan(p?.per)}</small></div>
-            ${dual('p', p?.aud, 'aud').replace(/class="(en|sr) aud"/g, 'class="aud $1"')}
+            ${dual('p', p?.aud, 'aud')}
             ${dual('p', p?.line)}
           </div>`
             )
@@ -414,14 +412,14 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
     ${eyebrow(c.eyebrow)}
     <div class="split stretch">
       <div>
-        <h2 class="en">${esc(bi(c.title_pre).en)} <em class="gd">${esc(bi(c.title_em).en)}</em></h2>
-        <h2 class="sr">${esc(bi(c.title_pre).sr)} <em class="gd">${esc(bi(c.title_em).sr)}</em></h2>
-        ${dual('p', c.lede, 'lede').replace(/class="(en|sr) lede"/g, 'class="lede $1"')}
+        <h2 class="en"${ed('title_pre')}>${esc(bi(c.title_pre).en)} <em class="gd"${ed('title_em')}>${esc(bi(c.title_em).en)}</em></h2>
+        <h2 class="sr"${ed('title_pre')}>${esc(bi(c.title_pre).sr)} <em class="gd"${ed('title_em')}>${esc(bi(c.title_em).sr)}</em></h2>
+        ${dual('p', c.lede, 'lede', 'lede')}
       </div>
       <div>
         <div class="cta-col">
-          <a class="btn gold" href="${esc(c.btn_url)}" target="_blank" rel="noopener">${dualSpan(c.btn_label)}</a>
-          ${dual('p', c.dlnote, 'dl-note').replace(/class="(en|sr) dl-note"/g, 'class="dl-note $1"')}
+          <a class="btn gold" href="${esc(c.btn_url)}" target="_blank" rel="noopener"${ed('btn_label')}>${dualSpan(c.btn_label)}</a>
+          ${dual('p', c.dlnote, 'dl-note', 'dlnote')}
           <div class="store-row">
             <a class="store" href="https://apps.apple.com/us/app/balkina-ai/id6761651423" target="_blank" rel="noopener">${APPLE_SVG}App Store</a>
             <a class="store" href="https://play.google.com/store/apps/details?id=com.tseggaid.balkinaai" target="_blank" rel="noopener">${GPLAY_SVG}Google Play</a>
@@ -433,8 +431,3 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
 </section>`,
   },
 ];
-
-function bi0(v: unknown): string {
-  const b = bi(v);
-  return b.en || b.sr;
-}

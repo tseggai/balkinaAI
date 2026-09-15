@@ -2,14 +2,9 @@
 // White-label deck (balkina.ai/deck) — dark luxury serif look, English only.
 // Render functions reproduce the hand-built static deck markup exactly.
 import type { TemplateDef } from './types';
-import { esc, wellAttrs } from './html';
+import { esc, escBr, ed, wellAttrs } from './html';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
-
-/** Escape + preserve intentional line breaks in titles. */
-function escBr(s: unknown): string {
-  return esc(s).replace(/\n/g, '<br>');
-}
 
 function bgWell(name: string, label: string, media: Record<string, string> | undefined): string {
   const w = wellAttrs(name, 'cover', media, 'bgwell');
@@ -21,15 +16,24 @@ function flowWell(name: string, label: string, media: Record<string, string> | u
   return `<div class="${w.cls}"${w.attrs} data-label="${esc(label)}">${w.media}</div>`;
 }
 
-function pointsList(points: any[]): string {
+function pointsList(points: any[], key = 'points'): string {
   return `<ul class="points">${(points || [])
-    .map((p) => `<li><strong>${esc(p?.strong)}</strong> ${esc(p?.text)}</li>`)
+    .map((p, i) => `<li${ed(`${key}.${i}`)}><strong>${esc(p?.strong)}</strong> ${esc(p?.text)}</li>`)
     .join('\n      ')}</ul>`;
 }
 
-function kicker(v: unknown): string {
-  return v ? `<p class="kicker">${esc(v)}</p>` : '';
+function kicker(v: unknown, key = 'kicker'): string {
+  return v ? `<p class="kicker"${ed(key)}>${esc(v)}</p>` : '';
 }
+
+function eyebrow(v: unknown): string {
+  return `<p class="eyebrow"${ed('eyebrow')}>${esc(v)}</p>`;
+}
+
+const POINT_ITEM = [
+  { key: 'strong', label: 'Bold lead', kind: 'text' as const },
+  { key: 'text', label: 'Text', kind: 'area' as const },
+];
 
 export const WHITELABEL_TEMPLATES: TemplateDef[] = [
   {
@@ -49,10 +53,10 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
       return `<section class="slide" aria-label="Cover">
   ${bgWell('cover-bg', 'Property hero photography', c.media)}
   <div class="inner">
-    <div class="cover-mark">${esc(c.mark)}</div>
-    <h1>${h1}</h1>
+    <div class="cover-mark"${ed('mark')}>${esc(c.mark)}</div>
+    <h1${ed('title')}>${h1}</h1>
     <div class="cover-rule"></div>
-    <p class="cover-sub">${esc(c.sub)}</p>
+    <p class="cover-sub"${ed('sub')}>${esc(c.sub)}</p>
   </div>
 </section>`;
     },
@@ -70,10 +74,10 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
     blank: { eyebrow: 'The Premise', title: '', lede: '', catalogue: [] },
     render: (c) => `<section class="slide" aria-label="${esc(c.eyebrow)}">
   <div class="inner">
-    <p class="eyebrow">${esc(c.eyebrow)}</p>
-    <h2>${escBr(c.title)}</h2>
-    <p class="lede">${esc(c.lede)}</p>
-    <div class="catalogue">
+    ${eyebrow(c.eyebrow)}
+    <h2${ed('title')}>${escBr(c.title)}</h2>
+    <p class="lede"${ed('lede')}>${esc(c.lede)}</p>
+    <div class="catalogue"${ed('catalogue')}>
       ${(c.catalogue || []).map((s: string) => `<span>${esc(s)}</span>`).join('')}
     </div>
     ${flowWell('premise-photo', 'Photography', c.media)}
@@ -90,6 +94,7 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
         key: 'gaps',
         label: 'Numbered items',
         kind: 'list',
+        itemLabel: 'item',
         item: [
           { key: 'heading', label: 'Heading', kind: 'text' },
           { key: 'text', label: 'Text', kind: 'area' },
@@ -101,12 +106,12 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
     blank: { eyebrow: '', title: '', gaps: [], kicker: '' },
     render: (c) => `<section class="slide" aria-label="${esc(c.eyebrow)}">
   <div class="inner">
-    <p class="eyebrow">${esc(c.eyebrow)}</p>
-    <h2>${escBr(c.title)}</h2>
+    ${eyebrow(c.eyebrow)}
+    <h2${ed('title')}>${escBr(c.title)}</h2>
     <div class="gaps">
       ${(c.gaps || [])
         .map(
-          (g: any, i: number) => `<div class="gap">
+          (g: any, i: number) => `<div class="gap"${ed(`gaps.${i}`)}>
         <div class="n">${ROMAN[i] || i + 1}</div>
         <h3>${esc(g?.heading)}</h3>
         <p>${esc(g?.text)}</p>
@@ -128,6 +133,7 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
         key: 'cards',
         label: 'Cards (first two get image wells)',
         kind: 'list',
+        itemLabel: 'card',
         item: [
           { key: 'heading', label: 'Heading', kind: 'text' },
           { key: 'text', label: 'Text', kind: 'area' },
@@ -142,12 +148,12 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
     blank: { eyebrow: 'Our Thesis', title: '', cards: [], kicker: '' },
     render: (c) => `<section class="slide" aria-label="${esc(c.eyebrow)}">
   <div class="inner">
-    <p class="eyebrow">${esc(c.eyebrow)}</p>
-    <h2>${escBr(c.title)}</h2>
+    ${eyebrow(c.eyebrow)}
+    <h2${ed('title')}>${escBr(c.title)}</h2>
     <div class="duo">
       ${(c.cards || [])
         .map(
-          (card: any, i: number) => `<div class="card">
+          (card: any, i: number) => `<div class="card"${ed(`cards.${i}`)}>
         <div class="rn">${ROMAN[i] || i + 1}</div>
         <h3>${esc(card?.heading)}</h3>
         <p>${esc(card?.text)}</p>
@@ -174,10 +180,10 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
     render: (c) => `<section class="slide" aria-label="${esc(c.chapter)} divider">
   ${bgWell('bg', 'Background photography', c.media)}
   <div class="inner divider">
-    <div class="big" aria-hidden="true">${esc(c.numeral)}</div>
-    <div class="chapter">${esc(c.chapter)}</div>
-    <h2>${escBr(c.title)}</h2>
-    <p class="lede" style="max-width:30em">${esc(c.lede)}</p>
+    <div class="big" aria-hidden="true"${ed('numeral')}>${esc(c.numeral)}</div>
+    <div class="chapter"${ed('chapter')}>${esc(c.chapter)}</div>
+    <h2${ed('title')}>${escBr(c.title)}</h2>
+    <p class="lede" style="max-width:30em"${ed('lede')}>${esc(c.lede)}</p>
   </div>
 </section>`,
   },
@@ -187,23 +193,15 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
     fields: [
       { key: 'eyebrow', label: 'Eyebrow', kind: 'text' },
       { key: 'title', label: 'Title', kind: 'text' },
-      {
-        key: 'points',
-        label: 'Points',
-        kind: 'list',
-        item: [
-          { key: 'strong', label: 'Bold lead', kind: 'text' },
-          { key: 'text', label: 'Text', kind: 'area' },
-        ],
-      },
+      { key: 'points', label: 'Points', kind: 'list', itemLabel: 'bullet', item: POINT_ITEM },
       { key: 'kicker', label: 'Italic gold kicker (optional)', kind: 'text', optional: true },
     ],
     wells: [{ name: 'shot', fit: 'flow', label: 'Screenshot / photography for this slide' }],
     blank: { eyebrow: '', title: '', points: [], kicker: '' },
     render: (c) => `<section class="slide" aria-label="${esc(c.eyebrow)}">
   <div class="inner">
-    <p class="eyebrow">${esc(c.eyebrow)}</p>
-    <h2>${escBr(c.title)}</h2>
+    ${eyebrow(c.eyebrow)}
+    <h2${ed('title')}>${escBr(c.title)}</h2>
     ${pointsList(c.points)}
     ${flowWell('shot', 'Screenshot / photo', c.media)}
     ${kicker(c.kicker)}
@@ -216,19 +214,12 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
     fields: [
       { key: 'eyebrow', label: 'Eyebrow', kind: 'text' },
       { key: 'title', label: 'Title', kind: 'text' },
-      {
-        key: 'points',
-        label: 'Points',
-        kind: 'list',
-        item: [
-          { key: 'strong', label: 'Bold lead', kind: 'text' },
-          { key: 'text', label: 'Text', kind: 'area' },
-        ],
-      },
+      { key: 'points', label: 'Points', kind: 'list', itemLabel: 'bullet', item: POINT_ITEM },
       {
         key: 'msgs',
         label: 'Chat messages',
         kind: 'list',
+        itemLabel: 'message',
         item: [
           { key: 'who', label: 'Sender', kind: 'select', options: ['guest', 'concierge'] },
           { key: 'text', label: 'Message', kind: 'area' },
@@ -240,18 +231,18 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
     render: (c) => {
       const w = wellAttrs('media', 'flow', c.media, 'chat');
       const msgs = (c.msgs || [])
-        .map((m: any) => {
+        .map((m: any, i: number) => {
           const who = m?.who === 'concierge' ? 'concierge' : 'guest';
           const label = who === 'concierge' ? 'Concierge' : 'Guest';
-          return `<div class="bubble ${who}"><span class="who">${label}</span>${esc(m?.text)}</div>`;
+          return `<div class="bubble ${who}"${ed(`msgs.${i}`)}><span class="who">${label}</span>${esc(m?.text)}</div>`;
         })
         .join('\n        ');
       return `<section class="slide" aria-label="${esc(c.eyebrow)}">
   <div class="inner">
-    <p class="eyebrow">${esc(c.eyebrow)}</p>
+    ${eyebrow(c.eyebrow)}
     <div class="cols">
       <div>
-        <h2>${escBr(c.title)}</h2>
+        <h2${ed('title')}>${escBr(c.title)}</h2>
         ${pointsList(c.points)}
       </div>
       <div class="${w.cls}"${w.attrs} aria-label="Example conversation">
@@ -272,6 +263,7 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
         key: 'options',
         label: 'Options',
         kind: 'list',
+        itemLabel: 'option',
         item: [
           { key: 'heading', label: 'Heading', kind: 'text' },
           { key: 'items', label: 'Lines (one per row)', kind: 'lines' },
@@ -283,12 +275,12 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
     blank: { eyebrow: 'The Alternatives', title: '', options: [] },
     render: (c) => `<section class="slide" aria-label="${esc(c.eyebrow)}">
   <div class="inner">
-    <p class="eyebrow">${esc(c.eyebrow)}</p>
-    <h2>${escBr(c.title)}</h2>
+    ${eyebrow(c.eyebrow)}
+    <h2${ed('title')}>${escBr(c.title)}</h2>
     <div class="compare">
       ${(c.options || [])
         .map(
-          (o: any) => `<div class="option${o?.best ? ' best' : ''}">
+          (o: any, i: number) => `<div class="option${o?.best ? ' best' : ''}"${ed(`options.${i}`)}>
         <h3>${esc(o?.heading)}</h3>
         <ul>
           ${(o?.items || []).map((s: string) => `<li>${esc(s)}</li>`).join('\n          ')}
@@ -310,6 +302,7 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
         key: 'plans',
         label: 'Plans',
         kind: 'list',
+        itemLabel: 'plan',
         item: [
           { key: 'name', label: 'Name', kind: 'text' },
           { key: 'price', label: 'Price (e.g. €899)', kind: 'text' },
@@ -323,12 +316,12 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
     blank: { eyebrow: 'The Engagement', title: '', plans: [] },
     render: (c) => `<section class="slide" aria-label="Pricing and launch">
   <div class="inner">
-    <p class="eyebrow">${esc(c.eyebrow)}</p>
-    <h2>${escBr(c.title)}</h2>
+    ${eyebrow(c.eyebrow)}
+    <h2${ed('title')}>${escBr(c.title)}</h2>
     <div class="plans">
       ${(c.plans || [])
         .map(
-          (p: any) => `<div class="plan${p?.hi ? ' hi' : ''}">
+          (p: any, i: number) => `<div class="plan${p?.hi ? ' hi' : ''}"${ed(`plans.${i}`)}>
         <div class="name">${esc(p?.name)}</div>
         <div class="price">${esc(p?.price)}${p?.per ? ` <small>${esc(p?.per)}</small>` : ''}</div>
         <p>${esc(p?.text)}</p>
@@ -351,6 +344,7 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
         key: 'buttons',
         label: 'Buttons',
         kind: 'list',
+        itemLabel: 'button',
         item: [
           { key: 'label', label: 'Label', kind: 'text' },
           { key: 'url', label: 'URL', kind: 'text' },
@@ -362,15 +356,15 @@ export const WHITELABEL_TEMPLATES: TemplateDef[] = [
     blank: { eyebrow: 'In the World', title_pre: '', title_em: '', lede: '', buttons: [] },
     render: (c) => `<section class="slide" aria-label="Proof and next step">
   <div class="inner">
-    <p class="eyebrow">${esc(c.eyebrow)}</p>
-    <h2>${esc(c.title_pre)} <em class="gd">${esc(c.title_em)}</em>.</h2>
-    <p class="lede">${esc(c.lede)}</p>
+    ${eyebrow(c.eyebrow)}
+    <h2${ed('title_pre')}>${esc(c.title_pre)} <em class="gd"${ed('title_em')}>${esc(c.title_em)}</em>.</h2>
+    <p class="lede"${ed('lede')}>${esc(c.lede)}</p>
     ${flowWell('proof-photo', 'Photography', c.media)}
     <div class="cta-row">
       ${(c.buttons || [])
         .map(
-          (b: any) =>
-            `<a class="btn ${b?.style === 'line' ? 'line' : 'gold'}" href="${esc(b?.url)}" target="_blank" rel="noopener">${esc(b?.label)}</a>`
+          (b: any, i: number) =>
+            `<a class="btn ${b?.style === 'line' ? 'line' : 'gold'}" href="${esc(b?.url)}" target="_blank" rel="noopener"${ed(`buttons.${i}`)}>${esc(b?.label)}</a>`
         )
         .join('\n      ')}
     </div>
