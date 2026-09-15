@@ -232,7 +232,7 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
   {
     id: 'points',
     category: 'FEATURE',
-    name: 'Title + bullet points',
+    name: 'Feature (text left, image right)',
     fields: [
       { key: 'eyebrow', label: 'Header', kind: 'text', bilingual: true },
       { key: 'title', label: 'Title', kind: 'area', bilingual: true },
@@ -244,14 +244,57 @@ export const TENANT_TEMPLATES: TemplateDef[] = [
     render: (c) => `<section class="slide" aria-label="${esc(bi0(c.eyebrow))}">
   <div class="inner">
     ${eyebrow(c.eyebrow)}
-    <div class="split">
+    <div class="split feature">
       <div>
         ${dual('h2', c.title, '', 'title')}
-      </div>
-      <div>
         ${pointsList(c.points)}
-        ${flowWell('shot', 'Screenshot / video', c)}
         ${kicker(c.kicker)}
+      </div>
+      <div class="feature-media">
+        ${flowWell('shot', 'Screenshot / short video', c)}
+      </div>
+    </div>
+  </div>
+</section>`,
+  },
+  {
+    id: 'overview',
+    category: 'OVERVIEW',
+    name: 'Platform overview (feature grid)',
+    fields: [
+      { key: 'eyebrow', label: 'Header', kind: 'text', bilingual: true },
+      { key: 'title', label: 'Title', kind: 'area', bilingual: true },
+      { key: 'lede', label: 'Lede', kind: 'area', bilingual: true },
+      {
+        key: 'features',
+        label: 'Features (two-column grid)',
+        kind: 'list',
+        itemLabel: 'feature',
+        item: [
+          { key: 'name', label: 'Feature', kind: 'text', bilingual: true },
+          { key: 'desc', label: 'One-line description', kind: 'text', bilingual: true },
+        ],
+      },
+    ],
+    wells: [],
+    blank: { eyebrow: { en: 'The Platform', sr: 'Platforma' }, title: { en: '', sr: '' }, lede: { en: '', sr: '' }, features: [] },
+    render: (c) => `<section class="slide" aria-label="${esc(bi0(c.eyebrow))}">
+  <div class="inner">
+    ${eyebrow(c.eyebrow)}
+    <div class="split overview">
+      <div>
+        ${dual('h2', c.title, '', 'title')}
+        ${dual('p', c.lede, 'lede', 'lede')}
+      </div>
+      <div class="grid2">
+        ${(c.features || [])
+          .map(
+            (f: any, i: number) => `<div class="feat"${ed(`features.${i}`)}>
+          <b class="en">${esc(bi(f?.name).en)}</b><b class="sr">${esc(bi(f?.name).sr)}</b>
+          ${dual('p', f?.desc)}
+        </div>`
+          )
+          .join('\n        ')}
       </div>
     </div>
   </div>

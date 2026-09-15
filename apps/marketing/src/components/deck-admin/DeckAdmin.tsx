@@ -205,7 +205,7 @@ export default function DeckAdmin({ deck }: { deck: DeckId }) {
     const el = previewPaneRef.current;
     if (!el) return;
     const update = () =>
-      setScale(device === 'desktop' ? Math.min((el.clientWidth - 2) / DESKTOP.w, 1) : Math.min((el.clientWidth - 2) / PHONE.w, 1));
+      setScale(device === 'desktop' ? (el.clientWidth - 2) / DESKTOP.w : Math.min((el.clientWidth - 2) / PHONE.w, 1));
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -243,12 +243,18 @@ export default function DeckAdmin({ deck }: { deck: DeckId }) {
         .da-chip::before{display:none!important;}
         .da-chip:hover{border-color:${ACCENT};color:#fff;}
       `;
+      const idx = (slides ?? []).findIndex((s) => s.id === selected.id);
+      const counter = `<span class="counter"><b>${String(idx + 1).padStart(2, '0')}</b> / ${String((slides ?? []).length).padStart(2, '0')}</span>`;
+      const chrome =
+        deck === 'tenant'
+          ? `<div class="brandbar"><img src="/assets/Balkina_icon_white.png" alt=""></div><div class="chrome"><div class="wordmark"><img src="/assets/Balkina_icon_white.png" alt=""><b>Balkina AI</b> · <span class="en">For Your Business</span><span class="sr">Za vaš biznis</span></div><div class="nav">${counter}</div></div>`
+          : `<div class="chrome"><div class="wordmark"><b>Balkina AI</b> · White Label</div><div class="nav">${counter}</div></div>`;
       setPreviewDoc(
-        `<!doctype html><html lang="${previewLang === 'sr' ? 'sr' : 'en'}" data-lang="${previewLang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${fonts}</head><body><style>${DECK_CSS[deck]}</style><style>${adminCss}</style>${section}</body></html>`
+        `<!doctype html><html lang="${previewLang === 'sr' ? 'sr' : 'en'}" data-lang="${previewLang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${fonts}</head><body><style>${DECK_CSS[deck]}</style><style>${adminCss}</style>${section}${chrome}</body></html>`
       );
     }, 250);
     return () => clearTimeout(t);
-  }, [deck, selected, draft, previewLang, target]);
+  }, [deck, selected, slides, draft, previewLang, target]);
 
   /* ---------- wire clicks + "add" chips inside the preview ---------- */
   const wirePreview = useCallback(() => {
@@ -846,7 +852,7 @@ export default function DeckAdmin({ deck }: { deck: DeckId }) {
 
       <div className="flex min-h-0 flex-1">
         {/* ---------- left: slide list ---------- */}
-        <aside className="flex w-[352px] shrink-0 flex-col border-r border-gray-200">
+        <aside className="flex w-[300px] shrink-0 flex-col border-r border-gray-200">
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
             {slides.map((s, i) => {
               const hidden = s.visible === false;
@@ -858,7 +864,7 @@ export default function DeckAdmin({ deck }: { deck: DeckId }) {
                 >
                   <div className="flex items-baseline gap-3">
                     <span className="w-5 shrink-0 text-[11px] font-semibold text-gray-400">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="truncate text-[13px] font-bold uppercase tracking-[.08em] text-gray-900">{slideLabel(s)}</span>
+                    <span className="truncate text-[12px] font-bold uppercase tracking-[.04em] text-gray-900">{slideLabel(s)}</span>
                   </div>
                   <div className="mt-1.5 flex items-center gap-3">
                     <span className="w-5 shrink-0" />
@@ -925,14 +931,16 @@ export default function DeckAdmin({ deck }: { deck: DeckId }) {
                   ))}
                 </select>
                 <span className="flex-1" />
-                <span className="text-sm text-gray-500">Writing in</span>
-                <select className={selectCls} value={writingLang} onChange={(e) => setWritingLang(e.target.value as Lang)}>
-                  <option value="en">EN</option>
-                  <option value="sr">CG</option>
-                </select>
-                <button className="btn-sm" disabled={translating} onClick={() => void translate('slide')}>
-                  {translating ? 'Translating…' : 'Translate slide'}
-                </button>
+                <div className="flex items-center gap-2 whitespace-nowrap">
+                  <span className="text-sm text-gray-500">Writing in</span>
+                  <select className={selectCls} value={writingLang} onChange={(e) => setWritingLang(e.target.value as Lang)}>
+                    <option value="en">EN</option>
+                    <option value="sr">CG</option>
+                  </select>
+                  <button className="btn-sm" disabled={translating} onClick={() => void translate('slide')}>
+                    {translating ? 'Translating…' : 'Translate slide'}
+                  </button>
+                </div>
               </div>
               <div className="mt-3 flex items-center gap-3">
                 {renderSaveButton()}

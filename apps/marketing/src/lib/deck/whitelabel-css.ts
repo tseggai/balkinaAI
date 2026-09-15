@@ -181,4 +181,9 @@ export const WHITELABEL_CSS = `
   .langswitch button.on{background:var(--gold);color:#151004;}
   .langswitch button:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
   @media (max-width:900px){.langswitch{top:10px;right:12px;padding:3px;}.langswitch button{padding:5px 10px;font-size:10px;}}
+  /* feature layout: text left, image right */
+  .feature-media .img-well{margin-top:0;}
+  .feature-media .img-well .da-media{max-height:62vh;}
+  .feature-media .img-well:not(.has-media){min-height:340px;}
+  @media (max-width:900px){.feature-media .img-well:not(.has-media){min-height:160px;}}
 `;

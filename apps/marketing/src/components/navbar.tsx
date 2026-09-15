@@ -8,6 +8,9 @@ export function Navbar() {
   const pathname = usePathname();
   const isCustomers = pathname === '/app';
 
+  // The deck editors are full-screen tools, not marketing pages.
+  if (pathname === '/deck/admin' || pathname === '/tenant-deck/admin') return null;
+
   return (
     <header className="sticky top-0 z-50 border-b border-gray-100/50 bg-gray-50/80 backdrop-blur-lg">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
