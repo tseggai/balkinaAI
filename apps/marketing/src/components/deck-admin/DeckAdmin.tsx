@@ -200,7 +200,8 @@ export default function DeckAdmin({ deck }: { deck: DeckId }) {
       .catch(() => setSaveState('error'));
   }, [deck]);
 
-  /* ---------- preview scale ---------- */
+  /* ---------- preview scale (re-measure once the pane exists) ---------- */
+  const paneReady = !!(selected && tpl);
   useEffect(() => {
     const el = previewPaneRef.current;
     if (!el) return;
@@ -210,7 +211,7 @@ export default function DeckAdmin({ deck }: { deck: DeckId }) {
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [device]);
+  }, [device, paneReady]);
 
   /* ---------- preview document (debounced) ---------- */
   const [previewDoc, setPreviewDoc] = useState('');
