@@ -23,7 +23,7 @@ export interface FieldDef {
   key: string;
   label: string;
   kind: FieldKind;
-  bilingual?: boolean;
+  bilingual?: boolean; // text/area/lines: value is { en, sr } (lines: { en: string[], sr: string[] })
   options?: string[]; // kind: select
   item?: FieldDef[]; // kind: list — subfields of each entry
   itemLabel?: string; // kind: list — singular noun for "+ add" chips ("bullet", "plan")
@@ -33,6 +33,8 @@ export interface FieldDef {
 export interface TemplateDef {
   id: string;
   name: string;
+  /** Short category shown under the slide title in the admin list (FEATURE, SECTION…). */
+  category: string;
   fields: FieldDef[];
   wells: WellDef[];
   /** Default content used when adding a new slide of this template. */

@@ -24,16 +24,45 @@ export function ed(path?: string): string {
 export function bi(v: unknown): Bi {
   if (v && typeof v === 'object') {
     const o = v as Record<string, unknown>;
-    return { en: String(o.en ?? ''), sr: String(o.sr ?? '') };
+    const en = String(o.en ?? '');
+    const sr = String(o.sr ?? '');
+    return { en: en || sr, sr: sr || en };
   }
   return { en: String(v ?? ''), sr: String(v ?? '') };
 }
 
 /** <tag class="cls en">..</tag><tag class="cls sr">..</tag> pair for a bilingual value. */
-export function dual(tag: string, v: unknown, cls = '', edit?: string): string {
+export function dual(tag: string, v: unknown, cls = '', edit?: string, br = false): string {
   const { en, sr } = bi(v);
   const c = cls ? `${cls} ` : '';
-  return `<${tag} class="${c}en"${ed(edit)}>${esc(en)}</${tag}><${tag} class="${c}sr"${ed(edit)}>${esc(sr)}</${tag}>`;
+  const e = br ? escBr : esc;
+  return `<${tag} class="${c}en"${ed(edit)}>${e(en)}</${tag}><${tag} class="${c}sr"${ed(edit)}>${e(sr)}</${tag}>`;
+}
+
+/** Bilingual list value: legacy string[] applies to both languages. */
+export function biLines(v: unknown): { en: string[]; sr: string[] } {
+  if (Array.isArray(v)) return { en: v.map(String), sr: v.map(String) };
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    const en = Array.isArray(o.en) ? o.en.map(String) : [];
+    const sr = Array.isArray(o.sr) ? o.sr.map(String) : [];
+    return { en: en.length ? en : sr, sr: sr.length ? sr : en };
+  }
+  return { en: [], sr: [] };
+}
+
+/** Renders a wrapper twice (en/sr) around per-language content. */
+export function dualWrap(tag: string, cls: string, edit: string | undefined, render: (lang: 'en' | 'sr') => string): string {
+  const c = cls ? `${cls} ` : '';
+  return `<${tag} class="${c}en"${ed(edit)}>${render('en')}</${tag}><${tag} class="${c}sr"${ed(edit)}>${render('sr')}</${tag}>`;
+}
+
+/** Per-slide well customisation stored in content: labels + hidden slots. */
+export function wellHidden(c: any, name: string): boolean {
+  return !!c?.hidden_wells?.[name];
+}
+export function wellLabel(c: any, name: string, fallback: string): string {
+  return String(c?.labels?.[name] || fallback);
 }
 
 /** Inline <span class="en">..</span><span class="sr">..</span> pair. */
