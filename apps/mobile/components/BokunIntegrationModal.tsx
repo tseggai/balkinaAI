@@ -24,22 +24,24 @@ export function BokunIntegrationModal({ tenantId, visible, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [token, setToken] = useState('');
 
-  const webhookUrl = `${API_BASE}/api/webhooks/bokun`;
+  const webhookUrl = `${API_BASE}/api/webhooks/bokun?t=${token}`;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
       .from('tenants')
-      .select('bokun_vendor_id')
+      .select('bokun_vendor_id, bokun_webhook_token')
       .eq('id', tenantId)
       .single();
-    const t = data as { bokun_vendor_id: string | null } | null;
+    const t = data as { bokun_vendor_id: string | null; bokun_webhook_token: string | null } | null;
     if (t?.bokun_vendor_id) {
       setVendorId(t.bokun_vendor_id);
       setSavedVendorId(t.bokun_vendor_id);
       setEnabled(true);
     }
+    setToken(t?.bokun_webhook_token ?? '');
     setLoading(false);
   }, [tenantId]);
 

@@ -27,6 +27,24 @@ interface BokunPayload {
 export async function POST(request: Request) {
   const supabase = createAdminClient();
 
+  // The tenant's webhook URL carries their secret (?t=...). Every delivery is
+  // authenticated by it and scoped to that tenant — the vendor id in the payload
+  // is informational only.
+  const token = new URL(request.url).searchParams.get('t')?.trim() ?? '';
+  if (!/^[a-f0-9]{32}$/.test(token)) {
+    return NextResponse.json({ error: 'Missing or invalid webhook token' }, { status: 401 });
+  }
+  const { data: tenantRow } = await supabase
+    .from('tenants')
+    .select('id, bokun_vendor_id')
+    .eq('bokun_webhook_token', token)
+    .maybeSingle();
+  if (!tenantRow) {
+    return NextResponse.json({ error: 'Unknown webhook token' }, { status: 401 });
+  }
+  const tenantId = (tenantRow as { id: string }).id;
+  const expectedVendor = (tenantRow as { bokun_vendor_id: string | null }).bokun_vendor_id;
+
   let body: BokunPayload;
   try {
     body = await request.json();
@@ -38,6 +56,9 @@ export async function POST(request: Request) {
   if (!bookingId) return NextResponse.json({ received: true, skipped: 'no bookingId' });
 
   const vendorId = String(body.seller?.id ?? '');
+  if (expectedVendor && vendorId && vendorId !== expectedVendor) {
+    console.warn(`[bokun-webhook] vendor mismatch for tenant ${tenantId}: payload ${vendorId}, configured ${expectedVendor}`);
+  }
   const status = (body.status ?? '').toUpperCase();
   const customer = body.customer ?? { firstName: '', lastName: '', email: '', phoneNumber: null };
   const customerName = `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim() || 'OTA Customer';
@@ -88,17 +109,9 @@ export async function POST(request: Request) {
 
   const eventId = (event as { id: string } | null)?.id;
 
-  if (status === 'CONFIRMED' && vendorId && startTime && productName) {
+  if (status === 'CONFIRMED' && startTime && productName) {
     try {
-      const { data: tenant } = await supabase
-        .from('tenants')
-        .select('id')
-        .eq('bokun_vendor_id', vendorId)
-        .single();
-
-      if (tenant) {
-        const tenantId = (tenant as { id: string }).id;
-
+      {
         const { data: service } = await supabase
           .from('services')
           .select('id, duration_minutes')
@@ -190,7 +203,8 @@ export async function POST(request: Request) {
       const apptId = (prev as { appointment_id: string }).appointment_id;
       await supabase.from('appointments')
         .update({ status: 'cancelled' } as never)
-        .eq('id', apptId);
+        .eq('id', apptId)
+        .eq('tenant_id', tenantId);
 
       if (eventId) {
         await supabase.from('bokun_webhook_events')
