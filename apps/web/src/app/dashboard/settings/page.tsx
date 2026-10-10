@@ -568,28 +568,47 @@ function BokunIntegration({ tenantId }: { tenantId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [token, setToken] = useState('');
+  const [regenerating, setRegenerating] = useState(false);
 
-  const webhookUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/api/webhooks/bokun`
-    : 'https://app.balkina.ai/api/webhooks/bokun';
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app.balkina.ai';
+  const webhookUrl = `${origin}/api/webhooks/bokun?t=${token}`;
 
   useEffect(() => {
     (async () => {
       const supabase = createClient();
       const { data } = await supabase
         .from('tenants')
-        .select('bokun_vendor_id')
+        .select('bokun_vendor_id, bokun_webhook_token')
         .eq('id', tenantId)
         .single();
-      const t = data as { bokun_vendor_id: string | null } | null;
+      const t = data as { bokun_vendor_id: string | null; bokun_webhook_token: string | null } | null;
       if (t?.bokun_vendor_id) {
         setVendorId(t.bokun_vendor_id);
         setSavedVendorId(t.bokun_vendor_id);
         setEnabled(true);
       }
+      setToken(t?.bokun_webhook_token ?? '');
       setLoading(false);
     })();
   }, [tenantId]);
+
+  // Issuing a new token invalidates the old URL immediately — Bokun must be
+  // updated with the new one.
+  const handleRegenerate = async () => {
+    if (!confirm('Generate a new webhook URL? The current one stops working immediately and you must paste the new URL into Bokun.')) return;
+    setRegenerating(true);
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const next = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('tenants')
+      .update({ bokun_webhook_token: next } as never)
+      .eq('id', tenantId);
+    if (!error) setToken(next);
+    setRegenerating(false);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -713,6 +732,18 @@ function BokunIntegration({ tenantId }: { tenantId: string }) {
                         {copied ? 'Copied!' : 'Copy'}
                       </button>
                     </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                      This URL contains your private key — only Bokun should have it.{' '}
+                      <button
+                        type="button"
+                        onClick={handleRegenerate}
+                        disabled={regenerating}
+                        className="font-medium text-brand-600 hover:underline disabled:opacity-50"
+                      >
+                        {regenerating ? 'Generating…' : 'Generate a new URL'}
+                      </button>{' '}
+                      if it was ever shared.
+                    </p>
                   </div>
                 </div>
               </div>
