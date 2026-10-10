@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { GrowthSearchTarget } from '@balkina/shared';
 
 export default function TargetsPage() {
@@ -8,8 +8,13 @@ export default function TargetsPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [running, setRunning] = useState<string | null>(null);
-  const [filterCountry, setFilterCountry] = useState('all');
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [form, setForm] = useState({ segment: 'tenant', vertical: '', query: '', city: '', country: 'rs', language: 'sr', priority: 5 });
+
+  // Bulk selection: countries → cities → verticals. Empty = all.
+  const [selCountries, setSelCountries] = useState<string[]>([]);
+  const [selCities, setSelCities] = useState<string[]>([]);
+  const [selVerticals, setSelVerticals] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     const res = await fetch('/api/admin/growth/targets');
@@ -66,15 +71,58 @@ export default function TargetsPage() {
     load();
   };
 
-  const toggleCity = async (city: string, country: string, enabled: boolean) => {
-    const ids = targets.filter((t) => t.city === city && t.country === country && t.enabled !== enabled).map((t) => t.id);
-    await Promise.all(ids.map((id) => patch(id, { enabled })));
+  const bulk = async (enabled: boolean, override?: { countries?: string[]; cities?: string[]; verticals?: string[] }) => {
+    setBulkBusy(true);
+    setMessage('');
+    const body = {
+      enabled,
+      countries: override?.countries ?? selCountries,
+      cities: override?.cities ?? selCities,
+      verticals: override?.verticals ?? selVerticals,
+    };
+    const res = await fetch('/api/admin/growth/targets/bulk', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!res.ok) setMessage(`Error: ${json.error}`);
+    else setMessage(`${enabled ? 'Enabled' : 'Disabled'} ${json.updated} target${json.updated === 1 ? '' : 's'}.`);
+    setBulkBusy(false);
+    load();
   };
 
-  const countries = Array.from(new Set(targets.map((t) => t.country)));
-  const visible = filterCountry === 'all' ? targets : targets.filter((t) => t.country === filterCountry);
+  // ── Derived lists ──────────────────────────────────────────────────────────
+  const countries = useMemo(() => Array.from(new Set(targets.map((t) => t.country))).sort(), [targets]);
+  const citiesByCountry = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const t of targets) {
+      const list = m.get(t.country) ?? [];
+      if (!list.includes(t.city)) list.push(t.city);
+      m.set(t.country, list);
+    }
+    for (const list of m.values()) list.sort();
+    return m;
+  }, [targets]);
+  const verticals = useMemo(() => Array.from(new Set(targets.map((t) => t.vertical))).sort(), [targets]);
+
+  const activeCountries = selCountries.length ? selCountries : countries;
+  const cityOptions = activeCountries.flatMap((c) => (citiesByCountry.get(c) ?? []).map((city) => ({ city, country: c })));
+
+  // Targets matching the current bulk selection (for the preview count and the list below).
+  const matches = targets.filter(
+    (t) =>
+      (selCountries.length === 0 || selCountries.includes(t.country)) &&
+      (selCities.length === 0 || selCities.includes(t.city)) &&
+      (selVerticals.length === 0 || selVerticals.includes(t.vertical))
+  );
+  const matchesEnabled = matches.filter((t) => t.enabled).length;
+
+  const toggleIn = (list: string[], value: string, set: (v: string[]) => void) =>
+    set(list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
+
   const byCity = new Map<string, GrowthSearchTarget[]>();
-  for (const t of visible) {
+  for (const t of matches) {
     const key = `${t.city}|${t.country}`;
     byCity.set(key, [...(byCity.get(key) ?? []), t]);
   }
@@ -88,10 +136,6 @@ export default function TargetsPage() {
             The vertical × city matrix the prospector runs. {targets.filter((t) => t.enabled).length} enabled of {targets.length}.
           </p>
         </div>
-        <select value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
-          <option value="all">All countries</option>
-          {countries.map((c) => <option key={c} value={c}>{c.toUpperCase()}</option>)}
-        </select>
       </div>
 
       {message && (
@@ -99,6 +143,57 @@ export default function TargetsPage() {
           {message} <button onClick={() => setMessage('')} className="ml-2 underline">dismiss</button>
         </div>
       )}
+
+      {/* Bulk selection */}
+      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-900">Bulk enable / disable</h2>
+          <p className="text-xs text-gray-500">
+            Pick countries, then cities, then business types. Nothing selected means all.
+            {' '}<span className="font-medium text-gray-700">{matches.length} targets match · {matchesEnabled} enabled</span>
+          </p>
+        </div>
+
+        <ChipRow
+          label="Countries"
+          options={countries.map((c) => ({ value: c, label: c.toUpperCase() }))}
+          selected={selCountries}
+          onToggle={(v) => { toggleIn(selCountries, v, setSelCountries); setSelCities([]); }}
+          onClear={() => { setSelCountries([]); setSelCities([]); }}
+        />
+        <ChipRow
+          label="Cities"
+          options={cityOptions.map((o) => ({ value: o.city, label: activeCountries.length > 1 ? `${o.city} (${o.country.toUpperCase()})` : o.city }))}
+          selected={selCities}
+          onToggle={(v) => toggleIn(selCities, v, setSelCities)}
+          onClear={() => setSelCities([])}
+        />
+        <ChipRow
+          label="Business types"
+          options={verticals.map((v) => ({ value: v, label: v.replace(/_/g, ' ') }))}
+          selected={selVerticals}
+          onToggle={(v) => toggleIn(selVerticals, v, setSelVerticals)}
+          onClear={() => setSelVerticals([])}
+        />
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => bulk(true)}
+            disabled={bulkBusy || matches.length === 0}
+            className="rounded-lg bg-brand-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            Enable {matches.length} matching
+          </button>
+          <button
+            onClick={() => bulk(false)}
+            disabled={bulkBusy || matches.length === 0}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Disable {matches.length} matching
+          </button>
+          <span className="text-xs text-gray-400">Only the matching targets are listed below.</span>
+        </div>
+      </div>
 
       {/* Add target */}
       <form onSubmit={add} className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-8">
@@ -128,8 +223,8 @@ export default function TargetsPage() {
                     {city} <span className="font-normal text-gray-400">{country.toUpperCase()} · {enabledCount}/{list.length} enabled</span>
                   </h2>
                   <div className="flex gap-2 text-xs">
-                    <button onClick={() => toggleCity(city, country, true)} className="text-brand-600 hover:underline">enable all</button>
-                    <button onClick={() => toggleCity(city, country, false)} className="text-gray-500 hover:underline">disable all</button>
+                    <button onClick={() => bulk(true, { countries: [country], cities: [city], verticals: selVerticals })} className="text-brand-600 hover:underline">enable all</button>
+                    <button onClick={() => bulk(false, { countries: [country], cities: [city], verticals: selVerticals })} className="text-gray-500 hover:underline">disable all</button>
                   </div>
                 </div>
                 <table className="min-w-full text-sm">
@@ -171,6 +266,40 @@ export default function TargetsPage() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function ChipRow({
+  label, options, selected, onToggle, onClear,
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-1.5">
+      <span className="mr-1 w-28 text-xs font-medium text-gray-500">{label}</span>
+      <button
+        onClick={onClear}
+        className={`rounded-full px-2.5 py-1 text-xs font-medium ${selected.length === 0 ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+      >
+        All
+      </button>
+      {options.map((o) => {
+        const on = selected.includes(o.value);
+        return (
+          <button
+            key={o.value}
+            onClick={() => onToggle(o.value)}
+            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${on ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

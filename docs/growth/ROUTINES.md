@@ -10,6 +10,7 @@ admin app's unattended endpoints. Both need the same secret.
 |---|---|
 | `GOOGLE_MAPS_API_KEY` | Already set. Must have **Places API (New)** enabled in Google Cloud Console. |
 | `GROWTH_CRON_SECRET` | New. Any long random string. Sent as `Authorization: Bearer …` to `/api/growth/cron/*`. |
+| `OPENAI_API_KEY` | Optional for the enricher. Enables services/prices/hours/owner extraction with `gpt-4o-mini` (override with `GROWTH_LLM_MODEL`). Without it the enricher still finds emails, phones, socials and booking widgets. |
 
 ## Endpoints
 
@@ -17,6 +18,8 @@ admin app's unattended endpoints. Both need the same secret.
 |---|---|---|
 | `POST /api/growth/cron/prospect` | bearer `GROWTH_CRON_SECRET` | Runs the next N due search targets through Google Places and upserts `growth_prospects`. Body: `{ "limit": 20, "max_pages": 3, "segment": "tenant" }`. |
 | `POST /api/admin/growth/prospector` | admin session | Same, from the admin UI. |
+| `POST /api/growth/cron/enrich` | bearer `GROWTH_CRON_SECRET` | Enriches the next N un-enriched prospects (highest ICP first): fetches website + contact page, extracts emails/phones/socials/booking widget, optional LLM extraction, creates `growth_contacts`, moves stage new → enriched. Body: `{ "limit": 40, "segment": "tenant" }`. |
+| `POST /api/admin/growth/enricher` | admin session | Same, from the admin UI; also accepts `prospect_ids` for one-off runs. |
 
 ## Routine 1 — Daily prospector
 
@@ -47,10 +50,31 @@ Vercel Cron alternative (`apps/admin/vercel.json`):
 
 Vercel sends `Authorization: Bearer $CRON_SECRET`; the endpoint accepts that too.
 
+## Routine 2 — Daily enricher
+
+- Schedule: `CRON_TZ=Europe/Belgrade 0 7 * * *` (after the prospector).
+- Cost guard: 40 prospects × up to 2 page fetches + one `gpt-4o-mini` call (~12k input tokens) ≈ a few cents per day.
+
+Prompt:
+
+```
+You are the Balkina growth enricher. Call the unattended enricher endpoint once:
+
+  POST https://<admin-domain>/api/growth/cron/enrich
+  Authorization: Bearer $GROWTH_CRON_SECRET
+  Content-Type: application/json
+  {"limit": 40}
+
+Report in one short message: processed, enriched, skipped, emails_found, contacts_created,
+llm_used, and the first few errors. If llm_configured is false, say that OPENAI_API_KEY is
+missing on the admin project. Do nothing else.
+```
+
+Vercel Cron: already in `apps/admin/vercel.json` (`0 5 * * *` UTC).
+
 ## Routines still to build (in plan order)
 
-1. Enricher — website/Instagram extraction → `growth_prospects.enrichment`, `growth_contacts`.
-2. Pre-provisioner — unclaimed tenant from enrichment via `provisionTenantDefaults`.
+1. Pre-provisioner — unclaimed tenant from enrichment via `provisionTenantDefaults`.
 3. Personaliser + Sender + Reply triage — `growth_sequences`, `growth_enrollments`, Resend.
 4. Ad optimiser — `growth_ad_metrics` from Meta / Google / TikTok / LinkedIn.
 5. Reporter — weekly email.
