@@ -53,7 +53,7 @@ Buyer titles: General Manager, Marina Manager, Director of Guest Experience, Hea
 
 Build it in the repo so every piece is inspectable, re-runnable and owned by us. No separate outbound SaaS is required at the start.
 
-### 3.1 Data layer (new Supabase migration `067_growth.sql`)
+### 3.1 Data layer (new Supabase migration `068_growth.sql`)
 
 | Table | Purpose |
 |---|---|
@@ -215,7 +215,7 @@ Every interested reply → you take the demo; Claude prepares a one-page account
 Each item is a separate PR on this repo. Estimates are working sessions, not calendar days.
 
 1. **Tracking and attribution** (1 session): pixels and server-side events on `apps/marketing` and `apps/web` signup; UTM capture stored on `tenants`.
-2. **Migration 067 + Growth admin section** (2 sessions): tables above, RLS, admin pages (prospects, inbox, approval queue, metrics), Resend outreach subdomain with SPF/DKIM/DMARC, Resend inbound webhook.
+2. **Migration 068 + Growth admin section** (2 sessions): tables above, RLS, admin pages (prospects, inbox, approval queue, metrics), Resend outreach subdomain with SPF/DKIM/DMARC, Resend inbound webhook.
 3. **Prospector + Enricher** (2 sessions): Places search matrix, website/Instagram extraction, scoring; runs as a Routine.
 4. **Pre-provisioner + claim flow** (2 sessions): reuses `provisionTenantDefaults` (already on the roadmap), hidden visibility until claimed, claim page that converts to a normal self-serve tenant.
 5. **Sequencer + Sender + Reply triage** (2 sessions): templates in `packages/email-templates`, enrollment engine, caps, suppression, classification.
@@ -287,4 +287,4 @@ Weekly KPIs in the Reporter: spend, leads, claims, signups, activation rate, CAC
 4. Permission from Portonovi to be named in the case study and ads.
 5. Whether to build the growth engine in-repo as proposed (recommended) or to run outreach from HubSpot/Lemlist with Claude driving them through connectors (faster week 1, weaker long-term control).
 
-Once you answer 1–3, the first build PR (tracking + migration 067 + Growth admin) can start immediately.
+Once you answer 1–3, the first build PR (tracking + migration 068 + Growth admin) can start immediately.
