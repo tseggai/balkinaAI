@@ -8,7 +8,8 @@ admin app's unattended endpoints. Both need the same secret.
 
 | Var | Purpose |
 |---|---|
-| `GOOGLE_MAPS_API_KEY` | Already set. Must have **Places API (New)** enabled in Google Cloud Console. |
+| `GOOGLE_MAPS_API_KEY` | Already set. Best with **Places API (New)** enabled (a separate service from "Places API") and included in the key's API restrictions. If the new API returns 403 the prospector falls back to the legacy Places API (Text Search + Place Details), which works with the legacy "Places API" alone but costs roughly one extra request per business. |
+| `GROWTH_PLACES_API` | Optional: `new` or `legacy` to force one API instead of auto-fallback. |
 | `GROWTH_CRON_SECRET` | New. Any long random string. Sent as `Authorization: Bearer …` to `/api/growth/cron/*`. |
 | `OPENAI_API_KEY` | Optional for the enricher. Enables services/prices/hours/owner extraction with `gpt-4o-mini` (override with `GROWTH_LLM_MODEL`). Without it the enricher still finds emails, phones, socials and booking widgets. |
 

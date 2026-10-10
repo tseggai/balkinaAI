@@ -9,6 +9,7 @@ export interface ProspectorRunResult {
   inserted: number;
   updated: number;
   api_requests: number;
+  api_used: { new: number; legacy: number };
   errors: { target: string; message: string }[];
   stopped_reason: string | null;
 }
@@ -29,6 +30,7 @@ export async function runProspector(
     inserted: 0,
     updated: 0,
     api_requests: 0,
+    api_used: { new: 0, legacy: 0 },
     errors: [],
     stopped_reason: null,
   };
@@ -50,13 +52,14 @@ export async function runProspector(
   for (const target of (targets ?? []) as GrowthSearchTarget[]) {
     const label = `${target.query} · ${target.city} (${target.country})`;
     try {
-      const { places, requests } = await searchPlaces({
+      const { places, requests, api } = await searchPlaces({
         textQuery: `${target.query} ${target.city}`,
         languageCode: target.language,
         regionCode: target.country,
         maxPages: opts.maxPages ?? 3,
       });
       result.api_requests += requests;
+      result.api_used[api]++;
       result.targets_run++;
       result.places_found += places.length;
 

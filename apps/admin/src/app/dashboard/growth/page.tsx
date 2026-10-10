@@ -37,6 +37,7 @@ interface RunResult {
   inserted: number;
   updated: number;
   api_requests: number;
+  api_used?: { new: number; legacy: number };
   errors: { target: string; message: string }[];
   stopped_reason: string | null;
 }
@@ -172,6 +173,11 @@ export default function GrowthOverviewPage() {
           {result && (
             <div className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
               Ran {result.targets_run} targets · found {result.places_found} · new {result.inserted} · refreshed {result.updated} · {result.api_requests} API requests
+              {result.api_used && result.api_used.legacy > 0 && (
+                <div className="mt-1 text-amber-800">
+                  {result.api_used.legacy} target{result.api_used.legacy === 1 ? '' : 's'} used the legacy Places API fallback (Places API (New) returned 403). Enable &quot;Places API (New)&quot; and add it to the key&apos;s API restrictions to cut request volume.
+                </div>
+              )}
               {result.stopped_reason && <div className="mt-1 text-red-700">Stopped: {result.stopped_reason}</div>}
               {result.errors.length > 0 && !result.stopped_reason && (
                 <ul className="mt-1 list-disc pl-4 text-xs text-amber-800">
