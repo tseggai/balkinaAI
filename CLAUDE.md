@@ -249,8 +249,10 @@ Plan: `docs/GTM_GROWTH_PLAN.md`. Routines and endpoints: `docs/growth/ROUTINES.m
 - Tables (service-role only): `growth_search_targets` (vertical × city matrix), `growth_prospects`, `growth_contacts`, `growth_sequences`, `growth_enrollments`, `growth_events`, `growth_ad_metrics`. Types in `/packages/shared/src/types/growth.ts`.
 - Admin UI: `/dashboard/growth` (overview + run prospector), `/dashboard/growth/prospects`, `/dashboard/growth/targets`.
 - Prospector: `apps/admin/src/lib/growth/` — Google **Places API (New)** Text Search (`places.ts`), ICP scoring (`score.ts`), batch runner (`prospector.ts`). Unattended entry point `POST /api/growth/cron/prospect` guarded by `GROWTH_CRON_SECRET` (or Vercel `CRON_SECRET`); admin cron in `apps/admin/vercel.json`.
+- Enricher: `apps/admin/src/lib/growth/enricher.ts` — fetches website + contact page, extracts emails/phones/socials/booking widget deterministically, optional `gpt-4o-mini` extraction of services/prices/hours/owner when `OPENAI_API_KEY` is set (REST call, no SDK). Writes `growth_prospects.enrichment` (`GrowthEnrichment` type), creates `growth_contacts`, stage new → enriched. Cron: `POST /api/growth/cron/enrich`.
+- Targets bulk toggle: `PATCH /api/admin/growth/targets/bulk` with `{ enabled, countries?, cities?, verticals? }` (AND-combined; empty = all).
 - Segments: `tenant` (SMB funnel) and `property` (white-label funnel). Never lower a prospect's `stage` from an automated job; only refresh public facts.
-- Still to build, in order: enricher, pre-provisioner (unclaimed tenants via `provisionTenantDefaults`), sequencer/sender/reply triage (Resend), ad metrics + optimiser, weekly reporter.
+- Still to build, in order: pre-provisioner (unclaimed tenants via `provisionTenantDefaults`), sequencer/sender/reply triage (Resend), ad metrics + optimiser, weekly reporter.
 
 ## When Stuck
 - Check /docs/ for detailed module specs.

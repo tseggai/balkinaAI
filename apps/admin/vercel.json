@@ -3,6 +3,10 @@
     {
       "path": "/api/growth/cron/prospect",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/growth/cron/enrich",
+      "schedule": "0 5 * * *"
     }
   ]
 }

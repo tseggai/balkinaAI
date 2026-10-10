@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { GrowthProspect, GrowthProspectStage } from '@balkina/shared';
+import type { GrowthEnrichment, GrowthProspect, GrowthProspectStage } from '@balkina/shared';
 import { GROWTH_PROSPECT_STAGES } from '@balkina/shared';
 
 const STAGE_COLORS: Record<string, string> = {
@@ -77,6 +77,19 @@ function ProspectsTable() {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } as GrowthProspect : r)));
   };
 
+  const enrichOne = async (row: GrowthProspect) => {
+    setMessage('');
+    const res = await fetch('/api/admin/growth/enricher', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prospect_ids: [row.id] }),
+    });
+    const j = await res.json();
+    if (!res.ok) { setMessage(`Error: ${j.error}`); return; }
+    if (j.errors?.length) setMessage(`Error: ${j.errors[0].message}`);
+    load();
+  };
+
   const remove = async (row: GrowthProspect) => {
     if (!confirm(`Delete "${row.name}" from prospects?`)) return;
     const res = await fetch(`/api/admin/growth/prospects?id=${row.id}`, { method: 'DELETE' });
@@ -142,6 +155,7 @@ function ProspectsTable() {
                   onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
                   onUpdate={(patch) => update(r.id, patch)}
                   onDelete={() => remove(r)}
+                  onEnrich={() => enrichOne(r)}
                 />
               ))}
             </tbody>
@@ -162,17 +176,22 @@ function ProspectsTable() {
 }
 
 function ProspectRow({
-  row, expanded, onToggle, onUpdate, onDelete,
+  row, expanded, onToggle, onUpdate, onDelete, onEnrich,
 }: {
   row: GrowthProspect;
   expanded: boolean;
   onToggle: () => void;
   onUpdate: (patch: Partial<Pick<GrowthProspect, 'stage' | 'notes' | 'email' | 'instagram'>>) => void;
   onDelete: () => void;
+  onEnrich: () => void;
 }) {
   const [notes, setNotes] = useState(row.notes ?? '');
   const [email, setEmail] = useState(row.email ?? '');
   const [instagram, setInstagram] = useState(row.instagram ?? '');
+  const [enriching, setEnriching] = useState(false);
+  const enrichment = (row.enriched_at && row.enrichment && typeof row.enrichment === 'object' && !Array.isArray(row.enrichment)
+    ? (row.enrichment as unknown as GrowthEnrichment)
+    : null);
 
   return (
     <>
@@ -207,8 +226,15 @@ function ProspectRow({
             {GROWTH_PROSPECT_STAGES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
           </select>
         </td>
-        <td className="px-4 py-3 text-right">
-          <button onClick={onDelete} className="text-xs text-gray-400 hover:text-red-600">delete</button>
+        <td className="px-4 py-3 text-right text-xs">
+          <button
+            onClick={async () => { setEnriching(true); await onEnrich(); setEnriching(false); }}
+            disabled={enriching}
+            className="mr-3 text-brand-600 hover:underline disabled:opacity-50"
+          >
+            {enriching ? 'enriching…' : row.enriched_at ? 're-enrich' : 'enrich'}
+          </button>
+          <button onClick={onDelete} className="text-gray-400 hover:text-red-600">delete</button>
         </td>
       </tr>
       {expanded && (
@@ -229,6 +255,35 @@ function ProspectRow({
                 <div className="mt-1 text-gray-400">Status: {row.business_status ?? '—'} · Added {new Date(row.created_at).toLocaleDateString()}</div>
               </div>
             </div>
+            {enrichment && (
+              <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-gray-900">Enrichment</span>
+                  <span className="text-gray-400">{new Date(enrichment.fetched_at).toLocaleString()}</span>
+                  {enrichment.skipped && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-500">skipped: {enrichment.skipped.replace('_', ' ')}</span>}
+                  {enrichment.error && <span className="rounded-full bg-red-50 px-2 py-0.5 text-red-700">{enrichment.error.replace('_', ' ')}</span>}
+                  {enrichment.booking_widget && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">uses {enrichment.booking_widget}</span>}
+                  {enrichment.llm_model && <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800">{enrichment.llm_model}</span>}
+                </div>
+                {enrichment.summary && <p className="mb-1 text-gray-600">{enrichment.summary}</p>}
+                <div className="grid gap-2 md:grid-cols-3">
+                  <div>
+                    <span className="text-gray-400">Emails:</span> {enrichment.emails.length ? enrichment.emails.join(', ') : '—'}
+                    <br /><span className="text-gray-400">Phones:</span> {enrichment.phones.length ? enrichment.phones.join(', ') : '—'}
+                    {enrichment.owner_name && <><br /><span className="text-gray-400">Owner:</span> {enrichment.owner_name}</>}
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Socials:</span>{' '}
+                    {Object.entries(enrichment.socials ?? {}).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(' · ') || '—'}
+                    {enrichment.hours && <><br /><span className="text-gray-400">Hours:</span> {Object.entries(enrichment.hours).map(([d, h]) => `${d} ${h}`).join(', ')}</>}
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Services ({enrichment.services?.length ?? 0}):</span>{' '}
+                    {(enrichment.services ?? []).slice(0, 8).map((s) => `${s.name}${s.price != null ? ` ${s.price}${s.currency ? ' ' + s.currency : ''}` : ''}`).join(' · ') || '—'}
+                  </div>
+                </div>
+              </div>
+            )}
             <label className="mt-3 block text-xs text-gray-500">
               Notes
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => onUpdate({ notes: notes || null })} rows={2} className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900" />

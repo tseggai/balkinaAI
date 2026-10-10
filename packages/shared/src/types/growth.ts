@@ -169,3 +169,26 @@ export interface GrowthAdMetric {
   raw: Json;
   created_at: Timestamp;
 }
+
+/** Shape of growth_prospects.enrichment, written by the enricher. */
+export interface GrowthEnrichment {
+  fetched_at: Timestamp;
+  fetched_url: string | null;
+  contact_url?: string;
+  skipped?: 'no_website' | 'social_only';
+  error?: 'fetch_failed';
+  title?: string | null;
+  description?: string | null;
+  lang?: string | null;
+  emails: string[];
+  phones: string[];
+  socials: { instagram?: string; facebook?: string; whatsapp?: string; tiktok?: string; linkedin?: string };
+  booking_widget: string | null;
+  text_chars?: number;
+  llm_model?: string;
+  owner_name?: string | null;
+  services: { name: string; price?: number | null; currency?: string | null; duration_minutes?: number | null }[];
+  hours?: Record<string, string> | null;
+  languages?: string[];
+  summary?: string | null;
+}

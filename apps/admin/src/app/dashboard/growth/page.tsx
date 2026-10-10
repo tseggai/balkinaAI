@@ -20,6 +20,17 @@ interface GrowthStats {
   eventsLast7d: Record<string, number>;
 }
 
+interface EnrichResult {
+  processed: number;
+  enriched: number;
+  skipped: number;
+  emails_found: number;
+  contacts_created: number;
+  llm_used: number;
+  llm_configured: boolean;
+  errors: { prospect: string; message: string }[];
+}
+
 interface RunResult {
   targets_run: number;
   places_found: number;
@@ -37,6 +48,10 @@ export default function GrowthOverviewPage() {
   const [batch, setBatch] = useState(10);
   const [result, setResult] = useState<RunResult | null>(null);
   const [error, setError] = useState('');
+  const [enriching, setEnriching] = useState(false);
+  const [enrichBatch, setEnrichBatch] = useState(20);
+  const [enrichResult, setEnrichResult] = useState<EnrichResult | null>(null);
+  const [enrichError, setEnrichError] = useState('');
 
   const load = useCallback(async () => {
     const res = await fetch('/api/admin/growth/stats');
@@ -64,6 +79,26 @@ export default function GrowthOverviewPage() {
       setError('Network error while running the prospector.');
     }
     setRunning(false);
+  };
+
+  const runEnricher = async () => {
+    setEnriching(true);
+    setEnrichError('');
+    setEnrichResult(null);
+    try {
+      const res = await fetch('/api/admin/growth/enricher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: enrichBatch }),
+      });
+      const json = await res.json();
+      if (!res.ok) setEnrichError(json.error ?? 'Enricher failed');
+      else setEnrichResult(json);
+      await load();
+    } catch {
+      setEnrichError('Network error while running the enricher.');
+    }
+    setEnriching(false);
   };
 
   if (loading) {
@@ -106,7 +141,7 @@ export default function GrowthOverviewPage() {
         <Kpi label="Enrollments" value={stats?.enrollments.total ?? 0} sub={Object.entries(stats?.enrollments.byStatus ?? {}).map(([k, v]) => `${v} ${k}`).join(' · ') || 'no sequences yet'} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-4">
         {/* Prospector */}
         <div className="rounded-xl border border-gray-200 bg-white p-5 lg:col-span-1">
           <h2 className="text-base font-semibold text-gray-900">Prospector</h2>
@@ -141,6 +176,46 @@ export default function GrowthOverviewPage() {
               {result.errors.length > 0 && !result.stopped_reason && (
                 <ul className="mt-1 list-disc pl-4 text-xs text-amber-800">
                   {result.errors.slice(0, 5).map((e, i) => <li key={i}>{e.target}: {e.message}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Enricher */}
+        <div className="rounded-xl border border-gray-200 bg-white p-5 lg:col-span-1">
+          <h2 className="text-base font-semibold text-gray-900">Enricher</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Visits each prospect&apos;s website and contact page: emails, phones, socials, booking widget, and (with an OpenAI key) services, prices, hours and owner name.
+          </p>
+          <p className="mt-1 text-xs text-gray-400">
+            {(p?.total ?? 0) - (p?.byStage.new ?? 0)} of {p?.total ?? 0} prospects past &quot;new&quot;
+          </p>
+          <div className="mt-4 flex items-center gap-2">
+            <label className="text-sm text-gray-600">Prospects per run</label>
+            <select value={enrichBatch} onChange={(e) => setEnrichBatch(Number(e.target.value))} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+              {[10, 20, 40, 80].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <button
+            onClick={runEnricher}
+            disabled={enriching}
+            className="mt-3 w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            {enriching ? 'Enriching…' : 'Enrich next batch'}
+          </button>
+          <p className="mt-2 text-xs text-gray-400">
+            Highest ICP score first, website prospects only. Unattended: POST <code>/api/growth/cron/enrich</code>.
+          </p>
+
+          {enrichError && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{enrichError}</div>}
+          {enrichResult && (
+            <div className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
+              Processed {enrichResult.processed} · enriched {enrichResult.enriched} · skipped {enrichResult.skipped} · emails {enrichResult.emails_found} · contacts {enrichResult.contacts_created}
+              {!enrichResult.llm_configured && <div className="mt-1 text-amber-800">OPENAI_API_KEY not set: services, hours and owner extraction were skipped.</div>}
+              {enrichResult.errors.length > 0 && (
+                <ul className="mt-1 list-disc pl-4 text-xs text-amber-800">
+                  {enrichResult.errors.slice(0, 5).map((e, i) => <li key={i}>{e.prospect}: {e.message}</li>)}
                 </ul>
               )}
             </div>
