@@ -87,6 +87,11 @@ export interface GrowthProspect {
   tenant_id: UUID | null;
   enriched_at: Timestamp | null;
   last_contacted_at: Timestamp | null;
+  claim_token: string | null;
+  preprovisioned_at: Timestamp | null;
+  claim_expires_at: Timestamp | null;
+  claimed_at: Timestamp | null;
+  claim_email: string | null;
   created_at: Timestamp;
   updated_at: Timestamp;
 }

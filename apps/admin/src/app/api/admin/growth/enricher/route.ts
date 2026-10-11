@@ -8,6 +8,7 @@ export const maxDuration = 300;
 const bodySchema = z.object({
   limit: z.number().int().min(1).max(100).default(20),
   prospect_ids: z.array(z.string().uuid()).max(100).optional(),
+  search_target_ids: z.array(z.string().uuid()).max(100).optional(),
   segment: z.enum(['tenant', 'property']).optional(),
 });
 
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
     const result = await runEnricher(auth.supabase, {
       limit: parsed.data.limit,
       prospectIds: parsed.data.prospect_ids,
+      targetIds: parsed.data.search_target_ids,
       segment: parsed.data.segment,
     });
     return NextResponse.json({ ...result, llm_configured: Boolean(process.env.OPENAI_API_KEY) });

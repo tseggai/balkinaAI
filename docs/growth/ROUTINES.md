@@ -11,6 +11,7 @@ admin app's unattended endpoints. Both need the same secret.
 | `GOOGLE_MAPS_API_KEY` | Already set. Best with **Places API (New)** enabled (a separate service from "Places API") and included in the key's API restrictions. If the new API returns 403 the prospector falls back to the legacy Places API (Text Search + Place Details), which works with the legacy "Places API" alone but costs roughly one extra request per business. |
 | `GROWTH_PLACES_API` | Optional: `new` or `legacy` to force one API instead of auto-fallback. |
 | `GROWTH_CRON_SECRET` | New. Any long random string. Sent as `Authorization: Bearer …` to `/api/growth/cron/*`. |
+| `GROWTH_CLAIM_BASE_URL` | Optional (admin project). Base URL for claim links, default `https://balkina.ai`. `NEXT_PUBLIC_CLAIM_BASE_URL` does the same for the admin UI copy button. |
 | `OPENAI_API_KEY` | Optional for the enricher. Enables services/prices/hours/owner extraction with `gpt-4o-mini` (override with `GROWTH_LLM_MODEL`). Without it the enricher still finds emails, phones, socials and booking widgets. |
 
 ## Endpoints
@@ -20,7 +21,10 @@ admin app's unattended endpoints. Both need the same secret.
 | `POST /api/growth/cron/prospect` | bearer `GROWTH_CRON_SECRET` | Runs the next N due search targets through Google Places and upserts `growth_prospects`. Body: `{ "limit": 20, "max_pages": 3, "segment": "tenant" }`. |
 | `POST /api/admin/growth/prospector` | admin session | Same, from the admin UI. |
 | `POST /api/growth/cron/enrich` | bearer `GROWTH_CRON_SECRET` | Enriches the next N un-enriched prospects (highest ICP first): fetches website + contact page, extracts emails/phones/socials/booking widget, optional LLM extraction, creates `growth_contacts`, moves stage new → enriched. Body: `{ "limit": 40, "segment": "tenant" }`. |
-| `POST /api/admin/growth/enricher` | admin session | Same, from the admin UI; also accepts `prospect_ids` for one-off runs. |
+| `POST /api/admin/growth/enricher` | admin session | Same, from the admin UI; also accepts `prospect_ids` or `search_target_ids` for scoped runs. |
+| `POST /api/admin/growth/generate` | admin session | Step 1 of "Generate prospects": upserts search targets for cities × business types and returns their ids; the UI then runs the prospector and enricher over them in chunks. |
+| `POST /api/admin/growth/preprovision` | admin session | Builds unclaimed booking pages (tenant `status='unclaimed'`, location, owner staff, services) for `prospect_ids` or the next `limit` enriched prospects; issues 30-day claim tokens. |
+| `POST /api/claim` (marketing site) | public, token | Claims a page: creates the owner login, links it to the tenant + staff, activates the tenant, marks the prospect claimed. Page: `/claim/<token>`. |
 
 ## Routine 1 — Daily prospector
 
@@ -73,9 +77,13 @@ missing on the admin project. Do nothing else.
 
 Vercel Cron: already in `apps/admin/vercel.json` (`0 5 * * *` UTC).
 
+## Pre-provisioner (on demand, from the Prospects page)
+
+Not scheduled: pages are built from the admin UI ("Build booking pages" on selected rows) so a human decides which businesses get one. Unclaimed tenants are invisible to customers (discovery and `/b/<slug>` filter `status = 'active'`). Claim links expire after 30 days; the next build on the same prospect refreshes the token.
+
 ## Routines still to build (in plan order)
 
-1. Pre-provisioner — unclaimed tenant from enrichment via `provisionTenantDefaults`.
-3. Personaliser + Sender + Reply triage — `growth_sequences`, `growth_enrollments`, Resend.
-4. Ad optimiser — `growth_ad_metrics` from Meta / Google / TikTok / LinkedIn.
-5. Reporter — weekly email.
+1. Personaliser + Sender + Reply triage — `growth_sequences`, `growth_enrollments`, Resend.
+2. Ad optimiser — `growth_ad_metrics` from Meta / Google / TikTok / LinkedIn.
+3. Reporter — weekly email.
+4. Unclaimed-page cleanup — delete unclaimed tenants 30 days after their claim link expires.

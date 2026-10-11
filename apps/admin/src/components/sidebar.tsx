@@ -11,7 +11,7 @@ const navItems = [
   { href: '/dashboard/categories', label: 'Categories', icon: CategoryIcon },
   { href: '/dashboard/plans', label: 'Plans', icon: CreditCardIcon },
   { href: '/dashboard/customers', label: 'Customers', icon: UsersIcon },
-  { href: '/dashboard/growth', label: 'Growth', icon: GrowthIcon },
+  { href: '/dashboard/prospects', label: 'Prospects', icon: GrowthIcon },
 ];
 
 export function Sidebar() {

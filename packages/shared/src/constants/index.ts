@@ -46,3 +46,4 @@ export const DEFAULT_PAGE_SIZE = 20;
 
 /** Booking confirmation window: customers can cancel up to this many hours before. */
 export const CANCELLATION_WINDOW_HOURS = 24;
+export * from './growth.js';
