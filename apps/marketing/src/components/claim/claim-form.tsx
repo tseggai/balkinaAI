@@ -73,7 +73,7 @@ export function ClaimForm({ token, businessName, defaultOwnerName, defaultEmail 
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
       <button type="submit" disabled={busy} className="mt-5 w-full rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
-        {busy ? 'Claiming…' : `Claim ${businessName}`}
+        {busy ? 'Claiming…' : businessName.length > 28 ? 'Claim this page' : `Claim ${businessName}`}
       </button>
       <p className="mt-3 text-center text-[11px] text-gray-400">
         By claiming you agree to our <a href="/terms" className="underline">Terms</a> and <a href="/privacy" className="underline">Privacy Policy</a>.
