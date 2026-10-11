@@ -247,12 +247,13 @@ The /api/chat endpoint accepts tenantId as OPTIONAL. When no tenantId is provide
 ## Growth Engine (Migration 068) — Marketing & Sales Automation
 Plan: `docs/GTM_GROWTH_PLAN.md`. Routines and endpoints: `docs/growth/ROUTINES.md`.
 - Tables (service-role only): `growth_search_targets` (vertical × city matrix), `growth_prospects`, `growth_contacts`, `growth_sequences`, `growth_enrollments`, `growth_events`, `growth_ad_metrics`. Types in `/packages/shared/src/types/growth.ts`.
-- Admin UI: `/dashboard/growth` (overview + run prospector), `/dashboard/growth/prospects`, `/dashboard/growth/targets`.
+- Admin UI: `/dashboard/prospects` is the hub (nav item "Prospects"): funnel strip, stage tabs, filters, bulk actions. "Generate prospects" modal picks countries → cities → business types (catalogue in `/packages/shared/src/constants/growth.ts`), upserts search targets via `POST /api/admin/growth/generate`, then runs the prospector and enricher in chunks from the client. `/dashboard/growth` redirects here.
 - Prospector: `apps/admin/src/lib/growth/` — Google **Places API (New)** Text Search (`places.ts`), ICP scoring (`score.ts`), batch runner (`prospector.ts`). Unattended entry point `POST /api/growth/cron/prospect` guarded by `GROWTH_CRON_SECRET` (or Vercel `CRON_SECRET`); admin cron in `apps/admin/vercel.json`.
 - Enricher: `apps/admin/src/lib/growth/enricher.ts` — fetches website + contact page, extracts emails/phones/socials/booking widget deterministically, optional `gpt-4o-mini` extraction of services/prices/hours/owner when `OPENAI_API_KEY` is set (REST call, no SDK). Writes `growth_prospects.enrichment` (`GrowthEnrichment` type), creates `growth_contacts`, stage new → enriched. Cron: `POST /api/growth/cron/enrich`.
 - Targets bulk toggle: `PATCH /api/admin/growth/targets/bulk` with `{ enabled, countries?, cities?, verticals? }` (AND-combined; empty = all).
+- Pre-provisioner (Migration 069): `apps/admin/src/lib/growth/preprovision.ts` builds an **unclaimed tenant** (`tenants.status='unclaimed'`, `user_id` null, slug, category link, location with Places coordinates, owner staff with no user, services from enrichment or vertical defaults with `hide_price`) and issues `growth_prospects.claim_token` (30 days). Claim flow on the marketing site: `/claim/[token]` + `POST /api/claim` creates the owner login, links tenant + staff, sets status active, stage → claimed. Unclaimed tenants never appear to customers because discovery and `/b/<slug>` filter `status='active'`.
 - Segments: `tenant` (SMB funnel) and `property` (white-label funnel). Never lower a prospect's `stage` from an automated job; only refresh public facts.
-- Still to build, in order: pre-provisioner (unclaimed tenants via `provisionTenantDefaults`), sequencer/sender/reply triage (Resend), ad metrics + optimiser, weekly reporter.
+- Still to build, in order: sequencer/sender/reply triage (Resend), ad metrics + optimiser, weekly reporter, unclaimed-page cleanup.
 
 ## When Stuck
 - Check /docs/ for detailed module specs.

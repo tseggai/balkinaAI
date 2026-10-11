@@ -307,7 +307,7 @@ export async function enrichProspect(prospect: GrowthProspect): Promise<GrowthEn
 
 export async function runEnricher(
   supabase: SupabaseClient,
-  opts: { limit?: number; prospectIds?: string[]; concurrency?: number; segment?: 'tenant' | 'property' } = {}
+  opts: { limit?: number; prospectIds?: string[]; targetIds?: string[]; concurrency?: number; segment?: 'tenant' | 'property' } = {}
 ): Promise<EnricherRunResult> {
   const limit = Math.max(1, Math.min(opts.limit ?? 20, 100));
   const concurrency = Math.max(1, Math.min(opts.concurrency ?? 4, 8));
@@ -322,6 +322,7 @@ export async function runEnricher(
     .order('google_review_count', { ascending: false, nullsFirst: false })
     .limit(limit);
   if (opts.prospectIds?.length) query = supabase.from('growth_prospects').select('*').in('id', opts.prospectIds);
+  if (opts.targetIds?.length) query = query.in('search_target_id', opts.targetIds);
   if (opts.segment) query = query.eq('segment', opts.segment);
 
   const { data, error } = await query;

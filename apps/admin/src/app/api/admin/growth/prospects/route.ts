@@ -19,6 +19,9 @@ export async function GET(request: Request) {
   const minScore = Number(searchParams.get('min_score') ?? '');
   // PostgREST `or` filters are comma/paren delimited — strip those from free text.
   const q = searchParams.get('q')?.replace(/[,()]/g, ' ').trim().slice(0, 100);
+  const hasEmail = searchParams.get('has_email');
+  const built = searchParams.get('built'); // 'yes' | 'no'
+  const enriched = searchParams.get('enriched'); // 'yes' | 'no'
   const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
 
   let query = auth.supabase
@@ -35,6 +38,12 @@ export async function GET(request: Request) {
   if (city && city !== 'all') query = query.eq('city', city);
   if (Number.isFinite(minScore) && searchParams.get('min_score')) query = query.gte('icp_score', minScore);
   if (q) query = query.or(`name.ilike.%${q}%,website.ilike.%${q}%,instagram.ilike.%${q}%`);
+  if (hasEmail === 'yes') query = query.not('email', 'is', null);
+  if (hasEmail === 'no') query = query.is('email', null);
+  if (built === 'yes') query = query.not('tenant_id', 'is', null);
+  if (built === 'no') query = query.is('tenant_id', null);
+  if (enriched === 'yes') query = query.not('enriched_at', 'is', null);
+  if (enriched === 'no') query = query.is('enriched_at', null);
 
   const { data, error, count } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
