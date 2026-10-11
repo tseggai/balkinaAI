@@ -138,8 +138,8 @@ export function GenerateProspectsModal({ onClose, onFinished }: Props) {
   const busy = phase === 'preparing' || phase === 'searching' || phase === 'enriching';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={busy ? undefined : onClose}>
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={busy ? undefined : onClose}>
+      <div className="max-h-[94vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl sm:p-6" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-bold text-gray-900">Generate prospects</h2>
         <p className="mt-1 text-sm text-gray-500">
           Pick where and what kind of businesses to find. Balkina searches Google Places, scores each business, and (optionally) visits their websites for emails, services and prices.
@@ -164,7 +164,7 @@ export function GenerateProspectsModal({ onClose, onFinished }: Props) {
                   <div key={c.code} className="mb-2 flex flex-wrap items-center gap-1.5">
                     <button
                       onClick={() => setSelCities(allOn ? selCities.filter((x) => x.country !== c.code) : [...selCities.filter((x) => x.country !== c.code), ...opts])}
-                      className="mr-1 w-24 text-left text-xs font-medium text-gray-500 hover:text-brand-700"
+                      className="mr-1 w-full text-left text-xs font-medium text-gray-500 hover:text-brand-700 sm:w-24"
                     >
                       {c.name.split(' ')[0]} · {allOn ? 'none' : 'all'}
                     </button>
@@ -215,7 +215,7 @@ export function GenerateProspectsModal({ onClose, onFinished }: Props) {
               </div>
             </Section>
 
-            <div className="mt-5 flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-sm">
+            <div className="mt-5 rounded-xl bg-gray-50 px-4 py-3 text-sm">
               <div className="text-gray-600">
                 <span className="font-semibold text-gray-900">{combos}</span> searches ({selCities.length} cities × {selVerticals.length} types)
                 · up to <span className="font-semibold text-gray-900">{combos * pages * 20}</span> businesses

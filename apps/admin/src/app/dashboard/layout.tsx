@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { Sidebar } from '@/components/sidebar';
+import { DashboardShell } from '@/components/dashboard-shell';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,10 +19,5 @@ export default async function DashboardLayout({
   const role = (user.app_metadata?.role as string) ?? '';
   if (role !== 'platform_admin') redirect('/auth/login');
 
-  return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <main className="flex-1 overflow-auto">{children}</main>
-    </div>
-  );
+  return <DashboardShell>{children}</DashboardShell>;
 }

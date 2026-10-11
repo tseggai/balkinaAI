@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import type { GrowthProspect, GrowthProspectStage } from '@balkina/shared';
 import { GROWTH_PROSPECT_STAGES } from '@balkina/shared';
 import { GenerateProspectsModal } from '@/components/generate-prospects-modal';
-import { ProspectRow, STAGE_LABELS } from '@/components/prospect-row';
+import { ProspectCard, ProspectRow, STAGE_LABELS } from '@/components/prospect-row';
 
 interface Facets {
   total: number;
@@ -166,8 +166,8 @@ function Prospects() {
   const isEmpty = facets !== null && facets.total === 0;
 
   return (
-    <div className="p-8">
-      <div className="mb-5 flex items-center justify-between">
+    <div className="p-4 md:p-8">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Prospects</h1>
           <p className="mt-1 text-sm text-gray-500">Businesses we found, what we know about them, and where each one is in the funnel.</p>
@@ -186,7 +186,7 @@ function Prospects() {
       )}
 
       {isEmpty ? (
-        <div className="mt-10 rounded-2xl border border-dashed border-gray-300 bg-white px-8 py-16 text-center">
+        <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-white px-5 py-12 text-center md:mt-10 md:px-8 md:py-16">
           <h2 className="text-lg font-semibold text-gray-900">No prospects yet</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500">
             Choose countries, cities and business types. Balkina searches Google Places, scores every business against the ideal customer profile, and visits their websites for emails, services and prices. Then you build their booking pages and start outreach.
@@ -199,7 +199,7 @@ function Prospects() {
         <>
           {/* Funnel strip */}
           {t && (
-            <div className="mb-5 grid grid-cols-3 gap-3 lg:grid-cols-6">
+            <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-3 lg:grid-cols-6">
               <Kpi label="Prospects" value={facets?.total ?? 0} />
               <Kpi label="Enriched" value={t.enriched} sub={`${t.withEmail} with email`} />
               <Kpi label="High fit (score ≥ 4)" value={t.highScore} />
@@ -210,7 +210,7 @@ function Prospects() {
           )}
 
           {/* Stage tabs */}
-          <div className="mb-4 flex flex-wrap gap-1.5">
+          <div className="-mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
             {STAGE_TABS.map((s) => {
               const n = s === 'all' ? facets?.total ?? 0 : facets?.stages[s] ?? 0;
               if (s !== 'all' && n === 0 && stage !== s) return null;
@@ -218,7 +218,7 @@ function Prospects() {
                 <button
                   key={s}
                   onClick={() => { setStage(s); setPage(1); setSelected(new Set()); }}
-                  className={`rounded-full px-3 py-1 text-xs font-medium ${stage === s ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${stage === s ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                 >
                   {s === 'all' ? 'All' : STAGE_LABELS[s]} <span className="opacity-70">{n}</span>
                 </button>
@@ -227,7 +227,7 @@ function Prospects() {
           </div>
 
           {/* Filters */}
-          <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <select value={country} onChange={(e) => { setCountry(e.target.value); setCity('all'); setPage(1); }} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
               <option value="all">All countries</option>
               {Object.entries(facets?.countries ?? {}).sort((a, b) => b[1] - a[1]).map(([c, n]) => <option key={c} value={c}>{c.toUpperCase()} ({n})</option>)}
@@ -256,8 +256,8 @@ function Prospects() {
               <option value="yes">Page built</option>
               <option value="no">No page yet</option>
             </select>
-            <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search name / site / IG" className="w-52 rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
-            <span className="ml-auto text-xs text-gray-400">{count} matching · sorted by score</span>
+            <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search name / site / IG" className="col-span-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm sm:w-52" />
+            <span className="col-span-2 text-xs text-gray-400 sm:ml-auto">{count} matching · sorted by score</span>
           </div>
 
           {/* Bulk bar */}
@@ -285,7 +285,36 @@ function Prospects() {
           ) : rows.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-sm text-gray-500">No prospects match these filters.</div>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <>
+            {/* Mobile: cards */}
+            <div className="space-y-2 md:hidden">
+              <label className="flex items-center gap-2 px-1 text-xs text-gray-500">
+                <input
+                  type="checkbox"
+                  checked={allOnPageSelected}
+                  onChange={(e) => setSelected(e.target.checked ? new Set([...Array.from(selected), ...rows.map((r) => r.id)]) : new Set(Array.from(selected).filter((id) => !rows.some((r) => r.id === id))))}
+                />
+                Select all on this page
+              </label>
+              {rows.map((r) => (
+                <ProspectCard
+                  key={r.id}
+                  row={r}
+                  selected={selected.has(r.id)}
+                  expanded={expanded === r.id}
+                  busy={rowBusy[r.id] ?? null}
+                  onSelect={(on) => setSelected((prev) => { const n = new Set(prev); if (on) n.add(r.id); else n.delete(r.id); return n; })}
+                  onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
+                  onUpdate={(patch) => update(r.id, patch)}
+                  onEnrich={() => enrich([r.id])}
+                  onBuild={() => build([r.id])}
+                  onDelete={() => remove(r)}
+                />
+              ))}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                   <tr>
@@ -325,6 +354,7 @@ function Prospects() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
 
           <div className="mt-4 flex items-center justify-between text-sm text-gray-500">

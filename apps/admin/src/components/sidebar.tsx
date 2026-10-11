@@ -14,7 +14,17 @@ const navItems = [
   { href: '/dashboard/prospects', label: 'Prospects', icon: GrowthIcon },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  /** Desktop icon-rail mode (labels hidden). */
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+  /** Called after a nav link is clicked (closes the off-canvas drawer on mobile). */
+  onNavigate?: () => void;
+  /** Mobile drawer close button. */
+  onClose?: () => void;
+}
+
+export function Sidebar({ collapsed = false, onToggleCollapse, onNavigate, onClose }: SidebarProps) {
   const pathname = usePathname();
 
   async function handleSignOut() {
@@ -24,15 +34,26 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
+    <aside className={`flex h-full flex-col border-r border-gray-200 bg-white transition-[width] duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
       {/* Logo */}
-      <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-6">
-        <img src="/assets/Balkina_logo_color.png" alt="Balkina AI" className="h-7 w-auto" />
-        <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">ADMIN</span>
+      <div className={`flex h-16 items-center border-b border-gray-200 ${collapsed ? 'justify-center px-2' : 'gap-2 px-6'}`}>
+        {collapsed ? (
+          <img src="/assets/Balkina_icon_color.png" alt="Balkina AI" className="h-7 w-7" />
+        ) : (
+          <>
+            <img src="/assets/Balkina_logo_color.png" alt="Balkina AI" className="h-7 w-auto" />
+            <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">ADMIN</span>
+          </>
+        )}
+        {onClose && (
+          <button onClick={onClose} aria-label="Close menu" className="ml-auto rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 md:hidden">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav className={`flex-1 overflow-y-auto py-4 ${collapsed ? 'px-2' : 'px-3'}`}>
         <ul className="space-y-1">
           {navItems.map((item) => {
             const isActive =
@@ -43,14 +64,16 @@ export function Sidebar() {
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  onClick={onNavigate}
+                  title={collapsed ? item.label : undefined}
+                  className={`flex items-center rounded-lg text-sm font-medium transition-colors ${collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2'} ${
                     isActive
                       ? 'bg-brand-50 text-brand-700'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }`}
                 >
                   <item.icon active={isActive} />
-                  {item.label}
+                  {!collapsed && item.label}
                 </Link>
               </li>
             );
@@ -58,21 +81,36 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      {/* Admin info + logout */}
-      <div className="border-t border-gray-200 p-4">
-        <div className="mb-3">
-          <p className="truncate text-sm font-semibold text-gray-900">Platform Admin</p>
-          <span className="mt-0.5 inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-            Super Admin
-          </span>
-        </div>
+      {/* Admin info + logout + collapse */}
+      <div className={`border-t border-gray-200 ${collapsed ? 'p-2' : 'p-4'}`}>
+        {!collapsed && (
+          <div className="mb-3">
+            <p className="truncate text-sm font-semibold text-gray-900">Platform Admin</p>
+            <span className="mt-0.5 inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+              Super Admin
+            </span>
+          </div>
+        )}
         <button
           onClick={handleSignOut}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+          title={collapsed ? 'Sign out' : undefined}
+          className={`flex w-full items-center rounded-lg text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 ${collapsed ? 'justify-center py-2.5' : 'gap-2 px-3 py-2'}`}
         >
           <LogoutIcon />
-          Sign out
+          {!collapsed && 'Sign out'}
         </button>
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            title={collapsed ? 'Expand menu' : 'Collapse menu'}
+            className={`mt-1 hidden w-full items-center rounded-lg text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 md:flex ${collapsed ? 'justify-center py-2.5' : 'gap-2 px-3 py-2'}`}
+          >
+            <svg className={`h-5 w-5 text-gray-400 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5" />
+            </svg>
+            {!collapsed && 'Collapse'}
+          </button>
+        )}
       </div>
     </aside>
   );
