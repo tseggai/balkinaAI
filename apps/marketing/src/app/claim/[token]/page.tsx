@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ClaimForm } from '@/components/claim/claim-form';
+import { ClaimDemo } from '@/components/claim/claim-demo';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,23 +88,11 @@ export default async function ClaimPage({ params }: { params: { token: string } 
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">{claim.name}</h1>
           {claim.address && <p className="mt-1 text-sm text-gray-500">{claim.address}</p>}
           <p className="mt-4 text-gray-600 leading-relaxed">
-            We built a booking page for your business from public information. Claim it, check the services and hours, and share your link. Customers can book you day or night, and the Balkina AI receptionist confirms every appointment.
+            We built a booking page for your business from public information. Claim it, check the services and hours, and share your link. Customers can book you day or night, and Balkina's AI receptionist confirms every appointment.
           </p>
 
-          <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-5">
-            <h2 className="text-sm font-semibold text-gray-900">Services we found</h2>
-            <p className="mt-0.5 text-xs text-gray-500">You can edit, add or remove any of these after claiming.</p>
-            <ul className="mt-3 divide-y divide-gray-200">
-              {claim.services.length === 0 && <li className="py-2 text-sm text-gray-400">No services yet. Add them in your dashboard.</li>}
-              {claim.services.map((s) => (
-                <li key={s.id} className="flex items-center justify-between py-2 text-sm">
-                  <span className="text-gray-900">{s.name}</span>
-                  <span className="text-gray-500">
-                    {s.duration_minutes} min{!s.hide_price && s.price > 0 ? ` · ${s.price} ${claim.currency}` : ''}
-                  </span>
-                </li>
-              ))}
-            </ul>
+          <div className="mt-6">
+            <ClaimDemo businessName={claim.name} ownerName={claim.ownerName} currency={claim.currency} services={claim.services} />
           </div>
 
           <ul className="mt-6 grid gap-2 text-sm text-gray-600 sm:grid-cols-2">
@@ -114,7 +103,7 @@ export default async function ClaimPage({ params }: { params: { token: string } 
           </ul>
         </div>
 
-        <div className="md:col-span-2">
+        <div id="claim-form" className="scroll-mt-24 md:col-span-2">
           <ClaimForm token={claim.token} businessName={claim.name} defaultOwnerName={claim.ownerName} defaultEmail={claim.email} />
           <p className="mt-4 text-xs text-gray-400">
             Not your business, or don't want this page? Reply to our email and we'll remove it. Unclaimed pages are never shown to customers.
