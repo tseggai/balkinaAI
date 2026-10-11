@@ -36,17 +36,17 @@ export function Sidebar({ collapsed = false, onToggleCollapse, onNavigate, onClo
   return (
     <aside className={`flex h-full flex-col border-r border-gray-200 bg-white transition-[width] duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
       {/* Logo */}
-      <div className={`flex h-16 items-center border-b border-gray-200 ${collapsed ? 'justify-center px-2' : 'gap-2 px-6'}`}>
+      <div className={`flex h-16 min-w-0 items-center overflow-hidden border-b border-gray-200 ${collapsed ? 'justify-center px-2' : 'gap-2 px-4'}`}>
         {collapsed ? (
           <img src="/assets/Balkina_icon_color.png" alt="Balkina AI" className="h-7 w-7" />
         ) : (
           <>
-            <img src="/assets/Balkina_logo_color.png" alt="Balkina AI" className="h-7 w-auto" />
-            <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">ADMIN</span>
+            <img src="/assets/Balkina_logo_color.png" alt="Balkina AI" className="h-6 w-auto max-w-[120px] shrink-0 object-contain" />
+            <span className="shrink-0 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">ADMIN</span>
           </>
         )}
         {onClose && (
-          <button onClick={onClose} aria-label="Close menu" className="ml-auto rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 md:hidden">
+          <button onClick={onClose} aria-label="Close menu" className="ml-auto shrink-0 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 md:hidden">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
           </button>
         )}
