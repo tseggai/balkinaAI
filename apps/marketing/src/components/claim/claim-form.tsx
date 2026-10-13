@@ -76,7 +76,7 @@ export function ClaimForm({ token, businessName, defaultOwnerName, defaultEmail,
   }
 
   return (
-    <form id="claim-form" onSubmit={submit} className="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+    <form id="claim-form" onSubmit={submit} className="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
       <h2 className="text-lg font-semibold text-gray-900">{t.claimTitle}</h2>
       <p className="mt-1 text-sm text-gray-500">{t.claimSubtitle}</p>
 
