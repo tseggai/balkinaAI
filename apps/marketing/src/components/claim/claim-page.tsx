@@ -57,16 +57,17 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-6 py-6 md:py-12">
-        <div className="grid gap-10 md:grid-cols-5">
-          <div className="md:col-span-3">
+      <div className="mx-auto max-w-5xl px-5 py-4 md:py-12">
+        <div className="grid gap-6 md:grid-cols-5 md:gap-x-10">
+          <div className="min-w-0 md:col-span-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{t.eyebrow}</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-900 md:text-4xl">
               {data.ownerFirstName ? t.greeting(data.ownerFirstName) : t.greetingNoName}
             </h1>
+            <p className="mt-1.5 text-sm text-gray-600 md:text-base">{t.lede}</p>
 
             {/* Business identity + proof */}
-            <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
+            <div className="mt-4 min-w-0 rounded-2xl border border-gray-200 bg-white p-4">
               <p className="text-lg font-semibold text-gray-900">{data.displayName}</p>
               {data.fullName !== data.displayName && <p className="mt-0.5 text-xs text-gray-400">{data.fullName}</p>}
               {data.address && <p className="mt-1 text-sm text-gray-500">{data.address}</p>}
@@ -78,32 +79,31 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
                 </p>
               )}
               {bookingUrl && (
-                <div className="mt-3 rounded-xl bg-brand-50 px-3 py-2">
+                <div className="mt-3 min-w-0 rounded-xl bg-brand-50 px-3 py-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">{t.yourLink}</p>
-                  <p className="truncate font-mono text-sm text-brand-900">{bookingUrl}</p>
+                  <p className="break-all font-mono text-[13px] leading-snug text-brand-900">{bookingUrl}</p>
                   <p className="text-[11px] text-brand-700">{t.yourLinkHint}</p>
                 </div>
               )}
             </div>
 
-            <p className="mt-4 text-gray-600 leading-relaxed">{t.lede}</p>
+          </div>
 
-            <div className="mt-6">
-              <ClaimDemo businessName={data.displayName} ownerName={data.ownerName} currency={data.currency} services={data.services} t={t} />
-            </div>
-
-            <ul className="mt-6 grid gap-2 text-sm text-gray-600 sm:grid-cols-2">
+          {/* Claim card: directly under the identity card on mobile, right column on desktop */}
+          <div className="min-w-0 md:col-span-2 md:col-start-4 md:row-span-2 md:row-start-1">
+            <ClaimForm token={data.token} businessName={data.displayName} defaultOwnerName={data.ownerName} defaultEmail={data.email} t={t} />
+            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
               {t.benefits.map((b) => (
                 <li key={b}>✓ {b}</li>
               ))}
             </ul>
-          </div>
-
-          <div className="md:col-span-2">
-            <ClaimForm token={data.token} businessName={data.displayName} defaultOwnerName={data.ownerName} defaultEmail={data.email} t={t} />
-            <p className="mt-4 text-xs text-gray-400">
+            <p className="mt-3 text-xs text-gray-400">
               <span className="font-medium text-gray-500">{t.notYours}</span> {t.notYoursBody}
             </p>
+          </div>
+
+          <div className="min-w-0 md:col-span-3">
+            <ClaimDemo businessName={data.displayName} ownerName={data.ownerName} currency={data.currency} services={data.services} t={t} />
           </div>
         </div>
       </div>
