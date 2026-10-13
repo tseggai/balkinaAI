@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import type { ClaimCopy } from '@/lib/claim/i18n';
 
 /**
  * Simulated booking flow for an unclaimed page: the business owner taps a
@@ -22,6 +23,7 @@ interface Props {
   ownerName: string;
   currency: string;
   services: DemoService[];
+  t: ClaimCopy;
 }
 
 const OPEN_HOUR = 9;
@@ -60,11 +62,13 @@ function slotsFor(day: Date, durationMinutes: number): { label: string; taken: b
   return out;
 }
 
-function fmtDay(d: Date, opts: Intl.DateTimeFormatOptions): string {
-  return d.toLocaleDateString('en-GB', opts);
+function fmtDay(d: Date, opts: Intl.DateTimeFormatOptions, locale = 'en-GB'): string {
+  return d.toLocaleDateString(locale, opts);
 }
 
-export function ClaimDemo({ businessName, ownerName, currency, services }: Props) {
+export function ClaimDemo({ businessName, ownerName, currency, services, t }: Props) {
+  const L = t.dateLocale;
+  const fd = (d: Date, opts: Intl.DateTimeFormatOptions) => fmtDay(d, opts, L);
   const [open, setOpen] = useState(false);
   const [service, setService] = useState<DemoService | null>(null);
   const [step, setStep] = useState(1);
@@ -98,17 +102,17 @@ export function ClaimDemo({ businessName, ownerName, currency, services }: Props
       <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">Services we found</h2>
-            <p className="mt-0.5 text-xs text-gray-500">Tap one to see how a customer books it. You can edit, add or remove any of these after claiming.</p>
+            <h2 className="text-sm font-semibold text-gray-900">{t.servicesTitle}</h2>
+            <p className="mt-0.5 text-xs text-gray-500">{t.servicesHint}</p>
           </div>
           {services.length > 0 && (
             <button onClick={() => start(services[0] as DemoService)} className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-brand-700 shadow-sm ring-1 ring-brand-100 hover:bg-brand-50">
-              Try a booking
+              {t.tryBooking}
             </button>
           )}
         </div>
         <ul className="mt-3 divide-y divide-gray-200">
-          {services.length === 0 && <li className="py-2 text-sm text-gray-400">No services yet. Add them in your dashboard.</li>}
+          {services.length === 0 && <li className="py-2 text-sm text-gray-400">{t.noServices}</li>}
           {services.map((s) => (
             <li key={s.id}>
               <button onClick={() => start(s)} className="flex w-full items-center justify-between py-2.5 text-left text-sm hover:text-brand-700">
@@ -129,7 +133,7 @@ export function ClaimDemo({ businessName, ownerName, currency, services }: Props
           <div className="max-h-[94vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">Preview · nothing is booked</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">{t.demoPreview}</p>
                 <h3 className="text-base font-semibold text-gray-900">{businessName}</h3>
               </div>
               <button onClick={close} aria-label="Close" className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100">
@@ -142,14 +146,14 @@ export function ClaimDemo({ businessName, ownerName, currency, services }: Props
                 {[1, 2, 3, 4].map((n) => (
                   <span key={n} className={`h-1.5 flex-1 rounded-full ${n <= step ? 'bg-brand-600' : 'bg-gray-200'}`} />
                 ))}
-                <span className="ml-2 text-[11px] text-gray-400">Step {step} of 4</span>
+                <span className="ml-2 text-[11px] text-gray-400">{t.demoStep(step)}</span>
               </div>
             )}
 
             {/* Step 1: service */}
             {step === 1 && (
               <div className="mt-4">
-                <h4 className="text-sm font-semibold text-gray-900">Choose a service</h4>
+                <h4 className="text-sm font-semibold text-gray-900">{t.demoChooseService}</h4>
                 <ul className="mt-2 space-y-1.5">
                   {services.map((s) => (
                     <li key={s.id}>
@@ -163,14 +167,14 @@ export function ClaimDemo({ businessName, ownerName, currency, services }: Props
                     </li>
                   ))}
                 </ul>
-                <button onClick={() => setStep(2)} className="mt-4 w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700">Continue</button>
+                <button onClick={() => setStep(2)} className="mt-4 w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700">{t.demoContinue}</button>
               </div>
             )}
 
             {/* Step 2: date */}
             {step === 2 && (
               <div className="mt-4">
-                <h4 className="text-sm font-semibold text-gray-900">Pick a day</h4>
+                <h4 className="text-sm font-semibold text-gray-900">{t.demoPickDay}</h4>
                 <div className="mt-2 grid grid-cols-4 gap-1.5">
                   {days.map((d) => {
                     const closed = d.getDay() === 0;
@@ -182,16 +186,16 @@ export function ClaimDemo({ businessName, ownerName, currency, services }: Props
                         onClick={() => { setDay(d); setTime(null); }}
                         className={`rounded-xl border px-2 py-2 text-center text-xs ${closed ? 'border-gray-100 text-gray-300' : on ? 'border-brand-500 bg-brand-50 text-brand-900' : 'border-gray-200 text-gray-800 hover:bg-gray-50'}`}
                       >
-                        <div className="font-semibold">{fmtDay(d, { weekday: 'short' })}</div>
-                        <div>{fmtDay(d, { day: 'numeric', month: 'short' })}</div>
-                        {closed && <div className="text-[10px]">closed</div>}
+                        <div className="font-semibold">{fd(d, { weekday: 'short' })}</div>
+                        <div>{fd(d, { day: 'numeric', month: 'short' })}</div>
+                        {closed && <div className="text-[10px]">{t.demoClosed}</div>}
                       </button>
                     );
                   })}
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <button onClick={() => setStep(1)} className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">Back</button>
-                  <button disabled={!day} onClick={() => setStep(3)} className="flex-1 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-40">Continue</button>
+                  <button onClick={() => setStep(1)} className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">{t.demoBack}</button>
+                  <button disabled={!day} onClick={() => setStep(3)} className="flex-1 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-40">{t.demoContinue}</button>
                 </div>
               </div>
             )}
@@ -199,8 +203,8 @@ export function ClaimDemo({ businessName, ownerName, currency, services }: Props
             {/* Step 3: time */}
             {step === 3 && day && (
               <div className="mt-4">
-                <h4 className="text-sm font-semibold text-gray-900">Pick a time · {fmtDay(day, { weekday: 'long', day: 'numeric', month: 'long' })}</h4>
-                <p className="mt-0.5 text-xs text-gray-500">Greyed-out times are already taken. Real availability comes from your working hours.</p>
+                <h4 className="text-sm font-semibold text-gray-900">{t.demoPickTime} · {fd(day, { weekday: 'long', day: 'numeric', month: 'long' })}</h4>
+                <p className="mt-0.5 text-xs text-gray-500">{t.demoTimeHint}</p>
                 <div className="mt-2 grid grid-cols-4 gap-1.5">
                   {slots.map((s) => (
                     <button
@@ -214,8 +218,8 @@ export function ClaimDemo({ businessName, ownerName, currency, services }: Props
                   ))}
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <button onClick={() => setStep(2)} className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">Back</button>
-                  <button disabled={!time} onClick={() => setStep(4)} className="flex-1 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-40">Continue</button>
+                  <button onClick={() => setStep(2)} className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">{t.demoBack}</button>
+                  <button disabled={!time} onClick={() => setStep(4)} className="flex-1 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-40">{t.demoContinue}</button>
                 </div>
               </div>
             )}
@@ -223,17 +227,17 @@ export function ClaimDemo({ businessName, ownerName, currency, services }: Props
             {/* Step 4: details */}
             {step === 4 && (
               <div className="mt-4">
-                <h4 className="text-sm font-semibold text-gray-900">Customer details</h4>
-                <p className="mt-0.5 text-xs text-gray-500">In the real flow customers sign in once; after that Balkina remembers them.</p>
-                <input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} placeholder="Name (e.g. Ana)" className={`mt-3 ${INPUT}`} />
-                <input value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} placeholder="Phone (e.g. +381 60 123 4567)" className={`mt-2 ${INPUT}`} />
+                <h4 className="text-sm font-semibold text-gray-900">{t.demoDetails}</h4>
+                <p className="mt-0.5 text-xs text-gray-500">{t.demoDetailsHint}</p>
+                <input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} placeholder={t.demoNamePh} className={`mt-3 ${INPUT}`} />
+                <input value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} placeholder={t.demoPhonePh} className={`mt-2 ${INPUT}`} />
                 <div className="mt-3 rounded-xl bg-gray-50 p-3 text-xs text-gray-600">
                   <div className="flex justify-between"><span>{service.name}</span><span>{service.duration_minutes} min{priceLabel(service)}</span></div>
-                  <div className="mt-1 flex justify-between"><span>{day && fmtDay(day, { weekday: 'short', day: 'numeric', month: 'short' })} · {time}</span><span>with {staffName}</span></div>
+                  <div className="mt-1 flex justify-between"><span>{day && fd(day, { weekday: 'short', day: 'numeric', month: 'short' })} · {time}</span><span>{t.demoWith} {staffName}</span></div>
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <button onClick={() => setStep(3)} className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">Back</button>
-                  <button onClick={() => setStep(5)} className="flex-1 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700">Confirm booking</button>
+                  <button onClick={() => setStep(3)} className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">{t.demoBack}</button>
+                  <button onClick={() => setStep(5)} className="flex-1 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700">{t.demoConfirm}</button>
                 </div>
               </div>
             )}
@@ -244,34 +248,34 @@ export function ClaimDemo({ businessName, ownerName, currency, services }: Props
                 <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
                   <div className="flex items-center gap-2">
                     <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-green-600 text-white">✓</span>
-                    <h4 className="text-base font-semibold text-gray-900">Booking confirmed</h4>
+                    <h4 className="text-base font-semibold text-gray-900">{t.demoConfirmed}</h4>
                   </div>
                   <dl className="mt-3 space-y-1 text-sm text-gray-700">
-                    <div className="flex justify-between"><dt className="text-gray-500">Service</dt><dd>{service.name}</dd></div>
-                    <div className="flex justify-between"><dt className="text-gray-500">When</dt><dd>{fmtDay(day, { weekday: 'short', day: 'numeric', month: 'short' })} at {time}</dd></div>
-                    <div className="flex justify-between"><dt className="text-gray-500">With</dt><dd>{staffName}</dd></div>
-                    <div className="flex justify-between"><dt className="text-gray-500">Customer</dt><dd>{custName}</dd></div>
+                    <div className="flex justify-between"><dt className="text-gray-500">{t.demoService}</dt><dd>{service.name}</dd></div>
+                    <div className="flex justify-between"><dt className="text-gray-500">{t.demoWhen}</dt><dd>{fd(day, { weekday: 'short', day: 'numeric', month: 'short' })} {t.demoAt} {time}</dd></div>
+                    <div className="flex justify-between"><dt className="text-gray-500">{t.demoWithLabel}</dt><dd>{staffName}</dd></div>
+                    <div className="flex justify-between"><dt className="text-gray-500">{t.demoCustomer}</dt><dd>{custName}</dd></div>
                   </dl>
                 </div>
 
                 <div className="mt-3 rounded-2xl border border-gray-200 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">What {custName} receives</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">{t.demoReceives(custName)}</p>
                   <div className="mt-2 rounded-2xl rounded-tl-sm bg-gray-100 px-3 py-2 text-sm text-gray-800">
-                    Hi {custName}, you&apos;re booked at {businessName}: {service.name}, {fmtDay(day, { weekday: 'long', day: 'numeric', month: 'long' })} at {time}. Reply here if you need to move it.
+                    {t.demoMessage(custName, businessName, service.name, fd(day, { weekday: 'long', day: 'numeric', month: 'long' }), time ?? '')}
                   </div>
-                  <p className="mt-2 text-xs text-gray-500">Plus an SMS reminder the day before, and a nudge when it&apos;s time to rebook.</p>
+                  <p className="mt-2 text-xs text-gray-500">{t.demoMessageNote}</p>
                 </div>
 
                 <div className="mt-3 rounded-2xl border border-gray-200 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">What you see</p>
-                  <p className="mt-1 text-sm text-gray-700">The appointment lands in your calendar with {custName}&apos;s details. You can approve, move or message in one tap, from your phone.</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">{t.demoYouSee}</p>
+                  <p className="mt-1 text-sm text-gray-700">{t.demoYouSeeBody(custName)}</p>
                 </div>
 
                 <div className="mt-4 rounded-2xl bg-brand-50 p-4 text-sm text-brand-900">
-                  <p className="font-semibold">This is how booking will look for your customers.</p>
-                  <p className="mt-1 text-brand-800">Nothing was booked just now. Claim the page and the same flow goes live under your name in about a minute.</p>
-                  <button onClick={goToClaim} className="mt-3 w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700">Claim this page</button>
-                  <button onClick={() => { setStep(1); setDay(null); setTime(null); }} className="mt-2 w-full text-xs text-brand-700 hover:underline">Try another booking</button>
+                  <p className="font-semibold">{t.demoThisIsHow}</p>
+                  <p className="mt-1 text-brand-800">{t.demoNothingBooked}</p>
+                  <button onClick={goToClaim} className="mt-3 w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700">{t.demoClaim}</button>
+                  <button onClick={() => { setStep(1); setDay(null); setTime(null); }} className="mt-2 w-full text-xs text-brand-700 hover:underline">{t.demoAgain}</button>
                 </div>
               </div>
             )}

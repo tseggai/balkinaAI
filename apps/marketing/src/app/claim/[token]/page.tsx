@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ClaimForm } from '@/components/claim/claim-form';
-import { ClaimDemo } from '@/components/claim/claim-demo';
+import { ClaimPage as ClaimPageView } from '@/components/claim/claim-page';
+import { cleanBusinessName, guessOwnerName, firstName } from '@/lib/claim/names';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,7 @@ async function loadClaim(token: string) {
   const supabase = getSupabase();
   const { data: prospect } = await supabase
     .from('growth_prospects')
-    .select('id, name, city, country, email, tenant_id, claimed_at, claim_expires_at')
+    .select('id, name, city, country, email, tenant_id, claimed_at, claim_expires_at, google_rating, google_review_count, enrichment')
     .eq('claim_token', token)
     .maybeSingle();
   if (!prospect || !prospect.tenant_id) return { state: 'invalid' as const };
@@ -39,15 +39,22 @@ async function loadClaim(token: string) {
   ]);
   if (!tenant || tenant.status !== 'unclaimed') return { state: 'claimed' as const, name: prospect.name as string };
 
+  const fullName = tenant.name as string;
+  const enrichment = (prospect.enrichment ?? {}) as { owner_name?: string | null };
+  const ownerName = guessOwnerName(fullName, enrichment.owner_name || (tenant.owner_name as string | null));
   return {
     state: 'ready' as const,
     token,
-    name: tenant.name as string,
+    fullName,
+    displayName: cleanBusinessName(fullName),
+    ownerName: ownerName ?? '',
+    ownerFirstName: firstName(ownerName),
     slug: tenant.slug as string | null,
     currency: tenant.currency as string,
-    ownerName: (tenant.owner_name as string) || '',
     email: (prospect.email as string | null) ?? '',
     address: (location?.address as string | null) ?? null,
+    googleRating: prospect.google_rating != null ? Number(prospect.google_rating) : null,
+    googleReviewCount: (prospect.google_review_count as number | null) ?? null,
     services: (services ?? []) as ServiceRow[],
   };
 }
@@ -80,38 +87,7 @@ export default async function ClaimPage({ params }: { params: { token: string } 
     );
   }
 
-  return (
-    <div className="mx-auto max-w-5xl px-6 py-12 md:py-20">
-      <div className="grid gap-10 md:grid-cols-5">
-        <div className="md:col-span-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">Your page is ready</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">{claim.name}</h1>
-          {claim.address && <p className="mt-1 text-sm text-gray-500">{claim.address}</p>}
-          <p className="mt-4 text-gray-600 leading-relaxed">
-            We built a booking page for your business from public information. Claim it, check the services and hours, and share your link. Customers can book you day or night, and Balkina's AI receptionist confirms every appointment.
-          </p>
-
-          <div className="mt-6">
-            <ClaimDemo businessName={claim.name} ownerName={claim.ownerName} currency={claim.currency} services={claim.services} />
-          </div>
-
-          <ul className="mt-6 grid gap-2 text-sm text-gray-600 sm:grid-cols-2">
-            <li>✓ Free to start, no card needed</li>
-            <li>✓ Your own booking link for Instagram and Google</li>
-            <li>✓ AI receptionist answers 24/7</li>
-            <li>✓ Reminders that cut no-shows</li>
-          </ul>
-        </div>
-
-        <div id="claim-form" className="scroll-mt-24 md:col-span-2">
-          <ClaimForm token={claim.token} businessName={claim.name} defaultOwnerName={claim.ownerName} defaultEmail={claim.email} />
-          <p className="mt-4 text-xs text-gray-400">
-            Not your business, or don't want this page? Reply to our email and we'll remove it. Unclaimed pages are never shown to customers.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  return <ClaimPageView data={claim} />;
 }
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
