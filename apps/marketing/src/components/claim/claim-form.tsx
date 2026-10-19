@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { ClaimCopy } from '@/lib/claim/i18n';
 import { ClaimShare } from './claim-share';
+import { trackClaim } from '@/lib/claim/track';
 
 const INPUT = 'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors';
 
@@ -34,6 +35,7 @@ export function ClaimForm({ token, businessName, defaultOwnerName, defaultEmail,
     e.preventDefault();
     setError('');
     setBusy(true);
+    trackClaim(token, 'claim_clicked', { with_password: more && !!password });
     try {
       const res = await fetch('/api/claim', {
         method: 'POST',
