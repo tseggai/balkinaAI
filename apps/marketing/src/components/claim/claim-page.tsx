@@ -35,6 +35,16 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
   const [lang, setLang] = useState<ClaimLang>('sr');
   const [activateOpen, setActivateOpen] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  // The sticky CTA only shows once the reader has started scrolling; at the
+  // top of the page it slides back down out of view.
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 80);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     let initial: ClaimLang = 'sr';
@@ -76,18 +86,33 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
     <div className="overflow-x-hidden pb-28">
       <header className="mx-auto flex max-w-2xl items-center justify-between px-6 py-5">
         <Image src="/assets/Balkina_logo_color.png" alt="Balkina" width={130} height={36} className="h-6 w-auto md:h-7" priority />
-        <div className="flex overflow-hidden rounded-full border border-gray-200/80 text-[11px] font-semibold">
-          {(['sr', 'en'] as ClaimLang[]).map((l) => (
-            <button key={l} onClick={() => switchLang(l)} className={`px-3 py-1.5 uppercase ${lang === l ? 'bg-gray-900 text-white' : 'bg-white text-gray-500'}`}>
-              {CLAIM_T[l].langLabel}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          {whatsappHref && (
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener"
+              aria-label={t.whatsappCta}
+              title={t.whatsappCta}
+              onClick={() => trackClaim(data.token, 'claim_whatsapp_support', { lang })}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200/80 bg-white text-[#128C7E] hover:bg-green-50"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6.3-.5c.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.2-.3-.3-.6-.4zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>
+            </a>
+          )}
+          <div className="flex overflow-hidden rounded-full border border-gray-200/80 text-[11px] font-semibold">
+            {(['sr', 'en'] as ClaimLang[]).map((l) => (
+              <button key={l} onClick={() => switchLang(l)} className={`px-3 py-1.5 uppercase ${lang === l ? 'bg-gray-900 text-white' : 'bg-white text-gray-500'}`}>
+                {CLAIM_T[l].langLabel}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-2xl space-y-10 px-6 pt-2 md:pt-6">
         {/* 1 · The business — theirs, prominent */}
-        <section className="rounded-3xl bg-brand-50 px-6 py-7 md:px-8 md:py-8">
+        <section className="rounded-2xl bg-brand-50 px-6 py-7 md:px-8 md:py-8">
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900 md:text-3xl">{data.displayName}</h1>
           {data.fullName !== data.displayName && <p className="mt-1.5 text-sm text-gray-500">{data.fullName}</p>}
           {data.address && <p className="mt-3 text-base text-gray-600">{data.address}</p>}
@@ -101,32 +126,37 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
         </section>
 
         {/* 2 · What we did — a short message, not a headline */}
-        <section className="space-y-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">{t.welcomeEyebrow}</p>
+        <section>
           <p className="text-lg leading-relaxed text-gray-900">
-            {data.ownerFirstName ? t.welcomeTitle(data.ownerFirstName) : t.welcomeTitleNoName}
+            {data.ownerFirstName ? (
+              <>
+                {data.ownerFirstName},
+                <br />
+                {t.welcomeMessage}
+              </>
+            ) : (
+              t.welcomeMessageNoName
+            )}
           </p>
-          <p className="text-lg leading-relaxed text-gray-600">{t.welcomeLede}</p>
         </section>
 
         {/* 3 · Test it */}
-        <section className="space-y-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">{t.servicesEyebrow}</p>
-          <button onClick={openDemo} className="flex w-full items-center justify-between gap-4 rounded-3xl border border-gray-200/80 bg-white px-6 py-5 text-left shadow-sm hover:bg-gray-50">
+        <section>
+          <button onClick={openDemo} className="flex w-full items-center justify-between gap-4 rounded-2xl bg-brand-600 px-6 py-5 text-left text-white shadow-sm hover:bg-brand-700">
             <span className="min-w-0">
-              <span className="block text-lg font-semibold text-gray-900">{t.testButton}</span>
-              <span className="mt-1 block text-sm text-gray-500">{t.testHint(data.services.length)}</span>
+              <span className="block text-lg font-semibold">{t.testButton}</span>
+              <span className="mt-1 block text-sm text-brand-100">{t.testHint(data.services.length)}</span>
             </span>
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-brand-600">
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
             </span>
           </button>
-          <button onClick={openActivate} className="mt-2 hidden w-full rounded-2xl bg-brand-600 px-5 py-4 text-base font-semibold text-white hover:bg-brand-700 md:block">
+          <button onClick={openActivate} className="mt-3 hidden w-full rounded-2xl border-2 border-brand-600 px-5 py-4 text-base font-semibold text-brand-700 hover:bg-brand-50 md:block">
             {t.stickyButton}
           </button>
         </section>
 
-        {/* 4 · Disclaimer + help */}
+        {/* 4 · Offer + benefits */}
         <section className="space-y-4 text-base">
           {reservedUntil && <p className="text-amber-700">⏳ {t.reservedUntil(reservedUntil)}</p>}
           <ul className="space-y-1.5 text-gray-600">
@@ -134,20 +164,11 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
               <li key={b}>✓ {b}</li>
             ))}
           </ul>
-          {whatsappHref && (
-            <a href={whatsappHref} target="_blank" rel="noopener" onClick={() => trackClaim(data.token, 'claim_whatsapp_support', { lang })} className="flex items-center justify-center gap-2 rounded-2xl border border-[#25D366]/40 bg-white px-4 py-3.5 font-medium text-[#128C7E] hover:bg-green-50">
-              <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6.3-.5c.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.2-.3-.3-.6-.4zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>
-              {t.whatsappCta}
-            </a>
-          )}
-          <p className="text-sm text-gray-400">
-            <span className="text-gray-500">{t.notYours}</span> {t.notYoursBody}
-          </p>
         </section>
       </main>
 
-      {/* Sticky CTA (mobile) */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-100 bg-white/95 px-6 py-3 backdrop-blur md:hidden">
+      {/* Sticky CTA (mobile) — slides in once the reader scrolls, back out at the top */}
+      <div className={`fixed inset-x-0 bottom-0 z-40 border-t border-gray-100 bg-white/95 px-6 py-3 backdrop-blur transition-transform duration-300 ease-out md:hidden ${scrolled ? 'translate-y-0' : 'translate-y-full'}`}>
         <button onClick={openActivate} className="w-full rounded-2xl bg-brand-600 px-5 py-4 text-base font-semibold text-white shadow-lg hover:bg-brand-700">
           {t.stickyButton}
         </button>
