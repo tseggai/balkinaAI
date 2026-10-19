@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ClaimCopy } from '@/lib/claim/i18n';
+import { trackClaim } from '@/lib/claim/track';
 
 interface Props {
   token: string;
@@ -23,6 +24,7 @@ export function ClaimShare({ token, businessName, bookingUrl, loginUrl, t }: Pro
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
   const copy = async () => {
+    trackClaim(token, 'claim_share_copy');
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -34,6 +36,7 @@ export function ClaimShare({ token, businessName, bookingUrl, loginUrl, t }: Pro
   // Each sign-in link is single-use, so mint a fresh one when the button is
   // pressed; fall back to the one issued at claim time if minting fails.
   const openDashboard = async () => {
+    trackClaim(token, 'claim_dashboard_opened');
     setOpening(true);
     let target = loginUrl;
     try {
@@ -50,6 +53,7 @@ export function ClaimShare({ token, businessName, bookingUrl, loginUrl, t }: Pro
     window.location.href = target;
   };
   const nativeShare = async () => {
+    trackClaim(token, 'claim_share_native');
     try {
       await navigator.share({ title: businessName, text: message, url });
     } catch {
@@ -81,6 +85,7 @@ export function ClaimShare({ token, businessName, bookingUrl, loginUrl, t }: Pro
               href={`https://wa.me/?text=${encodeURIComponent(message)}`}
               target="_blank"
               rel="noopener"
+              onClick={() => trackClaim(token, 'claim_share_whatsapp')}
               className="rounded-xl bg-[#25D366] px-4 py-3 text-center text-sm font-semibold text-white hover:brightness-95"
             >
               {t.shareWhatsApp}

@@ -24,6 +24,7 @@ interface Props {
   currency: string;
   services: DemoService[];
   t: ClaimCopy;
+  onEvent?: (type: 'opened' | 'completed') => void;
 }
 
 const OPEN_HOUR = 9;
@@ -66,7 +67,7 @@ function fmtDay(d: Date, opts: Intl.DateTimeFormatOptions, locale = 'en-GB'): st
   return d.toLocaleDateString(locale, opts);
 }
 
-export function ClaimDemo({ businessName, ownerName, currency, services, t }: Props) {
+export function ClaimDemo({ businessName, ownerName, currency, services, t, onEvent }: Props) {
   const L = t.dateLocale;
   const fd = (d: Date, opts: Intl.DateTimeFormatOptions) => fmtDay(d, opts, L);
   const [open, setOpen] = useState(false);
@@ -80,6 +81,7 @@ export function ClaimDemo({ businessName, ownerName, currency, services, t }: Pr
   const slots = useMemo(() => (day && service ? slotsFor(day, service.duration_minutes) : []), [day, service]);
 
   const start = (s: DemoService) => {
+    onEvent?.('opened');
     setService(s);
     setStep(1);
     setDay(null);
@@ -237,7 +239,7 @@ export function ClaimDemo({ businessName, ownerName, currency, services, t }: Pr
                 </div>
                 <div className="mt-4 flex gap-2">
                   <button onClick={() => setStep(3)} className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">{t.demoBack}</button>
-                  <button onClick={() => setStep(5)} className="flex-1 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700">{t.demoConfirm}</button>
+                  <button onClick={() => { onEvent?.('completed'); setStep(5); }} className="flex-1 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700">{t.demoConfirm}</button>
                 </div>
               </div>
             )}

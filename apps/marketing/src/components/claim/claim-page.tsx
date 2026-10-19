@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { ClaimForm } from './claim-form';
 import { ClaimDemo, type DemoService } from './claim-demo';
 import { CLAIM_T, CLAIM_LANG_KEY, type ClaimLang } from '@/lib/claim/i18n';
+import { trackClaim } from '@/lib/claim/track';
 
 export interface ClaimPageData {
   token: string;
@@ -26,13 +27,16 @@ export interface ClaimPageData {
 export function ClaimPage({ data }: { data: ClaimPageData }) {
   const [lang, setLang] = useState<ClaimLang>('sr');
   useEffect(() => {
+    let initial: ClaimLang = 'sr';
     try {
       const saved = localStorage.getItem(CLAIM_LANG_KEY);
-      if (saved === 'en' || saved === 'sr') setLang(saved);
+      if (saved === 'en' || saved === 'sr') initial = saved;
     } catch {
       /* storage unavailable */
     }
-  }, []);
+    setLang(initial);
+    trackClaim(data.token, 'claim_page_view', { lang: initial, mobile: window.innerWidth < 768 });
+  }, [data.token]);
   const switchLang = (l: ClaimLang) => {
     setLang(l);
     try {
@@ -107,7 +111,7 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
               ))}
             </ul>
             {whatsappHref && (
-              <a href={whatsappHref} target="_blank" rel="noopener" className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-[#25D366]/40 bg-white px-4 py-2.5 text-sm font-semibold text-[#128C7E] hover:bg-green-50">
+              <a href={whatsappHref} target="_blank" rel="noopener" onClick={() => trackClaim(data.token, 'claim_whatsapp_support', { lang })} className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-[#25D366]/40 bg-white px-4 py-2.5 text-sm font-semibold text-[#128C7E] hover:bg-green-50">
                 <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6.3-.5c.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.2-.3-.3-.6-.4zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>
                 {t.whatsappCta}
               </a>
@@ -118,7 +122,14 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
           </div>
 
           <div className="min-w-0 md:col-span-3">
-            <ClaimDemo businessName={data.displayName} ownerName={data.ownerName} currency={data.currency} services={data.services} t={t} />
+            <ClaimDemo
+              businessName={data.displayName}
+              ownerName={data.ownerName}
+              currency={data.currency}
+              services={data.services}
+              t={t}
+              onEvent={(e) => trackClaim(data.token, e === 'opened' ? 'claim_demo_opened' : 'claim_demo_completed', { lang })}
+            />
           </div>
         </div>
       </div>
