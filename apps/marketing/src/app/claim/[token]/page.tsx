@@ -15,7 +15,11 @@ export const metadata: Metadata = {
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    // Next's Data Cache must never serve a pre-claim snapshot of the prospect.
+    global: { fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }) },
+  });
 }
 
 interface ServiceRow { id: string; name: string; price: number; duration_minutes: number; hide_price: boolean | null }

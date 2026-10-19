@@ -22,18 +22,25 @@ function appUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || 'https://app.balkina.ai').replace(/\/$/, '');
 }
 
-/** Best-effort welcome email with a password-setup link; never blocks the claim. */
-async function sendWelcomeEmail(to: string, businessName: string, setPasswordUrl: string | null) {
+/**
+ * Best-effort welcome email; never blocks the claim. The "open dashboard"
+ * button goes through GET /api/claim/login, which mints a fresh single-use
+ * sign-in link on click (valid for 24h after claiming). Supabase keeps only
+ * one outstanding link per user, so we never pre-generate links for email.
+ */
+async function sendWelcomeEmail(to: string, businessName: string, openUrl: string, bookingUrl: string | null) {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
   if (!key || !from) return;
-  const dash = `${appUrl()}/dashboard`;
+  const forgot = `${appUrl()}/auth/forgot-password`;
   const html = `
-    <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;color:#111">
+    <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;color:#111;line-height:1.5">
       <h2 style="margin:0 0 12px">${businessName} je sada na Balkini 🎉</h2>
-      <p>Vaš panel: <a href="${dash}">${dash}</a></p>
-      ${setPasswordUrl ? `<p>Postavite lozinku za buduće prijave: <a href="${setPasswordUrl}">Postavi lozinku</a> (link važi 24h).</p>` : ''}
-      <p style="color:#555;font-size:13px;margin-top:24px">Your page is live on Balkina. Dashboard: <a href="${dash}">${dash}</a>${setPasswordUrl ? ` · <a href="${setPasswordUrl}">Set a password</a>` : ''}</p>
+      ${bookingUrl ? `<p>Vaš link za rezervacije: <a href="${bookingUrl}">${bookingUrl}</a></p>` : ''}
+      <p><a href="${openUrl}" style="display:inline-block;background:#4f5fc4;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600">Otvori moj panel</a></p>
+      <p style="color:#555;font-size:13px">Dugme radi 24h. Kasnije se prijavite sa e-mailom ${to} — lozinku postavite preko <a href="${forgot}">„Zaboravljena lozinka“</a>.</p>
+      <hr style="border:0;border-top:1px solid #eee;margin:20px 0">
+      <p style="color:#555;font-size:13px">Your page is live on Balkina. <a href="${openUrl}">Open your dashboard</a> (link works for 24h). To set a password later, use <a href="${forgot}">Forgot password</a> with ${to}.</p>
     </div>`;
   try {
     await fetch('https://api.resend.com/emails', {
@@ -127,15 +134,8 @@ export async function POST(request: Request) {
     loginUrl = `${appUrl()}/auth/callback?token_hash=${encodeURIComponent(hashed)}&type=magiclink&next=${encodeURIComponent('/dashboard')}`;
   }
 
-  let setPasswordUrl: string | null = null;
-  if (!password) {
-    const { data: rec } = await supabase.auth.admin.generateLink({ type: 'recovery', email });
-    const h = rec?.properties?.hashed_token;
-    if (h) setPasswordUrl = `${appUrl()}/auth/callback?token_hash=${encodeURIComponent(h)}&type=recovery`;
-  }
-  await sendWelcomeEmail(email, businessName, setPasswordUrl);
-
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://balkina.ai').replace(/\/$/, '');
   const bookingUrl = tenant.slug ? `${siteUrl}/b/${tenant.slug}` : null;
+  await sendWelcomeEmail(email, businessName, `${siteUrl}/api/claim/login?token=${token}`, bookingUrl);
   return Response.json({ success: true, login_url: loginUrl, booking_url: bookingUrl, business_name: businessName });
 }
