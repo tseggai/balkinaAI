@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { GrowthEnrichment, GrowthProspect } from '@balkina/shared';
-import { getGrowthCountry, getGrowthVertical, toSlug } from '@balkina/shared';
+import { cleanBusinessName, getGrowthCountry, getGrowthVertical, toSlug } from '@balkina/shared';
 
 /**
  * Pre-provisioner: builds a hidden, unclaimed Balkina booking page for a
@@ -120,7 +120,8 @@ export async function preprovisionProspect(
     categoryId = (cat as { id: string } | null)?.id ?? null;
   }
 
-  const slugBase = toSlug(prospect.name) || toSlug(`${vertical?.key ?? 'business'} ${prospect.city ?? ''}`) || 'business';
+  // Short slug from the cleaned name: balkina.ai/b/friends-barber-shop, not the keyword-stuffed Places title.
+  const slugBase = toSlug(cleanBusinessName(prospect.name)) || toSlug(prospect.name) || toSlug(`${vertical?.key ?? 'business'} ${prospect.city ?? ''}`) || 'business';
   const slug = await uniqueSlug(supabase, slugBase.slice(0, 60));
 
   const { data: tenantRow, error: tenantErr } = await supabase
