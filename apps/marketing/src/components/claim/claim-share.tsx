@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { ClaimCopy } from '@/lib/claim/i18n';
 
 interface Props {
+  token: string;
   businessName: string;
   bookingUrl: string | null;
   loginUrl: string;
@@ -14,8 +15,9 @@ interface Props {
  * Shown right after a successful claim, while the owner is still excited:
  * their link with one-tap copy / WhatsApp / native share, then the dashboard.
  */
-export function ClaimShare({ businessName, bookingUrl, loginUrl, t }: Props) {
+export function ClaimShare({ token, businessName, bookingUrl, loginUrl, t }: Props) {
   const [copied, setCopied] = useState(false);
+  const [opening, setOpening] = useState(false);
   const url = bookingUrl ?? '';
   const message = t.shareMessage(businessName, url);
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
@@ -28,6 +30,24 @@ export function ClaimShare({ businessName, bookingUrl, loginUrl, t }: Props) {
     } catch {
       /* clipboard unavailable — the field below is selectable */
     }
+  };
+  // Each sign-in link is single-use, so mint a fresh one when the button is
+  // pressed; fall back to the one issued at claim time if minting fails.
+  const openDashboard = async () => {
+    setOpening(true);
+    let target = loginUrl;
+    try {
+      const res = await fetch('/api/claim/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.login_url) target = json.login_url;
+    } catch {
+      /* use the original link */
+    }
+    window.location.href = target;
   };
   const nativeShare = async () => {
     try {
@@ -75,9 +95,9 @@ export function ClaimShare({ businessName, bookingUrl, loginUrl, t }: Props) {
         </>
       )}
 
-      <a href={loginUrl} className="mt-5 inline-block w-full rounded-xl bg-brand-600 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-brand-700">
-        {t.doneButton}
-      </a>
+      <button onClick={openDashboard} disabled={opening} className="mt-5 w-full rounded-xl bg-brand-600 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
+        {opening ? t.opening : t.doneButton}
+      </button>
       <p className="mt-2 text-xs text-gray-500">{t.doneNote}</p>
     </div>
   );
