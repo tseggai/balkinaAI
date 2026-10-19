@@ -35,16 +35,6 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
   const [lang, setLang] = useState<ClaimLang>('sr');
   const [activateOpen, setActivateOpen] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-
-  // The sticky CTA only shows once the reader has started scrolling; at the
-  // top of the page it slides back down out of view.
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 80);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
 
   useEffect(() => {
     let initial: ClaimLang = 'sr';
@@ -95,9 +85,9 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
               aria-label={t.whatsappCta}
               title={t.whatsappCta}
               onClick={() => trackClaim(data.token, 'claim_whatsapp_support', { lang })}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200/80 bg-white text-[#128C7E] hover:bg-green-50"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200/80 bg-white text-[#128C7E] hover:bg-green-50"
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6.3-.5c.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.2-.3-.3-.6-.4zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>
+              <svg viewBox="0 0 24 24" className="h-6 w-6 fill-current" aria-hidden><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6.3-.5c.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.2-.3-.3-.6-.4zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>
             </a>
           )}
           <div className="flex overflow-hidden rounded-full border border-gray-200/80 text-[11px] font-semibold">
@@ -110,7 +100,7 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl space-y-10 px-6 pt-2 md:pt-6">
+      <main className="mx-auto max-w-2xl space-y-6 px-6 pt-1 md:pt-6">
         {/* 1 · The business — theirs, prominent */}
         <section className="rounded-2xl bg-brand-50 px-6 py-7 md:px-8 md:py-8">
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900 md:text-3xl">{data.displayName}</h1>
@@ -157,9 +147,9 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
         </section>
 
         {/* 4 · Offer + benefits */}
-        <section className="space-y-4 text-base">
+        <section className="space-y-2.5 text-base leading-snug">
           {reservedUntil && <p className="text-amber-700">⏳ {t.reservedUntil(reservedUntil)}</p>}
-          <ul className="space-y-1.5 text-gray-600">
+          <ul className="space-y-1 text-gray-600">
             {t.benefits.map((b) => (
               <li key={b}>✓ {b}</li>
             ))}
@@ -167,8 +157,8 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
         </section>
       </main>
 
-      {/* Sticky CTA (mobile) — slides in once the reader scrolls, back out at the top */}
-      <div className={`fixed inset-x-0 bottom-0 z-40 border-t border-gray-100 bg-white/95 px-6 py-3 backdrop-blur transition-transform duration-300 ease-out md:hidden ${scrolled ? 'translate-y-0' : 'translate-y-full'}`}>
+      {/* Sticky CTA (mobile) — the page is short, so it is always in reach */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-100 bg-white/95 px-6 py-3 backdrop-blur md:hidden">
         <button onClick={openActivate} className="w-full rounded-2xl bg-brand-600 px-5 py-4 text-base font-semibold text-white shadow-lg hover:bg-brand-700">
           {t.stickyButton}
         </button>
