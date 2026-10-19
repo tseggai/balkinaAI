@@ -5,6 +5,7 @@ export type ClaimEventType =
   | 'claim_page_view'
   | 'claim_demo_opened'
   | 'claim_demo_completed'
+  | 'claim_activate_opened'
   | 'claim_clicked'
   | 'claim_whatsapp_support'
   | 'claim_share_copy'
