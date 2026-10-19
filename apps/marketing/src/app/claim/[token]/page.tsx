@@ -55,6 +55,7 @@ async function loadClaim(token: string) {
     address: (location?.address as string | null) ?? null,
     googleRating: prospect.google_rating != null ? Number(prospect.google_rating) : null,
     googleReviewCount: (prospect.google_review_count as number | null) ?? null,
+    claimExpiresAt: (prospect.claim_expires_at as string | null) ?? null,
     services: (services ?? []) as ServiceRow[],
   };
 }

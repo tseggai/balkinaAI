@@ -268,7 +268,20 @@ export function ClaimDemo({ businessName, ownerName, currency, services, t }: Pr
 
                 <div className="mt-3 rounded-2xl border border-gray-200 p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">{t.demoYouSee}</p>
-                  <p className="mt-1 text-sm text-gray-700">{t.demoYouSeeBody(custName)}</p>
+                  {/* The owner's phone: a push notification exactly as Balkina sends it */}
+                  <div className="mt-2 flex items-start gap-3 rounded-2xl bg-gray-900 px-3 py-2.5 text-white shadow-lg">
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold">b</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-[13px] font-semibold">{t.demoPushTitle}</span>
+                        <span className="text-[11px] text-gray-400">{t.demoNow}</span>
+                      </div>
+                      <p className="truncate text-[13px] text-gray-200">
+                        {t.demoPushBody(custName, service.name, `${fd(day, { weekday: 'short', day: 'numeric', month: 'short' })} ${time}`)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">{t.demoPushNote}</p>
                 </div>
 
                 <div className="mt-4 rounded-2xl bg-brand-50 p-4 text-sm text-brand-900">

@@ -18,6 +18,7 @@ export interface ClaimPageData {
   currency: string;
   googleRating: number | null;
   googleReviewCount: number | null;
+  claimExpiresAt: string | null;
   services: DemoService[];
 }
 
@@ -41,6 +42,9 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
   };
   const t = CLAIM_T[lang];
   const bookingUrl = data.slug ? `balkina.ai/b/${data.slug}` : null;
+  const reservedUntil = data.claimExpiresAt
+    ? new Date(data.claimExpiresAt).toLocaleDateString(t.dateLocale, { day: 'numeric', month: 'long' })
+    : null;
   const scrollToClaim = () => document.getElementById('claim-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   return (
@@ -92,6 +96,7 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
           {/* Claim card: directly under the identity card on mobile, right column on desktop */}
           <div className="min-w-0 md:col-span-2 md:col-start-4 md:row-span-2 md:row-start-1">
             <ClaimForm token={data.token} businessName={data.displayName} defaultOwnerName={data.ownerName} defaultEmail={data.email} t={t} />
+            {reservedUntil && <p className="mt-2 text-xs font-medium text-amber-700">⏳ {t.reservedUntil(reservedUntil)}</p>}
             <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
               {t.benefits.map((b) => (
                 <li key={b}>✓ {b}</li>

@@ -59,3 +59,5 @@ export function addMinutes(date: Date, minutes: number): Date {
 export function objectKeys<T extends object>(obj: T): (keyof T)[] {
   return Object.keys(obj) as (keyof T)[];
 }
+
+export * from './business-name.js';
