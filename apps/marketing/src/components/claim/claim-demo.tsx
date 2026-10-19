@@ -25,6 +25,7 @@ interface Props {
   services: DemoService[];
   t: ClaimCopy;
   onEvent?: (type: 'opened' | 'completed') => void;
+  onActivate?: () => void;
 }
 
 const OPEN_HOUR = 9;
@@ -67,7 +68,7 @@ function fmtDay(d: Date, opts: Intl.DateTimeFormatOptions, locale = 'en-GB'): st
   return d.toLocaleDateString(locale, opts);
 }
 
-export function ClaimDemo({ businessName, ownerName, currency, services, t, onEvent }: Props) {
+export function ClaimDemo({ businessName, ownerName, currency, services, t, onEvent, onActivate }: Props) {
   const L = t.dateLocale;
   const fd = (d: Date, opts: Intl.DateTimeFormatOptions) => fmtDay(d, opts, L);
   const [open, setOpen] = useState(false);
@@ -91,7 +92,7 @@ export function ClaimDemo({ businessName, ownerName, currency, services, t, onEv
   const close = () => setOpen(false);
   const goToClaim = () => {
     close();
-    document.getElementById('claim-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    onActivate?.();
   };
 
   const custName = customer.name.trim() || 'Ana';
@@ -100,33 +101,23 @@ export function ClaimDemo({ businessName, ownerName, currency, services, t, onEv
 
   return (
     <>
-      {/* Services list (tappable) */}
-      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">{t.servicesTitle}</h2>
-            <p className="mt-0.5 text-xs text-gray-500">{t.servicesHint}</p>
-          </div>
-          {services.length > 0 && (
-            <button onClick={() => start(services[0] as DemoService)} className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-brand-700 shadow-sm ring-1 ring-brand-100 hover:bg-brand-50">
-              {t.tryBooking}
-            </button>
-          )}
-        </div>
-        <ul className="mt-3 divide-y divide-gray-200">
-          {services.length === 0 && <li className="py-2 text-sm text-gray-400">{t.noServices}</li>}
+      {/* Services — every row is a "book" action */}
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+        {services.length === 0 && <p className="px-4 py-3 text-sm text-gray-400">{t.noServices}</p>}
+        <ul className="divide-y divide-gray-100">
           {services.map((s) => (
             <li key={s.id}>
-              <button onClick={() => start(s)} className="flex w-full items-center justify-between py-2.5 text-left text-sm hover:text-brand-700">
-                <span className="text-gray-900">{s.name}</span>
-                <span className="flex items-center gap-2 text-gray-500">
-                  {s.duration_minutes} min{priceLabel(s)}
-                  <span aria-hidden className="text-gray-300">›</span>
+              <button onClick={() => start(s)} className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-brand-50/60">
+                <span className="min-w-0">
+                  <span className="block truncate text-base font-medium text-gray-900">{s.name}</span>
+                  <span className="text-xs text-gray-500">{s.duration_minutes} min{priceLabel(s)}</span>
                 </span>
+                <span className="shrink-0 rounded-full bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white">{t.bookChip} ›</span>
               </button>
             </li>
           ))}
         </ul>
+        <p className="border-t border-gray-100 px-4 py-2 text-[11px] text-gray-400">{t.editLater}</p>
       </div>
 
       {/* Simulated booking */}

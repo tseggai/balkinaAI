@@ -62,11 +62,11 @@ export function ClaimForm({ token, businessName, defaultOwnerName, defaultEmail,
   };
 
   if (done) {
-    return <ClaimShare token={token} businessName={businessName} bookingUrl={done.booking_url} loginUrl={done.login_url} t={t} />;
+    return <div className="p-5 pt-3 md:p-6 md:pt-3"><ClaimShare token={token} businessName={businessName} bookingUrl={done.booking_url} loginUrl={done.login_url} t={t} /></div>;
   }
 
   return (
-    <form id="claim-form" onSubmit={submit} className="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+    <form onSubmit={submit} className="p-5 pt-3 md:p-6 md:pt-3">
       <h2 className="text-lg font-semibold text-gray-900">{t.claimTitle}</h2>
       <p className="mt-1 text-sm text-gray-500">{t.claimSubtitle}</p>
 
