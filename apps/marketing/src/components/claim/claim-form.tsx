@@ -60,7 +60,7 @@ export function ClaimForm({ token, businessName, defaultOwnerName, defaultEmail,
   };
 
   if (done) {
-    return <ClaimShare businessName={businessName} bookingUrl={done.booking_url} loginUrl={done.login_url} t={t} />;
+    return <ClaimShare token={token} businessName={businessName} bookingUrl={done.booking_url} loginUrl={done.login_url} t={t} />;
   }
 
   return (
