@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ClaimCopy } from '@/lib/claim/i18n';
+import { ClaimShare } from './claim-share';
 
 const INPUT = 'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors';
 
@@ -27,7 +28,7 @@ export function ClaimForm({ token, businessName, defaultOwnerName, defaultEmail,
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [done, setDone] = useState<{ login_url: string } | null>(null);
+  const [done, setDone] = useState<{ login_url: string; booking_url: string | null } | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,12 +51,8 @@ export function ClaimForm({ token, businessName, defaultOwnerName, defaultEmail,
         setBusy(false);
         return;
       }
-      setDone({ login_url: json.login_url });
-      // Straight into the dashboard; the card below stays as a fallback if the
-      // redirect is blocked.
-      window.setTimeout(() => {
-        window.location.href = json.login_url;
-      }, 900);
+      setDone({ login_url: json.login_url, booking_url: json.booking_url ?? null });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
       setError(t.errorNetwork);
     }
@@ -63,16 +60,7 @@ export function ClaimForm({ token, businessName, defaultOwnerName, defaultEmail,
   };
 
   if (done) {
-    return (
-      <div className="rounded-2xl border border-green-200 bg-green-50 p-6">
-        <h2 className="text-lg font-semibold text-gray-900">{t.doneTitle}</h2>
-        <p className="mt-2 text-sm text-gray-600">{t.doneBody(businessName)}</p>
-        <a href={done.login_url} className="mt-5 inline-block w-full rounded-xl bg-brand-600 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-brand-700">
-          {t.doneButton}
-        </a>
-        <p className="mt-3 text-xs text-gray-500">{t.doneNote}</p>
-      </div>
-    );
+    return <ClaimShare businessName={businessName} bookingUrl={done.booking_url} loginUrl={done.login_url} t={t} />;
   }
 
   return (
