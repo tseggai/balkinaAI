@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import { GettingStarted } from '@/components/getting-started';
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 
@@ -255,6 +256,9 @@ export default function DashboardOverview() {
           <p className="mt-1 text-sm text-gray-500">Overview of your business performance.</p>
         </div>
       </div>
+
+      {/* ── Getting started (new / claimed tenants) ─────────────────────── */}
+      <GettingStarted />
 
       {/* ── Period Selector ─────────────────────────────────────────────── */}
       <div className="mt-5">

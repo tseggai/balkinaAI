@@ -8,7 +8,7 @@ export async function GET() {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('id, name, avg_rating, review_count, payments_enabled')
+    .select('id, name, slug, business_type, created_at, avg_rating, review_count, payments_enabled')
     .eq('user_id', user.id)
     .single();
 

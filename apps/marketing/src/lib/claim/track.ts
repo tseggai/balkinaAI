@@ -8,6 +8,7 @@ export type ClaimEventType =
   | 'claim_activate_opened'
   | 'claim_clicked'
   | 'claim_whatsapp_support'
+  | 'claim_share_view'
   | 'claim_share_copy'
   | 'claim_share_whatsapp'
   | 'claim_share_native'

@@ -14,11 +14,13 @@ interface Props {
 
 /**
  * Shown right after a successful claim, while the owner is still excited:
- * their link with one-tap copy / WhatsApp / native share, then the dashboard.
+ * View (their live page) and Share (copy / WhatsApp / native share), then
+ * the dashboard.
  */
 export function ClaimShare({ token, businessName, bookingUrl, loginUrl, t }: Props) {
   const [copied, setCopied] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const url = bookingUrl ?? '';
   const message = t.shareMessage(businessName, url);
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
@@ -60,50 +62,72 @@ export function ClaimShare({ token, businessName, bookingUrl, loginUrl, t }: Pro
       /* user cancelled */
     }
   };
+  const share = () => {
+    // On phones the OS share sheet already offers copy + WhatsApp + everything.
+    if (canNativeShare) {
+      void nativeShare();
+      return;
+    }
+    setShareOpen((v) => !v);
+  };
 
   return (
-    <div className="rounded-2xl border border-green-200 bg-green-50 p-5 md:p-6">
-      <h2 className="text-lg font-semibold text-gray-900">{t.doneTitle}</h2>
-      <p className="mt-1 text-sm text-gray-600">{t.shareIntro}</p>
+    <div className="pt-1">
+      <div className="flex items-center gap-2.5">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-green-600 text-sm text-white">✓</span>
+        <h2 className="text-xl font-semibold text-gray-900">{t.doneTitle}</h2>
+      </div>
+      <p className="mt-2 text-base text-gray-600">{t.shareIntro}</p>
 
       {url && (
         <>
-          <div className="mt-4 rounded-xl border border-green-200 bg-white px-3 py-2.5">
+          <div className="mt-5 rounded-2xl bg-gray-50 px-4 py-3.5">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">{t.yourLink}</p>
             <input
               readOnly
               value={url}
               onClick={(e) => (e.target as HTMLInputElement).select()}
-              className="mt-0.5 w-full bg-transparent font-mono text-[13px] text-gray-900 outline-none"
+              className="mt-1 w-full min-w-0 bg-transparent text-base text-gray-900 outline-none"
             />
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button onClick={copy} className="rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-800">
-              {copied ? t.copied : t.copyLink}
-            </button>
+          <div className="mt-3 grid grid-cols-2 gap-2.5">
             <a
-              href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+              href={url}
               target="_blank"
               rel="noopener"
-              onClick={() => trackClaim(token, 'claim_share_whatsapp')}
-              className="rounded-xl bg-[#25D366] px-4 py-3 text-center text-sm font-semibold text-white hover:brightness-95"
+              onClick={() => trackClaim(token, 'claim_share_view')}
+              className="rounded-2xl border border-gray-200/80 bg-white px-4 py-3.5 text-center text-base font-semibold text-gray-900 hover:bg-gray-50"
             >
-              {t.shareWhatsApp}
+              {t.viewPage}
             </a>
-            {canNativeShare && (
-              <button onClick={nativeShare} className="col-span-2 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50">
-                {t.shareMore}
-              </button>
-            )}
+            <button onClick={share} className="rounded-2xl bg-gray-900 px-4 py-3.5 text-base font-semibold text-white hover:bg-gray-800">
+              {t.share}
+            </button>
           </div>
-          <p className="mt-2 text-xs text-gray-500">{t.shareInstagramHint}</p>
+          {shareOpen && (
+            <div className="mt-2.5 overflow-hidden rounded-2xl border border-gray-200/80 bg-white">
+              <button onClick={copy} className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-base text-gray-800 hover:bg-gray-50">
+                <span className="text-gray-400">⎘</span> {copied ? t.copied : t.copyLink}
+              </button>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+                target="_blank"
+                rel="noopener"
+                onClick={() => trackClaim(token, 'claim_share_whatsapp')}
+                className="flex w-full items-center gap-3 border-t border-gray-100 px-4 py-3.5 text-left text-base text-gray-800 hover:bg-gray-50"
+              >
+                <span className="text-[#25D366]">●</span> {t.shareWhatsApp}
+              </a>
+            </div>
+          )}
+          <p className="mt-3 text-sm text-gray-500">{t.shareInstagramHint}</p>
         </>
       )}
 
-      <button onClick={openDashboard} disabled={opening} className="mt-5 w-full rounded-xl bg-brand-600 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
+      <button onClick={openDashboard} disabled={opening} className="mt-6 w-full rounded-2xl bg-brand-600 px-5 py-4 text-center text-base font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
         {opening ? t.opening : t.doneButton}
       </button>
-      <p className="mt-2 text-xs text-gray-500">{t.doneNote}</p>
+      <p className="mt-2.5 text-sm text-gray-500">{t.doneNote}</p>
     </div>
   );
 }

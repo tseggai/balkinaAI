@@ -56,14 +56,9 @@ export function OnboardingWizard({ tenantName }: { tenantName: string }) {
         } else if (!hasStaff) {
           setStep('add-staff');
         } else {
-          // Both exist — show celebration once, then dismiss permanently
-          const celebrated = localStorage.getItem(STORAGE_KEY + '_celebrated');
-          if (!celebrated) {
-            setStep('done');
-            localStorage.setItem(STORAGE_KEY + '_celebrated', '1');
-          } else {
-            dismiss();
-          }
+          // Both exist — the "Getting started" guide on the overview takes
+          // over from here (it covers hours, profile, sharing and the app).
+          dismiss();
         }
       } catch {
         // API error — don't block the dashboard
