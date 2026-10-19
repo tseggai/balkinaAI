@@ -19,6 +19,7 @@ export interface ClaimPageData {
   googleRating: number | null;
   googleReviewCount: number | null;
   claimExpiresAt: string | null;
+  supportWhatsApp: string | null;
   services: DemoService[];
 }
 
@@ -46,6 +47,9 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
     ? new Date(data.claimExpiresAt).toLocaleDateString(t.dateLocale, { day: 'numeric', month: 'long' })
     : null;
   const scrollToClaim = () => document.getElementById('claim-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const whatsappHref = data.supportWhatsApp
+    ? `https://wa.me/${data.supportWhatsApp.replace(/[^\d]/g, '')}?text=${encodeURIComponent(t.whatsappMessage(data.displayName))}`
+    : null;
 
   return (
     <div className="pb-24 md:pb-0">
@@ -102,6 +106,12 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
                 <li key={b}>✓ {b}</li>
               ))}
             </ul>
+            {whatsappHref && (
+              <a href={whatsappHref} target="_blank" rel="noopener" className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-[#25D366]/40 bg-white px-4 py-2.5 text-sm font-semibold text-[#128C7E] hover:bg-green-50">
+                <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6.3-.5c.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.2-.3-.3-.6-.4zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>
+                {t.whatsappCta}
+              </a>
+            )}
             <p className="mt-3 text-xs text-gray-400">
               <span className="font-medium text-gray-500">{t.notYours}</span> {t.notYoursBody}
             </p>

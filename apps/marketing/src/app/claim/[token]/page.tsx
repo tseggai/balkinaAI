@@ -56,6 +56,7 @@ async function loadClaim(token: string) {
     googleRating: prospect.google_rating != null ? Number(prospect.google_rating) : null,
     googleReviewCount: (prospect.google_review_count as number | null) ?? null,
     claimExpiresAt: (prospect.claim_expires_at as string | null) ?? null,
+    supportWhatsApp: process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || null,
     services: (services ?? []) as ServiceRow[],
   };
 }

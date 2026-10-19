@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'This claim link has expired. Reply to our email and we will send a new one.' }, { status: 410 });
   }
 
-  const { data: tenant } = await supabase.from('tenants').select('id, name, status, user_id, owner_name').eq('id', prospect.tenant_id).maybeSingle();
+  const { data: tenant } = await supabase.from('tenants').select('id, name, slug, status, user_id, owner_name').eq('id', prospect.tenant_id).maybeSingle();
   if (!tenant || tenant.status !== 'unclaimed' || tenant.user_id) {
     return Response.json({ error: 'This page is no longer available to claim.' }, { status: 409 });
   }
@@ -135,5 +135,7 @@ export async function POST(request: Request) {
   }
   await sendWelcomeEmail(email, businessName, setPasswordUrl);
 
-  return Response.json({ success: true, login_url: loginUrl, business_name: businessName });
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://balkina.ai').replace(/\/$/, '');
+  const bookingUrl = tenant.slug ? `${siteUrl}/b/${tenant.slug}` : null;
+  return Response.json({ success: true, login_url: loginUrl, booking_url: bookingUrl, business_name: businessName });
 }
