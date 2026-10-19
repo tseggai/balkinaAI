@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useBusinessLabels } from '@/lib/useBusinessLabels';
+import { HelpLinks } from '@/components/getting-started';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: HomeIcon },
@@ -106,6 +107,9 @@ export function Sidebar({
           })}
         </ul>
       </nav>
+
+      {/* Help: support + the app */}
+      <HelpLinks onNavigate={onNavigate} />
 
       {/* Tenant info + logout */}
       <div className="border-t border-gray-200 p-4">
