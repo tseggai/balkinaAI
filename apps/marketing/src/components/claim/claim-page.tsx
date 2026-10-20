@@ -73,7 +73,7 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
   };
 
   return (
-    <div className="overflow-x-hidden pb-28">
+    <div className="overflow-x-hidden pb-12">
       <header className="mx-auto flex max-w-2xl items-center justify-between px-6 py-5">
         <Image src="/assets/Balkina_logo_color.png" alt="Balkina" width={130} height={36} className="h-6 w-auto md:h-7" priority />
         <div className="flex items-center gap-2">
@@ -117,7 +117,7 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
 
         {/* 2 · What we did — a short message, not a headline */}
         <section>
-          <p className="text-lg leading-relaxed text-gray-900">
+          <p className="text-base leading-relaxed text-gray-900">
             {data.ownerFirstName ? (
               <>
                 {data.ownerFirstName},
@@ -130,8 +130,8 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
           </p>
         </section>
 
-        {/* 3 · Test it */}
-        <section>
+        {/* 3 · Test → and → activate */}
+        <section className="rounded-2xl bg-gray-50 p-4">
           <button onClick={openDemo} className="flex w-full items-center justify-between gap-4 rounded-2xl bg-brand-600 px-6 py-5 text-left text-white shadow-sm hover:bg-brand-700">
             <span className="min-w-0">
               <span className="block text-lg font-semibold">{t.testButton}</span>
@@ -141,28 +141,27 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
             </span>
           </button>
-          <button onClick={openActivate} className="mt-3 hidden w-full rounded-2xl border-2 border-brand-600 px-5 py-4 text-base font-semibold text-brand-700 hover:bg-brand-50 md:block">
+          <div className="my-3 flex items-center gap-3">
+            <span className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">{t.and}</span>
+            <span className="h-px flex-1 bg-gray-200" />
+          </div>
+          <button onClick={openActivate} className="w-full rounded-2xl bg-brand-600 px-5 py-5 text-lg font-semibold text-white shadow-sm hover:bg-brand-700">
             {t.stickyButton}
           </button>
         </section>
 
-        {/* 4 · Offer + benefits */}
-        <section className="space-y-2.5 text-base leading-snug">
-          {reservedUntil && <p className="text-amber-700">⏳ {t.reservedUntil(reservedUntil)}</p>}
-          <ul className="space-y-1 text-gray-600">
-            {t.benefits.map((b) => (
-              <li key={b}>✓ {b}</li>
-            ))}
-          </ul>
-        </section>
+        {/* 4 · Offer */}
+        {reservedUntil && (
+          <p className="flex items-center gap-2 text-base text-amber-700">
+            <svg className="h-5 w-5 shrink-0 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+              <circle cx="12" cy="12" r="9" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2" />
+            </svg>
+            {t.reservedUntil(reservedUntil)}
+          </p>
+        )}
       </main>
-
-      {/* Sticky CTA (mobile) — the page is short, so it is always in reach */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-100 bg-white/95 px-6 py-3 backdrop-blur md:hidden">
-        <button onClick={openActivate} className="w-full rounded-2xl bg-brand-600 px-5 py-4 text-base font-semibold text-white shadow-lg hover:bg-brand-700">
-          {t.stickyButton}
-        </button>
-      </div>
 
       <ClaimDemo
         open={demoOpen}
