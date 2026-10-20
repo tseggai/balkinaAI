@@ -25,6 +25,21 @@ export interface ClaimPageData {
   services: DemoService[];
 }
 
+/** The two page actions share one look: small caps eyebrow, big label, arrow. */
+function CtaButton({ eyebrow, label, onClick }: { eyebrow: string; label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="flex w-full items-center justify-between gap-4 rounded-2xl bg-brand-600 px-5 py-4 text-left text-white shadow-sm transition hover:brightness-95 active:brightness-90">
+      <span className="min-w-0">
+        <span className="block text-[11px] font-semibold uppercase tracking-wider text-brand-100">{eyebrow}</span>
+        <span className="mt-0.5 block text-xl font-semibold">{label}</span>
+      </span>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-brand-600">
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+      </span>
+    </button>
+  );
+}
+
 /**
  * Hierarchy: the business (theirs) → what we did → test it → activate.
  * The page stays short: services only appear inside the booking sheet, and
@@ -131,36 +146,18 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
         </section>
 
         {/* 3 · Test → and → activate */}
-        <section className="rounded-2xl bg-gray-50 p-4">
-          <button onClick={openDemo} className="flex w-full items-center justify-between gap-4 rounded-2xl bg-brand-600 px-6 py-5 text-left text-white shadow-sm hover:bg-brand-700">
-            <span className="min-w-0">
-              <span className="block text-lg font-semibold">{t.testButton}</span>
-              <span className="mt-1 block text-sm text-brand-100">{t.testHint(data.services.length)}</span>
-            </span>
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-brand-600">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
-            </span>
-          </button>
-          <div className="my-3 flex items-center gap-3">
+        <section className="rounded-2xl bg-gray-50 p-3">
+          <CtaButton eyebrow={t.testEyebrow} label={t.testButton} onClick={openDemo} />
+          <div className="my-2.5 flex items-center gap-3">
             <span className="h-px flex-1 bg-gray-200" />
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">{t.and}</span>
             <span className="h-px flex-1 bg-gray-200" />
           </div>
-          <button onClick={openActivate} className="w-full rounded-2xl bg-brand-600 px-5 py-5 text-lg font-semibold text-white shadow-sm hover:bg-brand-700">
-            {t.stickyButton}
-          </button>
+          <CtaButton eyebrow={t.activateEyebrow} label={t.activateButton} onClick={openActivate} />
         </section>
 
         {/* 4 · Offer */}
-        {reservedUntil && (
-          <p className="flex items-center gap-2 text-base text-amber-700">
-            <svg className="h-5 w-5 shrink-0 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
-              <circle cx="12" cy="12" r="9" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2" />
-            </svg>
-            {t.reservedUntil(reservedUntil)}
-          </p>
-        )}
+        {reservedUntil && <p className="text-center text-base text-amber-700">{t.reservedUntil(reservedUntil)}</p>}
       </main>
 
       <ClaimDemo
