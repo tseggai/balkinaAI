@@ -137,11 +137,13 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
               <>
                 {data.ownerFirstName},
                 <br />
-                {t.welcomeMessage}
+                {t.welcomeBefore}
               </>
             ) : (
-              t.welcomeMessageNoName
+              t.welcomeBeforeNoName
             )}
+            <strong className="font-semibold">{data.displayName}</strong>
+            {t.welcomeAfter}
           </p>
         </section>
 
