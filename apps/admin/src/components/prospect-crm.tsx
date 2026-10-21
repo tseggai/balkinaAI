@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { GrowthProspect } from '@balkina/shared';
+import { DatePicker } from '@/components/date-picker';
+import { STAGE_COLORS } from '@/components/prospect-row';
 import {
   OUTREACH_STEPS,
   activityLabel,
@@ -134,6 +136,7 @@ export function ProspectMessages({ row, api, onStageChange, stageOptions }: { ro
   const [lang, setLang] = useState<OutreachLang>(defaultLang(row));
   const [text, setText] = useState('');
   const [edited, setEdited] = useState(false);
+  const [stageSaved, setStageSaved] = useState(false);
   const { busy, run } = api;
 
   useEffect(() => { setStep(nextStep(row)); setEdited(false); }, [row.id, row.touches]);
@@ -204,9 +207,17 @@ export function ProspectMessages({ row, api, onStageChange, stageOptions }: { ro
                 <button key={l} onClick={() => { setLang(l); setEdited(false); }} className={`px-3 py-1.5 ${lang === l ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>{l === 'sr' ? 'CG' : 'EN'}</button>
               ))}
             </div>
-            <select value={row.stage} onChange={(e) => onStageChange(e.target.value as GrowthProspect['stage'])} className={`${SELECT} ml-auto`} aria-label="Stage">
-              {stageOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
+            <span className="ml-auto flex items-center gap-2">
+              {stageSaved && <span className="text-xs text-emerald-600">Stage updated ✓</span>}
+              <select
+                value={row.stage}
+                onChange={(e) => { onStageChange(e.target.value as GrowthProspect['stage']); setStageSaved(true); setTimeout(() => setStageSaved(false), 2000); }}
+                className={`rounded-lg border border-transparent px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-brand-500 ${STAGE_COLORS[row.stage] ?? 'bg-gray-100 text-gray-700'}`}
+                aria-label="Stage"
+              >
+                {stageOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </span>
           </div>
 
           {/* 3. Text */}
@@ -252,7 +263,6 @@ export function ProspectFollowUp({ row, api }: { row: GrowthProspect; api: Activ
   const logCall = () => run('call', () => logActivity(row.id, { type: 'call', channel: 'phone' }));
 
   const due = dueState(followUp);
-  const dateValue = followUp ? new Date(followUp).toISOString().slice(0, 10) : '';
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -262,22 +272,24 @@ export function ProspectFollowUp({ row, api }: { row: GrowthProspect; api: Activ
           {due && <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${due.cls}`}>{due.label}</span>}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <input type="date" value={dateValue} onChange={(e) => setFollowUpDate(e.target.value ? new Date(`${e.target.value}T09:00:00`).toISOString() : null)} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700" />
+          <DatePicker value={followUp} onChange={setFollowUpDate} />
           <button onClick={() => setFollowUpDate(followUpIn(1))} disabled={busy !== ''} className={BTN_SECONDARY}>Tomorrow</button>
           <button onClick={() => setFollowUpDate(followUpIn(3))} disabled={busy !== ''} className={BTN_SECONDARY}>+3 days</button>
           <button onClick={() => setFollowUpDate(followUpIn(7))} disabled={busy !== ''} className={BTN_SECONDARY}>+1 week</button>
-          {followUp && <button onClick={() => setFollowUpDate(null)} className="text-sm text-gray-500 hover:underline">Clear</button>}
         </div>
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-4">
         <h3 className={SECTION_TITLE}>They got back to us</h3>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {(['whatsapp', 'instagram', 'email', 'phone'] as const).map((c) => (
-            <button key={c} onClick={() => logReply(c)} disabled={busy !== ''} className={BTN_SECONDARY}>
-              <span className="flex items-center gap-1.5 capitalize"><ChannelIcon channel={c} />{c}</span>
-            </button>
-          ))}
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <span className="text-sm text-gray-500">Replied via</span>
+          <div className="flex overflow-hidden rounded-lg border border-gray-300">
+            {(['whatsapp', 'instagram', 'email', 'phone'] as const).map((c) => (
+              <button key={c} onClick={() => logReply(c)} disabled={busy !== ''} title={`Replied via ${c}`} aria-label={`Replied via ${c}`} className="px-3 py-1.5 hover:bg-brand-50 disabled:opacity-50">
+                <ChannelIcon channel={c} />
+              </button>
+            ))}
+          </div>
           <button onClick={logCall} disabled={busy !== ''} className={BTN_SECONDARY}>Log a call</button>
         </div>
         <p className="mt-2 text-xs text-gray-400">A reply moves the stage to Replied and puts them back in today's queue.</p>
@@ -349,7 +361,8 @@ export function ProspectTimeline({ row, api }: { row: GrowthProspect; api: Activ
 /* ─── Icons ────────────────────────────────────────────────────────────────── */
 
 export function ChannelIcon({ channel, light = false, className = 'h-4 w-4' }: { channel: OutreachChannel | 'phone'; light?: boolean; className?: string }) {
-  const color = light ? 'text-white' : channel === 'whatsapp' ? 'text-[#25D366]' : channel === 'instagram' ? 'text-pink-600' : 'text-gray-500';
+  // One colour for every channel, matching the app's icon system.
+  const color = light ? 'text-white' : 'text-brand-600';
   switch (channel) {
     case 'whatsapp':
       return <svg viewBox="0 0 24 24" className={`${className} ${color} fill-current`} aria-hidden><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6.3-.5c.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.2-.3-.3-.6-.4zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z" /></svg>;
