@@ -259,8 +259,8 @@ function NotesCard({ row, onUpdate }: { row: GrowthProspect; onUpdate: (patch: P
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{label}</p>
-      <p className="mt-1 truncate text-xl font-bold text-gray-900">{value}</p>
+      <p className="text-xs font-medium text-gray-500">{label}</p>
+      <p className="mt-1 truncate text-xl font-bold text-brand-600">{value}</p>
     </div>
   );
 }
