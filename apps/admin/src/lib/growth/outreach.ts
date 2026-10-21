@@ -24,10 +24,13 @@ export function claimBase(): string {
   return (process.env.NEXT_PUBLIC_CLAIM_BASE_URL ?? 'https://balkina.ai').replace(/\/$/, '');
 }
 
-/** Claim link tagged with the channel so page views can be attributed. */
+/**
+ * Short claim link (balkina.ai/c/<12 chars>) tagged with the channel so page
+ * views can be attributed; the marketing site redirects it to the full page.
+ */
 export function claimLinkFor(row: Pick<GrowthProspect, 'claim_token'>, channel: OutreachChannel | null): string | null {
   if (!row.claim_token) return null;
-  const url = `${claimBase()}/claim/${row.claim_token}`;
+  const url = `${claimBase()}/c/${row.claim_token.slice(0, 12)}`;
   return channel ? `${url}?c=${CHANNEL_TAG[channel]}` : url;
 }
 
@@ -65,23 +68,24 @@ export function outreachMessage(row: GrowthProspect, step: OutreachStep, lang: O
   const link = claimLinkFor(row, channel) ?? '';
   const hi = lang === 'sr' ? `Zdravo${name ? ` ${name}` : ''}` : `Hi${name ? ` ${name}` : ''}`;
 
+  // Same voice as the claim page itself: short, business first, link alone on its own line.
   if (lang === 'sr') {
     switch (step) {
       case 'first':
-        return `${hi}! 👋 Napravili smo besplatnu stranicu za online zakazivanje za ${biz}: klijenti zakazuju termin za 20 sekundi, i u 23h, a dan ranije dobiju podsetnik.\n\nPogledajte i probajte zakazivanje: ${link}\n\nAko vam se dopada, aktivirajte je jednim klikom — besplatno. Tu sam za sva pitanja.\nBalkina`;
+        return `${hi}, ${biz} se sada može zakazati odmah, 24/7. Isprobajte, zavolite i aktivirajte besplatno.\n${link}`;
       case 'follow_up':
-        return `${hi}, samo da proverim — da li ste stigli da pogledate stranicu za ${biz}? ${link}\n\nProba traje 20 sekundi. Ako imate bilo kakvo pitanje, pišite mi ovde.`;
+        return `${hi}, da li ste stigli da probate zakazivanje za ${biz}? Traje 20 sekundi, a aktivacija je besplatna.\n${link}`;
       case 'last_chance':
-        return `${hi}, stranica za ${biz} je rezervisana do ${expiresOn(row, lang)}. Posle toga je uklanjamo da oslobodimo mesto.\n\nAktivacija je besplatna i traje 10 sekundi: ${link}`;
+        return `${hi}, stranica za ${biz} je rezervisana do ${expiresOn(row, lang)}. Posle toga je uklanjamo. Aktivacija je besplatna i traje 10 sekundi.\n${link}`;
     }
   }
   switch (step) {
     case 'first':
-      return `${hi}! 👋 We built a free online booking page for ${biz}: customers book in 20 seconds, even at 11pm, and get a reminder the day before.\n\nTake a look and try a test booking: ${link}\n\nIf you like it, activate it in one tap — free. Happy to answer any questions here.\nBalkina`;
+      return `${hi}, ${biz} is now bookable instantly, 24/7. Test it, love it, and activate it for free.\n${link}`;
     case 'follow_up':
-      return `${hi}, just checking — did you get a chance to look at the page for ${biz}? ${link}\n\nTrying it takes 20 seconds. Any questions, just reply here.`;
+      return `${hi}, did you get a chance to try the booking page for ${biz}? It takes 20 seconds, and activating is free.\n${link}`;
     case 'last_chance':
-      return `${hi}, the page for ${biz} is reserved until ${expiresOn(row, lang)}. After that we take it down to free the slot.\n\nActivating is free and takes 10 seconds: ${link}`;
+      return `${hi}, the page for ${biz} is reserved until ${expiresOn(row, lang)}. After that we take it down. Activating is free and takes 10 seconds.\n${link}`;
   }
 }
 

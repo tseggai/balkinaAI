@@ -6,11 +6,27 @@ import { cleanBusinessName, guessOwnerName, firstName } from '@/lib/claim/names'
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Claim your booking page — Balkina AI',
-  description: 'Your Balkina booking page is ready. Claim it in one minute and start taking bookings.',
-  robots: { index: false, follow: false },
-};
+// Link previews (WhatsApp, Instagram, iMessage) use the business name; the
+// image comes from opengraph-image.tsx in this folder.
+export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
+  let name: string | null = null;
+  if (/^[a-f0-9]{48}$/.test(params.token)) {
+    const { data } = await getSupabase().from('growth_prospects').select('name').eq('claim_token', params.token).maybeSingle();
+    if (data?.name) name = cleanBusinessName(data.name as string);
+  }
+  const title = name ? `${name} — your booking page is ready` : 'Your booking page is ready — Balkina';
+  const description = name
+    ? `${name} is now bookable instantly, 24/7. Test it, love it, and activate it for free.`
+    : 'Your Balkina booking page is ready. Test it, love it, and activate it for free.';
+  return {
+    metadataBase: new URL('https://balkina.ai'),
+    title,
+    description,
+    robots: { index: false, follow: false },
+    openGraph: { title, description, type: 'website', siteName: 'Balkina' },
+    twitter: { card: 'summary_large_image', title, description },
+  };
+}
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
