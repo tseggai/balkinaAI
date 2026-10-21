@@ -23,6 +23,8 @@ export interface ClaimPageData {
   claimExpiresAt: string | null;
   supportWhatsApp: string | null;
   services: DemoService[];
+  /** Outreach channel from the link (`?c=`), for attribution. */
+  channel: string | null;
 }
 
 /** The two page actions share one look: small caps eyebrow, big label, arrow. */
@@ -60,8 +62,28 @@ export function ClaimPage({ data }: { data: ClaimPageData }) {
       /* storage unavailable */
     }
     setLang(initial);
-    trackClaim(data.token, 'claim_page_view', { lang: initial, mobile: window.innerWidth < 768 });
-  }, [data.token]);
+    trackClaim(data.token, 'claim_page_view', { lang: initial, mobile: window.innerWidth < 768, ...(data.channel ? { channel: data.channel } : {}) });
+
+    // Time on page: report the seconds the tab was visible each time it is
+    // hidden or closed; the admin sums them per prospect.
+    let visibleSince = document.visibilityState === 'visible' ? Date.now() : null;
+    const flush = () => {
+      if (visibleSince === null) return;
+      const seconds = Math.round((Date.now() - visibleSince) / 1000);
+      visibleSince = null;
+      if (seconds >= 2) trackClaim(data.token, 'claim_page_leave', { seconds });
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+      else if (visibleSince === null) visibleSince = Date.now();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, [data.token, data.channel]);
 
   const switchLang = (l: ClaimLang) => {
     setLang(l);

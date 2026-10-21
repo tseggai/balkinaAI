@@ -12,6 +12,8 @@ export type GrowthProspectStage =
   | 'disqualified'
   | 'preprovisioned'
   | 'contacted'
+  | 'viewed'
+  | 'engaged'
   | 'replied'
   | 'claimed'
   | 'signed_up'
@@ -25,6 +27,8 @@ export const GROWTH_PROSPECT_STAGES: GrowthProspectStage[] = [
   'disqualified',
   'preprovisioned',
   'contacted',
+  'viewed',
+  'engaged',
   'replied',
   'claimed',
   'signed_up',
@@ -92,9 +96,22 @@ export interface GrowthProspect {
   claim_expires_at: Timestamp | null;
   claimed_at: Timestamp | null;
   claim_email: string | null;
+  // CRM (Migration 070) — maintained by the growth_events trigger
+  next_follow_up_at: Timestamp | null;
+  last_activity_at: Timestamp | null;
+  last_activity_type: string | null;
+  touches: number;
+  page_views: number;
+  page_viewed_at: Timestamp | null;
+  page_seconds: number;
+  demo_completed_at: Timestamp | null;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
+
+/** Outbound/inbound touch types an admin can log by hand (Migration 070). */
+export type GrowthManualEventType = 'sent' | 'replied' | 'note' | 'call';
+export type GrowthOutreachChannel = 'whatsapp' | 'instagram' | 'email' | 'phone' | 'other';
 
 export interface GrowthContact {
   id: UUID;

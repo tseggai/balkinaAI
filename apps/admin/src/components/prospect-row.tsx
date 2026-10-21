@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import type { GrowthEnrichment, GrowthProspect, GrowthProspectStage } from '@balkina/shared';
 import { GROWTH_PROSPECT_STAGES } from '@balkina/shared';
+import { ProspectCrm, quickSend } from '@/components/prospect-crm';
+import { activityLabel, dueState, formatSeconds, relativeTime, whatsappDigits } from '@/lib/growth/outreach';
 
 export const STAGE_LABELS: Record<GrowthProspectStage, string> = {
   new: 'New',
@@ -11,6 +13,8 @@ export const STAGE_LABELS: Record<GrowthProspectStage, string> = {
   disqualified: 'Disqualified',
   preprovisioned: 'Page ready',
   contacted: 'Contacted',
+  viewed: 'Viewed page',
+  engaged: 'Engaged',
   replied: 'Replied',
   claimed: 'Claimed',
   signed_up: 'Signed up',
@@ -25,6 +29,8 @@ export const STAGE_COLORS: Record<string, string> = {
   disqualified: 'bg-gray-100 text-gray-400',
   preprovisioned: 'bg-violet-100 text-violet-800',
   contacted: 'bg-blue-100 text-blue-800',
+  viewed: 'bg-cyan-100 text-cyan-800',
+  engaged: 'bg-teal-100 text-teal-800',
   replied: 'bg-amber-100 text-amber-800',
   claimed: 'bg-emerald-100 text-emerald-800',
   signed_up: 'bg-green-100 text-green-800',
@@ -56,19 +62,41 @@ function chipsFor(row: GrowthProspect, enrichment: GrowthEnrichment | null): { t
   return chips;
 }
 
-type Patch = Partial<Pick<GrowthProspect, 'stage' | 'notes' | 'email' | 'instagram'>>;
+type Patch = Partial<Pick<GrowthProspect, 'stage' | 'notes' | 'email' | 'instagram' | 'phone'>>;
 
 interface RowProps {
   row: GrowthProspect;
   selected: boolean;
   expanded: boolean;
-  busy: string | null; // 'enrich' | 'build' | null
+  busy: string | null; // 'enrich' | 'build' | 'send' | null
   onSelect: (on: boolean) => void;
   onToggle: () => void;
   onUpdate: (patch: Patch) => void;
+  /** Replace the whole row after the server changed it (activity log, trigger-driven stage). */
+  onRowChange: (row: GrowthProspect) => void;
+  onError: (msg: string) => void;
   onEnrich: () => void;
   onBuild: () => void;
   onDelete: () => void;
+}
+
+/** Last thing the prospect did, how long they spent, and when the next follow-up is due. */
+export function ActivityCell({ row, compact = false }: { row: GrowthProspect; compact?: boolean }) {
+  const due = row.claimed_at ? null : dueState(row.next_follow_up_at);
+  const last = row.last_activity_type ? `${activityLabel(row.last_activity_type)} · ${relativeTime(row.last_activity_at)}` : row.touches > 0 ? `Sent · ${relativeTime(row.last_contacted_at)}` : null;
+  return (
+    <div className={`text-xs ${compact ? 'flex flex-wrap items-center gap-x-2 gap-y-1' : 'space-y-1'}`}>
+      {last ? <span className="block text-gray-700">{last}</span> : <span className="block text-gray-300">—</span>}
+      {(row.page_views > 0 || row.touches > 0) && (
+        <span className="block text-[11px] text-gray-400">
+          {row.touches > 0 && `${row.touches} sent`}
+          {row.touches > 0 && row.page_views > 0 && ' · '}
+          {row.page_views > 0 && `${row.page_views} view${row.page_views === 1 ? '' : 's'}${row.page_seconds > 0 ? ` · ${formatSeconds(row.page_seconds)}` : ''}`}
+        </span>
+      )}
+      {due && <span className={`inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium ${due.cls}`}>{due.label}</span>}
+    </div>
+  );
 }
 
 function useCopy(link: string | null) {
@@ -113,9 +141,24 @@ function ContactLines({ row, maxWidth = 170 }: { row: GrowthProspect; maxWidth?:
   );
 }
 
-function Actions({ row, busy, copied, copy, onEnrich, onBuild, onDelete }: { row: GrowthProspect; busy: string | null; copied: boolean; copy: () => void; onEnrich: () => void; onBuild: () => void; onDelete: () => void }) {
+function Actions({ row, busy, copied, copy, onEnrich, onBuild, onDelete, onSend, onToggle }: { row: GrowthProspect; busy: string | null; copied: boolean; copy: () => void; onEnrich: () => void; onBuild: () => void; onDelete: () => void; onSend: (channel: 'whatsapp' | 'instagram') => void; onToggle: () => void }) {
+  const canWhatsApp = !!whatsappDigits(row.phone, row.country);
+  const ready = !!row.tenant_id && !row.claimed_at;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      {ready && (
+        canWhatsApp ? (
+          <button onClick={() => onSend('whatsapp')} disabled={busy !== null} className="font-medium text-[#128C7E] hover:underline disabled:opacity-50">
+            {busy === 'send' ? 'logging…' : row.touches > 0 ? 'WhatsApp follow-up' : 'WhatsApp'}
+          </button>
+        ) : row.instagram ? (
+          <button onClick={() => onSend('instagram')} disabled={busy !== null} className="font-medium text-pink-600 hover:underline disabled:opacity-50">
+            {busy === 'send' ? 'logging…' : row.touches > 0 ? 'IG follow-up' : 'Instagram'}
+          </button>
+        ) : (
+          <button onClick={onToggle} className="font-medium text-gray-700 hover:underline">message</button>
+        )
+      )}
       {row.tenant_id ? (
         <button onClick={copy} className="text-violet-700 hover:underline">{copied ? 'copied!' : 'copy claim link'}</button>
       ) : (
@@ -131,18 +174,27 @@ function Actions({ row, busy, copied, copy, onEnrich, onBuild, onDelete }: { row
   );
 }
 
-/** Expanded details: contact fields, claim link, enrichment, notes. Shared by the table row and the mobile card. */
-export function ProspectDetails({ row, onUpdate }: { row: GrowthProspect; onUpdate: (patch: Patch) => void }) {
+/** Expanded details: CRM panel (outreach + timeline), contact fields, claim link, enrichment, notes. Shared by the table row and the mobile card. */
+export function ProspectDetails({ row, onUpdate, onRowChange, onError }: { row: GrowthProspect; onUpdate: (patch: Patch) => void; onRowChange: (row: GrowthProspect) => void; onError: (msg: string) => void }) {
   const [notes, setNotes] = useState(row.notes ?? '');
   const [email, setEmail] = useState(row.email ?? '');
   const [instagram, setInstagram] = useState(row.instagram ?? '');
+  const [phone, setPhone] = useState(row.phone ?? '');
   const enrichment = enrichmentOf(row);
   const link = claimUrl(row);
   const { copied, copy } = useCopy(link);
 
   return (
     <div>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3">
+        <ProspectCrm row={row} onRowChange={onRowChange} onError={onError} />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <label className="text-xs text-gray-500">
+          Phone (WhatsApp)
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} onBlur={() => onUpdate({ phone: phone || null })} className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900" />
+        </label>
         <label className="text-xs text-gray-500">
           Email
           <input value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => onUpdate({ email: email || null })} className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900" />
@@ -220,11 +272,29 @@ export function ProspectDetails({ row, onUpdate }: { row: GrowthProspect; onUpda
   );
 }
 
+function useQuickSend(row: GrowthProspect, onRowChange: (row: GrowthProspect) => void, onError: (msg: string) => void) {
+  const [sending, setSending] = useState(false);
+  const send = async (channel: 'whatsapp' | 'instagram') => {
+    setSending(true);
+    try {
+      const updated = await quickSend(row, channel);
+      if (updated) onRowChange(updated);
+      else onError('No usable phone number for WhatsApp — add one in the details.');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Could not log the message');
+    }
+    setSending(false);
+  };
+  return { sending, send };
+}
+
 /** Desktop table row. */
-export function ProspectRow({ row, selected, expanded, busy, onSelect, onToggle, onUpdate, onEnrich, onBuild, onDelete }: RowProps) {
+export function ProspectRow({ row, selected, expanded, busy, onSelect, onToggle, onUpdate, onRowChange, onError, onEnrich, onBuild, onDelete }: RowProps) {
   const enrichment = enrichmentOf(row);
   const { copied, copy } = useCopy(claimUrl(row));
   const chips = chipsFor(row, enrichment);
+  const { sending, send } = useQuickSend(row, onRowChange, onError);
+  const rowBusy = sending ? 'send' : busy;
 
   return (
     <>
@@ -250,14 +320,15 @@ export function ProspectRow({ row, selected, expanded, busy, onSelect, onToggle,
         </td>
         <td className="px-3 py-3"><ContactLines row={row} /></td>
         <td className="px-3 py-3"><StageSelect row={row} onUpdate={onUpdate} /></td>
+        <td className="px-3 py-3"><ActivityCell row={row} /></td>
         <td className="whitespace-nowrap px-3 py-3 text-right">
-          <Actions row={row} busy={busy} copied={copied} copy={copy} onEnrich={onEnrich} onBuild={onBuild} onDelete={onDelete} />
+          <Actions row={row} busy={rowBusy} copied={copied} copy={copy} onEnrich={onEnrich} onBuild={onBuild} onDelete={onDelete} onSend={send} onToggle={onToggle} />
         </td>
       </tr>
       {expanded && (
         <tr className="bg-gray-50">
-          <td colSpan={9} className="px-6 py-4">
-            <ProspectDetails row={row} onUpdate={onUpdate} />
+          <td colSpan={10} className="px-6 py-4">
+            <ProspectDetails row={row} onUpdate={onUpdate} onRowChange={onRowChange} onError={onError} />
           </td>
         </tr>
       )}
@@ -266,10 +337,12 @@ export function ProspectRow({ row, selected, expanded, busy, onSelect, onToggle,
 }
 
 /** Mobile card (same data and actions as the table row). */
-export function ProspectCard({ row, selected, expanded, busy, onSelect, onToggle, onUpdate, onEnrich, onBuild, onDelete }: RowProps) {
+export function ProspectCard({ row, selected, expanded, busy, onSelect, onToggle, onUpdate, onRowChange, onError, onEnrich, onBuild, onDelete }: RowProps) {
   const enrichment = enrichmentOf(row);
   const { copied, copy } = useCopy(claimUrl(row));
   const chips = chipsFor(row, enrichment);
+  const { sending, send } = useQuickSend(row, onRowChange, onError);
+  const rowBusy = sending ? 'send' : busy;
 
   return (
     <div className={`rounded-xl border bg-white p-3 ${selected ? 'border-brand-300 bg-brand-50/40' : 'border-gray-200'}`}>
@@ -291,15 +364,16 @@ export function ProspectCard({ row, selected, expanded, busy, onSelect, onToggle
             </div>
           )}
           <div className="mt-2"><ContactLines row={row} maxWidth={260} /></div>
+          <div className="mt-2"><ActivityCell row={row} compact /></div>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
             <StageSelect row={row} onUpdate={onUpdate} />
-            <Actions row={row} busy={busy} copied={copied} copy={copy} onEnrich={onEnrich} onBuild={onBuild} onDelete={onDelete} />
+            <Actions row={row} busy={rowBusy} copied={copied} copy={copy} onEnrich={onEnrich} onBuild={onBuild} onDelete={onDelete} onSend={send} onToggle={onToggle} />
           </div>
         </div>
       </div>
       {expanded && (
         <div className="mt-3 border-t border-gray-100 pt-3">
-          <ProspectDetails row={row} onUpdate={onUpdate} />
+          <ProspectDetails row={row} onUpdate={onUpdate} onRowChange={onRowChange} onError={onError} />
         </div>
       )}
     </div>

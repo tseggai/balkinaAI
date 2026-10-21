@@ -22,11 +22,15 @@ export async function GET(request: Request) {
   const hasEmail = searchParams.get('has_email');
   const built = searchParams.get('built'); // 'yes' | 'no'
   const enriched = searchParams.get('enriched'); // 'yes' | 'no'
+  const dueBefore = searchParams.get('due_before'); // ISO: follow-up queue (next_follow_up_at <= value)
+  const activity = searchParams.get('activity'); // 'viewed' | 'tested' | 'untouched'
+  const sort = searchParams.get('sort') ?? 'score'; // 'score' | 'activity' | 'due'
   const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
 
-  let query = auth.supabase
-    .from('growth_prospects')
-    .select('*', { count: 'exact' })
+  let query = auth.supabase.from('growth_prospects').select('*', { count: 'exact' });
+  if (sort === 'activity') query = query.order('last_activity_at', { ascending: false, nullsFirst: false });
+  else if (sort === 'due') query = query.order('next_follow_up_at', { ascending: true, nullsFirst: false });
+  query = query
     .order('icp_score', { ascending: false })
     .order('google_review_count', { ascending: false, nullsFirst: false })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
@@ -44,6 +48,10 @@ export async function GET(request: Request) {
   if (built === 'no') query = query.is('tenant_id', null);
   if (enriched === 'yes') query = query.not('enriched_at', 'is', null);
   if (enriched === 'no') query = query.is('enriched_at', null);
+  if (dueBefore && !Number.isNaN(Date.parse(dueBefore))) query = query.lte('next_follow_up_at', dueBefore);
+  if (activity === 'viewed') query = query.gt('page_views', 0);
+  if (activity === 'tested') query = query.not('demo_completed_at', 'is', null);
+  if (activity === 'untouched') query = query.eq('touches', 0);
 
   const { data, error, count } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -57,7 +65,9 @@ const patchSchema = z.object({
   notes: z.string().max(5000).nullable().optional(),
   email: z.string().email().nullable().optional(),
   instagram: z.string().max(100).nullable().optional(),
+  phone: z.string().max(40).nullable().optional(),
   icp_score: z.number().int().min(-10).max(20).optional(),
+  next_follow_up_at: z.string().datetime({ offset: true }).nullable().optional(),
 });
 
 // PATCH /api/admin/growth/prospects — update stage / notes / contact facts
