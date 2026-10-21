@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import type { GrowthProspect, GrowthProspectStage } from '@balkina/shared';
 import { GROWTH_PROSPECT_STAGES } from '@balkina/shared';
 import { GenerateProspectsModal } from '@/components/generate-prospects-modal';
-import { ProspectCard, ProspectRow, STAGE_LABELS } from '@/components/prospect-row';
+import { ProspectCard, ProspectRow, STAGE_LABELS, type DrawerTab } from '@/components/prospect-row';
+import { ProspectDrawer } from '@/components/prospect-drawer';
 
 interface Facets {
   total: number;
@@ -42,7 +43,8 @@ function Prospects() {
   const [loading, setLoading] = useState(true);
   const [facets, setFacets] = useState<Facets | null>(null);
   const [message, setMessage] = useState('');
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [openTab, setOpenTab] = useState<DrawerTab>('overview');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [rowBusy, setRowBusy] = useState<Record<string, string>>({});
   const [bulkBusy, setBulkBusy] = useState('');
@@ -104,11 +106,14 @@ function Prospects() {
     loadFacets();
   };
   const showError = (msg: string) => setMessage(`Error: ${msg}`);
+  const open = (id: string, tab: DrawerTab = 'overview') => { setOpenTab(tab); setOpenId(id); };
+  const openRow = openId ? rows.find((r) => r.id === openId) ?? null : null;
+  const openIndex = openRow ? rows.indexOf(openRow) : -1;
 
   const remove = async (row: GrowthProspect) => {
     if (!confirm(`Delete "${row.name}" from prospects?`)) return;
     const res = await fetch(`/api/admin/growth/prospects?id=${row.id}`, { method: 'DELETE' });
-    if (res.ok) refresh();
+    if (res.ok) { if (openId === row.id) setOpenId(null); refresh(); }
   };
 
   const post = async (url: string, body: unknown) => {
@@ -338,10 +343,10 @@ function Prospects() {
                   key={r.id}
                   row={r}
                   selected={selected.has(r.id)}
-                  expanded={expanded === r.id}
+                  active={openId === r.id}
                   busy={rowBusy[r.id] ?? null}
                   onSelect={(on) => setSelected((prev) => { const n = new Set(prev); if (on) n.add(r.id); else n.delete(r.id); return n; })}
-                  onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
+                  onOpen={(tab) => open(r.id, tab)}
                   onUpdate={(patch) => update(r.id, patch)}
                   onRowChange={replaceRow}
                   onError={showError}
@@ -381,10 +386,10 @@ function Prospects() {
                       key={r.id}
                       row={r}
                       selected={selected.has(r.id)}
-                      expanded={expanded === r.id}
+                      active={openId === r.id}
                       busy={rowBusy[r.id] ?? null}
                       onSelect={(on) => setSelected((prev) => { const n = new Set(prev); if (on) n.add(r.id); else n.delete(r.id); return n; })}
-                      onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
+                      onOpen={(tab) => open(r.id, tab)}
                       onUpdate={(patch) => update(r.id, patch)}
                       onRowChange={replaceRow}
                       onError={showError}
@@ -397,6 +402,25 @@ function Prospects() {
               </table>
             </div>
             </>
+          )}
+
+          {openRow && (
+            <ProspectDrawer
+              row={openRow}
+              busy={rowBusy[openRow.id] ?? null}
+              initialTab={openTab}
+              hasPrev={openIndex > 0}
+              hasNext={openIndex >= 0 && openIndex < rows.length - 1}
+              onPrev={() => { const r = rows[openIndex - 1]; if (r) setOpenId(r.id); }}
+              onNext={() => { const r = rows[openIndex + 1]; if (r) setOpenId(r.id); }}
+              onClose={() => setOpenId(null)}
+              onUpdate={(patch) => update(openRow.id, patch)}
+              onRowChange={replaceRow}
+              onError={showError}
+              onEnrich={() => enrich([openRow.id])}
+              onBuild={() => build([openRow.id])}
+              onDelete={() => remove(openRow)}
+            />
           )}
 
           <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
