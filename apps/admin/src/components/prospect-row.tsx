@@ -38,7 +38,7 @@ export const STAGE_COLORS: Record<string, string> = {
   lost: 'bg-red-100 text-red-700',
 };
 
-export type DrawerTab = 'overview' | 'message' | 'activity';
+export type DrawerTab = 'overview' | 'activity';
 
 export function enrichmentOf(row: GrowthProspect): GrowthEnrichment | null {
   return row.enriched_at && row.enrichment && typeof row.enrichment === 'object' && !Array.isArray(row.enrichment)
@@ -167,7 +167,7 @@ function Actions({ row, busy, onEnrich, onBuild, onSend, onOpen }: { row: Growth
             {busy === 'send' ? 'logging…' : row.touches > 0 ? 'IG follow-up' : 'Instagram'}
           </button>
         ) : (
-          <button onClick={() => onOpen('message')} className="font-medium text-gray-700 hover:underline">message</button>
+          <button onClick={() => onOpen('overview')} className="font-medium text-gray-700 hover:underline">message</button>
         )
       )}
       {!row.tenant_id && (
