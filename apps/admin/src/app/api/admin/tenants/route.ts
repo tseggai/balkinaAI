@@ -41,7 +41,10 @@ export async function GET(request: Request) {
     .range(from, from + perPage - 1);
 
   // Filters
+  // Pre-provisioned ("unclaimed") pages are prospects, not customers: hide
+  // them unless that status is asked for explicitly.
   if (status) query = query.eq('status', status);
+  else query = query.neq('status', 'unclaimed');
   if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,owner_name.ilike.%${search}%`);
   if (planFilter) query = query.eq('subscription_plan_id', planFilter);
   if (paymentsFilter === 'true') query = query.eq('payments_enabled', true);

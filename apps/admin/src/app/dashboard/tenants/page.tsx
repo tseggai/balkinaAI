@@ -28,7 +28,7 @@ interface Tenant {
 interface Plan { id: string; name: string; }
 interface Category { id: string; name: string; }
 
-const STATUS_OPTIONS = ['active', 'inactive', 'suspended', 'pending_subscription', 'past_due'];
+const STATUS_OPTIONS = ['active', 'inactive', 'suspended', 'pending_subscription', 'past_due', 'unclaimed'];
 const STATUS_BADGE: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
   inactive: 'bg-gray-100 text-gray-700',
