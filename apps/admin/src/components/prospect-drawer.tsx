@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { GrowthProspect, GrowthProspectStage } from '@balkina/shared';
+import type { GrowthProspect } from '@balkina/shared';
 import { GROWTH_PROSPECT_STAGES } from '@balkina/shared';
-import { STAGE_COLORS, STAGE_LABELS, enrichmentOf } from '@/components/prospect-row';
+import { STAGE_LABELS, enrichmentOf } from '@/components/prospect-row';
 import {
   BTN_DANGER,
   BTN_PRIMARY,
@@ -48,12 +48,11 @@ export function ProspectDrawer({ row, busy, initialTab = 'overview', hasPrev, ha
   const [tab, setTab] = useState<Tab>(initialTab === 'activity' ? 'activity' : 'overview');
   const [shown, setShown] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [showKnown, setShowKnown] = useState(false);
   const [copied, setCopied] = useState(false);
   const api = useProspectActivity(row, onRowChange, onError);
 
   useEffect(() => { const t = setTimeout(() => setShown(true), 10); return () => clearTimeout(t); }, []);
-  useEffect(() => { setTab(initialTab === 'activity' ? 'activity' : 'overview'); setEditing(false); setShowKnown(false); }, [row.id, initialTab]);
+  useEffect(() => { setTab(initialTab === 'activity' ? 'activity' : 'overview'); setEditing(false); }, [row.id, initialTab]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
@@ -70,20 +69,11 @@ export function ProspectDrawer({ row, busy, initialTab = 'overview', hasPrev, ha
   const shortLink = claimLinkFor(row, null);
   const enrichment = enrichmentOf(row);
   const eventCount = api.events?.length ?? null;
+  const stageOptions = GROWTH_PROSPECT_STAGES.map((s) => ({ value: s, label: STAGE_LABELS[s] }));
   const copyLink = async () => {
     if (!shortLink) return;
     try { await navigator.clipboard.writeText(shortLink); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* ignore */ }
   };
-
-  const knownBits: string[] = [];
-  if (enrichment) {
-    if (enrichment.owner_name) knownBits.push(`Owner ${enrichment.owner_name}`);
-    if (enrichment.services?.length) knownBits.push(`${enrichment.services.length} services`);
-    if (enrichment.emails.length) knownBits.push(`${enrichment.emails.length} email${enrichment.emails.length === 1 ? '' : 's'}`);
-    if (enrichment.booking_widget && enrichment.booking_widget !== 'Balkina') knownBits.push(`uses ${enrichment.booking_widget}`);
-    if (enrichment.skipped === 'social_only') knownBits.push('Instagram/Facebook only, no website');
-    if (enrichment.skipped === 'no_website') knownBits.push('no website');
-  }
 
   return (
     <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true">
@@ -95,13 +85,20 @@ export function ProspectDrawer({ row, busy, initialTab = 'overview', hasPrev, ha
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-xl font-bold text-gray-900">{row.name}</h2>
-                <button onClick={onEnrich} disabled={busy !== null} className={BTN_SECONDARY}>{busy === 'enrich' ? 'Enriching…' : row.enriched_at ? 'Re-enrich' : 'Enrich'}</button>
+                <button onClick={onEnrich} disabled={busy !== null} title={enrichment ? `Enriched ${relativeTime(row.enriched_at)}` : 'Fetch website, services, contacts'} className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                  {busy === 'enrich' ? 'Enriching…' : row.enriched_at ? 'Re-enrich' : 'Enrich'}
+                </button>
               </div>
-              <p className="mt-1 text-sm text-gray-500">
-                {[row.city, row.country?.toUpperCase()].filter(Boolean).join(', ')}
-                {row.google_rating != null && <> · {row.google_rating}★ ({row.google_review_count ?? 0} reviews)</>}
-                {row.vertical && <> · {row.vertical.replace(/_/g, ' ')}</>}
-                {row.google_maps_url && <> · <a href={row.google_maps_url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">map</a></>}
+              <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-gray-500">
+                <span>
+                  {[row.city, row.country?.toUpperCase()].filter(Boolean).join(', ')}
+                  {row.google_rating != null && <> · {row.google_rating}★ ({row.google_review_count ?? 0} reviews)</>}
+                  {row.vertical && <> · {row.vertical.replace(/_/g, ' ')}</>}
+                  {row.google_maps_url && <> · <a href={row.google_maps_url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">map</a></>}
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${row.icp_score >= 4 ? 'bg-green-100 text-green-800' : row.icp_score >= 2 ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>score {row.icp_score}</span>
+                {due && <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${due.cls}`}>{due.label}</span>}
+                {row.claimed_at && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">claimed {relativeTime(row.claimed_at)}</span>}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
@@ -117,27 +114,12 @@ export function ProspectDrawer({ row, busy, initialTab = 'overview', hasPrev, ha
             </div>
           </div>
 
-          {/* Stage + state */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <select
-              value={row.stage}
-              onChange={(e) => onUpdate({ stage: e.target.value as GrowthProspectStage })}
-              className={`rounded-full border-0 px-2.5 py-1 text-xs font-medium ${STAGE_COLORS[row.stage] ?? ''}`}
-            >
-              {GROWTH_PROSPECT_STAGES.map((s) => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
-            </select>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${row.icp_score >= 4 ? 'bg-green-100 text-green-800' : row.icp_score >= 2 ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>score {row.icp_score}</span>
-            {due && <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${due.cls}`}>{due.label}</span>}
-            {row.claimed_at && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">claimed {relativeTime(row.claimed_at)}</span>}
-            {row.last_activity_at && <span className="text-xs text-gray-400">last activity {relativeTime(row.last_activity_at)}</span>}
-          </div>
-
           {editing ? (
             <EditForm row={row} onCancel={() => setEditing(false)} onSave={(patch) => { onUpdate(patch); setEditing(false); }} onDelete={onDelete} />
           ) : (
             <>
               {/* Contact */}
-              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
                 {row.phone && (
                   <a href={digits ? `https://wa.me/${digits}` : `tel:${row.phone}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-gray-700 hover:text-gray-900" title={digits ? 'Open WhatsApp chat' : 'Call'}>
                     <ChannelIcon channel="whatsapp" />{row.phone}
@@ -188,29 +170,6 @@ export function ProspectDrawer({ row, busy, initialTab = 'overview', hasPrev, ha
                 )}
               </div>
 
-              {/* What we know */}
-              <div className="mt-3 text-sm">
-                <span className="text-gray-500">What we know: </span>
-                {enrichment ? (
-                  <>
-                    <span className="text-gray-700">{knownBits.join(' · ') || 'website fetched, nothing extracted'}</span>
-                    <button onClick={() => setShowKnown((v) => !v)} className="ml-2 text-brand-600 hover:underline">{showKnown ? 'less' : 'more'}</button>
-                  </>
-                ) : (
-                  <span className="text-gray-400">not enriched yet</span>
-                )}
-                {showKnown && enrichment && (
-                  <dl className="mt-2 grid gap-x-4 gap-y-1 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 sm:grid-cols-2">
-                    {enrichment.summary && <div className="sm:col-span-2">{enrichment.summary}</div>}
-                    <Fact k="Emails" v={enrichment.emails.length ? enrichment.emails.join(', ') : null} />
-                    <Fact k="Phones" v={enrichment.phones.length ? enrichment.phones.join(', ') : null} />
-                    <Fact k="Socials" v={Object.entries(enrichment.socials ?? {}).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(' · ') || null} />
-                    <Fact k="Hours" v={enrichment.hours ? Object.entries(enrichment.hours).map(([d, h]) => `${d} ${h}`).join(', ') : null} />
-                    <Fact k="Services" v={(enrichment.services ?? []).slice(0, 10).map((s) => `${s.name}${s.price != null ? ` ${s.price}${s.currency ? ' ' + s.currency : ''}` : ''}`).join(' · ') || null} />
-                    <Fact k="Google" v={`${(row.google_types ?? []).slice(0, 5).join(', ') || '—'} · ${row.business_status ?? '—'} · added ${new Date(row.created_at).toLocaleDateString()}`} />
-                  </dl>
-                )}
-              </div>
             </>
           )}
 
@@ -240,8 +199,9 @@ export function ProspectDrawer({ row, busy, initialTab = 'overview', hasPrev, ha
                 <Stat label="Tested booking" value={row.demo_completed_at ? relativeTime(row.demo_completed_at) : '—'} />
               </section>
               <NotesCard row={row} onUpdate={onUpdate} />
-              <ProspectMessages row={row} api={api} />
+              <ProspectMessages row={row} api={api} stageOptions={stageOptions} onStageChange={(stage) => onUpdate({ stage })} />
               <ProspectFollowUp row={row} api={api} />
+              {enrichment && <KnownCard row={row} enrichment={enrichment} />}
             </div>
           ) : (
             <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -299,9 +259,35 @@ function NotesCard({ row, onUpdate }: { row: GrowthProspect; onUpdate: (patch: P
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-      <p className="text-xs font-medium text-gray-500">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{label}</p>
       <p className="mt-1 truncate text-xl font-bold text-gray-900">{value}</p>
     </div>
+  );
+}
+
+/** Enrichment facts, shown at the bottom of Overview once a site has been fetched. */
+function KnownCard({ row, enrichment }: { row: GrowthProspect; enrichment: NonNullable<ReturnType<typeof enrichmentOf>> }) {
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className={SECTION_TITLE}>What we know</h3>
+        <span className="text-xs text-gray-400">{new Date(enrichment.fetched_at).toLocaleString()}</span>
+        {enrichment.fetched_url && !enrichment.skipped && <a href={enrichment.fetched_url} target="_blank" rel="noreferrer" className="text-xs text-brand-600 hover:underline">site</a>}
+        {enrichment.skipped && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{enrichment.skipped === 'social_only' ? 'Instagram/Facebook page instead of a website' : 'no website'}</span>}
+        {enrichment.error && <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700">website could not be fetched</span>}
+        {enrichment.booking_widget && enrichment.booking_widget !== 'Balkina' && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">uses {enrichment.booking_widget}</span>}
+      </div>
+      {enrichment.summary && <p className="mt-2 text-sm text-gray-600">{enrichment.summary}</p>}
+      <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs text-gray-700 sm:grid-cols-2">
+        <Fact k="Owner" v={enrichment.owner_name ?? null} />
+        <Fact k="Emails" v={enrichment.emails.length ? enrichment.emails.join(', ') : null} />
+        <Fact k="Phones" v={enrichment.phones.length ? enrichment.phones.join(', ') : null} />
+        <Fact k="Socials" v={Object.entries(enrichment.socials ?? {}).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(' · ') || null} />
+        <Fact k="Hours" v={enrichment.hours ? Object.entries(enrichment.hours).map(([d, h]) => `${d} ${h}`).join(', ') : null} />
+        <Fact k="Services" v={(enrichment.services ?? []).slice(0, 10).map((s) => `${s.name}${s.price != null ? ` ${s.price}${s.currency ? ' ' + s.currency : ''}` : ''}`).join(' · ') || null} />
+        <Fact k="Google" v={`${(row.google_types ?? []).slice(0, 5).join(', ') || '—'} · ${row.business_status ?? '—'} · added ${new Date(row.created_at).toLocaleDateString()}`} />
+      </dl>
+    </section>
   );
 }
 

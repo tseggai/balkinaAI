@@ -116,16 +116,18 @@ export const BTN_DANGER = 'rounded-lg border border-red-300 bg-white px-3 py-1.5
 export const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wider text-gray-500';
 export const INPUT = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
-const CHANNELS: { key: OutreachChannel; label: string; tag: string }[] = [
-  { key: 'whatsapp', label: 'WhatsApp', tag: 'wa' },
-  { key: 'instagram', label: 'Instagram', tag: 'ig' },
-  { key: 'email', label: 'Email', tag: 'em' },
-  { key: 'other', label: 'Other', tag: 'ot' },
+const CHANNELS: { key: OutreachChannel; label: string }[] = [
+  { key: 'whatsapp', label: 'WhatsApp' },
+  { key: 'instagram', label: 'Instagram' },
+  { key: 'email', label: 'Email' },
+  { key: 'other', label: 'Copy' },
 ];
 
 /* ─── Messages (channel first) ─────────────────────────────────────────────── */
 
-export function ProspectMessages({ row, api }: { row: GrowthProspect; api: ActivityApi }) {
+export const SELECT = 'rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+
+export function ProspectMessages({ row, api, onStageChange, stageOptions }: { row: GrowthProspect; api: ActivityApi; onStageChange: (stage: GrowthProspect['stage']) => void; stageOptions: { value: GrowthProspect['stage']; label: string }[] }) {
   const digits = whatsappDigits(row.phone, row.country);
   const [channel, setChannel] = useState<OutreachChannel>('whatsapp');
   const [step, setStep] = useState<OutreachStep>(nextStep(row));
@@ -144,7 +146,6 @@ export function ProspectMessages({ row, api }: { row: GrowthProspect; api: Activ
   }, [row, step, lang, channel, edited]);
 
   const stepDays = OUTREACH_STEPS.find((s) => s.key === step)?.followUpDays ?? null;
-  const tag = CHANNELS.find((c) => c.key === channel)?.tag ?? 'ot';
   const canSend = channel === 'whatsapp' ? !!digits : true;
 
   const send = () => run(`send-${channel}`, async () => {
@@ -176,37 +177,36 @@ export function ProspectMessages({ row, api }: { row: GrowthProspect; api: Activ
         <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Build the booking page first — every message needs the claim link.</p>
       ) : (
         <>
-          {/* 1. Channel — decides where it opens and how the link is tagged */}
-          <div className="mt-3 grid grid-cols-4 gap-2">
-            {CHANNELS.map((c) => {
-              const on = channel === c.key;
-              const missing = (c.key === 'whatsapp' && !digits) || (c.key === 'instagram' && !row.instagram) || (c.key === 'email' && !row.email);
-              return (
-                <button
-                  key={c.key}
-                  onClick={() => { setChannel(c.key); setEdited(false); }}
-                  className={`rounded-lg border px-2 py-2 text-sm font-medium transition-colors ${on ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'} ${missing ? 'opacity-60' : ''}`}
-                  title={missing ? `No ${c.label.toLowerCase()} contact on file` : undefined}
-                >
-                  <span className="flex items-center justify-center gap-1.5"><ChannelIcon channel={c.key} />{c.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 2. Which message + language */}
+          {/* Step ▾ · channel (decides where it opens + link tag) · language · stage */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <select value={step} onChange={(e) => { setStep(e.target.value as OutreachStep); setEdited(false); }} className={SELECT} aria-label="Message">
+              {OUTREACH_STEPS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
             <div className="flex overflow-hidden rounded-lg border border-gray-300 text-sm">
-              {OUTREACH_STEPS.map((s) => (
-                <button key={s.key} onClick={() => { setStep(s.key); setEdited(false); }} className={`px-3 py-1.5 ${step === s.key ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>{s.label}</button>
-              ))}
+              {CHANNELS.map((c) => {
+                const on = channel === c.key;
+                const missing = (c.key === 'whatsapp' && !digits) || (c.key === 'instagram' && !row.instagram) || (c.key === 'email' && !row.email);
+                return (
+                  <button
+                    key={c.key}
+                    onClick={() => { setChannel(c.key); setEdited(false); }}
+                    className={`px-3 py-1.5 ${on ? 'bg-brand-600 text-white' : `bg-white text-gray-600 hover:bg-gray-50 ${missing ? 'opacity-50' : ''}`}`}
+                    title={missing ? `No ${c.label.toLowerCase()} contact on file` : c.label}
+                    aria-label={c.label}
+                  >
+                    <ChannelIcon channel={c.key} light={on} />
+                  </button>
+                );
+              })}
             </div>
             <div className="flex overflow-hidden rounded-lg border border-gray-300 text-sm">
               {(['sr', 'en'] as OutreachLang[]).map((l) => (
                 <button key={l} onClick={() => { setLang(l); setEdited(false); }} className={`px-3 py-1.5 ${lang === l ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>{l === 'sr' ? 'CG' : 'EN'}</button>
               ))}
             </div>
-            <span className="ml-auto text-xs text-gray-400">link tagged <code className="rounded bg-gray-100 px-1">?c={tag}</code></span>
+            <select value={row.stage} onChange={(e) => onStageChange(e.target.value as GrowthProspect['stage'])} className={`${SELECT} ml-auto`} aria-label="Stage">
+              {stageOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
           </div>
 
           {/* 3. Text */}
