@@ -81,9 +81,13 @@ Vercel Cron: already in `apps/admin/vercel.json` (`0 5 * * *` UTC).
 
 Not scheduled: pages are built from the admin UI ("Build booking pages" on selected rows) so a human decides which businesses get one. Unclaimed tenants are invisible to customers (discovery and `/b/<slug>` filter `status = 'active'`). Claim links expire after 30 days; the next build on the same prospect refreshes the token.
 
+## CRM (manual outreach, Migration 070)
+
+Not a routine: the Prospects page is the CRM. Each row shows last activity, sends, page views and time on page, and the follow-up due chip; the "Due today" tab is the follow-up queue. Expanding a row opens the composer (first touch / follow-up / last chance, CG or EN, channel-tagged claim link) with **Open WhatsApp & log**, **Copy & open Instagram DM** and **Copy & log**; every send writes a `sent` event and schedules the next follow-up (2 days after the first touch, 3 after the follow-up). Replies, calls and notes are logged by hand. The `growth_events_apply` trigger turns events into stage moves and counters, so the claim page (marketing) and the admin feed the same timeline.
+
 ## Routines still to build (in plan order)
 
-1. Personaliser + Sender + Reply triage — `growth_sequences`, `growth_enrollments`, Resend.
+1. WhatsApp Business API sender (Twilio, approved templates) + sequence runner on `growth_sequences` / `growth_enrollments` that stops on reply, claim or expiry; inbound reply webhook into `growth_events`. Resend email path for the few prospects with an address.
 2. Ad optimiser — `growth_ad_metrics` from Meta / Google / TikTok / LinkedIn.
 3. Reporter — weekly email.
 4. Unclaimed-page cleanup — delete unclaimed tenants 30 days after their claim link expires.

@@ -65,8 +65,12 @@ async function loadClaim(token: string) {
   };
 }
 
-export default async function ClaimPage({ params }: { params: { token: string } }) {
+// `?c=wa|ig|em` on the link tells us which channel the owner came from.
+const CHANNELS: Record<string, string> = { wa: 'whatsapp', ig: 'instagram', em: 'email', sms: 'sms' };
+
+export default async function ClaimPage({ params, searchParams }: { params: { token: string }; searchParams?: { c?: string } }) {
   const claim = await loadClaim(params.token);
+  const channel = CHANNELS[searchParams?.c ?? ''] ?? null;
 
   if (claim.state === 'invalid') {
     return (
@@ -93,7 +97,7 @@ export default async function ClaimPage({ params }: { params: { token: string } 
     );
   }
 
-  return <ClaimPageView data={claim} />;
+  return <ClaimPageView data={{ ...claim, channel }} />;
 }
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {

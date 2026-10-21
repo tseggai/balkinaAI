@@ -13,10 +13,17 @@ interface Facets {
   countries: Record<string, number>;
   cities: Record<string, Record<string, number>>;
   verticals: Record<string, number>;
-  totals: { withEmail: number; enriched: number; pagesBuilt: number; claimed: number; contacted: number; highScore: number };
+  totals: { withEmail: number; enriched: number; pagesBuilt: number; claimed: number; contacted: number; highScore: number; viewed: number; tested: number; due: number };
 }
 
-const STAGE_TABS: (GrowthProspectStage | 'all')[] = ['all', 'new', 'enriched', 'preprovisioned', 'contacted', 'replied', 'claimed', 'signed_up', 'customer', 'lost'];
+// 'due' is the follow-up queue (next_follow_up_at ≤ end of today), not a stage.
+const STAGE_TABS: (GrowthProspectStage | 'all' | 'due')[] = ['all', 'due', 'new', 'enriched', 'preprovisioned', 'contacted', 'viewed', 'engaged', 'replied', 'claimed', 'signed_up', 'customer', 'lost'];
+
+function endOfTodayIso(): string {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.toISOString();
+}
 
 export default function ProspectsPage() {
   return (
@@ -48,6 +55,8 @@ function Prospects() {
   const [minScore, setMinScore] = useState(params.get('min_score') ?? '');
   const [hasEmail, setHasEmail] = useState('any');
   const [built, setBuilt] = useState('any');
+  const [activity, setActivity] = useState('any');
+  const [sort, setSort] = useState('score');
   const [q, setQ] = useState('');
 
   const loadFacets = useCallback(async () => {
@@ -57,11 +66,13 @@ function Prospects() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const sp = new URLSearchParams({ stage, country, vertical, page: String(page) });
+    const sp = new URLSearchParams({ stage: stage === 'due' ? 'all' : stage, country, vertical, page: String(page), sort: stage === 'due' ? 'due' : sort });
+    if (stage === 'due') sp.set('due_before', endOfTodayIso());
     if (city !== 'all') sp.set('city', city);
     if (minScore) sp.set('min_score', minScore);
     if (hasEmail !== 'any') sp.set('has_email', hasEmail);
     if (built !== 'any') sp.set('built', built);
+    if (activity !== 'any') sp.set('activity', activity);
     if (q) sp.set('q', q);
     const res = await fetch(`/api/admin/growth/prospects?${sp}`);
     const json = await res.json();
@@ -69,7 +80,7 @@ function Prospects() {
     setCount(json.count ?? 0);
     setPageSize(json.page_size ?? 50);
     setLoading(false);
-  }, [stage, country, city, vertical, minScore, hasEmail, built, q, page]);
+  }, [stage, country, city, vertical, minScore, hasEmail, built, activity, sort, q, page]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadFacets(); }, [loadFacets]);
@@ -86,6 +97,13 @@ function Prospects() {
     setRows((prev) => prev.map((r) => (r.id === id ? ({ ...r, ...patch } as GrowthProspect) : r)));
     if (patch.stage) loadFacets();
   };
+
+  // The activity log changes stage/counters server-side (trigger); swap the row in place.
+  const replaceRow = (row: GrowthProspect) => {
+    setRows((prev) => prev.map((r) => (r.id === row.id ? row : r)));
+    loadFacets();
+  };
+  const showError = (msg: string) => setMessage(`Error: ${msg}`);
 
   const remove = async (row: GrowthProspect) => {
     if (!confirm(`Delete "${row.name}" from prospects?`)) return;
@@ -200,27 +218,29 @@ function Prospects() {
           {/* Funnel strip */}
           {t && (
             <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-3 lg:grid-cols-6">
-              <Kpi label="Prospects" value={facets?.total ?? 0} />
-              <Kpi label="Enriched" value={t.enriched} sub={`${t.withEmail} with email`} />
-              <Kpi label="High fit (score ≥ 4)" value={t.highScore} />
+              <Kpi label="Prospects" value={facets?.total ?? 0} sub={`${t.highScore} high fit · ${t.enriched} enriched`} />
               <Kpi label="Pages built" value={t.pagesBuilt} />
-              <Kpi label="Contacted" value={t.contacted} />
-              <Kpi label="Claimed" value={t.claimed} />
+              <Kpi label="Contacted" value={t.contacted} sub={pct(t.contacted, t.pagesBuilt, 'of pages')} />
+              <Kpi label="Viewed page" value={t.viewed} sub={pct(t.viewed, t.contacted, 'of contacted')} />
+              <Kpi label="Tested booking" value={t.tested} sub={pct(t.tested, t.viewed, 'of viewers')} />
+              <Kpi label="Claimed" value={t.claimed} sub={pct(t.claimed, t.contacted, 'of contacted')} />
             </div>
           )}
 
           {/* Stage tabs */}
           <div className="-mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
             {STAGE_TABS.map((s) => {
-              const n = s === 'all' ? facets?.total ?? 0 : facets?.stages[s] ?? 0;
-              if (s !== 'all' && n === 0 && stage !== s) return null;
+              const n = s === 'all' ? facets?.total ?? 0 : s === 'due' ? facets?.totals.due ?? 0 : facets?.stages[s] ?? 0;
+              if (s !== 'all' && s !== 'due' && n === 0 && stage !== s) return null;
+              const on = stage === s;
+              const dueCls = n > 0 ? 'bg-amber-100 text-amber-900 hover:bg-amber-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200';
               return (
                 <button
                   key={s}
                   onClick={() => { setStage(s); setPage(1); setSelected(new Set()); }}
-                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${stage === s ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${on ? 'bg-gray-900 text-white' : s === 'due' ? dueCls : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                 >
-                  {s === 'all' ? 'All' : STAGE_LABELS[s]} <span className="opacity-70">{n}</span>
+                  {s === 'all' ? 'All' : s === 'due' ? '⏰ Due today' : STAGE_LABELS[s]} <span className="opacity-70">{n}</span>
                 </button>
               );
             })}
@@ -256,8 +276,25 @@ function Prospects() {
               <option value="yes">Page built</option>
               <option value="no">No page yet</option>
             </select>
+            <select value={activity} onChange={(e) => { setActivity(e.target.value); setPage(1); }} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+              <option value="any">Activity: any</option>
+              <option value="untouched">Not contacted yet</option>
+              <option value="viewed">Viewed the page</option>
+              <option value="tested">Tested a booking</option>
+            </select>
             <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search name / site / IG" className="col-span-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm sm:w-52" />
-            <span className="col-span-2 text-xs text-gray-400 sm:ml-auto">{count} matching · sorted by score</span>
+            <span className="col-span-2 flex items-center gap-1 text-xs text-gray-400 sm:ml-auto">
+              {count} matching · sorted by
+              {stage === 'due' ? (
+                <span>follow-up due</span>
+              ) : (
+                <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} className="rounded border-0 bg-transparent p-0 text-xs text-gray-600 underline">
+                  <option value="score">score</option>
+                  <option value="activity">last activity</option>
+                  <option value="due">follow-up due</option>
+                </select>
+              )}
+            </span>
           </div>
 
           {/* Bulk bar */}
@@ -306,6 +343,8 @@ function Prospects() {
                   onSelect={(on) => setSelected((prev) => { const n = new Set(prev); if (on) n.add(r.id); else n.delete(r.id); return n; })}
                   onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
                   onUpdate={(patch) => update(r.id, patch)}
+                  onRowChange={replaceRow}
+                  onError={showError}
                   onEnrich={() => enrich([r.id])}
                   onBuild={() => build([r.id])}
                   onDelete={() => remove(r)}
@@ -332,6 +371,7 @@ function Prospects() {
                     <th className="px-3 py-3">Google</th>
                     <th className="px-3 py-3">Contact</th>
                     <th className="px-3 py-3">Stage</th>
+                    <th className="px-3 py-3">Activity</th>
                     <th className="px-3 py-3"></th>
                   </tr>
                 </thead>
@@ -346,6 +386,8 @@ function Prospects() {
                       onSelect={(on) => setSelected((prev) => { const n = new Set(prev); if (on) n.add(r.id); else n.delete(r.id); return n; })}
                       onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
                       onUpdate={(patch) => update(r.id, patch)}
+                      onRowChange={replaceRow}
+                      onError={showError}
                       onEnrich={() => enrich([r.id])}
                       onBuild={() => build([r.id])}
                       onDelete={() => remove(r)}
@@ -376,6 +418,11 @@ function mergeCities(byCountry: Record<string, Record<string, number>>): Record<
     for (const [city, n] of Object.entries(cities)) out[city] = (out[city] ?? 0) + n;
   }
   return out;
+}
+
+function pct(n: number, of: number, label: string): string | undefined {
+  if (!of) return undefined;
+  return `${Math.round((n / of) * 100)}% ${label}`;
 }
 
 function Kpi({ label, value, sub }: { label: string; value: number; sub?: string }) {
