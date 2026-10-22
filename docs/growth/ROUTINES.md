@@ -85,6 +85,22 @@ Not scheduled: pages are built from the admin UI ("Build booking pages" on selec
 
 Not a routine: the Prospects page is the CRM. Each row shows last activity, sends, page views and time on page, and the follow-up due chip; the "Due today" tab is the follow-up queue. Expanding a row opens the composer (first touch / follow-up / last chance, CG or EN, channel-tagged claim link) with **Open WhatsApp & log**, **Copy & open Instagram DM** and **Copy & log**; every send writes a `sent` event and schedules the next follow-up (2 days after the first touch, 3 after the follow-up). Replies, calls and notes are logged by hand. The `growth_events_apply` trigger turns events into stage moves and counters, so the claim page (marketing) and the admin feed the same timeline.
 
+## Routine 3 — Instagram publisher (Migration 071)
+
+Posts the planned feed image and its matching story three times a week, fully unattended.
+
+- **Plan**: `apps/admin/src/lib/ig/plan.ts` — 40 rows (week, day, set, file, vertical, SR + EN caption). Same order as the POSTING-PLAN.pdf that ships with the asset zips.
+- **Images**: `https://balkina.ai/ig/set<N>/<sq|st>/sr/<file>.jpg` (committed under `apps/marketing/public/ig/`). Instagram only accepts JPEG by public URL.
+- **Endpoint**: `GET|POST /api/growth/cron/instagram`, `Authorization: Bearer <GROWTH_CRON_SECRET>`.
+  - Picks the row due today (Europe/Podgorica) from `IG_PLAN_START` (the Monday of week 1).
+  - Publishes feed first (caption = SR, divider, EN, CTA, 8–10 rotating hashtags), then the story.
+  - Logs every attempt in `ig_publish_log`; a row with `published_at` is never posted again.
+  - `?dry=1` reports the jobs and checks the token against the account without posting. `?date=YYYY-MM-DD` pretends it is another day. `?row=set1/09-photo-barber` forces one row (use with `?only=feed` to test a single feed post). 
+- **Schedule**: `0 17 * * 1,3,5` UTC (18:00 CET / 19:00 CEST). Vercel Hobby allows one run per day, which this fits.
+- **Env (admin Vercel project)**: `META_IG_USER_ID`, `META_IG_ACCESS_TOKEN`, `IG_PLAN_START`, optional `IG_ASSET_BASE`, `IG_LANG`.
+- **Meta setup once**: Instagram switched to Business/Creator and linked to a Facebook Page → app at developers.facebook.com with the Instagram Graph API product → long-lived user token with `instagram_basic`, `instagram_content_publish`, `pages_show_list` → `META_IG_USER_ID` = the Instagram Business account id (`GET /me/accounts?fields=instagram_business_account`).
+- **Limits**: the API cannot add story stickers (the link sticker). Story images carry `balkina.ai` as text; add the sticker by hand when you want the tap. Rate limit is 100 API-published posts per 24h, far above our 2.
+
 ## Routines still to build (in plan order)
 
 1. WhatsApp Business API sender (Twilio, approved templates) + sequence runner on `growth_sequences` / `growth_enrollments` that stops on reply, claim or expiry; inbound reply webhook into `growth_events`. Resend email path for the few prospects with an address.
