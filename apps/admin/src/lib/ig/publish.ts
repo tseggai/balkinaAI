@@ -1,8 +1,9 @@
-/* Instagram Content Publishing API (Meta Graph API) — feed images and stories.
-   Needs an Instagram professional account linked to a Facebook Page and a long-lived token
-   with instagram_basic + instagram_content_publish + pages_show_list. */
+/* Instagram Content Publishing API — feed images and stories.
+   Default: "Instagram API with Instagram Login" (host graph.instagram.com, token from the app dashboard,
+   permissions instagram_business_basic + instagram_business_content_publish). Set META_IG_LOGIN=facebook
+   for the legacy Facebook-Login flavour (graph.facebook.com, instagram_basic + instagram_content_publish). */
 
-const GRAPH = 'https://graph.facebook.com/v21.0';
+const GRAPH = process.env.META_IG_LOGIN === 'facebook' ? 'https://graph.facebook.com/v21.0' : 'https://graph.instagram.com/v21.0';
 
 export interface IgCredentials {
   userId: string;
