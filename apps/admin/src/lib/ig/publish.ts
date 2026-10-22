@@ -3,7 +3,8 @@
    permissions instagram_business_basic + instagram_business_content_publish). Set META_IG_LOGIN=facebook
    for the legacy Facebook-Login flavour (graph.facebook.com, instagram_basic + instagram_content_publish). */
 
-const GRAPH = process.env.META_IG_LOGIN === 'facebook' ? 'https://graph.facebook.com/v21.0' : 'https://graph.instagram.com/v21.0';
+const FACEBOOK_LOGIN = process.env.META_IG_LOGIN === 'facebook';
+const GRAPH = FACEBOOK_LOGIN ? 'https://graph.facebook.com/v21.0' : 'https://graph.instagram.com/v21.0';
 
 export interface IgCredentials {
   userId: string;
@@ -19,10 +20,16 @@ interface GraphError {
   error?: { message?: string; code?: number; error_subcode?: number };
 }
 
+/**
+ * With Instagram Login the token is bound to one account, so every call goes to the `me` node and
+ * META_IG_USER_ID is optional (informational). With Facebook Login the node must be the IG business id.
+ */
 export function igCredentials(): IgCredentials | null {
-  const userId = process.env.META_IG_USER_ID;
   const accessToken = process.env.META_IG_ACCESS_TOKEN;
-  return userId && accessToken ? { userId, accessToken } : null;
+  const configured = process.env.META_IG_USER_ID;
+  if (!accessToken) return null;
+  if (FACEBOOK_LOGIN) return configured ? { userId: configured, accessToken } : null;
+  return { userId: 'me', accessToken };
 }
 
 async function graph<T>(path: string, params: Record<string, string>, method: 'GET' | 'POST'): Promise<T> {
@@ -76,6 +83,7 @@ export async function publishImage(
 }
 
 /** Sanity check used by the dry run: confirms the token can see the account. */
-export async function igAccountInfo(creds: IgCredentials): Promise<{ id: string; username?: string }> {
-  return graph<{ id: string; username?: string }>(`/${creds.userId}`, { fields: 'id,username', access_token: creds.accessToken }, 'GET');
+export async function igAccountInfo(creds: IgCredentials): Promise<{ id: string; user_id?: string; username?: string }> {
+  const fields = FACEBOOK_LOGIN ? 'id,username' : 'id,user_id,username';
+  return graph<{ id: string; user_id?: string; username?: string }>(`/${creds.userId}`, { fields, access_token: creds.accessToken }, 'GET');
 }

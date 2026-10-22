@@ -74,7 +74,7 @@ export default function InstagramPage() {
   const [rows, setRows] = useState<PlanRow[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
-  const [check, setCheck] = useState<{ ok: boolean; account?: { id: string; username?: string }; error?: string } | null>(null);
+  const [check, setCheck] = useState<{ ok: boolean; account?: { id: string; user_id?: string; username?: string }; error?: string } | null>(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState<string>('');
   const [message, setMessage] = useState('');
@@ -172,7 +172,7 @@ export default function InstagramPage() {
       {check && (
         <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${check.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
           {check.ok ? (
-            <>Token is valid. Posting as <b>@{check.account?.username ?? check.account?.id}</b>.</>
+            <>Token is valid. Posting as <b>@{check.account?.username ?? check.account?.id}</b>{check.account?.user_id ? <> (account id {check.account.user_id})</> : null}.</>
           ) : (
             <>Connection failed: {check.error}</>
           )}
@@ -180,7 +180,7 @@ export default function InstagramPage() {
       )}
       {!ready && config && (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Add <code>META_IG_USER_ID</code>, <code>META_IG_ACCESS_TOKEN</code> and <code>IG_PLAN_START</code> to the admin project in Vercel and redeploy. Until then the cron does nothing and “Post now” is disabled.
+          Add <code>META_IG_ACCESS_TOKEN</code> and <code>IG_PLAN_START</code> to the admin project in Vercel and redeploy. Until then the cron does nothing and “Post now” is disabled.
         </div>
       )}
       {message && <div className="mb-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">{message}</div>}
