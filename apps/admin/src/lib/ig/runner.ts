@@ -1,14 +1,14 @@
 /* Shared Instagram publishing runner: used by the cron route and the admin dashboard. */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { PLAN, assetUrl, buildCaption, rowDate, type PlanRow } from './plan';
+import { PLAN, assetUrl, buildCaption, type PlanRow } from './plan';
 import { igAccountInfo, igCredentials, publishImage, type IgCredentials } from './publish';
+import { effectiveSchedule, loadOverrides, loadSettings, planKey, type IgOverride, type IgSettings, type Kind, type RowSchedule } from './schedule';
 
-export type Kind = 'feed' | 'story';
+export type { Kind } from './schedule';
 
 export const DEFAULT_ASSET_BASE = 'https://balkina.ai/ig';
 
 export interface IgConfig {
-  start: string | null;
   base: string;
   lang: string;
   credentials: boolean;
@@ -17,7 +17,6 @@ export interface IgConfig {
 
 export function igConfig(): IgConfig {
   return {
-    start: process.env.IG_PLAN_START ?? null,
     base: process.env.IG_ASSET_BASE ?? DEFAULT_ASSET_BASE,
     lang: process.env.IG_LANG ?? 'sr',
     credentials: Boolean(igCredentials()),
@@ -36,6 +35,8 @@ export interface LogRow {
   ig_media_id: string | null;
   published_at: string | null;
   error: string | null;
+  attempts: number;
+  attempted_at: string | null;
   created_at: string;
 }
 
@@ -92,7 +93,8 @@ export async function publishRow(
     }
     await supabase
       .from('ig_publish_log')
-      .upsert({ key: job.key, kind: job.kind, set_no: row.set, file: row.file, scheduled_for: scheduledFor, image_url: job.imageUrl, caption: job.caption ?? null, error: null }, { onConflict: 'key' });
+      .upsert({ key: job.key, kind: job.kind, set_no: row.set, file: row.file, scheduled_for: scheduledFor, image_url: job.imageUrl, caption: job.caption ?? null, error: null, attempted_at: new Date().toISOString() }, { onConflict: 'key' });
+    await supabase.rpc('ig_publish_log_bump', { p_key: job.key }).then(() => undefined, () => undefined);
     try {
       const r = await publishImage(creds, { kind: job.kind, imageUrl: job.imageUrl, caption: job.caption });
       await supabase
@@ -121,39 +123,88 @@ export async function checkAccount(): Promise<{ ok: boolean; account?: { id: str
   }
 }
 
-export interface PlanStatusRow {
+export interface PlanStatusRow extends RowSchedule {
   index: number;
-  week: number;
-  day: PlanRow['day'];
+  key: string;
   set: number;
   file: string;
   vertical: string;
   sr: string;
   en: string;
-  date: string | null;
   sq: string;
   st: string;
   feed: LogRow | null;
   story: LogRow | null;
 }
 
-/** Every plan row with its scheduled date and publish-log state. */
-export async function planStatus(supabase: SupabaseClient, cfg: IgConfig): Promise<PlanStatusRow[]> {
-  const { data } = await supabase.from('ig_publish_log').select('*');
-  const log = new Map(((data ?? []) as LogRow[]).map((r) => [r.key, r]));
-  return PLAN.map((row, index) => ({
-    index,
-    week: row.week,
-    day: row.day,
-    set: row.set,
-    file: row.file,
-    vertical: row.vertical,
-    sr: row.sr,
-    en: row.en,
-    date: cfg.start ? rowDate(row, cfg.start) : null,
-    sq: assetUrl(row, 'sq', cfg.base, cfg.lang),
-    st: assetUrl(row, 'st', cfg.base, cfg.lang),
-    feed: log.get(rowKey(row, 'feed')) ?? null,
-    story: log.get(rowKey(row, 'story')) ?? null,
-  }));
+export interface PlanState {
+  settings: IgSettings;
+  overrides: IgOverride[];
+  rows: PlanStatusRow[];
+}
+
+/** Every plan row with its effective schedule and publish-log state. */
+export async function planState(supabase: SupabaseClient, cfg: IgConfig): Promise<PlanState> {
+  const [settingsRow, overrides, logRes] = await Promise.all([loadSettings(supabase), loadOverrides(supabase), supabase.from('ig_publish_log').select('*')]);
+  const { cron_secret: _secret, ...settings } = settingsRow;
+  void _secret;
+  const log = new Map(((logRes.data ?? []) as LogRow[]).map((r) => [r.key, r]));
+  const sched = effectiveSchedule(settings, overrides);
+  const rows = PLAN.map((row, index) => {
+    const key = planKey(row);
+    const s = sched.get(key) ?? { scheduledAt: null, source: 'plan' as const, enabled: true, kinds: ['feed', 'story'] as Kind[] };
+    return {
+      index,
+      key,
+      set: row.set,
+      file: row.file,
+      vertical: row.vertical,
+      sr: row.sr,
+      en: row.en,
+      sq: assetUrl(row, 'sq', cfg.base, cfg.lang),
+      st: assetUrl(row, 'st', cfg.base, cfg.lang),
+      feed: log.get(rowKey(row, 'feed')) ?? null,
+      story: log.get(rowKey(row, 'story')) ?? null,
+      ...s,
+    };
+  });
+  return { settings, overrides, rows };
+}
+
+const GRACE_MS = 36 * 3600 * 1000;      // a missed slot is still posted within 36h
+const RETRY_MS = 2 * 3600 * 1000;       // failed attempts are retried every 2h
+const MAX_ATTEMPTS = 3;
+const MAX_PER_RUN = 3;
+
+export interface DueJob {
+  row: PlanRow;
+  index: number;
+  key: string;
+  scheduledAt: string;
+  kinds: Kind[];
+}
+
+/** Rows whose effective time has passed and which still have something to publish. */
+export function dueRows(state: PlanState, now = new Date()): DueJob[] {
+  if (state.settings.paused) return [];
+  const t = now.getTime();
+  const out: DueJob[] = [];
+  for (const r of state.rows) {
+    if (!r.enabled || !r.scheduledAt) continue;
+    const at = Date.parse(r.scheduledAt);
+    if (at > t || t - at > GRACE_MS) continue;
+    const pending = r.kinds.filter((k) => {
+      const log = k === 'feed' ? r.feed : r.story;
+      if (!log) return true;
+      if (log.published_at) return false;
+      if (log.attempts >= MAX_ATTEMPTS) return false;
+      return !log.attempted_at || t - Date.parse(log.attempted_at) > RETRY_MS;
+    });
+    if (pending.length === 0) continue;
+    const row = PLAN[r.index];
+    if (!row) continue;
+    out.push({ row, index: r.index, key: r.key, scheduledAt: r.scheduledAt, kinds: pending });
+    if (out.length >= MAX_PER_RUN) break;
+  }
+  return out;
 }

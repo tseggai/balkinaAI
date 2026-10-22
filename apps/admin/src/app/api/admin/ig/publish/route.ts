@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin-auth';
-import { rowDate } from '@/lib/ig/plan';
 import { igCredentials } from '@/lib/ig/publish';
 import { findRow, igConfig, jobsFor, publishRow } from '@/lib/ig/runner';
 
@@ -28,7 +27,7 @@ export async function POST(request: Request) {
   if (!creds) return NextResponse.json({ error: 'META_IG_USER_ID / META_IG_ACCESS_TOKEN are not set in this deployment' }, { status: 500 });
 
   const cfg = igConfig();
-  const scheduledFor = cfg.start ? rowDate(picked.row, cfg.start) : new Date().toISOString().slice(0, 10);
+  const scheduledFor = new Date().toISOString().slice(0, 10);
   const results = await publishRow(auth.supabase, creds, picked.row, jobsFor(picked.row, picked.index, cfg, kinds), scheduledFor);
   return NextResponse.json({ results });
 }
