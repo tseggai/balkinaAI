@@ -80,11 +80,11 @@ export function ProspectDrawer({ row, busy, initialTab = 'overview', hasPrev, ha
       <div className={`absolute inset-0 bg-gray-900/30 transition-opacity duration-200 ${shown ? 'opacity-100' : 'opacity-0'}`} onClick={onClose} />
       <aside className={`absolute inset-y-0 right-0 flex w-full max-w-[680px] flex-col bg-gray-50 shadow-2xl transition-transform duration-200 ease-out ${shown ? 'translate-x-0' : 'translate-x-full'}`}>
         {/* ── Business profile ─────────────────────────────────────────── */}
-        <header className="shrink-0 border-b border-gray-200 bg-white px-6 pt-5">
+        <header className="shrink-0 border-b border-gray-200 bg-white px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-6 md:pt-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-bold text-gray-900">{row.name}</h2>
+                <h2 className="text-lg font-bold text-gray-900 md:text-xl">{row.name}</h2>
                 <button onClick={onEnrich} disabled={busy !== null} title={enrichment ? `Enriched ${relativeTime(row.enriched_at)}` : 'Fetch website, services, contacts'} className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">
                   {busy === 'enrich' ? 'Enriching…' : row.enriched_at ? 'Re-enrich' : 'Enrich'}
                 </button>
@@ -189,7 +189,7 @@ export function ProspectDrawer({ row, busy, initialTab = 'overview', hasPrev, ha
         </header>
 
         {/* ── Body ─────────────────────────────────────────────────────── */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:py-5">
           {tab === 'overview' ? (
             <div className="space-y-4">
               <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -234,7 +234,7 @@ function EditForm({ row, onCancel, onSave, onDelete }: { row: GrowthProspect; on
           <input value={email} onChange={(e) => setEmail(e.target.value)} className={`mt-1 ${INPUT}`} placeholder="owner@…" />
         </label>
       </div>
-      <div className="mt-3 flex items-center justify-between gap-2">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <button onClick={onDelete} className={BTN_DANGER}>Delete business</button>
         <div className="flex gap-2">
           <button onClick={onCancel} className={BTN_SECONDARY}>Cancel</button>

@@ -112,32 +112,32 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 md:p-8">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Platform Overview</h1>
         <p className="mt-1 text-sm text-gray-500">Manage and monitor the Balkina AI platform.</p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* KPI Cards: 2-up on phones so the numbers sit above the fold */}
+      <div className="mt-5 grid grid-cols-2 gap-3 md:mt-6 md:gap-4 lg:grid-cols-4">
         {kpis.map((kpi) => (
-          <Link key={kpi.label} href={kpi.href} className="group rounded-xl border border-gray-200 bg-white p-5 transition hover:shadow-md">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gray-500">{kpi.label}</p>
-              <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${kpi.color} ${kpi.iconColor}`}>
+          <Link key={kpi.label} href={kpi.href} className="group min-w-0 rounded-xl border border-gray-200 bg-white p-4 transition hover:shadow-md md:p-5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-xs font-medium text-gray-500 md:text-sm">{kpi.label}</p>
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg md:h-9 md:w-9 ${kpi.color} ${kpi.iconColor}`}>
                 {kpi.icon}
               </div>
             </div>
-            <p className="mt-3 text-3xl font-bold text-gray-900">{kpi.value}</p>
-            <p className="mt-1 text-xs text-gray-400">{kpi.subtitle}</p>
+            <p className="mt-2 truncate text-2xl font-bold text-gray-900 md:mt-3 md:text-3xl">{kpi.value}</p>
+            <p className="mt-1 truncate text-xs text-gray-400">{kpi.subtitle}</p>
           </Link>
         ))}
       </div>
 
       {/* Tenant Status and Plan Distribution */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 md:mt-6 md:gap-6 lg:grid-cols-2">
         {/* Tenant Status */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 md:p-6">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500">Tenant Status</h2>
           <div className="mt-4 space-y-3">
             {Object.entries(stats.tenants.statusBreakdown)
@@ -147,7 +147,7 @@ export default function AdminDashboard() {
                 const colors = TENANT_STATUS_COLORS[status] ?? { bg: 'bg-gray-100', text: 'text-gray-700' };
                 return (
                   <div key={status} className="flex items-center gap-3">
-                    <span className={`inline-flex w-32 items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}>
+                    <span className={`inline-flex w-28 shrink-0 items-center justify-center truncate rounded-full px-2 py-0.5 text-xs font-medium md:w-32 ${colors.bg} ${colors.text}`}>
                       {status.replace('_', ' ')}
                     </span>
                     <div className="flex-1 overflow-hidden rounded-full bg-gray-100 h-2.5">
@@ -161,7 +161,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Plan Distribution */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 md:p-6">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500">Plan Distribution</h2>
           <div className="mt-4 space-y-3">
             {Object.entries(stats.tenants.planDistribution)
@@ -170,7 +170,7 @@ export default function AdminDashboard() {
                 const pct = stats.tenants.total > 0 ? (count / stats.tenants.total) * 100 : 0;
                 return (
                   <div key={plan} className="flex items-center gap-3">
-                    <span className="w-32 truncate text-sm font-medium text-gray-600">{plan}</span>
+                    <span className="w-28 shrink-0 truncate text-sm font-medium text-gray-600 md:w-32">{plan}</span>
                     <div className="flex-1 overflow-hidden rounded-full bg-gray-100 h-2.5">
                       <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
                     </div>
@@ -183,9 +183,9 @@ export default function AdminDashboard() {
       </div>
 
       {/* Appointment Status */}
-      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+      <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4 md:mt-6 md:p-6">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500">Appointment Status (Platform-Wide)</h2>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 md:gap-3 lg:grid-cols-6">
           {Object.entries(stats.appointments.statusBreakdown)
             .sort(([, a], [, b]) => b - a)
             .map(([status, count]) => (

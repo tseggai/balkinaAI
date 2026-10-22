@@ -295,7 +295,7 @@ export default function TenantDetailPage() {
   const uniqueCustomers = Array.from(customerMap.values()).sort((a, b) => b.bookings - a.bookings);
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 md:p-8">
       {/* Back button */}
       <button onClick={() => router.push('/dashboard/tenants')} className="mb-4 flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
@@ -304,24 +304,24 @@ export default function TenantDetailPage() {
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-3 md:gap-4">
           {tenant.logo_url ? (
-            <img src={tenant.logo_url} alt="" className="h-14 w-14 rounded-xl object-cover" />
+            <img src={tenant.logo_url} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover md:h-14 md:w-14" />
           ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-brand-100 text-xl font-bold text-brand-700">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-xl font-bold text-brand-700 md:h-14 md:w-14">
               {tenant.name.charAt(0).toUpperCase()}
             </div>
           )}
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{tenant.name}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-gray-900 md:text-2xl">{tenant.name}</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-gray-500">
               {tenant.owner_name && <span>{tenant.owner_name}</span>}
-              {tenant.email && <span>· {tenant.email}</span>}
+              {tenant.email && <span className="break-all">· {tenant.email}</span>}
               {tenant.categories && <span>· {tenant.categories.name}</span>}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <button onClick={() => setEditingTenant(true)} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Edit Profile</button>
           <span className={`inline-flex rounded-full px-3 py-1 text-sm font-medium capitalize ${STATUS_BADGE[tenant.status] ?? 'bg-gray-100 text-gray-700'}`}>
             {tenant.status.replace('_', ' ')}
@@ -340,7 +340,7 @@ export default function TenantDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mt-6 flex gap-1 overflow-x-auto border-b border-gray-200">
+      <div className="-mx-4 mt-5 flex gap-1 overflow-x-auto border-b border-gray-200 px-4 md:mx-0 md:mt-6 md:px-0">
         {TABS.map((t) => (
           <button
             key={t}
@@ -363,7 +363,7 @@ export default function TenantDetailPage() {
       </div>
 
       {/* Tab content */}
-      <div className="mt-6">
+      <div className="mt-5 md:mt-6">
         {tab === 'Overview' && <OverviewTab stats={stats} tenant={tenant} />}
         {tab === 'Locations' && <LocationsTab locations={locations} locationStaffCount={locationStaffCount} onEdit={setEditingLocation} onAdd={() => setEditingLocation('new')} />}
         {tab === 'Staff' && <StaffTab staff={staff} staffToLocations={staffToLocations} onEdit={setEditingStaff} onAdd={() => setEditingStaff('new')} />}
@@ -376,7 +376,7 @@ export default function TenantDetailPage() {
 
       {/* Toast notification */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 rounded-lg px-4 py-3 text-sm font-medium shadow-lg ${toast.startsWith('Error') ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}>
+        <div className={`fixed inset-x-4 bottom-4 z-50 rounded-lg px-4 py-3 text-sm font-medium shadow-lg md:inset-x-auto md:bottom-6 md:right-6 ${toast.startsWith('Error') ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}>
           {toast}
         </div>
       )}
@@ -428,9 +428,9 @@ export default function TenantDetailPage() {
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
-      <p className="text-sm font-medium text-gray-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
+    <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-4 md:p-5">
+      <p className="truncate text-xs font-medium text-gray-500 md:text-sm">{label}</p>
+      <p className="mt-1 truncate text-xl font-bold text-gray-900 md:text-2xl">{value}</p>
       {sub && <p className="mt-0.5 text-xs text-gray-400">{sub}</p>}
     </div>
   );
@@ -438,7 +438,7 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 
 function OverviewTab({ stats, tenant }: { stats: Stats; tenant: TenantDetail }) {
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
       <StatCard label="Total Appointments" value={stats.total_appointments} sub={`${stats.completed_appointments} completed`} />
       <StatCard label="Revenue" value={formatCurrency(stats.total_revenue)} sub="From completed bookings" />
       <StatCard label="Avg Rating" value={tenant.avg_rating?.toFixed(1) ?? '—'} sub={`${stats.review_count} reviews`} />
@@ -630,7 +630,7 @@ function ServicesTab({ services, serviceToStaff, serviceToLocations, onEdit, onA
 function CustomersTab({ customers }: { customers: { name: string; email: string | null; bookings: number }[] }) {
   if (customers.length === 0) return <EmptyState text="No customers have booked with this tenant yet." />;
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
@@ -656,7 +656,7 @@ function CustomersTab({ customers }: { customers: { name: string; email: string 
 function AppointmentsTab({ appointments }: { appointments: Appointment[] }) {
   if (appointments.length === 0) return <EmptyState text="No appointments yet." />;
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
@@ -672,7 +672,7 @@ function AppointmentsTab({ appointments }: { appointments: Appointment[] }) {
         <tbody className="divide-y divide-gray-100">
           {appointments.map((a) => (
             <tr key={a.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3 text-sm text-gray-700">{formatDateTime(a.start_time)}</td>
+              <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{formatDateTime(a.start_time)}</td>
               <td className="px-4 py-3 text-sm text-gray-900">{a.services?.name ?? '—'}</td>
               <td className="px-4 py-3 text-sm text-gray-500">{a.customers?.display_name ?? '—'}</td>
               <td className="px-4 py-3 text-sm text-gray-500">{a.staff?.name ?? '—'}</td>
@@ -724,7 +724,7 @@ function SettingsTab({ tenant, coupons }: { tenant: TenantDetail; coupons: Coupo
   return (
     <div className="space-y-6">
       {/* Subscription */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 md:p-6">
         <h3 className="text-lg font-semibold text-gray-900">Subscription</h3>
         <div className="mt-3 grid grid-cols-2 gap-4 text-sm lg:grid-cols-4">
           <div>
@@ -747,7 +747,7 @@ function SettingsTab({ tenant, coupons }: { tenant: TenantDetail; coupons: Coupo
       </div>
 
       {/* Payment Settings */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 md:p-6">
         <h3 className="text-lg font-semibold text-gray-900">Payments</h3>
         <div className="mt-3 grid grid-cols-2 gap-4 text-sm lg:grid-cols-4">
           <div>
@@ -766,10 +766,10 @@ function SettingsTab({ tenant, coupons }: { tenant: TenantDetail; coupons: Coupo
       </div>
 
       {/* Coupons */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 md:p-6">
         <h3 className="text-lg font-semibold text-gray-900">Coupons ({coupons.length})</h3>
         {coupons.length > 0 ? (
-          <div className="mt-3 overflow-hidden rounded-lg border border-gray-100">
+          <div className="mt-3 overflow-x-auto rounded-lg border border-gray-100">
             <table className="min-w-full divide-y divide-gray-100">
               <thead className="bg-gray-50">
                 <tr>
@@ -803,7 +803,7 @@ function SettingsTab({ tenant, coupons }: { tenant: TenantDetail; coupons: Coupo
       </div>
 
       {/* Metadata */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 md:p-6">
         <h3 className="text-lg font-semibold text-gray-900">Metadata</h3>
         <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
           <div>
@@ -830,17 +830,18 @@ function EmptyState({ text }: { text: string }) {
 
 // ── Edit Modals ───────────────────────────────────────────────────────────────
 
+/** Centred card from `sm` up; a scrollable bottom sheet on phones. */
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="relative mx-4 w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
+      <div className="relative flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 pt-4 sm:px-6 sm:pt-6">
           <h2 className="text-lg font-bold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} aria-label="Close" className="-mr-1.5 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        {children}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pb-6">{children}</div>
       </div>
     </div>
   );
@@ -868,7 +869,7 @@ function TenantEditModal({ tenant, saving, onSave, onClose }: { tenant: TenantDe
       <div className="space-y-3">
         <InputField label="Business Name" value={name} onChange={setName} />
         <InputField label="Owner Name" value={ownerName} onChange={setOwnerName} />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <InputField label="Email" value={email} onChange={setEmail} type="email" />
           <InputField label="Phone" value={phone} onChange={setPhone} />
         </div>
@@ -903,7 +904,7 @@ function ServiceEditModal({ service, saving, onSave, onDelete, onClose }: { serv
     <ModalShell title={service ? 'Edit Service' : 'Add Service'} onClose={onClose}>
       <div className="space-y-3">
         <InputField label="Service Name" value={name} onChange={setName} />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <InputField label="Price" value={price} onChange={setPrice} type="number" />
           <InputField label="Duration (min)" value={duration} onChange={setDuration} type="number" />
         </div>
@@ -920,7 +921,7 @@ function ServiceEditModal({ service, saving, onSave, onDelete, onClose }: { serv
           </select>
         </div>
       </div>
-      <div className="mt-6 flex justify-between">
+      <div className="mt-6 flex flex-wrap justify-between gap-2">
         <div>
           {onDelete && (
             <button onClick={onDelete} disabled={saving} className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Delete</button>
@@ -946,7 +947,7 @@ function StaffEditModal({ staff, saving, onSave, onDelete, onClose }: { staff: S
     <ModalShell title={staff ? 'Edit Staff' : 'Add Staff'} onClose={onClose}>
       <div className="space-y-3">
         <InputField label="Full Name" value={name} onChange={setName} />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <InputField label="Email" value={email} onChange={setEmail} type="email" />
           <InputField label="Phone" value={phone} onChange={setPhone} />
         </div>
@@ -960,7 +961,7 @@ function StaffEditModal({ staff, saving, onSave, onDelete, onClose }: { staff: S
           </select>
         </div>
       </div>
-      <div className="mt-6 flex justify-between">
+      <div className="mt-6 flex flex-wrap justify-between gap-2">
         <div>
           {onDelete && (
             <button onClick={onDelete} disabled={saving} className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Delete</button>
@@ -1070,7 +1071,7 @@ function LocationEditModal({ location, saving, onSave, onClose }: { location: Lo
         <input value={addressLine2} onChange={e => setAddressLine2(e.target.value)} placeholder="Apt, Suite, Unit (Optional)" className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
 
         {/* City + State */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <input value={city} onChange={e => setCity(e.target.value)} placeholder="City" className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
           <input value={state} onChange={e => setState(e.target.value)} placeholder="State / Province" className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
         </div>

@@ -90,15 +90,15 @@ export default function PlansPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Subscription Plans</h1>
           <p className="mt-1 text-sm text-gray-500">Manage pricing tiers and plan limits.</p>
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          className="shrink-0 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
         >
           Add Plan
         </button>
@@ -106,7 +106,7 @@ export default function PlansPage() {
 
       {/* Form */}
       {showForm && (
-        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+        <div className="mt-5 rounded-xl border border-gray-200 bg-white p-4 md:mt-6 md:p-6">
           <h2 className="text-lg font-semibold text-gray-900">{editingId ? 'Edit Plan' : 'New Plan'}</h2>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
@@ -177,10 +177,10 @@ export default function PlansPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
         </div>
       ) : (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 md:mt-6 md:gap-4 lg:grid-cols-3">
           {plans.length > 0 ? (
             plans.map((plan) => (
-              <div key={plan.id} className="relative rounded-xl border border-gray-200 bg-white p-6">
+              <div key={plan.id} className="relative rounded-xl border border-gray-200 bg-white p-5 md:p-6">
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
