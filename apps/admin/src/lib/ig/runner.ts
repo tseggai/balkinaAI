@@ -110,9 +110,9 @@ export async function publishRow(
 }
 
 /** Token sanity check: who does this token belong to? */
-export async function checkAccount(): Promise<{ ok: boolean; account?: { id: string; username?: string }; error?: string }> {
+export async function checkAccount(): Promise<{ ok: boolean; account?: { id: string; user_id?: string; username?: string }; error?: string }> {
   const creds = igCredentials();
-  if (!creds) return { ok: false, error: 'META_IG_USER_ID / META_IG_ACCESS_TOKEN are not set in this deployment' };
+  if (!creds) return { ok: false, error: 'META_IG_ACCESS_TOKEN is not set in this deployment (and META_IG_USER_ID when using Facebook login)' };
   try {
     const account = await igAccountInfo(creds);
     return { ok: true, account };
