@@ -12,6 +12,7 @@ const navItems = [
   { href: '/dashboard/plans', label: 'Plans', icon: CreditCardIcon },
   { href: '/dashboard/customers', label: 'Customers', icon: UsersIcon },
   { href: '/dashboard/prospects', label: 'Prospects', icon: GrowthIcon },
+  { href: '/dashboard/instagram', label: 'Instagram', icon: InstagramIcon },
 ];
 
 interface SidebarProps {
@@ -170,6 +171,16 @@ function GrowthIcon({ active }: { active?: boolean }) {
   return (
     <svg className={`h-5 w-5 ${active ? 'text-brand-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" />
+    </svg>
+  );
+}
+
+function InstagramIcon({ active }: { active?: boolean }) {
+  return (
+    <svg className={`h-5 w-5 ${active ? 'text-brand-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="3.75" />
+      <circle cx="17.25" cy="6.75" r="0.75" fill="currentColor" />
     </svg>
   );
 }
