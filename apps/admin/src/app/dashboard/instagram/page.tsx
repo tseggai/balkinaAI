@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CanvaCard } from '@/components/canva-card';
 import { ConfirmDialog, type ConfirmRequest } from '@/components/confirm-dialog';
 import { IgRowModal, type RowEdit, type RowEditResult } from '@/components/ig-row-modal';
 import { IgSettingsCard, type IgSettingsValue } from '@/components/ig-settings-card';
@@ -107,6 +108,8 @@ export default function InstagramPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const notify = useCallback((title: string, lines: string[]) => setNotice({ title, lines }), []);
 
   const api = async (path: string, body: unknown, method = 'POST'): Promise<{ ok: boolean; data: Record<string, unknown> }> => {
     const res = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -244,7 +247,8 @@ export default function InstagramPage() {
         </div>
       )}
 
-      {settings && <div className="mb-6"><IgSettingsCard value={settings} onSave={saveSettings} /></div>}
+      {settings && <div className="mb-4"><IgSettingsCard value={settings} onSave={saveSettings} /></div>}
+      <div className="mb-6"><CanvaCard notify={notify} /></div>
 
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <span className={SECTION_TITLE}>Plan</span>

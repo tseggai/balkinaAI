@@ -100,6 +100,15 @@ Posts the planned feed image and its matching story on a schedule you control fr
 - **Token renewal**: the token lasts 60 days. "Check connection" turns red when it expires; generate a new one in the same dashboard and update the env var.
 - **Limits**: the API cannot add story stickers (the link sticker). Story images carry `balkina.ai` as text; add the sticker by hand when you want the tap. Rate limit is 100 API-published posts per 24h.
 
+## Canva studio (Migration 073) — in progress
+
+Posts will be designed as Canva brand templates and filled from the admin.
+
+- **Connect once**: `/dashboard/instagram` → Canva templates card → Connect Canva (OAuth, PKCE). Requires `CANVA_CLIENT_ID` / `CANVA_CLIENT_SECRET` in the admin Vercel project, the integration's redirect URL set to `https://admin.balkina.ai/api/admin/canva/callback`, scopes `design:content:read design:content:write design:meta:read brandtemplate:meta:read brandtemplate:content:read asset:read asset:write`, and MFA on the Canva account.
+- **Templates**: design in Canva with Bulk Create data fields (`eyebrow`, `headline`, `subline`, `photo`, `url`, plus per-layout extras), publish as brand template named `IG · 01 card · square` … `IG · 08 stat · story`, then **Sync from Canva**. **Test render** fills sample copy + a sample photo and shows the exported JPEG (stored in the public `ig-renders` bucket).
+- **Pipeline** (`lib/canva/client.ts` → `renderTemplate`): photo URL → Canva asset → autofill job → export job (JPG q90) → download → `ig-renders/<path>.jpg` → public URL. Canva export links expire after 24h, which is why renders are copied to storage.
+- Still to build: the studio form (vertical, tone, SR/EN, photo upload → GPT-4o-mini copy → square + story render → post row in the schedule), multiple times per day + tracks, bilingual carousels.
+
 ## Routines still to build (in plan order)
 
 1. WhatsApp Business API sender (Twilio, approved templates) + sequence runner on `growth_sequences` / `growth_enrollments` that stops on reply, claim or expiry; inbound reply webhook into `growth_events`. Resend email path for the few prospects with an address.
