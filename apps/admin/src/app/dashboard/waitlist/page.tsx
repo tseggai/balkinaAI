@@ -115,8 +115,8 @@ export default function WaitlistPage() {
   };
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="p-4 md:p-8">
+      <div className="mb-5 flex items-center justify-between md:mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Beta Waitlist</h1>
           <p className="mt-1 text-sm text-gray-500">{entries.length} total submissions</p>
@@ -131,12 +131,12 @@ export default function WaitlistPage() {
       )}
 
       {/* Filter tabs */}
-      <div className="mb-6 flex gap-2">
+      <div className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:mb-6 md:flex-wrap md:px-0">
         {['all', 'pending', 'contacted', 'onboarded'].map((s) => (
           <button
             key={s}
             onClick={() => { setFilter(s); setLoading(true); }}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               filter === s ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -155,21 +155,22 @@ export default function WaitlistPage() {
             <div key={entry.id} className="rounded-xl border border-gray-200 bg-white">
               {/* Summary row */}
               <div
-                className="flex cursor-pointer items-center gap-4 px-5 py-4"
+                className="flex cursor-pointer items-center gap-3 px-4 py-4 md:gap-4 md:px-5"
                 onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{entry.business_name}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <p className="truncate text-sm font-semibold text-gray-900">{entry.business_name}</p>
                     <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[entry.status]}`}>
                       {entry.status}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-gray-500">
+                  <p className="mt-0.5 truncate text-xs text-gray-500">
                     {entry.owner_name} &middot; {entry.email} {entry.category ? `· ${entry.category}` : ''}
                   </p>
+                  <p className="mt-0.5 text-xs text-gray-400 md:hidden">{new Date(entry.created_at).toLocaleDateString()}</p>
                 </div>
-                <p className="shrink-0 text-xs text-gray-400">{new Date(entry.created_at).toLocaleDateString()}</p>
+                <p className="hidden shrink-0 text-xs text-gray-400 md:block">{new Date(entry.created_at).toLocaleDateString()}</p>
                 <svg className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${expandedId === entry.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
@@ -177,7 +178,7 @@ export default function WaitlistPage() {
 
               {/* Expanded details */}
               {expandedId === entry.id && (
-                <div className="border-t border-gray-100 px-5 py-4">
+                <div className="border-t border-gray-100 px-4 py-4 md:px-5">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <p className="text-xs font-medium text-gray-400">Phone</p>

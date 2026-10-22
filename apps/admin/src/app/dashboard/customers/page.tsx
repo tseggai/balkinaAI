@@ -51,36 +51,69 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 md:p-8">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
         <p className="mt-1 text-sm text-gray-500">All customers across the platform.</p>
       </div>
 
       {/* Search */}
-      <div className="mt-6 flex items-center gap-3">
+      <div className="mt-5 flex items-center gap-3 md:mt-6">
         <input
           type="text"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           placeholder="Search by name, email, or phone..."
-          className="w-72 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 md:w-72"
         />
         {search && (
-          <button onClick={() => { setSearch(''); setPage(1); }} className="text-sm font-medium text-brand-600 hover:text-brand-700">
+          <button onClick={() => { setSearch(''); setPage(1); }} className="shrink-0 text-sm font-medium text-brand-600 hover:text-brand-700">
             Clear
           </button>
         )}
       </div>
 
-      {/* Table */}
       {loading ? (
         <div className="mt-8 flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
         </div>
       ) : (
         <>
-          <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
+          {/* Phone: card list */}
+          {customers.length > 0 && (
+            <div className="mt-4 space-y-2 md:hidden">
+              {customers.map((customer) => (
+                <div key={customer.id} className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3.5">
+                  {customer.profile_image_url ? (
+                    <img src={customer.profile_image_url} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
+                      {getDisplayName(customer).charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="truncate text-sm font-semibold text-gray-900">{getDisplayName(customer)}</p>
+                      {customer.user_id ? (
+                        <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700">Linked</span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">Chat only</span>
+                      )}
+                    </div>
+                    {customer.email && <a href={`mailto:${customer.email}`} className="mt-0.5 block truncate text-sm text-gray-600">{customer.email}</a>}
+                    {customer.phone && <a href={`tel:${customer.phone}`} className="block truncate text-sm text-gray-600">{customer.phone}</a>}
+                    <p className="mt-1 text-xs text-gray-400">
+                      {customer.gender ? <span className="capitalize">{customer.gender.replace('-', ' ')} · </span> : null}
+                      Joined {new Date(customer.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Tablet and up: table */}
+          <div className={`mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white ${customers.length > 0 ? 'hidden md:block' : ''}`}>
             {customers.length > 0 ? (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -139,9 +172,9 @@ export default function CustomersPage() {
           </div>
 
           {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-between">
+            <div className="mt-6 flex items-center justify-between gap-3">
               <p className="text-sm text-gray-500">
-                Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
+                {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
               </p>
               <div className="flex gap-2">
                 <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}

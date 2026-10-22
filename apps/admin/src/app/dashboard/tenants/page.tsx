@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { Modal } from '@/components/modal';
 
 interface Tenant {
   id: string;
@@ -71,7 +72,7 @@ const COUNTRIES = [
   { code: 'lb', name: 'Lebanon' }, { code: 'ge', name: 'Georgia' }, { code: 'am', name: 'Armenia' },
 ].sort((a, b) => a.name.localeCompare(b.name));
 
-const selectCls = 'rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const selectCls = 'w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 md:w-auto';
 const inputCls = 'mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
 export default function TenantsPage() {
@@ -331,58 +332,89 @@ export default function TenantsPage() {
   const totalPages = Math.ceil(total / perPage);
   const clearFilters = () => { setSearch(''); setStatusFilter(''); setPlanFilter(''); setPaymentsFilter(''); setCategoryFilter(''); setCityFilter(''); setSortOption('created_at'); setPage(1); };
 
+
+  const statusCell = (t: Tenant) =>
+    editingId === t.id ? (
+      <div className="flex flex-wrap items-center gap-1">
+        <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className="rounded border border-gray-300 px-2 py-1 text-xs">
+          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+        </select>
+        <button onClick={() => handleStatusChange(t.id, editStatus)} disabled={saving} className="rounded bg-brand-600 px-2 py-1 text-xs text-white hover:bg-brand-700 disabled:opacity-50">Save</button>
+        <button onClick={() => setEditingId(null)} className="rounded bg-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-300">Cancel</button>
+      </div>
+    ) : (
+      <button onClick={() => { setEditingId(t.id); setEditStatus(t.status); }} className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_BADGE[t.status] ?? 'bg-gray-100 text-gray-700'}`}>
+        {t.status.replace('_', ' ')}
+      </button>
+    );
+
+  const paymentsToggle = (t: Tenant) => (
+    <button onClick={() => togglePayments(t.id, t.payments_enabled)} aria-label={t.payments_enabled ? 'Disable payments' : 'Enable payments'} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${t.payments_enabled ? 'bg-brand-600' : 'bg-gray-300'}`}>
+      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${t.payments_enabled ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+    </button>
+  );
+
+  const avatar = (t: Tenant) =>
+    t.logo_url ? (
+      <img src={t.logo_url} alt={t.name} className="h-9 w-9 shrink-0 rounded-full object-cover" />
+    ) : (
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{t.name.charAt(0).toUpperCase()}</div>
+    );
+
   return (
-    <div className="p-6 lg:p-8">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Tenants</h1>
           <p className="mt-1 text-sm text-gray-500">{total} business{total !== 1 ? 'es' : ''} on the platform</p>
         </div>
-        <button onClick={() => setShowBulkConfig(true)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Bulk Create Test Data</button>
+        <button onClick={() => setShowBulkConfig(true)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:self-auto">Bulk Create Test Data</button>
       </div>
 
-      {/* Filters — Row 1: search + dropdowns */}
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search by name, email, owner..." className="w-72 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className={selectCls}>
-          <option value="">All Statuses</option>
-          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-        </select>
-        <select value={planFilter} onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }} className={selectCls}>
-          <option value="">All Plans</option>
-          {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-        <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }} className={selectCls}>
-          <option value="">All Categories</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select value={cityFilter} onChange={(e) => { setCityFilter(e.target.value); setPage(1); }} className={selectCls}>
-          <option value="">All Cities</option>
-          {cities.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={paymentsFilter} onChange={(e) => { setPaymentsFilter(e.target.value); setPage(1); }} className={selectCls}>
-          <option value="">All Payment Status</option>
-          <option value="true">Payments Enabled</option>
-          <option value="false">Payments Disabled</option>
-        </select>
-        <select value={sortOption} onChange={(e) => { setSortOption(e.target.value); setPage(1); }} className={selectCls}>
-          {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-        {hasFilters && <button onClick={clearFilters} className="text-sm font-medium text-brand-600 hover:text-brand-700">Clear all</button>}
+      {/* Filters: full-width search, then a 2-column grid of selects on phones */}
+      <div className="mt-5 space-y-2 md:mt-6">
+        <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search by name, email, owner..." className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 md:w-72" />
+        <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center md:gap-3">
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className={selectCls}>
+            <option value="">All Statuses</option>
+            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+          </select>
+          <select value={planFilter} onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }} className={selectCls}>
+            <option value="">All Plans</option>
+            {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }} className={selectCls}>
+            <option value="">All Categories</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <select value={cityFilter} onChange={(e) => { setCityFilter(e.target.value); setPage(1); }} className={selectCls}>
+            <option value="">All Cities</option>
+            {cities.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={paymentsFilter} onChange={(e) => { setPaymentsFilter(e.target.value); setPage(1); }} className={selectCls}>
+            <option value="">All Payment Status</option>
+            <option value="true">Payments Enabled</option>
+            <option value="false">Payments Disabled</option>
+          </select>
+          <select value={sortOption} onChange={(e) => { setSortOption(e.target.value); setPage(1); }} className={selectCls}>
+            {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          {hasFilters && <button onClick={clearFilters} className="col-span-2 py-1 text-left text-sm font-medium text-brand-600 hover:text-brand-700 md:col-span-1">Clear all</button>}
+        </div>
       </div>
 
       {bulkResult && (
-        <div className="mt-4 flex items-center justify-between rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-700">
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-700">
           <span>{bulkResult}</span>
-          <button onClick={() => setBulkResult(null)} className="font-medium hover:text-blue-900">Dismiss</button>
+          <button onClick={() => setBulkResult(null)} className="shrink-0 font-medium hover:text-blue-900">Dismiss</button>
         </div>
       )}
 
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="mt-4 flex items-center gap-3 rounded-lg bg-brand-50 border border-brand-200 px-4 py-2.5">
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2.5 md:gap-3 md:px-4">
           <span className="text-sm font-medium text-brand-700">{selectedIds.size} selected</span>
-          <div className="h-4 w-px bg-brand-200" />
+          <div className="hidden h-4 w-px bg-brand-200 md:block" />
           <button onClick={() => handleBulkAction('active')} disabled={bulkActing} className="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50">Set Active</button>
           <button onClick={() => handleBulkAction('suspended')} disabled={bulkActing} className="rounded-md bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50">Suspend</button>
           <button onClick={() => handleBulkAction('inactive')} disabled={bulkActing} className="rounded-md bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50">Deactivate</button>
@@ -392,7 +424,6 @@ export default function TenantsPage() {
         </div>
       )}
 
-      {/* Table */}
       {loadError ? (
         <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           Couldn&apos;t load tenants — {loadError}.
@@ -405,109 +436,128 @@ export default function TenantsPage() {
         <div className="mt-8 flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" /></div>
       ) : (
         <>
-          <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            {tenants.length > 0 ? (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="w-10 px-4 py-3">
-                      <input type="checkbox" checked={selectedIds.size === tenants.length && tenants.length > 0} onChange={toggleSelectAll} className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Business</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Owner</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Category</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Plan</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Cities</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Loc</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Staff</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Svc</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Pay</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Rating</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
+          {tenants.length === 0 ? (
+            <div className="mt-6 rounded-xl border border-gray-200 bg-white px-6 py-16 text-center"><p className="text-sm text-gray-500">No tenants found.</p></div>
+          ) : (
+            <>
+              {/* Phone / small tablet: card list */}
+              <div className="mt-4 lg:hidden">
+                <label className="flex items-center gap-2 px-1 pb-2 text-xs text-gray-500">
+                  <input type="checkbox" checked={selectedIds.size === tenants.length && tenants.length > 0} onChange={toggleSelectAll} className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                  Select all on this page
+                </label>
+                <div className="grid gap-3 md:grid-cols-2">
                   {tenants.map(t => (
-                    <tr key={t.id} className={`hover:bg-gray-50 ${selectedIds.has(t.id) ? 'bg-brand-50' : ''}`}>
-                      <td className="w-10 px-4 py-3">
-                        <input type="checkbox" checked={selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                      </td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => router.push(`/dashboard/tenants/${t.id}`)} className="flex items-center gap-2 text-left">
-                          {t.logo_url ? (
-                            <img src={t.logo_url} alt={t.name} className="h-8 w-8 shrink-0 rounded-full object-cover" />
-                          ) : (
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{t.name.charAt(0).toUpperCase()}</div>
-                          )}
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 hover:text-brand-600">{t.name}</p>
-                            <p className="text-xs text-gray-400">{t.email ?? '\u2014'}</p>
-                          </div>
+                    <div key={t.id} className={`rounded-xl border bg-white p-4 ${selectedIds.has(t.id) ? 'border-brand-300 bg-brand-50/40' : 'border-gray-200'}`}>
+                      <div className="flex items-start gap-3">
+                        <input type="checkbox" checked={selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} className="mt-2.5 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                        {avatar(t)}
+                        <button onClick={() => router.push(`/dashboard/tenants/${t.id}`)} className="min-w-0 flex-1 text-left">
+                          <p className="truncate text-sm font-semibold text-gray-900">{t.name}</p>
+                          <p className="truncate text-xs text-gray-500">{t.owner_name ?? '—'}{t.email ? ` · ${t.email}` : ''}</p>
                         </button>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{t.owner_name ?? '\u2014'}</td>
-                      <td className="px-4 py-3">
-                        {t.categories ? (
-                          <span className="inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">{t.categories.name}</span>
-                        ) : <span className="text-xs text-gray-400">\u2014</span>}
-                      </td>
-                      <td className="px-4 py-3">
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                        {statusCell(t)}
                         <span className="inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">{t.subscription_plans?.name ?? 'No Plan'}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {editingId === t.id ? (
-                          <div className="flex items-center gap-1">
-                            <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className="rounded border border-gray-300 px-2 py-1 text-xs">
-                              {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-                            </select>
-                            <button onClick={() => handleStatusChange(t.id, editStatus)} disabled={saving} className="rounded bg-brand-600 px-2 py-1 text-xs text-white hover:bg-brand-700 disabled:opacity-50">Save</button>
-                            <button onClick={() => setEditingId(null)} className="rounded bg-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-300">Cancel</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => { setEditingId(t.id); setEditStatus(t.status); }} className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_BADGE[t.status] ?? 'bg-gray-100 text-gray-700'}`}>
-                            {t.status.replace('_', ' ')}
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {t.cities.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {t.cities.slice(0, 2).map(c => <span key={c} className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">{c}</span>)}
-                            {t.cities.length > 2 && <span className="text-xs text-gray-400">+{t.cities.length - 2}</span>}
-                          </div>
-                        ) : <span className="text-xs text-gray-400">\u2014</span>}
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">{t.location_count}</td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">{t.staff_count}</td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">{t.service_count}</td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => togglePayments(t.id, t.payments_enabled)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${t.payments_enabled ? 'bg-brand-600' : 'bg-gray-300'}`}>
-                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${t.payments_enabled ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {t.avg_rating !== null ? <span>{t.avg_rating.toFixed(1)} ({t.review_count})</span> : '\u2014'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-3">
-                          <button onClick={() => router.push(`/dashboard/tenants/${t.id}`)} className="text-sm font-medium text-gray-600 hover:text-gray-800">View</button>
-                          <button onClick={() => openEditModal(t)} className="text-sm font-medium text-brand-600 hover:text-brand-700">Edit</button>
-                          <button onClick={() => handleDelete(t.id, t.name)} disabled={deleting === t.id} className="text-sm font-medium text-red-500 hover:text-red-700 disabled:opacity-50">{deleting === t.id ? '...' : 'Delete'}</button>
-                        </div>
-                      </td>
-                    </tr>
+                        {t.categories && <span className="inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">{t.categories.name}</span>}
+                        {t.cities.slice(0, 2).map(c => <span key={c} className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">{c}</span>)}
+                        {t.cities.length > 2 && <span className="text-xs text-gray-400">+{t.cities.length - 2}</span>}
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3 text-xs text-gray-500">
+                        <span>{t.location_count} loc · {t.staff_count} staff · {t.service_count} svc{t.avg_rating !== null ? ` · ★ ${t.avg_rating.toFixed(1)} (${t.review_count})` : ''}</span>
+                        <span className="flex items-center gap-1.5">Pay {paymentsToggle(t)}</span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-gray-100 pt-3">
+                        <button onClick={() => router.push(`/dashboard/tenants/${t.id}`)} className="rounded-lg bg-gray-100 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">View</button>
+                        <button onClick={() => openEditModal(t)} className="rounded-lg bg-brand-50 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100">Edit</button>
+                        <button onClick={() => handleDelete(t.id, t.name)} disabled={deleting === t.id} className="rounded-lg bg-red-50 py-2 text-sm font-medium text-red-600 hover:bg-red-100 disabled:opacity-50">{deleting === t.id ? '...' : 'Delete'}</button>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="px-6 py-16 text-center"><p className="text-sm text-gray-500">No tenants found.</p></div>
-            )}
-          </div>
+                </div>
+              </div>
+
+              {/* Desktop: full table */}
+              <div className="mt-6 hidden overflow-x-auto rounded-xl border border-gray-200 bg-white lg:block">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="w-10 px-4 py-3">
+                        <input type="checkbox" checked={selectedIds.size === tenants.length && tenants.length > 0} onChange={toggleSelectAll} className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Business</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Owner</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Category</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Plan</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Cities</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Loc</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Staff</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Svc</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Pay</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Rating</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {tenants.map(t => (
+                      <tr key={t.id} className={`hover:bg-gray-50 ${selectedIds.has(t.id) ? 'bg-brand-50' : ''}`}>
+                        <td className="w-10 px-4 py-3">
+                          <input type="checkbox" checked={selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                        </td>
+                        <td className="px-4 py-3">
+                          <button onClick={() => router.push(`/dashboard/tenants/${t.id}`)} className="flex items-center gap-2 text-left">
+                            {avatar(t)}
+                            <div>
+                              <p className="text-sm font-medium text-gray-900 hover:text-brand-600">{t.name}</p>
+                              <p className="text-xs text-gray-400">{t.email ?? '—'}</p>
+                            </div>
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{t.owner_name ?? '—'}</td>
+                        <td className="px-4 py-3">
+                          {t.categories ? (
+                            <span className="inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">{t.categories.name}</span>
+                          ) : <span className="text-xs text-gray-400">—</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">{t.subscription_plans?.name ?? 'No Plan'}</span>
+                        </td>
+                        <td className="px-4 py-3">{statusCell(t)}</td>
+                        <td className="px-4 py-3">
+                          {t.cities.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {t.cities.slice(0, 2).map(c => <span key={c} className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">{c}</span>)}
+                              {t.cities.length > 2 && <span className="text-xs text-gray-400">+{t.cities.length - 2}</span>}
+                            </div>
+                          ) : <span className="text-xs text-gray-400">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-600">{t.location_count}</td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-600">{t.staff_count}</td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-600">{t.service_count}</td>
+                        <td className="px-4 py-3">{paymentsToggle(t)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {t.avg_rating !== null ? <span>{t.avg_rating.toFixed(1)} ({t.review_count})</span> : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            <button onClick={() => router.push(`/dashboard/tenants/${t.id}`)} className="text-sm font-medium text-gray-600 hover:text-gray-800">View</button>
+                            <button onClick={() => openEditModal(t)} className="text-sm font-medium text-brand-600 hover:text-brand-700">Edit</button>
+                            <button onClick={() => handleDelete(t.id, t.name)} disabled={deleting === t.id} className="text-sm font-medium text-red-500 hover:text-red-700 disabled:opacity-50">{deleting === t.id ? '...' : 'Delete'}</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
 
           {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-between">
-              <p className="text-sm text-gray-500">Showing {(page - 1) * perPage + 1}\u2013{Math.min(page * perPage, total)} of {total}</p>
+            <div className="mt-6 flex items-center justify-between gap-3">
+              <p className="text-sm text-gray-500">{(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}</p>
               <div className="flex gap-2">
                 <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Previous</button>
                 <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Next</button>
@@ -517,148 +567,147 @@ export default function TenantsPage() {
         </>
       )}
 
-      {/* Edit Tenant Modal */}
-      {editTenant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold text-gray-900">Edit Tenant</h2>
-            <p className="mt-1 text-sm text-gray-500">Update business details. Changes take effect immediately.</p>
-
-            {editError && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{editError}</div>}
-
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Business Name *</label>
-                <input type="text" value={editFields.name} onChange={e => setEditFields({ ...editFields, name: e.target.value })} className={inputCls} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Owner Name *</label>
-                  <input type="text" value={editFields.owner_name} onChange={e => setEditFields({ ...editFields, owner_name: e.target.value })} className={inputCls} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Email *</label>
-                  <input type="email" value={editFields.email} onChange={e => setEditFields({ ...editFields, email: e.target.value })} className={inputCls} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Phone</label>
-                <input type="tel" value={editFields.phone} onChange={e => setEditFields({ ...editFields, phone: e.target.value })} className={inputCls} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Category</label>
-                  <select value={editFields.category_id} onChange={e => setEditFields({ ...editFields, category_id: e.target.value })} className={inputCls}>
-                    <option value="">No Category</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Plan</label>
-                  <select value={editFields.subscription_plan_id} onChange={e => setEditFields({ ...editFields, subscription_plan_id: e.target.value })} className={inputCls}>
-                    <option value="">No Plan</option>
-                    {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Status</label>
-                <select value={editFields.status} onChange={e => setEditFields({ ...editFields, status: e.target.value })} className={inputCls}>
-                  {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="edit_payments" checked={editFields.payments_enabled} onChange={e => setEditFields({ ...editFields, payments_enabled: e.target.checked })} className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                <label htmlFor="edit_payments" className="text-sm text-gray-700">Enable payments</label>
-              </div>
+      {/* Edit Tenant */}
+      <Modal
+        open={Boolean(editTenant)}
+        onClose={() => setEditTenant(null)}
+        title="Edit Tenant"
+        busy={editSaving}
+        width="max-w-lg"
+        footer={
+          <>
+            <button onClick={() => { if (editTenant) { handleDelete(editTenant.id, editTenant.name); setEditTenant(null); } }} className="mr-auto rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">Delete</button>
+            <button onClick={() => setEditTenant(null)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button onClick={handleEditSave} disabled={editSaving} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{editSaving ? 'Saving...' : 'Save Changes'}</button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-500">Update business details. Changes take effect immediately.</p>
+        {editError && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{editError}</div>}
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Business Name *</label>
+            <input type="text" value={editFields.name} onChange={e => setEditFields({ ...editFields, name: e.target.value })} className={inputCls} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Owner Name *</label>
+              <input type="text" value={editFields.owner_name} onChange={e => setEditFields({ ...editFields, owner_name: e.target.value })} className={inputCls} />
             </div>
-
-            <div className="mt-6 flex justify-between">
-              <button onClick={() => { if (editTenant) { handleDelete(editTenant.id, editTenant.name); setEditTenant(null); } }} className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">Delete Tenant</button>
-              <div className="flex gap-3">
-                <button onClick={() => setEditTenant(null)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button onClick={handleEditSave} disabled={editSaving} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-                  {editSaving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Email *</label>
+              <input type="email" value={editFields.email} onChange={e => setEditFields({ ...editFields, email: e.target.value })} className={inputCls} />
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Bulk Create Modal */}
-      {showBulkConfig && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold text-gray-900">Bulk Create Test Tenants</h2>
-            <p className="mt-1 text-sm text-gray-500">Create multiple test businesses with staff, services, and location assignments.</p>
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700">Number of tenants</label>
-              <input type="number" min={1} max={50} value={bulkCount} onChange={e => setBulkCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))} className="mt-1 w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Phone</label>
+            <input type="tel" value={editFields.phone} onChange={e => setEditFields({ ...editFields, phone: e.target.value })} className={inputCls} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Category</label>
+              <select value={editFields.category_id} onChange={e => setEditFields({ ...editFields, category_id: e.target.value })} className={inputCls}>
+                <option value="">No Category</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
             </div>
-            <div className="mt-4">
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">Locations <span className="text-gray-400 font-normal">(each tenant gets all locations listed below)</span></label>
-                <button type="button" onClick={() => setBulkLocations([...bulkLocations, { name: '', country: '', countryCode: '' }])} className="text-sm font-medium text-brand-600 hover:text-brand-700">+ Add location</button>
-              </div>
-              <p className="mt-1 text-xs text-gray-400">Leave empty to use random default cities. Coordinates and timezone are auto-resolved.</p>
-              <div className="mt-2 space-y-3">
-                {bulkLocations.map((loc, idx) => (
-                  <div key={idx} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-gray-500">Location {idx + 1}</span>
-                      {bulkLocations.length > 1 && <button type="button" onClick={() => { setBulkLocations(bulkLocations.filter((_, i) => i !== idx)); setCitySuggestions(prev => { const n = { ...prev }; delete n[idx]; return n; }); }} className="text-xs text-red-500 hover:text-red-700">Remove</button>}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <select value={loc.countryCode} onChange={e => updateBulkLoc(idx, 'countryCode', e.target.value)} className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none">
-                        <option value="">Select country</option>
-                        {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
-                      </select>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          placeholder={loc.countryCode ? 'Search city...' : 'Select country first'}
-                          value={loc.name}
-                          onChange={e => handleCityInput(idx, e.target.value)}
-                          disabled={!loc.countryCode}
-                          className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
-                        />
-                        {(citySuggestions[idx]?.length ?? 0) > 0 && (
-                          <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-40 overflow-y-auto">
-                            {citySuggestions[idx]?.map((s, i) => (
-                              <button key={i} type="button" onClick={() => selectCity(idx, s.name)} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100">
-                                <span className="font-medium">{s.name}</span>
-                                <span className="ml-1 text-xs text-gray-400">{s.full}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Plan</label>
+              <select value={editFields.subscription_plan_id} onChange={e => setEditFields({ ...editFields, subscription_plan_id: e.target.value })} className={inputCls}>
+                <option value="">No Plan</option>
+                {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Status</label>
+            <select value={editFields.status} onChange={e => setEditFields({ ...editFields, status: e.target.value })} className={inputCls}>
+              {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="edit_payments" checked={editFields.payments_enabled} onChange={e => setEditFields({ ...editFields, payments_enabled: e.target.checked })} className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+            <label htmlFor="edit_payments" className="text-sm text-gray-700">Enable payments</label>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Bulk Create */}
+      <Modal
+        open={showBulkConfig}
+        onClose={() => setShowBulkConfig(false)}
+        title="Bulk Create Test Tenants"
+        busy={bulking}
+        width="max-w-2xl"
+        footer={
+          <>
+            <button onClick={() => setShowBulkConfig(false)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button onClick={handleBulkCreate} disabled={bulking} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{bulking ? 'Creating...' : `Create ${bulkCount} Tenants`}</button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-500">Create multiple test businesses with staff, services, and location assignments.</p>
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700">Number of tenants</label>
+          <input type="number" min={1} max={50} value={bulkCount} onChange={e => setBulkCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))} className="mt-1 w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+        </div>
+        <div className="mt-4">
+          <div className="flex items-center justify-between gap-3">
+            <label className="block text-sm font-medium text-gray-700">Locations <span className="font-normal text-gray-400">(each tenant gets all locations listed below)</span></label>
+            <button type="button" onClick={() => setBulkLocations([...bulkLocations, { name: '', country: '', countryCode: '' }])} className="shrink-0 text-sm font-medium text-brand-600 hover:text-brand-700">+ Add</button>
+          </div>
+          <p className="mt-1 text-xs text-gray-400">Leave empty to use random default cities. Coordinates and timezone are auto-resolved.</p>
+          <div className="mt-2 space-y-3">
+            {bulkLocations.map((loc, idx) => (
+              <div key={idx} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-500">Location {idx + 1}</span>
+                  {bulkLocations.length > 1 && <button type="button" onClick={() => { setBulkLocations(bulkLocations.filter((_, i) => i !== idx)); setCitySuggestions(prev => { const n = { ...prev }; delete n[idx]; return n; }); }} className="text-xs text-red-500 hover:text-red-700">Remove</button>}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <select value={loc.countryCode} onChange={e => updateBulkLoc(idx, 'countryCode', e.target.value)} className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none">
+                    <option value="">Select country</option>
+                    {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                  </select>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder={loc.countryCode ? 'Search city...' : 'Select country first'}
+                      value={loc.name}
+                      onChange={e => handleCityInput(idx, e.target.value)}
+                      disabled={!loc.countryCode}
+                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
+                    />
+                    {(citySuggestions[idx]?.length ?? 0) > 0 && (
+                      <div className="absolute z-10 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                        {citySuggestions[idx]?.map((s, i) => (
+                          <button key={i} type="button" onClick={() => selectCity(idx, s.name)} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100">
+                            <span className="font-medium">{s.name}</span>
+                            <span className="ml-1 text-xs text-gray-400">{s.full}</span>
+                          </button>
+                        ))}
                       </div>
-                    </div>
+                    )}
                   </div>
-                ))}
+                </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className="text-xs text-gray-400 self-center">Quick add:</span>
-                {[
-                  { name: 'Valencia', country: 'Spain', countryCode: 'es' },
-                  { name: 'Berlin', country: 'Germany', countryCode: 'de' },
-                  { name: 'Tivat', country: 'Montenegro', countryCode: 'me' },
-                  { name: 'San Francisco', country: 'United States', countryCode: 'us' },
-                  { name: 'Dubai', country: 'UAE', countryCode: 'ae' },
-                  { name: 'London', country: 'United Kingdom', countryCode: 'gb' },
-                ].map(preset => (
-                  <button key={preset.name} type="button" onClick={() => { const idx = bulkLocations.findIndex(l => !l.name); if (idx >= 0) { setBulkLocations(prev => prev.map((l, i) => i === idx ? preset : l)); } else { setBulkLocations(prev => [...prev, preset]); } }} className="rounded-full border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-100 hover:border-gray-400">{preset.name}</button>
-                ))}
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setShowBulkConfig(false)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button onClick={handleBulkCreate} disabled={bulking} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{bulking ? 'Creating...' : `Create ${bulkCount} Tenants`}</button>
-            </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="self-center text-xs text-gray-400">Quick add:</span>
+            {[
+              { name: 'Valencia', country: 'Spain', countryCode: 'es' },
+              { name: 'Berlin', country: 'Germany', countryCode: 'de' },
+              { name: 'Tivat', country: 'Montenegro', countryCode: 'me' },
+              { name: 'San Francisco', country: 'United States', countryCode: 'us' },
+              { name: 'Dubai', country: 'UAE', countryCode: 'ae' },
+              { name: 'London', country: 'United Kingdom', countryCode: 'gb' },
+            ].map(preset => (
+              <button key={preset.name} type="button" onClick={() => { const idx = bulkLocations.findIndex(l => !l.name); if (idx >= 0) { setBulkLocations(prev => prev.map((l, i) => i === idx ? preset : l)); } else { setBulkLocations(prev => [...prev, preset]); } }} className="rounded-full border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-600 hover:border-gray-400 hover:bg-gray-100">{preset.name}</button>
+            ))}
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

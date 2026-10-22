@@ -53,6 +53,9 @@ interface Outcome {
 
 type Filter = 'all' | 'upcoming' | 'published' | 'failed' | 'skipped';
 
+/** INPUT without its full width, for the small fields inside the bulk bar. */
+const INPUT_INLINE = INPUT.replace('w-full ', '');
+
 function fmtWhen(iso: string | null): { date: string; time: string } {
   if (!iso) return { date: '—', time: '' };
   const d = new Date(iso);
@@ -229,7 +232,7 @@ export default function InstagramPage() {
         <button type="button" className={BTN_SECONDARY} onClick={runCheck} disabled={checking}>{checking ? 'Checking…' : 'Check connection'}</button>
       </div>
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-2 md:gap-3 lg:grid-cols-4">
         <Stat label="Connection" value={config ? (config.credentials ? 'Token set' : 'No token') : '…'} sub={config ? `${config.login} login · ${config.lang.toUpperCase()}` : ''} tone={config?.credentials ? 'ok' : 'warn'} />
         <Stat label="Status" value={settings?.paused ? 'Paused' : settings?.start_date ? 'Running' : 'No start date'} sub={settings ? `${settings.days.length}× a week at ${settings.post_time}` : ''} tone={settings?.paused || !settings?.start_date ? 'warn' : 'ok'} />
         <Stat label="Published" value={`${stats.published} / ${rows.length || 40}`} sub={stats.failed ? `${stats.failed} failed` : 'feed posts'} tone={stats.failed ? 'warn' : 'ok'} />
@@ -259,16 +262,20 @@ export default function InstagramPage() {
           <option value="failed">Failed</option>
           <option value="skipped">Skipped</option>
         </select>
+        <label className="flex items-center gap-2 text-xs text-gray-500 md:hidden">
+          <input type="checkbox" checked={allVisibleSelected} onChange={toggleAll} className="h-4 w-4 rounded border-gray-300 text-brand-600" />
+          Select all
+        </label>
         {selected.size > 0 && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm">
+          <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm md:w-auto">
             <span className="font-semibold text-brand-700">{selected.size} selected</span>
             <span className="text-gray-300">|</span>
             <div className="flex items-center gap-1">
-              <input type="number" className={`${INPUT} w-20 py-1`} value={bulkShift} onChange={(e) => setBulkShift(e.target.value)} />
+              <input type="number" className={`${INPUT_INLINE} w-20 py-1`} value={bulkShift} onChange={(e) => setBulkShift(e.target.value)} />
               <button type="button" className={BTN_SECONDARY} disabled={busy} onClick={() => bulk({ shift_days: Number(bulkShift) }, `Shifted by ${bulkShift} day(s)`)}>Shift days</button>
             </div>
             <div className="flex items-center gap-1">
-              <input type="time" className={`${INPUT} w-28 py-1`} value={bulkTime} onChange={(e) => setBulkTime(e.target.value)} />
+              <input type="time" className={`${INPUT_INLINE} w-32 py-1`} value={bulkTime} onChange={(e) => setBulkTime(e.target.value)} />
               <button type="button" className={BTN_SECONDARY} disabled={busy} onClick={() => bulk({ time: bulkTime }, `Time set to ${bulkTime}`)}>Set time</button>
             </div>
             <button type="button" className={BTN_SECONDARY} disabled={busy} onClick={() => bulk({ set: { enabled: false } }, 'Skipped')}>Skip</button>
@@ -288,7 +295,68 @@ export default function InstagramPage() {
       {loading ? (
         <div className="p-8 text-gray-400">Loading…</div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <>
+        {/* Phone: one card per post */}
+        <div className="space-y-3 md:hidden">
+          {visible.map((r) => {
+            const isOpen = open === r.key;
+            const feedDone = Boolean(r.feed?.published_at);
+            const storyDone = Boolean(r.story?.published_at);
+            const when = fmtWhen(r.scheduledAt);
+            const isNext = stats.next?.key === r.key;
+            return (
+              <div key={r.key} className={`rounded-xl border bg-white p-3 ${isNext ? 'border-brand-300 bg-brand-50/40' : 'border-gray-200'} ${!r.enabled ? 'opacity-60' : ''}`}>
+                <div className="flex items-start gap-3">
+                  <input type="checkbox" checked={selected.has(r.key)} onChange={() => toggle(r.key)} className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600" />
+                  <button type="button" className="shrink-0" onClick={() => setOpen(isOpen ? null : r.key)}>
+                    <img src={r.sq} alt="" className="h-16 w-16 rounded-md object-cover" loading="lazy" />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      className="block text-left"
+                      onClick={() => setEditing({ key: r.key, label: r.file, scheduledAt: r.scheduledAt, source: r.source, enabled: r.enabled, kinds: r.kinds })}
+                    >
+                      <div className="text-sm font-semibold text-gray-900">{when.date}</div>
+                      <div className="text-xs text-gray-500">{when.time}{r.source === 'override' && <span className="ml-1 rounded bg-brand-100 px-1 text-[10px] font-semibold text-brand-700">custom</span>} · <span className="underline decoration-dotted">edit</span></div>
+                    </button>
+                    <div className="mt-1 truncate font-mono text-[11px] text-brand-600">set{r.set} · {r.file}</div>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500">
+                  <span className="flex items-center gap-1.5 whitespace-nowrap">Feed <StatePill log={r.feed} wanted={r.kinds.includes('feed')} enabled={r.enabled} scheduledAt={r.scheduledAt} now={now} /></span>
+                  <span className="flex items-center gap-1.5 whitespace-nowrap">Story <StatePill log={r.story} wanted={r.kinds.includes('story')} enabled={r.enabled} scheduledAt={r.scheduledAt} now={now} /></span>
+                </div>
+                <button type="button" className="mt-2 block w-full text-left" onClick={() => setOpen(isOpen ? null : r.key)}>
+                  <div className={`text-sm text-gray-700 ${isOpen ? '' : 'line-clamp-2'}`}>{r.sr}</div>
+                  <div className="mt-0.5 text-xs capitalize text-gray-400">{r.vertical}{r.kinds.length === 1 ? ` · ${r.kinds[0]} only` : ''}</div>
+                </button>
+                {isOpen && (
+                  <div className="mt-2 space-y-2 text-xs text-gray-600">
+                    <div><b className="text-gray-500">EN</b> {r.en}</div>
+                    <div className="flex gap-3">
+                      <a href={r.sq} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">Open square</a>
+                      <a href={r.st} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">Open story</a>
+                    </div>
+                    {(r.feed?.error || r.story?.error) && <div className="break-words rounded-lg bg-red-50 px-3 py-2 text-red-700">{r.feed?.error ?? r.story?.error}</div>}
+                  </div>
+                )}
+                <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+                  {!(feedDone && storyDone) && (
+                    <button type="button" className={`${BTN_PRIMARY} flex-1`} disabled={!config?.credentials || busy} onClick={() => publish(r, ['feed', 'story'])}>Post now</button>
+                  )}
+                  {!feedDone && <button type="button" className={`${BTN_SECONDARY} flex-1`} disabled={!config?.credentials || busy} onClick={() => publish(r, ['feed'])}>Feed only</button>}
+                  {!storyDone && feedDone && <button type="button" className={`${BTN_SECONDARY} flex-1`} disabled={!config?.credentials || busy} onClick={() => publish(r, ['story'])}>Story only</button>}
+                  {(r.feed || r.story) && <button type="button" className={BTN_DANGER} disabled={busy} onClick={() => reset(r)}>Reset</button>}
+                </div>
+              </div>
+            );
+          })}
+          {visible.length === 0 && <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-400">Nothing matches this filter.</div>}
+        </div>
+
+        {/* Tablet and up: table */}
+        <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
               <tr>
@@ -359,6 +427,7 @@ export default function InstagramPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
       <p className="mt-4 text-xs text-gray-400">
         Click a date to set a custom time, skip a post, or post only the feed or story. Select rows for bulk changes. Times shown in your browser&apos;s timezone{settings ? `; the plan runs in ${settings.timezone}` : ''}. Stories go out without the link sticker (the API cannot add one). {ready ? '' : 'Set a first posting day to start the schedule.'}
@@ -375,9 +444,9 @@ export default function InstagramPage() {
 
 function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'ok' | 'warn' }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-      <div className="text-xs font-medium uppercase tracking-wider text-gray-500">{label}</div>
-      <div className={`mt-1 text-lg font-semibold ${tone === 'warn' ? 'text-amber-600' : 'text-brand-600'}`}>{value}</div>
+    <div className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-3 md:px-4">
+      <div className="truncate text-[11px] font-medium uppercase tracking-wider text-gray-500 md:text-xs">{label}</div>
+      <div className={`mt-1 truncate text-base font-semibold md:text-lg ${tone === 'warn' ? 'text-amber-600' : 'text-brand-600'}`}>{value}</div>
       {sub && <div className="truncate text-xs text-gray-500">{sub}</div>}
     </div>
   );

@@ -9,6 +9,12 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Local UI preview only (never honoured in production builds): `ADMIN_PREVIEW_BYPASS=1 next dev`
+  // renders the shell without a session so pages can be screenshotted with mocked APIs.
+  if (process.env.NODE_ENV !== 'production' && process.env.ADMIN_PREVIEW_BYPASS === '1') {
+    return <DashboardShell>{children}</DashboardShell>;
+  }
+
   const supabase = createClient();
   const {
     data: { user },

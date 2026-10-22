@@ -88,7 +88,7 @@ export function IgRowModal({ row, busy, onClose, onSave, onClear }: {
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-500">What to post</label>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             {KIND_OPTIONS.map((o) => (
               <button
                 key={o.label}

@@ -33,7 +33,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [mobileOpen]);
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-[100dvh] bg-gray-50">
       {/* Mobile overlay */}
       {mobileOpen && <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)} />}
 
@@ -51,8 +51,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-4 md:hidden">
-          <button onClick={() => setMobileOpen(true)} aria-label="Open menu" className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-4 pt-[env(safe-area-inset-top)] md:hidden">
+          <button onClick={() => setMobileOpen(true)} aria-label="Open menu" className="-ml-1.5 rounded-lg p-2 text-gray-600 hover:bg-gray-100 active:bg-gray-200">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
@@ -61,7 +61,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">ADMIN</span>
         </header>
 
-        <main className="min-w-0 flex-1 overflow-auto">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain pb-[env(safe-area-inset-bottom)]">{children}</main>
       </div>
     </div>
   );

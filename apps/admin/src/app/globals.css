@@ -3,7 +3,22 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     @apply text-gray-900 antialiased;
+    overflow-x: hidden;
+  }
+
+  /* iOS Safari zooms into any field below 16px; keep the desktop size above the md breakpoint. */
+  @media (max-width: 767px) {
+    input:not([type='checkbox']):not([type='radio']),
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 }

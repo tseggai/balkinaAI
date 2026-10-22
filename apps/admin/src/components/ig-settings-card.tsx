@@ -28,14 +28,14 @@ export function IgSettingsCard({ value, onSave }: { value: IgSettingsValue; onSa
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <span className={SECTION_TITLE}>Schedule</span>
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" checked={draft.paused} onChange={(e) => setDraft({ ...draft, paused: e.target.checked })} className="h-4 w-4 rounded border-gray-300 text-brand-600" />
           Pause all posting
         </label>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-500">First posting day</label>
           <input type="date" className={INPUT} value={draft.start_date ?? ''} onChange={(e) => setDraft({ ...draft, start_date: e.target.value || null })} />
@@ -50,7 +50,7 @@ export function IgSettingsCard({ value, onSave }: { value: IgSettingsValue; onSa
             {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
           </select>
         </div>
-        <div>
+        <div className="col-span-2 lg:col-span-1">
           <label className="mb-1 block text-xs font-medium text-gray-500">Days</label>
           <div className="flex flex-wrap gap-1">
             {WEEKDAYS.map(([d, label]) => (
@@ -66,11 +66,11 @@ export function IgSettingsCard({ value, onSave }: { value: IgSettingsValue; onSa
           </div>
         </div>
       </div>
-      <div className="mt-3 flex items-center justify-between gap-3">
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-gray-500">
           Posts fill the chosen days in plan order from the first day, {draft.days.length || 0} a week at {draft.post_time}. Rows with a custom time keep it.
         </p>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           {dirty && <button type="button" className={BTN_SECONDARY} onClick={() => setDraft(value)} disabled={saving}>Discard</button>}
           <button
             type="button"

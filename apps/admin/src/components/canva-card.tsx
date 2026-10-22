@@ -87,7 +87,7 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className={SECTION_TITLE}>Canva templates</span>
           {status.connected ? (
             <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Connected</span>
@@ -96,7 +96,7 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
           )}
           <span className="text-xs text-gray-500">{status.templates.length} of {EXPECTED.length * 2} templates</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {status.connected ? (
             <>
               <button type="button" className={BTN_SECONDARY} onClick={() => setOpen((o) => !o)}>{open ? 'Hide' : 'Show'} templates</button>
@@ -110,7 +110,7 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
       </div>
 
       {!status.connected && status.configured && (
-        <div className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+        <div className="mt-3 break-words rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
           <div>Client ID the server will send: <code>{status.client_id}</code>{status.client_id_raw_length !== status.client_id.length ? <span className="ml-2 font-semibold text-amber-700">(the Vercel value had extra whitespace, now trimmed)</span> : null}</div>
           <div>Redirect URL to register in Canva: <code>{status.redirect_uri}</code></div>
           <div>Scopes to enable in Canva: <code>{status.scopes.join(' ')}</code></div>
