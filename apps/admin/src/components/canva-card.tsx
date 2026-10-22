@@ -17,6 +17,10 @@ interface Template {
 
 interface Status {
   configured: boolean;
+  client_id: string;
+  client_id_raw_length: number;
+  redirect_uri: string;
+  scopes: string[];
   connected: boolean;
   connection: { connected_at: string; expires_at: string; user_id: string | null } | null;
   templates: Template[];
@@ -104,6 +108,14 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
           )}
         </div>
       </div>
+
+      {!status.connected && status.configured && (
+        <div className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          <div>Client ID the server will send: <code>{status.client_id}</code>{status.client_id_raw_length !== status.client_id.length ? <span className="ml-2 font-semibold text-amber-700">(the Vercel value had extra whitespace, now trimmed)</span> : null}</div>
+          <div>Redirect URL to register in Canva: <code>{status.redirect_uri}</code></div>
+          <div>Scopes to enable in Canva: <code>{status.scopes.join(' ')}</code></div>
+        </div>
+      )}
 
       {open && status.connected && (
         <div className="mt-4">

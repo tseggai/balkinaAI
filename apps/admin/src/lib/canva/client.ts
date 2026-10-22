@@ -17,12 +17,20 @@ export const CANVA_SCOPES = [
   'asset:write',
 ];
 
+/** Env values trimmed: a trailing newline pasted into Vercel makes Canva reject the client id. */
+export function clientId(): string {
+  return (process.env.CANVA_CLIENT_ID ?? '').trim();
+}
+function clientSecret(): string {
+  return (process.env.CANVA_CLIENT_SECRET ?? '').trim();
+}
+
 export function canvaConfigured(): boolean {
-  return Boolean(process.env.CANVA_CLIENT_ID && process.env.CANVA_CLIENT_SECRET);
+  return Boolean(clientId() && clientSecret());
 }
 
 export function redirectUri(): string {
-  return process.env.CANVA_REDIRECT_URI ?? 'https://admin.balkina.ai/api/admin/canva/callback';
+  return (process.env.CANVA_REDIRECT_URI ?? '').trim() || 'https://admin.balkina.ai/api/admin/canva/callback';
 }
 
 /* ---------- OAuth ---------- */
@@ -39,7 +47,7 @@ export function authorizeUrl(state: string, challenge: string): string {
     code_challenge_method: 's256',
     scope: CANVA_SCOPES.join(' '),
     response_type: 'code',
-    client_id: process.env.CANVA_CLIENT_ID ?? '',
+    client_id: clientId(),
     state,
     redirect_uri: redirectUri(),
   });
@@ -55,7 +63,7 @@ interface TokenResponse {
 }
 
 async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
-  const basic = Buffer.from(`${process.env.CANVA_CLIENT_ID}:${process.env.CANVA_CLIENT_SECRET}`).toString('base64');
+  const basic = Buffer.from(`${clientId()}:${clientSecret()}`).toString('base64');
   const res = await fetch(TOKEN, {
     method: 'POST',
     headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' },
