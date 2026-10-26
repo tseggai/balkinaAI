@@ -76,12 +76,16 @@ const HASHTAGS: Record<string, string[]> = {
 const BRAND_TAGS = ['#zakazivanje', '#onlinezakazivanje', '#balkina', '#booking'];
 const PLACE_TAGS = ['#crnagora', '#podgorica', '#budva', '#bar', '#beograd', '#novisad'];
 
+/** 8-10 hashtags for a vertical: its own tags, the brand tags, and two rotating place tags picked by `seed`. */
+export function hashtagsFor(vertical: string, seed: number): string[] {
+  const own = HASHTAGS[vertical] ?? HASHTAGS.all ?? [];
+  const places = [PLACE_TAGS[seed % PLACE_TAGS.length], PLACE_TAGS[(seed + 3) % PLACE_TAGS.length]].filter((t): t is string => Boolean(t));
+  return Array.from(new Set([...own, ...BRAND_TAGS, ...places])).slice(0, 10);
+}
+
 /** Caption for the feed post: Serbian, a divider, English, the CTA, then 8-10 rotating hashtags. */
 export function buildCaption(row: PlanRow, index: number): string {
-  const vertical = HASHTAGS[row.vertical] ?? HASHTAGS.all ?? [];
-  const places = [PLACE_TAGS[index % PLACE_TAGS.length], PLACE_TAGS[(index + 3) % PLACE_TAGS.length]].filter((t): t is string => Boolean(t));
-  const tags = Array.from(new Set([...vertical, ...BRAND_TAGS, ...places])).slice(0, 10);
-  return `${row.sr}\n—\n${row.en}\n\nLink u biu → balkina.ai\n\n${tags.join(' ')}`;
+  return `${row.sr}\n—\n${row.en}\n\nLink u biu → balkina.ai\n\n${hashtagsFor(row.vertical, index).join(' ')}`;
 }
 
 /** Local calendar date (YYYY-MM-DD) and ISO weekday for a timezone. */
