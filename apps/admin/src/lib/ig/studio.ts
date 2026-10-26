@@ -111,6 +111,8 @@ export interface StudioPost {
   error: string | null;
   attempts: number;
   attempted_at: string | null;
+  canva_asset_id: string | null;      // the photo uploaded to Canva once per post…
+  canva_asset_photo: string | null;   // …for this photo_url
 }
 
 interface TemplateRow {
@@ -226,39 +228,44 @@ export function pendingRenders(post: StudioPost, has: { sq: boolean; st: boolean
   return out;
 }
 
-/** Render one format in one language and store it on the row. */
+/**
+ * Render one format in one language and merge it into the row. Renders of the same post run in
+ * parallel (one request each), so the merge is an atomic jsonb update (ig_posts_set_render) and the
+ * photo's Canva asset is cached on the row after the first upload.
+ */
 export async function renderOne(supabase: SupabaseClient, post: StudioPost, step: RenderStep): Promise<StudioPost> {
   const { sq, st } = await templatesFor(supabase, post.layout);
   const tpl = step.format === 'sq' ? sq : st;
   if (!tpl) throw new Error(`No ${step.format === 'sq' ? 'square' : 'story'} template synced for layout "${post.layout}"`);
   const text = post.copy[step.lang];
   if (!text) throw new Error(`No ${step.lang.toUpperCase()} copy on this post`);
+  const cachedAsset = post.canva_asset_id && post.canva_asset_photo === post.photo_url ? post.canva_asset_id : undefined;
   const r = await renderTemplate(supabase, {
     brandTemplateId: tpl.brand_template_id,
     fields: tpl.fields,
     text,
     photoUrl: post.photo_url,
+    photoAssetId: cachedAsset,
     title: `Studio · ${post.layout} ${step.format} ${step.lang} · ${post.id.slice(0, 8)}`,
     storagePath: `posts/${post.id}-${step.format}-${step.lang}.jpg`,
   });
-  const url = `${r.url}?v=${Date.now()}`;
-  const renders: Renders = { ...post.renders, [step.format]: { ...(post.renders[step.format] ?? {}), [step.lang]: url } };
-  const designs: Renders = { ...post.designs, [step.format]: { ...(post.designs[step.format] ?? {}), [step.lang]: r.designId } };
-  const patch: Record<string, unknown> = { renders, designs, [`template_${step.format}_id`]: tpl.id, error: null, updated_at: new Date().toISOString() };
-  if (step.lang === post.lang) {
-    patch[`render_${step.format}_url`] = url;
-    patch[`design_${step.format}_id`] = r.designId;
+  if (r.photoAssetId && !cachedAsset) {
+    await supabase.from('ig_posts').update({ canva_asset_id: r.photoAssetId, canva_asset_photo: post.photo_url }).eq('id', post.id);
   }
-  const { data, error } = await supabase.from('ig_posts').update(patch).eq('id', post.id).select('*').single();
+  const url = `${r.url}?v=${Date.now()}`;
+  const { data, error } = await supabase.rpc('ig_posts_set_render', { p_id: post.id, p_format: step.format, p_lang: step.lang, p_url: url, p_design: r.designId, p_template: tpl.id });
   if (error) throw new Error(error.message);
-  return data as StudioPost;
+  const row = (Array.isArray(data) ? data[0] : data) as StudioPost | undefined;
+  if (!row) throw new Error('Post disappeared while rendering');
+  return row;
 }
 
-/** Forget every render (after copy or photo changed) so the steps run again. */
+/** Forget every render (after copy or photo changed) so the steps run again. A new photo also drops the cached asset. */
 export async function clearRenders(supabase: SupabaseClient, post: StudioPost, extra: Record<string, unknown> = {}): Promise<StudioPost> {
+  const photoChanged = typeof extra.photo_url === 'string' && extra.photo_url !== post.photo_url;
   const { data, error } = await supabase
     .from('ig_posts')
-    .update({ ...extra, renders: {}, designs: {}, render_sq_url: null, render_st_url: null, design_sq_id: null, design_st_id: null, error: null, updated_at: new Date().toISOString() })
+    .update({ ...extra, ...(photoChanged ? { canva_asset_id: null, canva_asset_photo: null } : {}), renders: {}, designs: {}, render_sq_url: null, render_st_url: null, design_sq_id: null, design_st_id: null, error: null, updated_at: new Date().toISOString() })
     .eq('id', post.id)
     .select('*')
     .single();
