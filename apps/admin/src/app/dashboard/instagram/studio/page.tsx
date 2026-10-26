@@ -93,23 +93,53 @@ export default function StudioPage() {
   const hasCopy = fields.length > 0 && Boolean(copy[lang]?.headline);
   const ready = Boolean(cat?.canva && cat.openai && cat.layouts.length > 0);
 
-  /* ---------- pipeline: render steps one request at a time ---------- */
+  /* ---------- pipeline: render steps, one request each, two at a time ---------- */
 
+  /** Steps a post still needs: formats × languages (primary first) minus what is rendered. */
+  const stepsFor = (p: StudioPostView): { format: Format; lang: Lang }[] => {
+    const formats: Format[] = hasStory(p.layout) && p.kinds.includes('story') ? ['sq', 'st'] : ['sq'];
+    const langs = [p.lang, ...(p.langs.length ? p.langs : [p.lang]).filter((l) => l !== p.lang)];
+    const out: { format: Format; lang: Lang }[] = [];
+    for (const format of formats) for (const lang of langs) if (!p.renders[format]?.[lang]) out.push({ format, lang });
+    return out;
+  };
+
+  /**
+   * The first render runs alone so the photo is uploaded to Canva once and cached on the post; the
+   * remaining renders run two at a time (each is its own request, so the 60 s cap applies per render).
+   */
   const renderSteps = async (p: StudioPostView, label: string, offset = 0, total = 0): Promise<StudioPostView | null> => {
     let cur = p;
     const want = renderProgress(cur, hasStory(cur.layout)).total;
     const base = total || want;
-    for (let i = 0; i < 8; i++) {
-      if (stopRef.current) return cur;
-      const done = renderProgress(cur, hasStory(cur.layout)).done;
-      if (done >= want) break;
-      setProgress({ title: label, done: offset + done, total: base, detail: `Rendering ${done + 1} of ${want}…` });
-      const { ok, data } = await api(`/api/admin/studio/posts/${cur.id}`, { action: 'render' }, 'PATCH');
-      if (!ok) { notify('Render failed', [String(data.error ?? 'Unknown error')]); return null; }
-      cur = data.post as StudioPostView;
-      const step = data.step as { format: Format; lang: Lang } | undefined;
+    const runOne = async (step: { format: Format; lang: Lang }): Promise<StudioPostView | null> => {
+      const { ok, data } = await api(`/api/admin/studio/posts/${cur.id}`, { action: 'render', ...step }, 'PATCH');
+      if (!ok) { notify('Render failed', [`${STEP_LABEL[step.format]} ${step.lang.toUpperCase()}: ${String(data.error ?? 'Unknown error')}`]); return null; }
+      return data.post as StudioPostView;
+    };
+    const merge = (results: (StudioPostView | null)[]) => {
+      // Every response carries the row after its own atomic merge; the union of renders is the truth.
+      for (const r of results) {
+        if (!r) continue;
+        const renders = { ...cur.renders };
+        const designs = { ...cur.designs };
+        for (const f of ['sq', 'st'] as Format[]) { renders[f] = { ...(renders[f] ?? {}), ...(r.renders[f] ?? {}) }; designs[f] = { ...(designs[f] ?? {}), ...(r.designs[f] ?? {}) }; }
+        cur = { ...r, renders, designs };
+      }
       if (post?.id === cur.id || !post) setPost(cur);
-      if (!step) break;
+    };
+    let first = true;
+    for (let guard = 0; guard < 6; guard++) {
+      if (stopRef.current) return cur;
+      const pending = stepsFor(cur);
+      if (pending.length === 0) break;
+      const batch = first ? pending.slice(0, 1) : pending.slice(0, 2);
+      first = false;
+      const done = want - pending.length;
+      setProgress({ title: label, done: offset + done, total: base, detail: `Rendering ${batch.map((s) => `${STEP_LABEL[s.format]} ${s.lang.toUpperCase()}`).join(' + ')} (${done + 1}${batch.length > 1 ? `–${done + batch.length}` : ''} of ${want})…` });
+      const results = await Promise.all(batch.map(runOne));
+      merge(results);
+      if (results.some((r) => !r)) return null;
     }
     return cur;
   };

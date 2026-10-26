@@ -206,22 +206,25 @@ export interface RenderInput {
   fields: Record<string, string>;      // dataset types by field name
   text: Record<string, string>;        // text field values
   photoUrl?: string;                   // public URL for the `photo` image field
+  photoAssetId?: string;               // already-uploaded Canva asset for photoUrl (skips the upload)
   title?: string;
   storagePath: string;                 // e.g. renders/2026/10/abc-sq.jpg
 }
 
-/** Fill a brand template, export it as JPEG, store it, and return the public URL + design id. */
-export async function renderTemplate(supabase: SupabaseClient, input: RenderInput): Promise<{ url: string; designId: string }> {
+/** Fill a brand template, export it as JPEG, store it, and return the public URL, design id and the photo asset used. */
+export async function renderTemplate(supabase: SupabaseClient, input: RenderInput): Promise<{ url: string; designId: string; photoAssetId: string | null }> {
   const token = await accessToken(supabase);
   const data: Record<string, AutofillValue> = {};
+  let photoAssetId: string | null = input.photoAssetId ?? null;
   for (const [name, type] of Object.entries(input.fields)) {
     if (type === 'text' && input.text[name] !== undefined) data[name] = { type: 'text', text: input.text[name] ?? '' };
     if (type === 'image' && name === 'photo' && input.photoUrl) {
-      data[name] = { type: 'image', asset_id: await uploadAssetFromUrl(token, input.photoUrl, `balkina-${Date.now()}`) };
+      if (!photoAssetId) photoAssetId = await uploadAssetFromUrl(token, input.photoUrl, `balkina-${Date.now()}`);
+      data[name] = { type: 'image', asset_id: photoAssetId };
     }
   }
   const designId = await autofill(token, input.brandTemplateId, data, input.title);
   const exportUrl = await exportJpg(token, designId);
   const url = await storeRender(supabase, exportUrl, input.storagePath);
-  return { url, designId };
+  return { url, designId, photoAssetId };
 }
