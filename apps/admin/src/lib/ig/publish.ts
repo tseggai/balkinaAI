@@ -82,6 +82,29 @@ export async function publishImage(
   return { containerId: container.id, mediaId: published.id };
 }
 
+/**
+ * Publish 2–10 JPEGs as one feed carousel. Each image becomes an item container, then a CAROUSEL
+ * container with `children` is created and published. Stories cannot be carousels.
+ */
+export async function publishCarousel(
+  creds: IgCredentials,
+  opts: { imageUrls: string[]; caption?: string }
+): Promise<IgPublishResult> {
+  if (opts.imageUrls.length < 2 || opts.imageUrls.length > 10) throw new Error('A carousel needs 2 to 10 images');
+  const children: string[] = [];
+  for (const imageUrl of opts.imageUrls) {
+    const item = await graph<{ id: string }>(`/${creds.userId}/media`, { image_url: imageUrl, is_carousel_item: 'true', access_token: creds.accessToken }, 'POST');
+    await waitForContainer(item.id, creds.accessToken);
+    children.push(item.id);
+  }
+  const params: Record<string, string> = { media_type: 'CAROUSEL', children: children.join(','), access_token: creds.accessToken };
+  if (opts.caption) params.caption = opts.caption;
+  const container = await graph<{ id: string }>(`/${creds.userId}/media`, params, 'POST');
+  await waitForContainer(container.id, creds.accessToken);
+  const published = await graph<{ id: string }>(`/${creds.userId}/media_publish`, { creation_id: container.id, access_token: creds.accessToken }, 'POST');
+  return { containerId: container.id, mediaId: published.id };
+}
+
 /** Sanity check used by the dry run: confirms the token can see the account. */
 export async function igAccountInfo(creds: IgCredentials): Promise<{ id: string; user_id?: string; username?: string }> {
   const fields = FACEBOOK_LOGIN ? 'id,username' : 'id,user_id,username';

@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { igConfig } from '@/lib/ig/runner';
-import { STOCK_PHOTOS, TONES, VERTICALS } from '@/lib/ig/studio';
+import { loadSettings } from '@/lib/ig/schedule';
+import { listPhotos, TONES, VERTICALS } from '@/lib/ig/studio';
 
-// GET /api/admin/studio — catalogue (verticals, tones, stock photos), synced layouts and the latest posts.
+// GET /api/admin/studio — catalogue (verticals, tones, photo library), synced layouts, plan cadence defaults and the latest posts.
 export async function GET() {
   const auth = await requireAdmin();
   if (!auth.admin) return auth.response;
-  const [tplRes, postRes, canvaRes] = await Promise.all([
+  const [tplRes, postRes, canvaRes, photos, settings] = await Promise.all([
     auth.supabase.from('ig_templates').select('id, layout, format, fields, thumbnail_url, last_render_url').order('title'),
-    auth.supabase.from('ig_posts').select('*').order('created_at', { ascending: false }).limit(60),
+    auth.supabase.from('ig_posts').select('*').order('scheduled_at', { ascending: false, nullsFirst: true }).order('created_at', { ascending: false }).limit(120),
     auth.supabase.from('canva_connection').select('connected_at').eq('id', 1).maybeSingle(),
+    listPhotos(auth.supabase),
+    loadSettings(auth.supabase),
   ]);
   const templates = (tplRes.data ?? []) as { id: string; layout: string; format: 'sq' | 'st'; fields: Record<string, string>; thumbnail_url: string | null; last_render_url: string | null }[];
   const layouts = Array.from(new Set(templates.map((t) => t.layout))).map((layout) => {
@@ -22,8 +25,9 @@ export async function GET() {
   return NextResponse.json({
     verticals: VERTICALS,
     tones: TONES,
-    photos: STOCK_PHOTOS,
+    photos,
     layouts,
+    cadence: { post_time: settings.post_time, days: settings.days, timezone: settings.timezone },
     posts: postRes.data ?? [],
     canva: Boolean(canvaRes.data),
     openai: Boolean(process.env.OPENAI_API_KEY),
