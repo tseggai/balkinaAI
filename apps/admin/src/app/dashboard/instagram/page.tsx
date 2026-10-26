@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { CanvaCard } from '@/components/canva-card';
 import { ConfirmDialog, type ConfirmRequest } from '@/components/confirm-dialog';
 import { IgRowModal, type RowEdit, type RowEditResult } from '@/components/ig-row-modal';
@@ -229,7 +230,10 @@ export default function InstagramPage() {
           <h1 className="text-2xl font-bold text-gray-900">Instagram</h1>
           <p className="mt-1 text-sm text-gray-500">40 feed posts and their matching stories. The publisher checks every 15 minutes and posts whatever is due.</p>
         </div>
-        <button type="button" className={BTN_SECONDARY} onClick={runCheck} disabled={checking}>{checking ? 'Checking…' : 'Check connection'}</button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={BTN_SECONDARY} onClick={runCheck} disabled={checking}>{checking ? 'Checking…' : 'Check connection'}</button>
+          <Link href="/dashboard/instagram/studio" className={BTN_PRIMARY}>+ New post (Studio)</Link>
+        </div>
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-2 md:gap-3 lg:grid-cols-4">
