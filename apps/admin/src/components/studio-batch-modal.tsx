@@ -11,7 +11,7 @@ export interface BatchRequest {
   count: number;
   verticals: string[];
   tones: string[];
-  layouts: string[];
+  layouts?: string[];   // omitted = each post uses its audience's category template
   lang: Lang;
   langs: Lang[];
   kinds: Kind[];
@@ -35,11 +35,12 @@ function Chips<T extends string | number>({ options, value, onChange }: { option
 }
 
 /** "Generate batch": how many posts, what to rotate through, and the cadence they land on. */
-export function StudioBatchModal({ open, onClose, onStart, verticals, tones, layouts, cadence }: {
+export function StudioBatchModal({ open, onClose, onStart, verticals, categories, tones, layouts, cadence }: {
   open: boolean;
   onClose: () => void;
   onStart: (req: BatchRequest) => void;
-  verticals: { value: string; label: string }[];
+  verticals: { value: string; label: string; category: string }[];
+  categories: { key: string; label: string; synced: boolean }[];
   tones: { value: string; label: string }[];
   layouts: { layout: string; st: boolean }[];
   cadence: { post_time: string; days: number[]; timezone: string };
@@ -47,7 +48,7 @@ export function StudioBatchModal({ open, onClose, onStart, verticals, tones, lay
   const [count, setCount] = useState(10);
   const [vs, setVs] = useState<string[]>(['salon', 'barber', 'nails', 'spa']);
   const [ts, setTs] = useState<string[]>(['friendly', 'bold']);
-  const [ls, setLs] = useState<string[]>(layouts.map((l) => l.layout));
+  const [ls, setLs] = useState<string[]>([]);   // empty = by category
   const [lang, setLang] = useState<Lang>('sr');
   const [bilingual, setBilingual] = useState(true);
   const [kinds, setKinds] = useState<Kind[]>(['feed', 'story']);
@@ -59,7 +60,7 @@ export function StudioBatchModal({ open, onClose, onStart, verticals, tones, lay
   const [perDay, setPerDay] = useState(1);
   const [gap, setGap] = useState(180);
 
-  const valid = count > 0 && vs.length > 0 && ts.length > 0 && ls.length > 0 && days.length > 0 && kinds.length > 0 && start && time;
+  const valid = count > 0 && vs.length > 0 && ts.length > 0 && days.length > 0 && kinds.length > 0 && start && time;
   const minutes = count * (bilingual ? 2 : 1) * (kinds.includes('story') ? 2 : 1) * 0.5 + count * 0.15;
 
   return (
@@ -75,7 +76,7 @@ export function StudioBatchModal({ open, onClose, onStart, verticals, tones, lay
             type="button"
             className={BTN_PRIMARY}
             disabled={!valid}
-            onClick={() => onStart({ count, verticals: vs, tones: ts, layouts: ls, lang, langs: bilingual ? ['sr', 'en'] : [lang], kinds, brief: brief || undefined, cadence: { start_date: start, post_time: time, days, timezone: tz, per_day: perDay, gap_minutes: gap } })}
+            onClick={() => onStart({ count, verticals: vs, tones: ts, layouts: ls.length ? ls : undefined, lang, langs: bilingual ? ['sr', 'en'] : [lang], kinds, brief: brief || undefined, cadence: { start_date: start, post_time: time, days, timezone: tz, per_day: perDay, gap_minutes: gap } })}
           >
             Generate {count} post{count === 1 ? '' : 's'}
           </button>
@@ -98,8 +99,22 @@ export function StudioBatchModal({ open, onClose, onStart, verticals, tones, lay
           </div>
         </div>
         <div>
-          <label className={LABEL}>Audiences (rotated in this order)</label>
-          <Chips options={verticals} value={vs} onChange={setVs} />
+          <label className={LABEL}>Audiences (rotated in this order; each uses its category's template)</label>
+          <div className="space-y-2">
+            {categories.map((c) => (
+              <div key={c.key} className="flex flex-wrap items-center gap-1">
+                <button
+                  type="button"
+                  title={c.synced ? 'Toggle every audience in this category' : 'No template synced for this category yet'}
+                  onClick={() => { const members = verticals.filter((v) => v.category === c.key).map((v) => v.value); const all = members.every((m) => vs.includes(m)); setVs(all ? vs.filter((v) => !members.includes(v)) : [...vs, ...members.filter((m) => !vs.includes(m))]); }}
+                  className={`mr-1 w-32 shrink-0 truncate text-left text-[11px] font-semibold uppercase tracking-wider ${c.synced ? 'text-gray-500 hover:text-gray-800' : 'text-gray-300'}`}
+                >
+                  {c.label}
+                </button>
+                <Chips options={verticals.filter((v) => v.category === c.key)} value={vs} onChange={setVs} />
+              </div>
+            ))}
+          </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -107,7 +122,7 @@ export function StudioBatchModal({ open, onClose, onStart, verticals, tones, lay
             <Chips options={tones} value={ts} onChange={setTs} />
           </div>
           <div>
-            <label className={LABEL}>Layouts</label>
+            <label className={LABEL}>Templates <span className="font-normal text-gray-400">(none picked = by category)</span></label>
             <Chips options={layouts.map((l) => ({ value: l.layout, label: `${l.layout}${l.st ? '' : ' (sq only)'}` }))} value={ls} onChange={setLs} />
           </div>
         </div>

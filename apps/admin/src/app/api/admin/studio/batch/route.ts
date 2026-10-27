@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin-auth';
-import { batchSlots, listPhotos, pickPhoto } from '@/lib/ig/studio';
+import { batchSlots, categoryOf, listPhotos, pickPhoto } from '@/lib/ig/studio';
 
 const Body = z.object({
   count: z.number().int().min(1).max(40),
   verticals: z.array(z.string().min(1)).min(1),
   tones: z.array(z.string().min(1)).min(1),
-  layouts: z.array(z.string().min(1)).min(1),
+  layouts: z.array(z.string().min(1)).optional(),   // omitted = each post uses its audience's category template
   lang: z.enum(['sr', 'en']).default('sr'),
   langs: z.array(z.enum(['sr', 'en'])).min(1).default(['sr', 'en']),
   kinds: z.array(z.enum(['feed', 'story'])).min(1).default(['feed', 'story']),
@@ -38,12 +38,23 @@ export async function POST(request: Request) {
   const b = parsed.data;
   const langs = b.langs.includes(b.lang) ? b.langs : [b.lang, ...b.langs];
 
-  const [pool, takenRes] = await Promise.all([
+  const [pool, takenRes, tplRes] = await Promise.all([
     listPhotos(auth.supabase),
     auth.supabase.from('ig_posts').select('scheduled_at').eq('status', 'scheduled').not('scheduled_at', 'is', null),
+    auth.supabase.from('ig_templates').select('layout').eq('format', 'sq'),
   ]);
   const photos = b.photos?.length ? pool.filter((p) => b.photos?.includes(p.url)) : pool;
   if (photos.length === 0) return NextResponse.json({ error: 'No photos in the library' }, { status: 400 });
+  const synced = new Set(((tplRes.data ?? []) as { layout: string }[]).map((t) => t.layout));
+  const explicit = (b.layouts ?? []).filter((l) => synced.has(l));
+  if (synced.size === 0) return NextResponse.json({ error: 'No square templates synced yet' }, { status: 400 });
+  // Audiences whose category has no template yet fall back to the explicit list, then to any synced template.
+  const layoutFor = (vertical: string, i: number): string => {
+    const cat = categoryOf(vertical);
+    if (synced.has(cat) && explicit.length === 0) return cat;
+    if (explicit.length) return explicit[i % explicit.length] ?? cat;
+    return Array.from(synced)[i % synced.size] ?? cat;
+  };
   const taken = new Set(((takenRes.data ?? []) as { scheduled_at: string }[]).map((r) => r.scheduled_at));
   const slots = batchSlots(b.cadence, b.count, taken);
   const batch_id = randomUUID();
@@ -56,7 +67,7 @@ export async function POST(request: Request) {
       status: 'draft',
       vertical,
       tone: b.tones[i % b.tones.length],
-      layout: b.layouts[i % b.layouts.length],
+      layout: layoutFor(vertical, i),
       lang: b.lang,
       langs,
       kinds: b.kinds,

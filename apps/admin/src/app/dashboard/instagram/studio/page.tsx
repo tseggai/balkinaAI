@@ -9,7 +9,8 @@ import { renderProgress, StudioPostCard, type Format, type Kind, type Lang, type
 import { BTN_DANGER, BTN_PRIMARY, BTN_SECONDARY, INPUT, SECTION_TITLE, SELECT } from '@/components/prospect-crm';
 
 interface Catalogue {
-  verticals: { value: string; label: string }[];
+  verticals: { value: string; label: string; category: string }[];
+  categories: { key: string; order: number; label: string; synced: boolean; story: boolean }[];
   tones: { value: string; label: string; hint: string }[];
   photos: { name: string; url: string; source: 'stock' | 'upload' }[];
   layouts: { layout: string; sq: boolean; st: boolean; fields: string[]; preview: string | null }[];
@@ -42,7 +43,7 @@ export default function StudioPage() {
   const [tone, setTone] = useState('friendly');
   const [lang, setLang] = useState<Lang>('sr');            // primary (first slide / first story)
   const [bilingual, setBilingual] = useState(true);
-  const [layout, setLayout] = useState('');
+  const [layoutPick, setLayoutPick] = useState('');   // '' = follow the audience's category
   const [brief, setBrief] = useState('');
   const [photo, setPhoto] = useState('');
   // copy
@@ -73,7 +74,6 @@ export default function StudioPage() {
     if (!res.ok) return null;
     const data = (await res.json()) as Catalogue;
     setCat(data);
-    setLayout((l) => l || data.layouts[0]?.layout || '');
     setPhoto((p) => p || data.photos[0]?.url || '');
     return data;
   }, []);
@@ -86,6 +86,12 @@ export default function StudioPage() {
     return { ok: res.ok, data };
   };
 
+  const categoryOfVertical = (v: string) => cat?.verticals.find((x) => x.value === v)?.category ?? '';
+  const autoLayout = (v: string) => {
+    const c = categoryOfVertical(v);
+    return cat?.layouts.some((l) => l.layout === c) ? c : cat?.layouts[0]?.layout ?? '';
+  };
+  const layout = layoutPick || autoLayout(vertical);
   const layoutInfo = cat?.layouts.find((l) => l.layout === layout) ?? null;
   const hasStory = (l: string) => Boolean(cat?.layouts.find((x) => x.layout === l)?.st);
   const langs: Lang[] = bilingual ? ['sr', 'en'] : [lang];
@@ -226,7 +232,7 @@ export default function StudioPage() {
 
   const openPost = (p: StudioPostView) => {
     setPost(p);
-    setVertical(p.vertical); setTone(p.tone); setLang(p.lang); setBilingual(p.langs.length > 1); setLayout(p.layout); setBrief(p.brief ?? ''); setPhoto(p.photo_url);
+    setVertical(p.vertical); setTone(p.tone); setLang(p.lang); setBilingual(p.langs.length > 1); setLayoutPick(p.layout); setBrief(p.brief ?? ''); setPhoto(p.photo_url);
     setCopy(p.copy); setCaption(p.caption ?? ''); setFields(Object.keys(p.copy[p.lang] ?? {})); setEditLang(p.lang); setKinds(p.kinds);
     if (p.scheduled_at) setWhen(toLocalInput(new Date(p.scheduled_at)));
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -361,8 +367,12 @@ export default function StudioPage() {
             <div className="mt-3 grid grid-cols-2 gap-3">
               <div>
                 <label className={LABEL}>Audience</label>
-                <select className={`${SELECT} w-full`} value={vertical} onChange={(e) => setVertical(e.target.value)}>
-                  {cat.verticals.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+                <select className={`${SELECT} w-full`} value={vertical} onChange={(e) => { setVertical(e.target.value); setPost(null); }}>
+                  {cat.categories.map((c) => (
+                    <optgroup key={c.key} label={`${c.label}${c.synced ? '' : ' · no template yet'}`}>
+                      {cat.verticals.filter((v) => v.category === c.key).map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
               <div>
@@ -372,8 +382,9 @@ export default function StudioPage() {
                 </select>
               </div>
               <div>
-                <label className={LABEL}>Layout</label>
-                <select className={`${SELECT} w-full`} value={layout} onChange={(e) => { setLayout(e.target.value); setPost(null); }}>
+                <label className={LABEL}>Template</label>
+                <select className={`${SELECT} w-full`} value={layoutPick} onChange={(e) => { setLayoutPick(e.target.value); setPost(null); }}>
+                  <option value="">Auto · {autoLayout(vertical) || 'none synced'}{categoryOfVertical(vertical) && autoLayout(vertical) !== categoryOfVertical(vertical) ? ` (no ${categoryOfVertical(vertical)} template yet)` : ''}</option>
                   {cat.layouts.map((l) => <option key={l.layout} value={l.layout}>{l.layout}{l.st ? '' : ' (square only)'}</option>)}
                 </select>
               </div>
@@ -579,7 +590,7 @@ export default function StudioPage() {
         )}
       </div>
 
-      <StudioBatchModal open={batchOpen} onClose={() => setBatchOpen(false)} onStart={(req) => void startBatch(req)} verticals={cat.verticals} tones={cat.tones} layouts={cat.layouts} cadence={cat.cadence} />
+      <StudioBatchModal open={batchOpen} onClose={() => setBatchOpen(false)} onStart={(req) => void startBatch(req)} verticals={cat.verticals} categories={cat.categories} tones={cat.tones} layouts={cat.layouts} cadence={cat.cadence} />
       <ConfirmDialog request={confirm} busy={busy !== '' && busy !== 'batch'} onClose={() => (busy && busy !== 'batch' ? undefined : setConfirm(null))} />
       <Modal open={Boolean(notice)} onClose={() => setNotice(null)} title={notice?.title ?? ''} footer={<button type="button" className={BTN_PRIMARY} onClick={() => setNotice(null)}>OK</button>}>
         <ul className="space-y-1">{notice?.lines.map((l, i) => <li key={i} className="break-words">{l}</li>)}</ul>
