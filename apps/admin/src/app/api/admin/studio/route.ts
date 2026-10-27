@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { igConfig } from '@/lib/ig/runner';
 import { loadSettings } from '@/lib/ig/schedule';
-import { listPhotos, TONES, VERTICALS } from '@/lib/ig/studio';
+import { CATEGORIES, listPhotos, TONES, VERTICALS } from '@/lib/ig/studio';
 
 // GET /api/admin/studio — catalogue (verticals, tones, photo library), synced layouts, plan cadence defaults and the latest posts.
 export async function GET() {
@@ -23,7 +23,8 @@ export async function GET() {
     return { layout, sq: Boolean(sq), st: Boolean(st), fields, preview: sq?.last_render_url ?? sq?.thumbnail_url ?? st?.thumbnail_url ?? null };
   }).filter((l) => l.sq);
   return NextResponse.json({
-    verticals: VERTICALS,
+    verticals: VERTICALS.map((v) => ({ value: v.value, label: v.label, category: v.category })),
+    categories: CATEGORIES.map((c) => ({ key: c.key, order: c.order, label: c.name.en, synced: layouts.some((l) => l.layout === c.key), story: layouts.some((l) => l.layout === c.key && l.st) })),
     tones: TONES,
     photos,
     layouts,

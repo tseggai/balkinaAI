@@ -3,7 +3,7 @@
    scheduling, and due-post selection for the cron. Rows live in ig_posts (Migrations 074–075). */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { RENDER_BUCKET, renderTemplate } from '@/lib/canva/client';
-import { hashtagsFor } from './plan';
+import { categoryOf, eyebrowFor, studioHashtags, verticalByValue, type StudioVertical } from './categories';
 import { publishCarousel, publishImage, type IgCredentials } from './publish';
 import { zonedToUtc, type Kind } from './schedule';
 
@@ -13,21 +13,8 @@ export type PostStatus = 'draft' | 'scheduled' | 'published' | 'failed' | 'cance
 export type StudioCopy = Record<string, string>;
 export const LANGS: Lang[] = ['sr', 'en'];
 
-export const VERTICALS: { value: string; label: string; sr: string }[] = [
-  { value: 'salon', label: 'Hair salon', sr: 'frizerski salon' },
-  { value: 'barber', label: 'Barbershop', sr: 'barbershop' },
-  { value: 'nails', label: 'Nail studio', sr: 'nail studio' },
-  { value: 'lashes', label: 'Lashes & brows', sr: 'trepavice i obrve' },
-  { value: 'makeup', label: 'Makeup artist', sr: 'šminker' },
-  { value: 'beauty', label: 'Beauty salon', sr: 'salon lepote' },
-  { value: 'spa', label: 'Spa & massage', sr: 'spa i masaža' },
-  { value: 'yoga', label: 'Yoga studio', sr: 'joga studio' },
-  { value: 'pilates', label: 'Pilates', sr: 'pilates studio' },
-  { value: 'fitness', label: 'Personal trainer', sr: 'personalni trener' },
-  { value: 'tennis', label: 'Tennis coach', sr: 'teniski trener' },
-  { value: 'restaurant', label: 'Restaurant', sr: 'restoran' },
-  { value: 'all', label: 'All businesses', sr: 'mali biznisi' },
-];
+export { CATEGORIES, VERTICALS, categoryOf, eyebrowFor } from './categories';
+export type { StudioVertical };
 
 export const TONES: { value: string; label: string; hint: string }[] = [
   { value: 'friendly', label: 'Friendly', hint: 'warm, plain words, speaks to the owner directly' },
@@ -49,11 +36,10 @@ export async function listPhotos(supabase: SupabaseClient): Promise<Photo[]> {
   return [...uploads, ...STOCK_PHOTOS];
 }
 
-/** Pick a photo for a vertical from the pool: a name that mentions the vertical wins, otherwise round-robin by `seed`. */
+/** Pick a photo for an audience from the pool: a name that mentions one of its photo words wins, otherwise round-robin by `seed`. */
 export function pickPhoto(pool: Photo[], vertical: string, seed: number): Photo | null {
   if (pool.length === 0) return null;
-  const hints: Record<string, string[]> = { salon: ['salon', 'hair'], barber: ['barber', 'beard', 'shave'], nails: ['nail', 'manic'], spa: ['spa', 'massage', 'facial'], yoga: ['yoga'], pilates: ['pilates', 'reformer'], fitness: ['fit', 'gym', 'train'], makeup: ['makeup', 'mua'], lashes: ['lash', 'brow'], beauty: ['beauty', 'salon'], tennis: ['tennis'], restaurant: ['restaurant', 'food', 'dining'] };
-  const words = hints[vertical] ?? [];
+  const words = verticalByValue(vertical)?.photo ?? [];
   const matching = pool.filter((p) => words.some((w) => p.name.toLowerCase().includes(w)));
   const list = matching.length ? matching : pool;
   return list[seed % list.length] ?? null;
@@ -61,7 +47,6 @@ export function pickPhoto(pool: Photo[], vertical: string, seed: number): Photo 
 
 /** Every text field a template may ask for, with a hint for the copywriter. */
 const FIELD_HINTS: Record<string, string> = {
-  eyebrow: 'tag line above the headline, ALL CAPS, max 24 characters, names the audience (e.g. "ZA FRIZERE I BARBERE")',
   headline: 'the hook, max 60 characters, two short sentences at most',
   subline: 'one supporting sentence, max 70 characters, says what Balkina gives them',
   url: 'always exactly "balkina.ai"',
@@ -173,9 +158,12 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY is not set in this deployment');
   const model = process.env.GROWTH_LLM_MODEL ?? 'gpt-4o-mini';
-  const vertical = VERTICALS.find((v) => v.value === req.vertical);
+  const vertical = verticalByValue(req.vertical);
   const tone = TONES.find((t) => t.value === req.tone);
-  const fields = req.fields.length ? req.fields : ['eyebrow', 'headline', 'subline', 'url'];
+  const category = categoryOf(req.vertical);
+  // The eyebrow is the category name (fixed per template family), never written by the model.
+  const fields = (req.fields.length ? req.fields : ['headline', 'subline', 'url']).filter((f) => f !== 'eyebrow');
+  const wantsEyebrow = req.fields.length === 0 || req.fields.includes('eyebrow');
   const fieldSpec = fields.map((f) => `- ${f}: ${FIELD_HINTS[f] ?? 'short text, max 40 characters'}`).join('\n');
   const langNames: Record<Lang, string> = { sr: 'Serbian (Latin script, natural Montenegrin/Serbian marketing voice)', en: 'English' };
   const langs = LANGS; // always write both so the caption and a later language switch need no second call
@@ -187,7 +175,7 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
     'Respect the character limits strictly; shorter is better. Serbian uses proper diacritics (č ć š ž đ).\n' +
     'Return strict JSON: { "copy": { "<lang>": { <field>: <text>, ... } }, "caption": { "<lang>": <feed caption 1-3 sentences, may use one emoji, no hashtags> } } ' +
     `for these languages: ${langs.map((l) => `"${l}" = ${langNames[l]}`).join('; ')}.\nFields per language:\n${fieldSpec}`;
-  const user = `Layout: ${req.layout}.${req.brief ? `\nBrief from the marketer: ${req.brief}` : '\nNo extra brief; pick one concrete benefit and build the post around it.'}`;
+  const user = `Template: ${req.layout} (category ${category}).${req.brief ? `\nBrief from the marketer: ${req.brief}` : '\nNo extra brief; pick one concrete benefit and build the post around it.'}`;
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -205,11 +193,12 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
     const src = parsed.copy?.[lang] ?? {};
     const out: StudioCopy = {};
     for (const f of fields) out[f] = f === 'url' ? 'balkina.ai' : String(src[f] ?? '').trim();
+    if (wantsEyebrow) out.eyebrow = eyebrowFor(category, lang);
     copy[lang] = out;
   }
   const order: Lang[] = req.langs.length ? [...req.langs] : langs;
   const captionParts = order.map((l) => String(parsed.caption?.[l] ?? '').trim()).filter(Boolean);
-  const caption = `${captionParts.join('\n—\n')}\n\nLink u biu → balkina.ai\n\n${hashtagsFor(req.vertical, Date.now() % 97).join(' ')}`;
+  const caption = `${captionParts.join('\n—\n')}\n\nLink u biu → balkina.ai\n\n${studioHashtags(req.vertical, Date.now() % 97).join(' ')}`;
   return { copy, caption, model };
 }
 

@@ -4,10 +4,11 @@ import { accessToken, getDataset, listBrandTemplates } from '@/lib/canva/client'
 
 export const maxDuration = 120;
 
-// Titles like "IG · 01 card · square" / "IG - 03 framed - story" → { layout: 'card', format: 'sq' }
-const TITLE = /^IG\s*[·\-–]\s*\d{1,2}\s+([a-z]+)\s*[·\-–]\s*(square|story)\s*$/i;
+// Titles like "IG · 02 beauty · square" / "IG - beauty - story" → { layout: 'beauty', format: 'sq' }.
+// The word is a category key (lib/ig/categories.ts) or a legacy shape layout; the number is optional and only orders the list.
+const TITLE = /^IG\s*[·\-–]\s*(?:\d{1,2}\s+)?([a-z]+)\s*[·\-–]\s*(square|story)\s*$/i;
 
-// POST /api/admin/canva/templates/sync — pull brand templates named "IG · NN layout · square|story" and their datasets.
+// POST /api/admin/canva/templates/sync — pull brand templates named "IG · NN category · square|story" and their datasets.
 export async function POST() {
   const auth = await requireAdmin();
   if (!auth.admin) return auth.response;
