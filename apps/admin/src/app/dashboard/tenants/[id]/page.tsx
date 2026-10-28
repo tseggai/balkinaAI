@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useChromeTint } from '@/lib/use-chrome-tint';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -830,18 +831,19 @@ function EmptyState({ text }: { text: string }) {
 
 // ── Edit Modals ───────────────────────────────────────────────────────────────
 
-/** Centred card from `sm` up; a scrollable bottom sheet on phones. */
+/** Centred card with a 16px margin on every screen size; scrolls inside itself. */
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  useChromeTint(true);
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
-      <div className="relative flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="relative flex max-h-[85dvh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 sm:px-6 sm:pt-6">
           <h2 className="text-lg font-bold text-gray-900">{title}</h2>
           <button onClick={onClose} aria-label="Close" className="-mr-1.5 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pb-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6">{children}</div>
       </div>
     </div>
   );

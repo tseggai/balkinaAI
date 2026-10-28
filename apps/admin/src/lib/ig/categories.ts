@@ -36,14 +36,21 @@ export function copyLimits(layout: string): { headline: number; subline: number 
   return c?.column === 'narrow' ? { headline: 42, subline: 60 } : { headline: 60, subline: 70 };
 }
 
-/** Longest realistic copy for a template, used by the test render to show the layout at its limits. */
+/**
+ * Longest realistic copy for a template, used by the test render to show the layout at its limits.
+ * Complete sentences written to each column's budget (never truncated), in the voice the copywriter
+ * uses: speaking to the owner about what they get.
+ */
 export function stressSample(layout: string, lang: Lang): Record<string, string> {
-  const lim = copyLimits(layout);
-  const sr = { headline: 'Treninzi koji se ne otkazuju u poslednji čas. Puniji dan.', subline: 'SMS podsetnik dan ranije. Manje nedolazaka, puniji kalendar.' };
-  const en = { headline: "Sessions that don't cancel at the last minute. Fuller days.", subline: 'SMS reminder the day before. Fewer no-shows, a fuller calendar.' };
+  const narrow = categoryByKey(layout)?.column === 'narrow';
+  const sr = narrow
+    ? { headline: 'Vaš kalendar pun. Bez propuštenih poziva.', subline: 'Klijenti zakazuju online, vi dobijate obavještenje.' }
+    : { headline: 'Neka vam klijenti zakazuju sami, i kad je zatvoreno.', subline: 'SMS podsjetnik dan ranije. Manje nedolazaka, puniji dan.' };
+  const en = narrow
+    ? { headline: 'Get your calendar full. No missed calls.', subline: 'Clients book online. You get a notification.' }
+    : { headline: "Let your clients book themselves, even when you're closed.", subline: 'SMS reminder the day before. Fewer no-shows, fuller days.' };
   const src = lang === 'sr' ? sr : en;
-  const cut = (s: string, n: number) => (s.length <= n ? s : s.slice(0, n).replace(/[\s,.]+\S*$/, '') + '.');
-  return { eyebrow: eyebrowFor(layout, lang), headline: cut(src.headline, lim.headline), subline: cut(src.subline, lim.subline), url: 'balkina.ai' };
+  return { eyebrow: eyebrowFor(layout, lang), headline: src.headline, subline: src.subline, url: 'balkina.ai' };
 }
 
 export interface StudioVertical {

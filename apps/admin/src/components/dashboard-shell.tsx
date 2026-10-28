@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/sidebar';
+import { useChromeTint } from '@/lib/use-chrome-tint';
 
 const STORAGE_KEY = 'admin.sidebar.collapsed';
 
@@ -12,6 +13,7 @@ const STORAGE_KEY = 'admin.sidebar.collapsed';
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  useChromeTint(mobileOpen);
 
   useEffect(() => {
     try { setCollapsed(window.localStorage.getItem(STORAGE_KEY) === '1'); } catch { /* ignore */ }

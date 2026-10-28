@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { GROWTH_COUNTRIES, GROWTH_VERTICALS } from '@balkina/shared';
+import { useChromeTint } from '@/lib/use-chrome-tint';
 
 type Phase = 'setup' | 'preparing' | 'searching' | 'enriching' | 'done' | 'error';
 
@@ -19,6 +20,7 @@ const PAGE_OPTIONS = [
 ];
 
 export function GenerateProspectsModal({ onClose, onFinished }: Props) {
+  useChromeTint(true);
   const [selCountries, setSelCountries] = useState<string[]>(['rs']);
   const [selCities, setSelCities] = useState<{ city: string; country: string }[]>([]);
   const [selVerticals, setSelVerticals] = useState<string[]>(GROWTH_VERTICALS.filter((v) => v.tier === 1).map((v) => v.key));
@@ -138,8 +140,8 @@ export function GenerateProspectsModal({ onClose, onFinished }: Props) {
   const busy = phase === 'preparing' || phase === 'searching' || phase === 'enriching';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={busy ? undefined : onClose}>
-      <div className="max-h-[94vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl sm:p-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={busy ? undefined : onClose}>
+      <div className="max-h-[85dvh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:p-6" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-bold text-gray-900">Generate prospects</h2>
         <p className="mt-1 text-sm text-gray-500">
           Pick where and what kind of businesses to find. Balkina searches Google Places, scores each business, and (optionally) visits their websites for emails, services and prices.

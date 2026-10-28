@@ -17,6 +17,7 @@ import {
   useProspectActivity,
 } from '@/components/prospect-crm';
 import { claimLinkFor, dueState, formatSeconds, relativeTime, whatsappDigits } from '@/lib/growth/outreach';
+import { useChromeTint } from '@/lib/use-chrome-tint';
 
 /**
  * Right-side drawer for one prospect. Header = business profile (name,
@@ -50,6 +51,7 @@ export function ProspectDrawer({ row, busy, initialTab = 'overview', hasPrev, ha
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const api = useProspectActivity(row, onRowChange, onError);
+  useChromeTint(true);
 
   useEffect(() => { const t = setTimeout(() => setShown(true), 10); return () => clearTimeout(t); }, []);
   useEffect(() => { setTab(initialTab === 'activity' ? 'activity' : 'overview'); setEditing(false); }, [row.id, initialTab]);

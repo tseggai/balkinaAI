@@ -37,6 +37,15 @@ the PDF yet.
 
 Logo: leave it as a plain element (no data field), or as an image field named `logo` which the studio ignores.
 
+## Copy voice
+
+The copywriter speaks to the owner (you / your; vi / vaš) about what they get: "Get your tables booked
+while you cook", "Neka vam klijenti zakazuju sami", never "Tables booked". Serbian is written first, in
+the ijekavian form used in Montenegro (prije, vrijeme, podsjetnik, obavještenje), and the English is the
+same idea, not a translation. Budgets: narrow columns (health, beauty, events, food) headline 42 /
+subline 60 characters; the others 60 / 70. Test render fills both languages with complete sentences at
+those limits.
+
 ## Two things the PDF shows that the API cannot do
 
 1. **Mixed styles inside the headline** (the bold "rezervisana." / "poslednji cas."). Autofill replaces the
