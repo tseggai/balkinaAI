@@ -32,7 +32,7 @@ const EXPECTED = ['card', 'split', 'framed', 'circle', 'column', 'steps', 'cta',
 export function CanvaCard({ notify }: { notify: (title: string, lines: string[]) => void }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState('');
-  const [preview, setPreview] = useState<{ title: string; url: string } | null>(null);
+  const [preview, setPreview] = useState<{ title: string; sr: string | null; en: string | null } | null>(null);
   const [open, setOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -68,13 +68,22 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
     await load();
   };
 
+  /** Renders the Serbian and English versions (two requests, in parallel) and shows them side by side. */
   const test = async (t: Template) => {
     setBusy(t.id);
-    const res = await fetch('/api/admin/canva/templates/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) });
-    const data = (await res.json()) as { url?: string; error?: string };
+    const one = async (lang: 'sr' | 'en'): Promise<{ url: string | null; error: string | null }> => {
+      const res = await fetch('/api/admin/canva/templates/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, lang }) });
+      const data = (await res.json()) as { url?: string; error?: string };
+      return res.ok && data.url ? { url: data.url, error: null } : { url: null, error: data.error ?? 'Unknown error' };
+    };
+    const [sr, en] = await Promise.all([one('sr'), one('en')]);
     setBusy('');
-    if (!res.ok || !data.url) notify('Render failed', [data.error ?? 'Unknown error']);
-    else setPreview({ title: t.title, url: data.url });
+    const errors = [sr, en].flatMap((r, i) => (r.error ? [`${i === 0 ? 'SR' : 'EN'}: ${r.error}`] : []));
+    if (errors.length === 2) notify('Render failed', errors);
+    else {
+      if (errors.length) notify('One render failed', errors);
+      setPreview({ title: t.title, sr: sr.url, en: en.url });
+    }
     await load();
   };
 
@@ -146,9 +155,18 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
         </div>
       )}
 
-      <Modal open={Boolean(preview)} onClose={() => setPreview(null)} title={preview?.title ?? ''} width="max-w-2xl" footer={<button type="button" className={BTN_PRIMARY} onClick={() => setPreview(null)}>Close</button>}>
-        {preview && <img src={preview.url} alt="" className="mx-auto max-h-[70vh] rounded-lg" />}
-        <p className="mt-2 text-xs text-gray-500">Filled with sample copy and a sample photo. If the layout looks right, the template is ready for the studio.</p>
+      <Modal open={Boolean(preview)} onClose={() => setPreview(null)} title={preview?.title ?? ''} width="max-w-4xl" footer={<button type="button" className={BTN_PRIMARY} onClick={() => setPreview(null)}>Close</button>}>
+        {preview && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(['sr', 'en'] as const).map((lang) => (
+              <div key={lang}>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">{lang === 'sr' ? 'Serbian' : 'English'}</div>
+                {preview[lang] ? <img src={preview[lang] ?? ''} alt={lang} className="w-full rounded-lg" /> : <div className="rounded-lg bg-red-50 p-4 text-xs text-red-700">Render failed</div>}
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="mt-2 text-xs text-gray-500">Filled with the category eyebrow, the longest copy the copywriter may write for this layout, and a matching photo. If both fit, the template is ready for the studio.</p>
       </Modal>
     </div>
   );
