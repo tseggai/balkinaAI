@@ -3,7 +3,7 @@
    scheduling, and due-post selection for the cron. Rows live in ig_posts (Migrations 074–075). */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { RENDER_BUCKET, renderTemplate } from '@/lib/canva/client';
-import { categoryOf, eyebrowFor, studioHashtags, verticalByValue, type StudioVertical } from './categories';
+import { categoryOf, copyLimits, eyebrowFor, studioHashtags, verticalByValue, type StudioVertical } from './categories';
 import { publishCarousel, publishImage, type IgCredentials } from './publish';
 import { zonedToUtc, type Kind } from './schedule';
 
@@ -25,7 +25,9 @@ export const TONES: { value: string; label: string; hint: string }[] = [
 ];
 
 export interface Photo { name: string; url: string; source: 'stock' | 'upload' }
-export const STOCK_PHOTOS: Photo[] = ['barber', 'salon', 'nails', 'yoga'].map((n) => ({ name: n, url: `https://balkina.ai/ig/photos/${n}.jpg`, source: 'stock' }));
+export const STOCK_PHOTOS: Photo[] = [
+  'barber', 'barber-shave-h1', 'barber-shave-h2', 'customer-cafe-h', 'customer-lounge-h', 'facial-plants-h', 'facial-white-v', 'gym-bench-v', 'gym-cable-h', 'gym-coach-h', 'makeup-eyes-h', 'makeup-ringlight-h', 'nails', 'nails-loft-v', 'nails-swatches-v', 'nails-window-h', 'owner-terrace-h', 'pilates-kneel-h', 'pilates-legs-h', 'pilates-window-h', 'reception-card-h', 'salon', 'salon-client-phone-h', 'salon-loft-v', 'salon-mirror-gold-v', 'salon-robe-v', 'spa-couple-h', 'spa-facial-window-h', 'tennis-highfive-h', 'tennis-kid-h', 'tennis-lesson-v', 'yoga', 'yoga-class-h', 'yoga-tree-v',
+].map((n) => ({ name: n, url: `https://balkina.ai/ig/photos/${n}.jpg`, source: 'stock' as const }));
 
 /** Stock photos plus everything uploaded through the studio (ig-renders/photos/). */
 export async function listPhotos(supabase: SupabaseClient): Promise<Photo[]> {
@@ -47,8 +49,8 @@ export function pickPhoto(pool: Photo[], vertical: string, seed: number): Photo 
 
 /** Every text field a template may ask for, with a hint for the copywriter. */
 const FIELD_HINTS: Record<string, string> = {
-  headline: 'the hook, max 60 characters, two short sentences at most',
-  subline: 'one supporting sentence, max 70 characters, says what Balkina gives them',
+  headline: 'the hook, max {HEADLINE} characters, two short sentences at most',
+  subline: 'one supporting sentence, max {SUBLINE} characters, says what Balkina gives them',
   url: 'always exactly "balkina.ai"',
   button: 'call-to-action button label with an arrow, max 24 characters (e.g. "Napravite stranicu →")',
   big: 'one big number or very short stat, max 6 characters (e.g. "24/7", "20 s", "0 €")',
@@ -165,7 +167,8 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
   // The eyebrow is the category name (fixed per template family), never written by the model.
   const fields = (req.fields.length ? req.fields : ['headline', 'subline', 'url']).filter((f) => f !== 'eyebrow');
   const wantsEyebrow = req.fields.length === 0 || req.fields.includes('eyebrow');
-  const fieldSpec = fields.map((f) => `- ${f}: ${FIELD_HINTS[f] ?? 'short text, max 40 characters'}`).join('\n');
+  const lim = copyLimits(req.layout);
+  const fieldSpec = fields.map((f) => `- ${f}: ${(FIELD_HINTS[f] ?? 'short text, max 40 characters').replace('{HEADLINE}', String(lim.headline)).replace('{SUBLINE}', String(lim.subline))}`).join('\n');
   const langNames: Record<Lang, string> = { sr: 'Serbian (Latin script, natural Montenegrin/Serbian marketing voice)', en: 'English' };
   const langs = LANGS; // always write both so the caption and a later language switch need no second call
 

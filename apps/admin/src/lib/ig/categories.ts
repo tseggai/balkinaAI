@@ -9,24 +9,42 @@ export interface StudioCategory {
   order: number;      // the NN in the template name
   slug: string;       // categories.slug
   name: Record<Lang, string>;   // eyebrow text (upper-cased on the image)
+  /** Text column width of the design: narrow columns (photo beside the text) take shorter copy. */
+  column: 'narrow' | 'wide';
 }
 
 export const CATEGORIES: StudioCategory[] = [
-  { key: 'health', order: 1, slug: 'health-wellness', name: { en: 'Health & Wellness', sr: 'Zdravlje i wellness' } },
-  { key: 'beauty', order: 2, slug: 'beauty-personal-care', name: { en: 'Beauty & Personal Care', sr: 'Lepota i nega' } },
-  { key: 'fitness', order: 3, slug: 'fitness-sports', name: { en: 'Fitness & Sports', sr: 'Fitnes i sport' } },
-  { key: 'home', order: 4, slug: 'home-services', name: { en: 'Home Services', sr: 'Usluge za dom' } },
-  { key: 'professional', order: 5, slug: 'professional-services', name: { en: 'Professional Services', sr: 'Profesionalne usluge' } },
-  { key: 'education', order: 6, slug: 'education-tutoring', name: { en: 'Education & Tutoring', sr: 'Edukacija i časovi' } },
-  { key: 'pets', order: 7, slug: 'pet-services', name: { en: 'Pet Services', sr: 'Usluge za ljubimce' } },
-  { key: 'auto', order: 8, slug: 'automotive', name: { en: 'Automotive', sr: 'Auto usluge' } },
-  { key: 'events', order: 9, slug: 'events-entertainment', name: { en: 'Events & Entertainment', sr: 'Događaji i zabava' } },
-  { key: 'food', order: 10, slug: 'food-nutrition', name: { en: 'Food & Nutrition', sr: 'Hrana i ishrana' } },
-  { key: 'rentals', order: 11, slug: 'rentals-tours', name: { en: 'Rentals & Tours', sr: 'Iznajmljivanje i ture' } },
-  { key: 'hospitality', order: 12, slug: 'hospitality', name: { en: 'Hospitality', sr: 'Ugostiteljstvo' } },
+  { key: 'health', order: 1, slug: 'health-wellness', name: { en: 'Health & Wellness', sr: 'Zdravlje i wellness' }, column: 'narrow' },
+  { key: 'beauty', order: 2, slug: 'beauty-personal-care', name: { en: 'Beauty & Personal Care', sr: 'Lepota i nega' }, column: 'narrow' },
+  { key: 'fitness', order: 3, slug: 'fitness-sports', name: { en: 'Fitness & Sports', sr: 'Fitnes i sport' }, column: 'wide' },
+  { key: 'home', order: 4, slug: 'home-services', name: { en: 'Home Services', sr: 'Usluge za dom' }, column: 'wide' },
+  { key: 'professional', order: 5, slug: 'professional-services', name: { en: 'Professional Services', sr: 'Profesionalne usluge' }, column: 'wide' },
+  { key: 'education', order: 6, slug: 'education-tutoring', name: { en: 'Education & Tutoring', sr: 'Edukacija i časovi' }, column: 'wide' },
+  { key: 'pets', order: 7, slug: 'pet-services', name: { en: 'Pet Services', sr: 'Usluge za ljubimce' }, column: 'wide' },
+  { key: 'auto', order: 8, slug: 'automotive', name: { en: 'Automotive', sr: 'Auto usluge' }, column: 'wide' },
+  { key: 'events', order: 9, slug: 'events-entertainment', name: { en: 'Events & Entertainment', sr: 'Događaji i zabava' }, column: 'narrow' },
+  { key: 'food', order: 10, slug: 'food-nutrition', name: { en: 'Food & Nutrition', sr: 'Hrana i ishrana' }, column: 'narrow' },
+  { key: 'rentals', order: 11, slug: 'rentals-tours', name: { en: 'Rentals & Tours', sr: 'Iznajmljivanje i ture' }, column: 'wide' },
+  { key: 'hospitality', order: 12, slug: 'hospitality', name: { en: 'Hospitality', sr: 'Ugostiteljstvo' }, column: 'wide' },
 ];
 
 export const categoryByKey = (key: string): StudioCategory | undefined => CATEGORIES.find((c) => c.key === key);
+
+/** Character budgets the copywriter must respect for a template (narrow text columns wrap sooner). */
+export function copyLimits(layout: string): { headline: number; subline: number } {
+  const c = categoryByKey(layout);
+  return c?.column === 'narrow' ? { headline: 42, subline: 60 } : { headline: 60, subline: 70 };
+}
+
+/** Longest realistic copy for a template, used by the test render to show the layout at its limits. */
+export function stressSample(layout: string, lang: Lang): Record<string, string> {
+  const lim = copyLimits(layout);
+  const sr = { headline: 'Treninzi koji se ne otkazuju u poslednji čas. Puniji dan.', subline: 'SMS podsetnik dan ranije. Manje nedolazaka, puniji kalendar.' };
+  const en = { headline: "Sessions that don't cancel at the last minute. Fuller days.", subline: 'SMS reminder the day before. Fewer no-shows, a fuller calendar.' };
+  const src = lang === 'sr' ? sr : en;
+  const cut = (s: string, n: number) => (s.length <= n ? s : s.slice(0, n).replace(/[\s,.]+\S*$/, '') + '.');
+  return { eyebrow: eyebrowFor(layout, lang), headline: cut(src.headline, lim.headline), subline: cut(src.subline, lim.subline), url: 'balkina.ai' };
+}
 
 export interface StudioVertical {
   value: string;
