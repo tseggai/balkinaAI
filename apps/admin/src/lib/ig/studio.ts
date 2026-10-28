@@ -25,7 +25,9 @@ export const TONES: { value: string; label: string; hint: string }[] = [
 ];
 
 export interface Photo { name: string; url: string; source: 'stock' | 'upload' }
-export const STOCK_PHOTOS: Photo[] = ['barber', 'salon', 'nails', 'yoga'].map((n) => ({ name: n, url: `https://balkina.ai/ig/photos/${n}.jpg`, source: 'stock' }));
+export const STOCK_PHOTOS: Photo[] = [
+  'barber', 'barber-shave-h1', 'barber-shave-h2', 'customer-cafe-h', 'customer-lounge-h', 'facial-plants-h', 'facial-white-v', 'gym-bench-v', 'gym-cable-h', 'gym-coach-h', 'makeup-eyes-h', 'makeup-ringlight-h', 'nails', 'nails-loft-v', 'nails-swatches-v', 'nails-window-h', 'owner-terrace-h', 'pilates-kneel-h', 'pilates-legs-h', 'pilates-window-h', 'reception-card-h', 'salon', 'salon-client-phone-h', 'salon-loft-v', 'salon-mirror-gold-v', 'salon-robe-v', 'spa-couple-h', 'spa-facial-window-h', 'tennis-highfive-h', 'tennis-kid-h', 'tennis-lesson-v', 'yoga', 'yoga-class-h', 'yoga-tree-v',
+].map((n) => ({ name: n, url: `https://balkina.ai/ig/photos/${n}.jpg`, source: 'stock' as const }));
 
 /** Stock photos plus everything uploaded through the studio (ig-renders/photos/). */
 export async function listPhotos(supabase: SupabaseClient): Promise<Photo[]> {
