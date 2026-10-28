@@ -169,14 +169,16 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
   const wantsEyebrow = req.fields.length === 0 || req.fields.includes('eyebrow');
   const lim = copyLimits(req.layout);
   const fieldSpec = fields.map((f) => `- ${f}: ${(FIELD_HINTS[f] ?? 'short text, max 40 characters').replace('{HEADLINE}', String(lim.headline)).replace('{SUBLINE}', String(lim.subline))}`).join('\n');
-  const langNames: Record<Lang, string> = { sr: 'Serbian (Latin script, natural Montenegrin/Serbian marketing voice)', en: 'English' };
+  const langNames: Record<Lang, string> = { sr: 'Serbian/Montenegrin, Latin script, ijekavian as spoken in Montenegro (prije, vrijeme, podsjetnik, obavještenje)', en: 'English' };
   const langs = LANGS; // always write both so the caption and a later language switch need no second call
 
   const system =
     `You write Instagram ad copy for Balkina AI. ${PRODUCT_FACTS}\n` +
     `Audience: owners of a ${vertical?.label ?? req.vertical} (${vertical?.sr ?? req.vertical}). Tone: ${tone?.label ?? req.tone} — ${tone?.hint ?? ''}.\n` +
-    'Write for a small business owner, in the second person, concrete and specific to their day. The English version must say the same thing as the Serbian one (it is the second slide of the same post), not a different idea. No emojis in the image fields. ' +
-    'Respect the character limits strictly; shorter is better. Serbian uses proper diacritics (č ć š ž đ).\n' +
+    'Speak to the owner directly, in the second person (you / your; vi / vaš): tell them what they get or what to do, never describe what happens. ' +
+    'Good: "Get your tables booked while you cook." / "Neka vam klijenti zakazuju sami." Bad: "Tables booked." / "Termini zakazani." Concrete, specific to their day, one benefit per post. ' +
+    'Write the Serbian FIRST, as a native Montenegrin marketer would say it (natural word order, no calques from English), then the English with the same meaning (it is the second slide of the same post), never a word-for-word translation in either direction. ' +
+    'Every field is a complete sentence or phrase, never cut mid-thought. No emojis in the image fields. Respect the character limits strictly; shorter is better. Serbian uses proper diacritics (č ć š ž đ).\n' +
     'Return strict JSON: { "copy": { "<lang>": { <field>: <text>, ... } }, "caption": { "<lang>": <feed caption 1-3 sentences, may use one emoji, no hashtags> } } ' +
     `for these languages: ${langs.map((l) => `"${l}" = ${langNames[l]}`).join('; ')}.\nFields per language:\n${fieldSpec}`;
   const user = `Template: ${req.layout} (category ${category}).${req.brief ? `\nBrief from the marketer: ${req.brief}` : '\nNo extra brief; pick one concrete benefit and build the post around it.'}`;

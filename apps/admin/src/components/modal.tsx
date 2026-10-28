@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
+import { useChromeTint } from '@/lib/use-chrome-tint';
 
 /**
- * In-app dialog. Centred card from the `sm` breakpoint up; on phones it becomes a
- * bottom sheet that scrolls inside itself. Closes on backdrop click and Escape unless `busy`.
+ * In-app dialog: a centred card with a 16px margin on every screen size, scrolling inside itself
+ * when taller than the viewport. Closes on backdrop click and Escape unless `busy`.
  */
 export function Modal({ open, onClose, title, children, footer, busy = false, width = 'max-w-md' }: {
   open: boolean;
@@ -15,6 +16,7 @@ export function Modal({ open, onClose, title, children, footer, busy = false, wi
   busy?: boolean;
   width?: string;
 }) {
+  useChromeTint(open);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -27,13 +29,13 @@ export function Modal({ open, onClose, title, children, footer, busy = false, wi
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]"
       onClick={busy ? undefined : onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className={`flex max-h-[92dvh] w-full ${width} flex-col rounded-t-2xl bg-white shadow-xl sm:max-h-[90vh] sm:rounded-2xl`}
+        className={`flex max-h-[85dvh] w-full ${width} flex-col rounded-2xl bg-white shadow-xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
@@ -50,7 +52,7 @@ export function Modal({ open, onClose, title, children, footer, busy = false, wi
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3 text-sm text-gray-700 sm:px-5 sm:pb-5">{children}</div>
         {footer && (
-          <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
+          <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 px-4 py-3 sm:px-5">
             {footer}
           </div>
         )}
