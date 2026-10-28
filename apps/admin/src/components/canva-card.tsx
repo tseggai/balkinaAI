@@ -56,10 +56,15 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
   const sync = async () => {
     setBusy('sync');
     const res = await fetch('/api/admin/canva/templates/sync', { method: 'POST' });
-    const data = (await res.json()) as { matched?: number; found?: number; ignored?: string[]; error?: string };
+    const data = (await res.json()) as { matched?: number; found?: number; ignored?: string[]; removed?: string[]; duplicates?: string[]; error?: string };
     setBusy('');
     if (!res.ok) notify('Sync failed', [data.error ?? 'Unknown error']);
-    else notify('Templates synced', [`${data.matched} of ${data.found} brand templates matched the naming rule.`, ...(data.ignored?.length ? [`Ignored: ${data.ignored.join(', ')}`] : [])]);
+    else notify('Templates synced', [
+      `${data.matched} of ${data.found} brand templates matched the naming rule.`,
+      ...(data.duplicates?.length ? [`Published twice in Canva (the newest is used; delete the extra): ${data.duplicates.join(', ')}`] : []),
+      ...(data.removed?.length ? [`Removed (no longer in Canva): ${data.removed.join(', ')}`] : []),
+      ...(data.ignored?.length ? [`Ignored: ${data.ignored.join(', ')}`] : []),
+    ]);
     await load();
   };
 

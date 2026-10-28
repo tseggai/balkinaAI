@@ -33,7 +33,14 @@ export async function POST() {
       const { error } = await auth.supabase.from('ig_templates').upsert(rows, { onConflict: 'brand_template_id' });
       if (error) throw new Error(error.message);
     }
-    return NextResponse.json({ found: all.length, matched: rows.length, ignored: all.filter((t) => !TITLE.test(t.title.trim())).map((t) => t.title) });
+    // Templates deleted or renamed away in Canva disappear from the registry too (posts keep their renders; the FK is SET NULL).
+    const keep = rows.map((r) => r.brand_template_id);
+    const { data: stale } = await auth.supabase.from('ig_templates').select('id, title').not('brand_template_id', 'in', `(${keep.map((k) => `"${k}"`).join(',') || '""'})`);
+    const removed = ((stale ?? []) as { id: string; title: string }[]);
+    if (removed.length) await auth.supabase.from('ig_templates').delete().in('id', removed.map((r) => r.id));
+    const titles = rows.map((r) => r.title);
+    const duplicates = Array.from(new Set(titles.filter((t, i) => titles.indexOf(t) !== i)));
+    return NextResponse.json({ found: all.length, matched: rows.length, removed: removed.map((r) => r.title), duplicates, ignored: all.filter((t) => !TITLE.test(t.title.trim())).map((t) => t.title) });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }

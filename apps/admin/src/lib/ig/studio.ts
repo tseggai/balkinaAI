@@ -111,7 +111,8 @@ interface TemplateRow {
 
 /** Square + story templates for a layout (story optional). */
 export async function templatesFor(supabase: SupabaseClient, layout: string): Promise<{ sq: TemplateRow | null; st: TemplateRow | null }> {
-  const { data } = await supabase.from('ig_templates').select('id, brand_template_id, title, layout, format, fields').eq('layout', layout);
+  // Newest first, so a template published twice under the same name resolves to the latest copy.
+  const { data } = await supabase.from('ig_templates').select('id, brand_template_id, title, layout, format, fields').eq('layout', layout).order('updated_at', { ascending: false });
   const rows = (data ?? []) as TemplateRow[];
   return { sq: rows.find((r) => r.format === 'sq') ?? null, st: rows.find((r) => r.format === 'st') ?? null };
 }
