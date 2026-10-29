@@ -13,7 +13,7 @@ Two adaptations are mandatory and are threaded through every section:
 
 ## Part A — How to use this document
 
-1. Read `CLAUDE.md` in the target repo first. It overrides this spec on stack conventions, naming, commit rules, and on **which media the creators are found on** if it names specific sources. This spec supplies defaults where `CLAUDE.md` is silent.
+1. Read `CLAUDE.md` in the target repo first. It overrides this spec on stack conventions, naming, commit rules, and on **which media the creators are found on** if it names specific sources. This spec supplies defaults where `CLAUDE.md` is silent. **Then read Part G and the four Oxytoshi documents it reconciles** (`MARKETING_STRATEGY.md`, `CREATOR_OUTREACH_KIT.md`, `outreach/PROSPECTS.csv`, `outreach/REACHOUT_SCRIPTS.md`). Part G's rules override the defaults in Parts B–E wherever they differ; those four documents are the product's voice and motion, and the build must serve them, not the Balkina defaults.
 2. Do **Part C (Discovery)** completely before writing any code. Produce the "Resolved names" table in your first message, then build. Do not ask the user to confirm it unless a hard gate in Part C fires.
 3. Build in the order of **Part D**. Each step ends with a build that passes and a commit. Do not reorder; later steps depend on earlier contracts.
 4. Everything here that says **MUST** is a contract. Everything that says **default** is a choice you may change only if `CLAUDE.md` or the codebase gives a concrete reason, and you say so in the commit message.
@@ -377,8 +377,8 @@ CREATE TABLE IF NOT EXISTS growth_prospects (
   icp_score INTEGER NOT NULL DEFAULT 0,
   score_override INTEGER,              -- hand-set; wins over the computed score when not null
   stage TEXT NOT NULL DEFAULT 'new' CHECK (stage IN (
-    'new', 'enriched', 'qualified', 'disqualified', 'preprovisioned',
-    'contacted', 'viewed', 'engaged', 'replied', 'claimed', 'signed_up', 'customer', 'lost'
+    'new', 'enriched', 'qualified', 'disqualified', 'preprovisioned', 'warming',
+    'contacted', 'viewed', 'engaged', 'replied', 'call_booked', 'claimed', 'signed_up', 'customer', 'lost'
   )),
   enrichment JSONB NOT NULL DEFAULT '{}'::jsonb,
   notes TEXT,
@@ -498,7 +498,10 @@ BEGIN
       WHEN NEW.type = 'replied' AND stage IN ('preprovisioned', 'contacted', 'viewed', 'engaged') THEN 'replied'
       WHEN NEW.type IN ('claim_demo_completed', 'claim_activate_opened', 'claim_clicked') AND stage IN ('preprovisioned', 'contacted', 'viewed') THEN 'engaged'
       WHEN NEW.type = 'claim_page_view' AND stage IN ('preprovisioned', 'contacted') THEN 'viewed'
-      WHEN NEW.type = 'sent' AND stage IN ('new', 'enriched', 'qualified', 'preprovisioned') THEN 'contacted'
+      WHEN NEW.type = 'call_booked' AND stage IN ('preprovisioned', 'warming', 'contacted', 'viewed', 'engaged', 'replied') THEN 'call_booked'
+      WHEN NEW.type = 'cold' AND stage NOT IN ('claimed', 'signed_up', 'customer') THEN 'lost'
+      WHEN NEW.type = 'sent' AND stage IN ('new', 'enriched', 'qualified', 'preprovisioned', 'warming') THEN 'contacted'
+      WHEN NEW.type = 'warmup' AND stage IN ('new', 'enriched', 'qualified', 'preprovisioned') THEN 'warming'
       ELSE stage
     END,
     updated_at = now()
@@ -618,7 +621,7 @@ export const COMPETITOR_HOSTS: { host: string; name: string }[] = [ /* resolve f
   { host: 'geyser.fund', name: 'Geyser' }, { host: 'fountain.fm', name: 'Fountain' }, { host: 'substack.com', name: 'Substack' },
   { host: 'gumroad.com', name: 'Gumroad' }, { host: 'stacker.news', name: 'Stacker News' }, { host: 'zap.stream', name: 'zap.stream' },
 ];
-export const FOLLOWER_SWEET_SPOT = { min: 1_000, max: 250_000 }; // too small = no revenue yet; too big = has a stack
+export const FOLLOWER_SWEET_SPOT = { min: 500, max: 25_000 }; // MARKETING_STRATEGY §6.1; > 100_000 is white-glove only (see Part G)
 export const ACTIVE_DAYS = 60;
 export const INACTIVE_DAYS = 365;
 export function getGrowthNiche(key: string | null | undefined): GrowthNiche | undefined { … }
@@ -673,7 +676,7 @@ export class SourceError extends Error { constructor(message: string, public rea
 
 **`x.ts`** (optional, `X_BEARER_TOKEN`): `GET /2/users/search?query=&max_results=100&user.fields=description,location,public_metrics,url,profile_image_url,verified_type,entities` (available only on paid tiers). Map `public_metrics.followers_count`, `tweet_count`, `url`/`entities.url` → website, `description` → bio, Lightning address and npub regex on the bio. `externalId = user id`. If the env var is absent, the adapter throws `SourceError('X API not configured', 501, true)` and the modal hides the platform.
 
-**`csv.ts`**: `POST /api/admin/growth/import` with a CSV (`platform,handle_or_url,niche,name?,email?,notes?`) parsed server-side; each row is resolved through the matching adapter's `lookup(handleOrUrl)` (implement `lookup` for youtube by handle/URL via `channels.list?forHandle=`, nostr by npub/nip05, podcast by feed URL, x by username) and inserted with `source='csv'`. Errors returned per row.
+**`csv.ts`**: `POST /api/admin/growth/import` with a CSV in the **exact column layout of `outreach/PROSPECTS.csv`** (mapping in Part G.6) parsed server-side; each row is resolved through the matching adapter's `lookup(handleOrUrl)` (implement `lookup` for youtube by handle/URL via `channels.list?forHandle=`, nostr by npub/nip05, podcast by feed URL, x by username) and inserted with `source='csv'`. Errors returned per row.
 
 **Cross-source dedupe (MUST):** before inserting, look up existing prospects by `(platform, external_id)` **and** by any shared id in `external_ids` (`external_ids ?| array[...]` on the known keys: a YouTube channel found via a podcast's RSS link, an npub found in a YouTube description). When a match exists, merge: fill empty identity columns, union `external_ids`, refresh public facts (followers, content_count, views_total, last_published_at, avatar_url, bio, website), **never** touch `stage`, `notes`, `enrichment`, `creator_id`, `claim_*`, `score_override`.
 
@@ -740,7 +743,7 @@ UI: rebuild B.6's page, modal, rows, drawer, and CRM one-to-one, laid out as in 
 - Funnel strip labels: Prospects (high fit · enriched), Pages built, Contacted, Viewed page, Tested {PRIMARY_FAN_ACTION verb} (e.g. "Tested tipping"), Claimed.
 - Row columns: Score · Creator (name, @handle, platform icon, chips: `Lightning ⚡` when `accepts_bitcoin`, `N offerings · M emails`, `uses <Competitor>`, `No website`, `Site unreachable`, `Page ready`, `Claimed`) · Niche · Platform · Reach (followers formatted `12.3k`, content count, "active 12d ago") · Contact (site, @x, npub short, email, t.me) · Stage · Activity · actions (quick-send **Email** when email exists, else **X DM** when `x_handle`, else **Nostr DM** when `nostr_pubkey`; build page; enrich; open).
 - Drawer header line: `{platform} · {followers} followers · {niche} · profile link`; contact row icons for email (`mailto:`), X (`https://x.com/messages/compose?recipient_id=<id>` when the X user id is known, else `https://x.com/<handle>`), Nostr (`nostr:<npub>` link, which opens the user's Nostr client, plus a copy-npub button), YouTube (profile URL), Telegram (`https://t.me/<handle>`), site. Edit form fields: email, X handle, npub, Telegram, Lightning address, website. "What we know" card shows: person, topics, offerings, monetization, competitor, Lightning (verified ✓ / unverified), languages, summary, recent titles.
-- Messages composer channels: **Email** (copy & open `mailto:` with subject + body), **X** (copy & open DM/profile), **Nostr** (copy & open `nostr:` link), **YouTube** (copy; the admin pastes into the channel's business email or a comment), **Telegram** (copy & open), **Copy**. Default channel = first with a contact in that order. Language toggle only if `LANGS` has more than one.
+- Messages composer channels: **Email** (copy & open `mailto:` with subject + body), **X** (copy & open DM/profile), **Nostr** (copy & open `nostr:` link), **YouTube** (copy; the admin pastes into the channel's business email or a comment), **Telegram** (copy & open), **Copy**. Default channel = the row's `outreach_channel` when set, else the first with a contact in the order **X → Nostr → Discord → Email → Telegram** (Part G.2). Language toggle only if `LANGS` has more than one.
 - Demo stat label: "Tested {PRIMARY_FAN_ACTION}".
 
 Outreach copy (`lib/growth/outreach.ts`), same structure as B.6 (step × channel × lang, follow-up 2/3/none days, short link with `?c=em|x|ns|yt|tg|ot`), creator voice, email gets a subject line:
@@ -837,6 +840,119 @@ Visual:
 
 Docs:
 - [ ] `CLAUDE.md` section and `docs/growth/ROUTINES.md` written; commit messages follow the repo's convention.
+
+---
+
+## Part G — Reconciliation with the Oxytoshi outreach documents (overrides Parts B–E)
+
+Read these four files in the target repo before building; they are the authority on voice, channels, targeting and motion:
+`MARKETING_STRATEGY.md` (§2 positioning, §3 audiences, §6 creator loop, §7 metrics), `CREATOR_OUTREACH_KIT.md` (channel ranking, link discipline, CTA ladder, templates, tracking columns), `outreach/PROSPECTS.csv` (76 hand-researched rows; its header is the import schema), `outreach/REACHOUT_SCRIPTS.md` (per-prospect first touches, "Message 2", bumps, the four owner voices, the September audit states). The rules below are the deltas against the Balkina defaults. Where a rule here conflicts with Parts B–E, this part wins.
+
+### G.1 The motion is concierge, not self-serve claim
+
+The conversion target is a **15-minute concierge call** (kit §3): the founder builds the page live on the call and the creator posts the link before it ends. The pre-provisioned page makes that call shorter (the page already exists; on the call the creator opens the claim link and enters an email), and the self-serve activate path stays for creators who want it. Consequences:
+- Add `NEXT_PUBLIC_CONCIERGE_CALENDAR_URL` (public site + admin). When set, the claim page shows a third, secondary action under the two CTAs: "Prefer we do it with you? Book 15 min" (event `claim_call_clicked`), and the composer's Message 2 template includes it.
+- Add manual event types `warmup`, `call_booked`, `cold` to the activity POST schema, the timeline labels ("Warm-up done", "Call booked", "Marked cold") and the drawer: a **Warm-up done** button (logs `warmup`; kit says follow/engage/zap 1–3 days before the DM), a **Call booked** button with a date (logs `call_booked` with `payload.at`; sets `next_follow_up_at` to that date), and **Mark cold** (logs `cold`; the trigger moves the stage to `lost`; "re-approach in a month" → sets `next_follow_up_at` +30 days). Stages `warming` and `call_booked` are added in D.1/D.3 above; stage labels: "Warming", "Call booked".
+- Stage tabs order: All · Due today · New · Enriched · Page ready · Warming · Contacted · Viewed · Engaged · Replied · Call booked · Claimed · Customer · Lost.
+- Funnel strip for this product (kit §5 / strategy §7): Prospects · Pages built · DMs sent (`touches > 0`) · Replied (stage ≥ replied, % of sent) · Calls booked (% of replied) · Live (claimed, % of sent). Replace the Balkina six.
+
+### G.2 Channels (kit §1) — this replaces every channel list in D.10
+
+Ranked: **X DM → Nostr DM → Discord DM → Email (podcasters, or anyone publishing a booking address) → Telegram**, plus **Stacker News** (post/comment, link allowed per SN culture) for SN-native writers. Explicitly never: WhatsApp, SMS, LinkedIn, website contact forms, any bulk sender. The composer has exactly these channels; there is no WhatsApp anywhere in the port. `GrowthOutreachChannel = 'x' | 'nostr' | 'discord' | 'email' | 'telegram' | 'stackernews' | 'other'`. Channel tags on claim links: `?c=x|ns|dc|em|tg|sn|ot`. Contact fields to add on the prospect and the edit form: `discord` (server invite URL or handle), `stackernews` (username). Per-channel open actions: X `https://x.com/<handle>` (DM compose needs the numeric id; use `https://x.com/messages/compose?recipient_id=` only when `external_ids.x` holds it), Nostr `nostr:<npub>`, Discord the server URL, email `mailto:` with subject, Telegram `https://t.me/<handle>`, SN `https://stacker.news/<user>`.
+
+**No bulk send.** The bulk bar never gets a "send" action. One row, one personalised message, one log entry. Keep "Enrich", "Build pages", "Set stage", "Set owner", "Delete".
+
+### G.3 Link discipline and the message ladder (kit §2–§3, scripts "Message 2")
+
+The first DM carries **no link**. The claim link appears only in Message 2, after any reply. This changes the step model from Balkina's (first / follow-up / last chance, link in every message) to:
+
+| Step key | When | Links | Follow-up set |
+|---|---|---|---|
+| `first` | after warm-up | **none** | +4 days |
+| `message2` | the moment they reply, whatever they say | claim link (full creator-page preview) + calendar link; the demo clip attached natively | +4 days |
+| `bump` | 3–5 days of silence after `first` | the fee-table image; claim link allowed | +5 days, then Mark cold |
+| `last_chance` | only for prospects who viewed the page and went quiet | claim link with the expiry date | none |
+
+- `nextStep(row)`: `first` when `touches = 0`; `message2` when the stage is `replied` and no `message2` was logged; `bump` when `touches ≥ 1` and no reply; `last_chance` when `page_views > 0` and silence ≥ 7 days.
+- The composer no longer requires a built page for `first` (Balkina disabled the composer until the claim link existed). It requires one for `message2`, `bump` and `last_chance`.
+- **Hook required.** The first sentence of every `first` and `bump` must be specific and recent (kit §4 "personalise the first line or don't send it"). Add `hook TEXT` to `growth_prospects` (imported from the CSV's `personal_hook`, filled by the enricher's LLM as "one specific, recent, public thing about this creator in ≤ 20 words", editable in the drawer). The composer prepends the hook to the template and the Send button is disabled while the hook is empty or still equals the LLM placeholder for `first`/`bump`.
+- Add `no_bump BOOLEAN NOT NULL DEFAULT false` (scripts: "never bump DarthCoin"); when true the composer hides `bump` and `last_chance` and the row shows a "no bump" chip.
+- Variants: templates are keyed by `(step, pitch)` where `pitch ∈ tipwall | livestream | both` (see G.5), each with **four phrasings** matching the owner voices P1–P4 in `REACHOUT_SCRIPTS.md` (Nostr/SN, X/video, podcasters, music/international). The composer picks the phrasing by the row's `owner` and offers a "Next phrasing" button. The scripts file's per-prospect drafts are the quality bar; port their structure (hook → one sentence of what the product does, in the creator's own terms → "we already set yours up / onboarding founding creators personally" → one yes/no question), never their exact text as a reusable template.
+- Template copy must keep the strategy's message discipline (§2): lead with money kept, "wallet-to-wallet, we structurally can't take a cut", never the word "platform" for ourselves, never open with Aura/Halo/OXY scores, never imply the product processes payments (App Store posture, §8).
+
+Replace the D.10 outreach templates with these shapes (fill the brackets from the row; `{what}` = "superchat you / tip you / unlock your posts" by pitch):
+
+- `first` (no link): "{hook}. I'm on the team building {BRAND}: your {audience word} {what} in sats wallet-to-wallet and you keep 100%, we literally can't take a cut. We've already set a page up for {Name} as a founding creator. Want to see it? 15 min and it's live, we do the work."
+- `message2`: "Easiest way to show you: here's the page we built for {Name}: {claim link} (everything on it is live product, not mockups). And 30 seconds of what your {audience word} would see: [attach clip]. Got 15 min this week? I'll finish it live with you: {calendar}"
+- `bump`: "{hook}. [fee-table image] Made this for another creator who asked what the actual math is: $100 of support on {their platform} ≈ $70 to them; here it's $100, same minute. Offer stands: 15 min and {Name}'s page is live. Want a slot?"
+- `last_chance`: "The page for {Name} is held until {date}; after that we take it down. Claiming takes 10 seconds and is free: {claim link}"
+- Money objection canned reply (kit): available as a "Reply: what's the catch" insert in the composer, verbatim from `REACHOUT_SCRIPTS.md` → "The money objection".
+
+### G.4 Targeting, discovery platforms and scoring (strategy §3, §6.1; CSV categories)
+
+- **Audience band**: 500–25,000 followers is the sweet spot (`FOLLOWER_SWEET_SPOT` updated above). Over 100,000: score −2 and chip "white-glove" (do not auto-queue; founder only). Non-bitcoin creators are out of scope for v1 (wallet objection); the niche catalogue is bitcoin-only topics: `bitcoin`, `lightning_nostr`, `mining`, `sound_money`, `privacy_foss`, `bitcoin_music` (V4V musicians), `circular_economy` (meetups, Global-South projects). Drop `crypto`, `defi` and `btc_merchant` from the seeded catalogue (keep the BTC Map adapter in the codebase but not in the modal; the map/local play is Phase 3 in the strategy).
+- **Creator type** (`category`, from the CSV): `nostr-creator`, `spaces-host`, `meetup-organizer`, `youtuber`, `youtuber-live`, `podcaster`, `podcaster-live`, `community-owner`, `writer`, `educator`, `dev-educator`, `musician`, `artist`, `builder`, `nostr-streamer`. Add `category TEXT` to `growth_prospects`; the generate modal's first section is **Creator types** (chips), the second **Platforms**, topic niche is a small third row defaulting to `bitcoin`.
+- **Pitch** (`pitch TEXT CHECK IN ('tipwall','livestream','both')`, from the CSV's `prospect_type`): derived at insert (live/streams/spaces/`youtuber-live`/`podcaster-live` → `livestream`; writers/educators/artists → `tipwall`; podcasters with a live show → `both`), editable. Drives the template family (G.3) and the demo variant (G.7).
+- **Owner** (`owner TEXT`, the CSV's `P1-nostr-sn` etc.): the admin user responsible. Add an Owner filter, a "Mine" quick filter, "Set owner" in the bulk bar, and store `payload.by` on events as today.
+- **Discovery platforms for v1**: `nostr` (NIP-50 relay search), `stackernews` (new adapter: GraphQL at `https://stacker.news/api/graphql`, query users by recent items and sats earned; `users(…)`/`items(sort: "top")` with `user { name, stacked }`, dedupe key `stackernews:<name>`), `youtube`, `podcast` (Apple + RSS; **Fountain/Podcast Index `value` blocks are a tier-1 signal** because the audience already holds wallets), `x` (optional, paid), `csv`. Record only as **CSV-fed for now**, with adapters as a later phase: Wavlake (musicians), zap.stream (streamers), Substack (writers), Geyser (gated communities), X Spaces hosts, Rumble. Say so in `ROUTINES.md`.
+- **Scoring replaces D.6**: `+2` category in the strategy's list (§6.1); `+2` wallet evidence (Lightning address, zaps, V4V value block, SN sats earned, Wavlake); `+2` **gates a community or content behind Patreon / Substack / Geyser / SN territory** (the Patreon-replacement wedge, strategy §1 and §6.1; this is the opposite of Balkina's competitor penalty); `+2` already takes live sats through an intermediary (LiveTip, SuperSats, Wavlake 10%): "direct tool upgrade"; `+1` audience in band, `−2` over 100k; `+1` published within 14 days for `livestream`, 60 days for `tipwall`; `−5` nothing dated in 12 months; `+1` replies to DMs / reads boosts on air when the enricher can see it (mentions "boostagram", "reads boosts", "Q&A"); `+1` has a reachable channel in G.2's top three. No negative score for using any other tool. Store the wedge in `enrichment.monetization` and show it as the row chip (`gates via Patreon`, `takes sats via LiveTip`), because it is the pitch angle, not a disqualifier.
+- **Freshness states from the September audit** (`queued` = verified active in window: tip-wall ≤ 2 months, livestream ≤ 2 weeks; `verify` = probably active but unchecked; `stale` = nothing since the cutoff). Reproduce them as a computed `freshness` chip from `last_published_at` and `pitch`, plus a `verify_before_send TEXT` column shown in the composer as a checklist line ("Check: open YouTube /streams, keep if < 2 weeks") that the admin ticks before the first send (logs `note` "verified").
+
+### G.5 The CSV import maps the real file
+
+`POST /api/admin/growth/import` accepts `outreach/PROSPECTS.csv` as-is. Column mapping:
+
+| CSV column | Prospect column / behaviour |
+|---|---|
+| `id` | `external_ids.csv_id` (string) |
+| `owner` | `owner` |
+| `name` | `name` |
+| `category` | `category` (values above; unknown → kept verbatim) |
+| `outreach_channel` | `outreach_channel` (new column; normalised to G.2 keys: "X DM"→x, "Nostr DM"→nostr, "Stacker News"→stackernews, "email…"→email, "Instagram/X DM"→x, "Substack DM"→other, "boost…"→other) |
+| `handle_or_contact` | parsed: `npub1…` → `nostr_pubkey` (decode to hex) ; `@handle` → `x_handle`; `stacker.news/<u>` → `stackernews`; email → `email`; else → `notes` prefix "contact: …" |
+| `profile_url` | `profile_url`, and `website` when it is not a platform host; platform detected from the host → `platform` + `external_id` (YouTube channel/handle, fountain.fm show, wavlake.com artist, stacker.news user, primal.net npub, x.com user, substack) |
+| `est_audience` | `followers` when a number can be parsed ("~5.2k subs" → 5200), else kept in `enrichment.audience_note` |
+| `wallet_evidence` | `enrichment.wallet_evidence`; sets `accepts_bitcoin = true` when non-empty and not "unknown" |
+| `monetization_today` | `enrichment.monetization_note` and feeds the wedge chips |
+| `personal_hook` | `hook` |
+| `confidence` | `enrichment.confidence` |
+| `verify_before_send` | `verify_before_send` |
+| `state` | stage: `bench`→new, `verify`→qualified (+ chip "verify first"), `queued`→qualified, `stale`→disqualified, `warming`→warming, `dm_sent`→contacted, `replied`→replied, `call booked`→call_booked, `live`→claimed, `cold`→lost |
+| `first_touch_date` | event `sent` back-dated with `created_at` = that date (so `touches`/`last_contacted_at` are right) |
+| `last_action`, `next_action`, `notes` | `notes` (joined, labelled) |
+| `prospect_type` | `pitch` |
+| `last_verified_activity` | `enrichment.last_verified_activity` and, when it contains a parseable date, `last_published_at` |
+
+Re-importing the same file updates rows matched by `external_ids.csv_id` and never lowers a stage. The import result lists per-row warnings (unparsed handle, unknown state).
+
+### G.6 Pre-provisioned page content (strategy §6.2, kit §2)
+
+The pre-built page is a founding-creator page: display name, bio, the creator's links, the platform avatar hotlinked, and **at least one tip-wall item** (kit: "a bare page is worse than no link"), seeded from the pitch: `tipwall` → one locked item named from the enrichment ("The Week That Was · 2,100 sats", "Node setup guide · 5,000 sats") or the category default ("Supporter post", 2,100 sats); `livestream` → a Superchat-enabled page plus one item ("Backstage chat · 10,000 sats" when the prospect gates a Discord/Telegram, else "Thank-you post"). Mark seeded items as drafts if the product has such a flag so nothing can be bought before claim. The claim page copy says "we set up a founding-creator page for {Name}" and shows the founder's own page link as proof (`NEXT_PUBLIC_FOUNDER_PAGE_URL`, e.g. `oxytoshi.com/c/blindowl`) in the "what we did" paragraph.
+
+### G.7 Demo variants on the claim page
+
+- `livestream` pitch → **Superchat demo**: pick an amount + message → fake invoice (DEMO watermark) → "what the fan sees" (sent) and "what you see" = the Superchat lighting up on the phone mock during a stream + earnings row.
+- `tipwall` pitch → **Unlock demo**: pick the seeded locked item → fake invoice → "what the fan sees" = the item unlocked with a one-use code/link mock → "what you see" = the earnings row + "1 supporter".
+- `both` → Superchat demo first, with a "Try the tip wall too" link to the other.
+Nothing is written in either; events as D.11.
+
+### G.8 Assets the composer needs (kit §2, scripts "Message 2")
+
+Add a single-row `growth_settings` table (service-role) or env, read by the admin: `fee_table_image_url` (the $100-of-support PNG), `demo_clip_url` (the 25–30 s vertical MP4, captions burned in), `calendar_url`, `founder_page_url`. The composer shows "Attach: demo clip ⤓" and "Attach: fee table ⤓" download links next to `message2` and `bump` so the sender attaches the file natively in X/Nostr (links to videos do not autoplay and trip spam filters). Audio in `marketing-assets/*.mp3` is not used by this feature.
+
+### G.9 Metrics (strategy §7, kit §5)
+
+The facets endpoint adds: `dms_sent` (events `sent` in the last 7 days), `reply_rate` (replied ÷ sent, all time and 7 days), `calls_booked`, `live` (claimed), `top_objection` (most frequent `payload.objection` tag; add an optional "Objection" select on the `replied` log: fees / wallet / platform-rules / time / not-now / other). The Prospects page shows these as the Monday scorecard strip; `ROUTINES.md` documents the Monday ritual.
+
+### G.10 Acceptance additions (append to Part E)
+
+- [ ] Importing `outreach/PROSPECTS.csv` creates 76 prospects with the stages, owners, hooks and pitches mapped per G.5, and importing it again changes nothing except refreshed facts.
+- [ ] The composer refuses to send a `first` with an empty hook and never shows a link in `first`.
+- [ ] A row with `no_bump = true` shows no bump/last-chance step.
+- [ ] A row over 100k followers shows "white-glove" and is excluded from the "Build pages" default selection.
+- [ ] Logging `replied` then `call_booked` moves the stage to `call_booked`; `cold` moves it to `lost` and sets a 30-day follow-up.
+- [ ] The claim page for a `tipwall` prospect runs the unlock demo; for a `livestream` prospect the Superchat demo; a seeded tip-wall item exists on every built page.
+- [ ] No WhatsApp, SMS or bulk-send code path exists anywhere in the port.
 
 ---
 
