@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { boxesFor, type Format } from '@/lib/ig/overlay';
+import { boxesFor, TYPE, type Format } from '@/lib/ig/overlay';
 
 type Lang = 'sr' | 'en';
 
@@ -84,34 +84,46 @@ export function PostPreview({ format, layout, slides, baseUrl, templateUrl, draf
           </div>
         )}
 
-        {/* Editable copy over the text-free render */}
+        {/* Editable copy over the text-free render, at the template's own positions and type scale */}
         {overlay && width > 0 && FIELDS.map((field) => {
           const b = boxes[field];
           const text = slide.copy[field] ?? '';
           const fixed = field === 'eyebrow';
           const isEditing = editing === field;
           const isHover = hover === field;
-          const fontSize = Math.max(9, b.size * width);
+          const spec = fixed ? TYPE[format].eyebrow : TYPE[format][field];
+          const fontSize = spec.size * width;
+          // Text boxes are stored by their ascender line; the CSS line box starts `top` em above it.
+          const top = fixed ? `${b.y * 100}%` : `calc(${b.y * 100}% - ${(spec as { top: number }).top * fontSize}px)`;
           return (
             <div
               key={field}
               className="absolute"
-              style={{ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: fixed ? 'auto' : `${b.w * 100}%`, maxWidth: `${(1 - b.x - 0.04) * 100}%` }}
+              style={{ left: `${b.x * 100}%`, top, width: fixed ? 'auto' : `${b.w * 100}%`, height: fixed ? `${boxes.eyebrow.h * 100}%` : undefined, maxWidth: `${(1 - b.x - 0.04) * 100}%` }}
               onMouseEnter={() => setHover(field)}
               onMouseLeave={() => setHover((h) => (h === field ? null : h))}
             >
-              <div
-                contentEditable={!fixed}
-                suppressContentEditableWarning
-                spellCheck={false}
-                onFocus={() => !fixed && setEditing(field)}
-                onBlur={(e) => !fixed && commit(field, e.currentTarget)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); } if (e.key === 'Escape') { (e.currentTarget as HTMLElement).innerText = text; (e.currentTarget as HTMLElement).blur(); } }}
-                className={`outline-none transition ${fixed ? 'inline-block whitespace-nowrap rounded-md bg-[#FFE300] px-[0.6em] py-[0.25em] font-bold uppercase tracking-wide text-[#232B5E]' : 'cursor-text text-white'} ${field === 'headline' ? 'font-medium leading-[1.12]' : field === 'subline' ? 'font-normal leading-[1.3]' : ''} ${isEditing ? 'rounded-sm ring-2 ring-white/90 ring-offset-1 ring-offset-black/20' : isHover && !fixed ? 'rounded-sm ring-1 ring-white/60' : ''}`}
-                style={{ fontSize, textShadow: fixed ? 'none' : '0 1px 2px rgba(0,0,0,.25)', minHeight: fontSize * 1.1 }}
-              >
-                {text}
-              </div>
+              {fixed ? (
+                <div
+                  className="flex h-full items-center whitespace-nowrap bg-[#FFE300] font-bold uppercase text-[#232B5E]"
+                  style={{ fontSize, lineHeight: 1, paddingLeft: TYPE[format].eyebrow.padX * width, paddingRight: TYPE[format].eyebrow.padX * width, borderRadius: TYPE[format].eyebrow.radius * width, letterSpacing: `${TYPE[format].eyebrow.tracking}em` }}
+                >
+                  {text}
+                </div>
+              ) : (
+                <div
+                  contentEditable
+                  suppressContentEditableWarning
+                  spellCheck={false}
+                  onFocus={() => setEditing(field)}
+                  onBlur={(e) => commit(field, e.currentTarget)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); } if (e.key === 'Escape') { (e.currentTarget as HTMLElement).innerText = text; (e.currentTarget as HTMLElement).blur(); } }}
+                  className={`cursor-text text-white outline-none transition ${isEditing ? 'rounded-sm ring-2 ring-white/90 ring-offset-1 ring-offset-black/20' : isHover ? 'rounded-sm ring-1 ring-white/60' : ''}`}
+                  style={{ fontSize, lineHeight: (spec as { lineHeight: number }).lineHeight, fontWeight: (spec as { weight: number }).weight, letterSpacing: 0, minHeight: fontSize * (spec as { lineHeight: number }).lineHeight }}
+                >
+                  {text}
+                </div>
+              )}
               {!fixed && (isHover || isEditing) && (
                 <button
                   type="button"
