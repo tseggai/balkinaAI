@@ -62,7 +62,9 @@ const FIELD_HINTS: Record<string, string> = {
   step3_text: 'step 3 one-liner, max 40 characters',
 };
 
-export type Renders = Partial<Record<Format, Partial<Record<Lang, string>>>>;
+/** Per format: one URL per language, plus `base` = the same template with the photo and no text (editable preview). */
+export type RenderKey = Lang | 'base';
+export type Renders = Partial<Record<Format, Partial<Record<RenderKey, string>>>>;
 
 export interface StudioPost {
   id: string;
@@ -221,7 +223,7 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
 
 /* ---------- Rendering (one format × language per call, each ~20–40 s) ---------- */
 
-export interface RenderStep { format: Format; lang: Lang }
+export interface RenderStep { format: Format; lang: RenderKey }
 
 /** Steps still missing for a post, given which templates its layout has. */
 export function pendingRenders(post: StudioPost, has: { sq: boolean; st: boolean }): RenderStep[] {
@@ -243,7 +245,10 @@ export async function renderOne(supabase: SupabaseClient, post: StudioPost, step
   const { sq, st } = await templatesFor(supabase, post.layout);
   const tpl = step.format === 'sq' ? sq : st;
   if (!tpl) throw new Error(`No ${step.format === 'sq' ? 'square' : 'story'} template synced for layout "${post.layout}"`);
-  const text = post.copy[step.lang];
+  // `base` = every text field blank (a single space; Canva rejects empty strings), so only the photo and the design remain.
+  const text = step.lang === 'base'
+    ? Object.fromEntries(Object.entries(tpl.fields).filter(([, t]) => t === 'text').map(([k]) => [k, ' ']))
+    : post.copy[step.lang];
   if (!text) throw new Error(`No ${step.lang.toUpperCase()} copy on this post`);
   const cachedAsset = post.canva_asset_id && post.canva_asset_photo === post.photo_url ? post.canva_asset_id : undefined;
   const r = await renderTemplate(supabase, {
@@ -269,9 +274,11 @@ export async function renderOne(supabase: SupabaseClient, post: StudioPost, step
 /** Forget every render (after copy or photo changed) so the steps run again. A new photo also drops the cached asset. */
 export async function clearRenders(supabase: SupabaseClient, post: StudioPost, extra: Record<string, unknown> = {}): Promise<StudioPost> {
   const photoChanged = typeof extra.photo_url === 'string' && extra.photo_url !== post.photo_url;
+  // The text-free base render only depends on the photo, so it survives a copy change.
+  const keep = (r: Renders): Renders => (photoChanged ? {} : Object.fromEntries((['sq', 'st'] as Format[]).filter((f) => r[f]?.base).map((f) => [f, { base: r[f]?.base }])));
   const { data, error } = await supabase
     .from('ig_posts')
-    .update({ ...extra, ...(photoChanged ? { canva_asset_id: null, canva_asset_photo: null } : {}), renders: {}, designs: {}, render_sq_url: null, render_st_url: null, design_sq_id: null, design_st_id: null, error: null, updated_at: new Date().toISOString() })
+    .update({ ...extra, ...(photoChanged ? { canva_asset_id: null, canva_asset_photo: null } : {}), renders: keep(post.renders), designs: keep(post.designs), render_sq_url: null, render_st_url: null, design_sq_id: null, design_st_id: null, error: null, updated_at: new Date().toISOString() })
     .eq('id', post.id)
     .select('*')
     .single();

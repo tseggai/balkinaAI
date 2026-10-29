@@ -5,7 +5,8 @@ import { BTN_DANGER, BTN_SECONDARY } from '@/components/prospect-crm';
 export type Lang = 'sr' | 'en';
 export type Kind = 'feed' | 'story';
 export type Format = 'sq' | 'st';
-export type Renders = Partial<Record<Format, Partial<Record<Lang, string>>>>;
+export type RenderKey = Lang | 'base';
+export type Renders = Partial<Record<Format, Partial<Record<RenderKey, string>>>>;
 
 /** The ig_posts row as the studio page sees it. */
 export interface StudioPostView {
