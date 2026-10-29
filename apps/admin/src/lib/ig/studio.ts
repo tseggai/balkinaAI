@@ -245,9 +245,10 @@ export async function renderOne(supabase: SupabaseClient, post: StudioPost, step
   const { sq, st } = await templatesFor(supabase, post.layout);
   const tpl = step.format === 'sq' ? sq : st;
   if (!tpl) throw new Error(`No ${step.format === 'sq' ? 'square' : 'story'} template synced for layout "${post.layout}"`);
-  // `base` = every text field blank (a single space; Canva rejects empty strings), so only the photo and the design remain.
+  // `base` = the copy fields blank (a single space; Canva rejects empty strings), so only the photo, the design
+  // and the fixed URL remain — the editable preview lays the copy over it.
   const text = step.lang === 'base'
-    ? Object.fromEntries(Object.entries(tpl.fields).filter(([, t]) => t === 'text').map(([k]) => [k, ' ']))
+    ? Object.fromEntries(Object.entries(tpl.fields).filter(([, t]) => t === 'text').map(([k]) => [k, k === 'url' ? 'balkina.ai' : ' ']))
     : post.copy[step.lang];
   if (!text) throw new Error(`No ${step.lang.toUpperCase()} copy on this post`);
   const cachedAsset = post.canva_asset_id && post.canva_asset_photo === post.photo_url ? post.canva_asset_id : undefined;
