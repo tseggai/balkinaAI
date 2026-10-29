@@ -35,7 +35,15 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState('');
   const [open, setOpen] = useState(false);
-  const [preview, setPreview] = useState<{ title: string; format: 'sq' | 'st'; sr: string | null; en: string | null } | null>(null);
+  const [preview, setPreview] = useState<{ title: string; format: 'sq' | 'st'; slides: { url: string | null; label: string }[]; note: string } | null>(null);
+
+  /** Opens the template as published (and the last test render, when there is one) at full size. */
+  const show = (t: Template) => setPreview({
+    title: t.title,
+    format: t.format,
+    slides: [{ url: t.thumbnail_url, label: 'Template as published in Canva' }, ...(t.last_render_url ? [{ url: t.last_render_url, label: 'Last test render' }] : [])],
+    note: t.last_render_url ? 'Swipe between the published template and the last test render.' : 'The template as published in Canva, before any copy is filled in. Test renders it with the longest copy.',
+  });
 
   const load = useCallback(async () => {
     const res = await fetch('/api/admin/canva/status');
@@ -84,7 +92,7 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
     if (errors.length === 2) notify('Render failed', errors);
     else {
       if (errors.length) notify('One render failed', errors);
-      setPreview({ title: t.title, format: t.format, sr: sr.url, en: en.url });
+      setPreview({ title: t.title, format: t.format, slides: [{ url: sr.url, label: 'Serbian · slide 1' }, { url: en.url, label: 'English · slide 2' }], note: 'Swipe or use the arrows, as in the Instagram feed. Filled with the category eyebrow, the longest copy for this layout, and a matching photo.' });
     }
     await load();
   };
@@ -138,28 +146,31 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
             <div>Scopes to enable in Canva: <code>{status.scopes.join(' ')}</code></div>
           </div>
         )}
-        <p className="mb-3 text-xs text-gray-500">One square and one story per business category, named <code>IG · NN category · square|story</code>. Test renders both languages with the longest copy the copywriter may write.</p>
+        <p className="mb-3 text-xs text-gray-500">One square and one story per business category, named <code>IG · NN category · square|story</code>. Click a thumbnail to see the template full size; Test renders both languages with the longest copy the copywriter may write.</p>
         <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
           {byCategory.map(({ c, sq, st }) => (
-            <div key={c.key} className="flex flex-wrap items-center gap-2 px-3 py-2">
-              <span className="w-8 text-xs text-gray-400">{String(c.order).padStart(2, '0')}</span>
-              <span className="w-44 text-sm font-medium text-gray-900">{c.name.en}</span>
-              {([['sq', sq, 'Square'], ['st', st, 'Story']] as const).map(([f, t, label]) => (
-                <span key={f} className="flex items-center gap-1">
-                  {t ? (
-                    <button type="button" className={`${BTN_SECONDARY} py-1 text-xs`} disabled={Boolean(busy)} onClick={() => test(t)} title={`Test render ${t.title}`}>{busy === t.id ? 'Rendering…' : `Test ${label.toLowerCase()}`}</button>
-                  ) : (
-                    <span className="rounded-lg border border-dashed border-gray-200 px-2 py-1 text-xs text-gray-400">{label} missing</span>
-                  )}
-                </span>
-              ))}
-              {sq?.last_render_url && <img src={sq.last_render_url} alt="" className="ml-auto h-8 w-8 rounded object-cover" />}
+            <div key={c.key} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
+              <span className="w-6 text-xs text-gray-400">{String(c.order).padStart(2, '0')}</span>
+              <span className="w-40 text-sm font-medium text-gray-900 sm:w-44">{c.name.en}</span>
+              <span className="flex items-center gap-2">
+                {([['sq', sq, 'Square'], ['st', st, 'Story']] as const).map(([f, t, label]) => (
+                  <span key={f} className="flex items-center gap-2">
+                    <Thumb t={t} label={label} onClick={t ? () => show(t) : undefined} />
+                    {t ? (
+                      <button type="button" className={`${BTN_SECONDARY} py-1 text-xs`} disabled={Boolean(busy)} onClick={() => test(t)} title={`Test render ${t.title}`}>{busy === t.id ? 'Rendering…' : 'Test'}</button>
+                    ) : (
+                      <span className="text-xs text-gray-400">missing</span>
+                    )}
+                  </span>
+                ))}
+              </span>
             </div>
           ))}
           {legacy.map((t) => (
-            <div key={t.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-gray-500">
-              <span className="w-8 text-xs text-gray-400">—</span>
-              <span className="w-44 text-sm">{t.title} <span className="text-xs text-gray-400">(legacy)</span></span>
+            <div key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 text-gray-500">
+              <span className="w-6 text-xs text-gray-400">—</span>
+              <span className="w-40 text-sm sm:w-44">{t.title} <span className="text-xs text-gray-400">(legacy)</span></span>
+              <Thumb t={t} label={t.format === 'st' ? 'Story' : 'Square'} onClick={() => show(t)} />
               <button type="button" className={`${BTN_SECONDARY} py-1 text-xs`} disabled={Boolean(busy)} onClick={() => test(t)}>{busy === t.id ? 'Rendering…' : 'Test'}</button>
             </div>
           ))}
@@ -168,13 +179,22 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
 
       <Modal open={Boolean(preview)} onClose={() => setPreview(null)} title={preview?.title ?? ''} width={preview?.format === 'st' ? 'max-w-sm' : 'max-w-xl'} footer={<button type="button" className={BTN_PRIMARY} onClick={() => setPreview(null)}>Close</button>}>
         {preview && (
-          <Carousel
-            aspect={preview.format === 'st' ? 'aspect-[9/16]' : 'aspect-square'}
-            slides={[{ url: preview.sr, label: 'Serbian · slide 1' }, { url: preview.en, label: 'English · slide 2' }]}
-          />
+          <Carousel aspect={preview.format === 'st' ? 'aspect-[9/16]' : 'aspect-square'} slides={preview.slides} />
         )}
-        <p className="mt-2 text-xs text-gray-500">Swipe or use the arrows, as in the Instagram feed. Filled with the category eyebrow, the longest copy for this layout, and a matching photo.</p>
+        <p className="mt-2 text-xs text-gray-500">{preview?.note}</p>
       </Modal>
     </div>
+  );
+}
+
+/** Thumbnail of the template as published (falls back to the last test render); click to enlarge. */
+function Thumb({ t, label, onClick }: { t: Template | null; label: string; onClick?: () => void }) {
+  const size = label === 'Story' ? 'h-16 w-9' : 'h-16 w-16';
+  const src = t?.thumbnail_url ?? t?.last_render_url ?? null;
+  if (!t || !src) return <span className={`${size} flex items-center justify-center rounded-md border border-dashed border-gray-200 text-[10px] text-gray-400`} title={`${label} missing`}>{label === 'Story' ? 'St' : 'Sq'}</span>;
+  return (
+    <button type="button" onClick={onClick} className={`${size} overflow-hidden rounded-md border border-gray-200 bg-gray-100 transition hover:ring-2 hover:ring-indigo-300`} title={`${t.title} — click to enlarge`}>
+      <img src={src} alt={t.title} className="h-full w-full object-cover" />
+    </button>
   );
 }
