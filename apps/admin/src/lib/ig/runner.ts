@@ -1,7 +1,7 @@
 /* Shared Instagram publishing runner: used by the cron route and the admin dashboard. */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { PLAN, assetUrl, buildCaption, type PlanRow } from './plan';
-import { igAccountInfo, igCredentials, publishImage, type IgCredentials } from './publish';
+import { igAccountInfo, publishImage, resolveIgCredentials, type IgCredentialState, type IgCredentials } from './publish';
 import { effectiveSchedule, loadOverrides, loadSettings, planKey, type IgOverride, type IgSettings, type Kind, type RowSchedule } from './schedule';
 
 export type { Kind } from './schedule';
@@ -12,15 +12,26 @@ export interface IgConfig {
   base: string;
   lang: string;
   credentials: boolean;
+  source: 'db' | 'env' | null;
+  username: string | null;
+  expiresAt: string | null;
+  updatedAt: string | null;
   login: 'instagram' | 'facebook';
 }
 
-export function igConfig(): IgConfig {
+/** Asset base, language and the state of the Instagram token (DB first, env fallback). */
+export async function igConfig(supabase: SupabaseClient): Promise<IgConfig & { state: IgCredentialState }> {
+  const state = await resolveIgCredentials(supabase);
   return {
     base: process.env.IG_ASSET_BASE ?? DEFAULT_ASSET_BASE,
     lang: process.env.IG_LANG ?? 'sr',
-    credentials: Boolean(igCredentials()),
+    credentials: Boolean(state.creds),
+    source: state.source,
+    username: state.username,
+    expiresAt: state.expiresAt,
+    updatedAt: state.updatedAt,
     login: process.env.META_IG_LOGIN === 'facebook' ? 'facebook' : 'instagram',
+    state,
   };
 }
 
@@ -112,14 +123,14 @@ export async function publishRow(
 }
 
 /** Token sanity check: who does this token belong to? */
-export async function checkAccount(): Promise<{ ok: boolean; account?: { id: string; user_id?: string; username?: string }; error?: string }> {
-  const creds = igCredentials();
-  if (!creds) return { ok: false, error: 'META_IG_ACCESS_TOKEN is not set in this deployment (and META_IG_USER_ID when using Facebook login)' };
+export async function checkAccount(supabase: SupabaseClient): Promise<{ ok: boolean; source?: 'db' | 'env'; account?: { id: string; user_id?: string; username?: string }; error?: string }> {
+  const state = await resolveIgCredentials(supabase);
+  if (!state.creds) return { ok: false, error: 'No Instagram token: paste one on the Instagram page (or set META_IG_ACCESS_TOKEN in Vercel)' };
   try {
-    const account = await igAccountInfo(creds);
-    return { ok: true, account };
+    const account = await igAccountInfo(state.creds);
+    return { ok: true, source: state.source ?? undefined, account };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return { ok: false, source: state.source ?? undefined, error: err instanceof Error ? err.message : String(err) };
   }
 }
 

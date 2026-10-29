@@ -1,11 +1,29 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
-import { igCredentials } from '@/lib/ig/publish';
+import { refreshLongLivedToken, resolveIgCredentials } from '@/lib/ig/publish';
 import { checkAccount, dueRows, findRow, igConfig, jobsFor, planState, publishRow, type Kind } from '@/lib/ig/runner';
 import { loadSettings } from '@/lib/ig/schedule';
 import { duePosts, publishPost } from '@/lib/ig/studio';
 
 export const maxDuration = 300;
+
+const REFRESH_WITHIN_MS = 10 * 24 * 3600 * 1000;   // refresh the DB token when it expires within 10 days
+const MIN_AGE_MS = 24 * 3600 * 1000;               // Instagram refuses to refresh tokens younger than 24 h
+
+/** Keep the DB token alive: refresh it when it is about to expire. Env tokens cannot be refreshed here. */
+async function maybeRefreshToken(supabase: ReturnType<typeof createAdminClient>, cfg: Awaited<ReturnType<typeof igConfig>>): Promise<boolean> {
+  if (cfg.source !== 'db' || !cfg.state.creds || !cfg.expiresAt) return false;
+  const now = Date.now();
+  if (Date.parse(cfg.expiresAt) - now > REFRESH_WITHIN_MS) return false;
+  if (cfg.updatedAt && now - Date.parse(cfg.updatedAt) < MIN_AGE_MS) return false;
+  try {
+    const r = await refreshLongLivedToken(cfg.state.creds.accessToken);
+    await supabase.from('ig_settings').update({ access_token: r.accessToken, token_expires_at: new Date(now + r.expiresIn * 1000).toISOString(), token_updated_at: new Date(now).toISOString() }).eq('id', 1);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * GET|POST /api/growth/cron/instagram
@@ -29,7 +47,8 @@ export async function POST(request: Request) {
   const dry = url.searchParams.get('dry') === '1';
   const only = url.searchParams.get('only') as Kind | null;
   const forced = url.searchParams.get('row');
-  const cfg = igConfig();
+  const cfg = await igConfig(supabase);
+  const refreshed = await maybeRefreshToken(supabase, cfg);
   const state = await planState(supabase, cfg);
 
   let due = dueRows(state);
@@ -48,21 +67,24 @@ export async function POST(request: Request) {
   const posts = forced || state.settings.paused ? [] : await duePosts(supabase);
 
   if (dry) {
-    const check = await checkAccount();
+    const check = await checkAccount(supabase);
     return NextResponse.json({
       dry: true,
       paused: state.settings.paused,
       due: due.map((d) => ({ key: d.key, scheduledAt: d.scheduledAt, kinds: d.kinds })),
       duePosts: posts.map((p) => ({ id: p.id, layout: p.layout, scheduledAt: p.scheduled_at, kinds: p.kinds, attempts: p.attempts })),
       credentials: cfg.credentials,
+      tokenSource: cfg.source,
+      tokenExpiresAt: cfg.expiresAt,
+      tokenRefreshed: refreshed,
       account: check.account ?? null,
       accountError: check.error ?? null,
     });
   }
   if (due.length === 0 && posts.length === 0) return NextResponse.json({ published: [], posts: [], skipped: state.settings.paused ? 'paused' : 'nothing due' });
 
-  const creds = igCredentials();
-  if (!creds) return NextResponse.json({ error: 'META_IG_ACCESS_TOKEN is not set' }, { status: 500 });
+  const creds = (await resolveIgCredentials(supabase)).creds;
+  if (!creds) return NextResponse.json({ error: 'No Instagram token' }, { status: 500 });
 
   const results = [];
   for (const d of due) {

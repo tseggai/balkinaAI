@@ -11,6 +11,8 @@ const Body = z.object({
   layout: z.string().min(1),
   brief: z.string().max(1000).optional(),
   langs: z.array(z.enum(['sr', 'en'])).min(1).default(['sr', 'en']),
+  only: z.array(z.string()).optional(),
+  current: z.object({ copy: z.record(z.enum(['sr', 'en']), z.record(z.string(), z.string())).optional(), caption: z.string().nullable().optional() }).optional(),
 });
 
 // POST /api/admin/studio/copy — write the image copy (per language) and a feed caption for a layout.

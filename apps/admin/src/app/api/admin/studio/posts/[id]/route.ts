@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin-auth';
-import { igCredentials } from '@/lib/ig/publish';
+import { resolveIgCredentials } from '@/lib/ig/publish';
 import { clearRenders, generateCopy, pendingRenders, publishPost, renderOne, templatesFor, textFieldsOf, type StudioPost } from '@/lib/ig/studio';
 
 export const maxDuration = 60;
@@ -88,8 +88,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         return NextResponse.json({ post: data });
       }
       case 'publish': {
-        const creds = igCredentials();
-        if (!creds) return NextResponse.json({ error: 'META_IG_ACCESS_TOKEN is not set in this deployment' }, { status: 500 });
+        const creds = (await resolveIgCredentials(auth.supabase)).creds;
+        if (!creds) return NextResponse.json({ error: 'No Instagram token: paste one on the Instagram page' }, { status: 500 });
         if (!post.renders.sq?.[post.lang]) return NextResponse.json({ error: 'Render the post before publishing it' }, { status: 400 });
         const target = { ...post, kinds: b.kinds ?? post.kinds, caption: b.caption ?? post.caption };
         await db().update({ kinds: target.kinds, caption: target.caption, updated_at: now }).eq('id', post.id);

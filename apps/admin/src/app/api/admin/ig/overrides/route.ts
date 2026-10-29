@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   const { keys, set, shift_days, time, clear } = parsed.data;
 
-  const state = await planState(auth.supabase, igConfig());
+  const state = await planState(auth.supabase, await igConfig(auth.supabase));
   const rows = state.rows.filter((r) => keys.includes(r.key));
   if (rows.length === 0) return NextResponse.json({ error: 'No matching rows' }, { status: 404 });
   const tz = state.settings.timezone;

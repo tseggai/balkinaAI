@@ -20,10 +20,10 @@ export async function GET() {
     const sq = templates.find((t) => t.layout === layout && t.format === 'sq') ?? null;
     const st = templates.find((t) => t.layout === layout && t.format === 'st') ?? null;
     const fields = Array.from(new Set([...Object.entries(sq?.fields ?? {}), ...Object.entries(st?.fields ?? {})].filter(([, v]) => v === 'text').map(([k]) => k)));
-    return { layout, sq: Boolean(sq), st: Boolean(st), fields, preview: sq?.last_render_url ?? sq?.thumbnail_url ?? st?.thumbnail_url ?? null };
+    return { layout, sq: Boolean(sq), st: Boolean(st), fields, preview: sq?.last_render_url ?? sq?.thumbnail_url ?? st?.thumbnail_url ?? null, previewSq: sq?.last_render_url ?? sq?.thumbnail_url ?? null, previewSt: st?.last_render_url ?? st?.thumbnail_url ?? null };
   }).filter((l) => l.sq);
   return NextResponse.json({
-    verticals: VERTICALS.map((v) => ({ value: v.value, label: v.label, category: v.category })),
+    verticals: VERTICALS.map((v) => ({ value: v.value, label: v.label, category: v.category, photo: v.photo })),
     categories: CATEGORIES.map((c) => ({ key: c.key, order: c.order, label: c.name.en, synced: layouts.some((l) => l.layout === c.key), story: layouts.some((l) => l.layout === c.key && l.st) })),
     tones: TONES,
     photos,
@@ -32,6 +32,6 @@ export async function GET() {
     posts: postRes.data ?? [],
     canva: Boolean(canvaRes.data),
     openai: Boolean(process.env.OPENAI_API_KEY),
-    instagram: igConfig().credentials,
+    instagram: (await igConfig(auth.supabase)).credentials,
   });
 }

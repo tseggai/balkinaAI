@@ -3,6 +3,8 @@
    permissions instagram_business_basic + instagram_business_content_publish). Set META_IG_LOGIN=facebook
    for the legacy Facebook-Login flavour (graph.facebook.com, instagram_basic + instagram_content_publish). */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 const FACEBOOK_LOGIN = process.env.META_IG_LOGIN === 'facebook';
 const GRAPH = FACEBOOK_LOGIN ? 'https://graph.facebook.com/v21.0' : 'https://graph.instagram.com/v21.0';
 
@@ -21,8 +23,9 @@ interface GraphError {
 }
 
 /**
- * With Instagram Login the token is bound to one account, so every call goes to the `me` node and
- * META_IG_USER_ID is optional (informational). With Facebook Login the node must be the IG business id.
+ * Token from the environment (fallback). With Instagram Login the token is bound to one account, so
+ * every call goes to the `me` node and META_IG_USER_ID is optional. With Facebook Login the node must
+ * be the IG business id.
  */
 export function igCredentials(): IgCredentials | null {
   const accessToken = process.env.META_IG_ACCESS_TOKEN;
@@ -30,6 +33,51 @@ export function igCredentials(): IgCredentials | null {
   if (!accessToken) return null;
   if (FACEBOOK_LOGIN) return configured ? { userId: configured, accessToken } : null;
   return { userId: 'me', accessToken };
+}
+
+export interface IgTokenRow {
+  access_token: string | null;
+  token_expires_at: string | null;
+  token_updated_at: string | null;
+  ig_username: string | null;
+  ig_user_id: string | null;
+}
+
+export interface IgCredentialState {
+  creds: IgCredentials | null;
+  source: 'db' | 'env' | null;
+  username: string | null;
+  userId: string | null;
+  expiresAt: string | null;
+  updatedAt: string | null;
+}
+
+/** The token the admin set in the DB wins; the env var is the fallback. */
+export async function resolveIgCredentials(supabase: SupabaseClient): Promise<IgCredentialState> {
+  const { data } = await supabase.from('ig_settings').select('access_token, token_expires_at, token_updated_at, ig_username, ig_user_id').eq('id', 1).maybeSingle();
+  const row = (data ?? null) as IgTokenRow | null;
+  if (row?.access_token) {
+    const userId = FACEBOOK_LOGIN ? row.ig_user_id ?? process.env.META_IG_USER_ID ?? 'me' : 'me';
+    return { creds: { userId, accessToken: row.access_token }, source: 'db', username: row.ig_username, userId: row.ig_user_id, expiresAt: row.token_expires_at, updatedAt: row.token_updated_at };
+  }
+  const env = igCredentials();
+  return { creds: env, source: env ? 'env' : null, username: null, userId: null, expiresAt: null, updatedAt: null };
+}
+
+/**
+ * Exchange a long-lived Instagram Login token for a fresh one (valid 60 days). The token must be at
+ * least 24 h old and not expired. Returns the new token and its lifetime in seconds.
+ */
+export async function refreshLongLivedToken(accessToken: string): Promise<{ accessToken: string; expiresIn: number }> {
+  const host = FACEBOOK_LOGIN ? 'https://graph.facebook.com' : 'https://graph.instagram.com';
+  const q = FACEBOOK_LOGIN
+    ? new URLSearchParams({ grant_type: 'fb_exchange_token', client_id: process.env.META_APP_ID ?? '', client_secret: process.env.META_APP_SECRET ?? '', fb_exchange_token: accessToken })
+    : new URLSearchParams({ grant_type: 'ig_refresh_token', access_token: accessToken });
+  const path = FACEBOOK_LOGIN ? '/v21.0/oauth/access_token' : '/refresh_access_token';
+  const res = await fetch(`${host}${path}?${q.toString()}`);
+  const json = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number } & GraphError;
+  if (!res.ok || !json.access_token) throw new Error(`Token refresh: ${json.error?.message ?? res.statusText} (code ${json.error?.code ?? res.status})`);
+  return { accessToken: json.access_token, expiresIn: json.expires_in ?? 60 * 24 * 3600 };
 }
 
 async function graph<T>(path: string, params: Record<string, string>, method: 'GET' | 'POST'): Promise<T> {

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin-auth';
-import { igCredentials } from '@/lib/ig/publish';
 import { findRow, igConfig, jobsFor, publishRow } from '@/lib/ig/runner';
 
 export const maxDuration = 300;
@@ -23,10 +22,10 @@ export async function POST(request: Request) {
 
   const picked = findRow(set, file);
   if (!picked) return NextResponse.json({ error: 'Unknown row' }, { status: 404 });
-  const creds = igCredentials();
-  if (!creds) return NextResponse.json({ error: 'META_IG_USER_ID / META_IG_ACCESS_TOKEN are not set in this deployment' }, { status: 500 });
+  const cfg = await igConfig(auth.supabase);
+  const creds = cfg.state.creds;
+  if (!creds) return NextResponse.json({ error: 'No Instagram token: paste one on the Instagram page' }, { status: 500 });
 
-  const cfg = igConfig();
   const scheduledFor = new Date().toISOString().slice(0, 10);
   const results = await publishRow(auth.supabase, creds, picked.row, jobsFor(picked.row, picked.index, cfg, kinds), scheduledFor);
   return NextResponse.json({ results });
