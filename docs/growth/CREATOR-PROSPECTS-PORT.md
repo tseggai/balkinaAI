@@ -18,6 +18,8 @@ Two adaptations are mandatory and are threaded through every section:
 3. Build in the order of **Part D**. Each step ends with a build that passes and a commit. Do not reorder; later steps depend on earlier contracts.
 4. Everything here that says **MUST** is a contract. Everything that says **default** is a choice you may change only if `CLAUDE.md` or the codebase gives a concrete reason, and you say so in the commit message.
 5. Do not invent entities. Reuse the product's creator profile, auth, dashboard, public site, admin app, and LLM client. The only new tables are the `growth_*` tables in Part D.1–D.3 plus the columns added to the creator profile table in D.2.
+6. **Visual rule (MUST).** This document specifies *layout, content, hierarchy and behaviour* only. It never specifies colours, fonts, type sizes, radii, shadows, spacing values, icon sets or component widths. The reference screens in B.10 are deliberately greyscale wireframes. Build every screen with the target product's own design system: its buttons, inputs, chips, tables, drawers/sheets, toasts and tokens. Where this document names a state (positive, warning, neutral, muted, selected, danger) map it to the product's semantic tokens; where it names a component (drawer, bottom sheet, modal) use the product's existing equivalent, and if the product has none, follow its nearest pattern rather than importing one. Any sizing in the wireframes (column widths, panel widths) is a proportion hint, not a value.
+7. Read B.10 (screens) and B.11 (flows) before building the UI; each D.10/D.11 bullet maps to a numbered annotation on a screen.
 
 ---
 
@@ -89,11 +91,11 @@ UI (`/dashboard/prospects`, sidebar item "Prospects"; `/dashboard/growth` redire
 - **Header**: title, one-line description, "+ Generate prospects" button. Empty state explains the flow and offers the same button.
 - **Generate modal** (4 sections): countries (chips) → cities (chips per country, "all/none", add custom city) → business types (chips, presets "beauty & barbers / beauty + wellness / everything / clear") → depth (top 20/40/60 per search, "Enrich automatically" checkbox). Cost preview: searches = cities × types, up to N businesses, approximate provider cost. Run phases with progress rows: preparing → searching (chunks of 2 targets) → enriching (rounds of 16 until `processed = 0`) → done/error. Stops on `stopped_reason`.
 - **Funnel strip** (6 KPIs): Prospects (sub: high fit · enriched), Pages built, Contacted (% of pages), Viewed page (% of contacted), Tested booking (% of viewers), Claimed (% of contacted).
-- **Stage tabs**: All, ⏰ Due today (follow-up queue, amber when > 0), then each stage with a count (hidden when 0 unless selected).
+- **Stage tabs**: All, ⏰ Due today (follow-up queue, visually flagged with the product's warning state when > 0), then each stage with a count (hidden when 0 unless selected).
 - **Filters**: country, city (scoped to country), business type, min score (2/4/6), email any/yes/no, page any/built/not, activity any/untouched/viewed/tested, free-text search (name/site/IG), sort (score / last activity / follow-up due; forced to due on the Due tab).
 - **Bulk bar** (when rows selected): Enrich, Build booking pages, Set stage…, Delete, clear.
-- **Rows** (desktop table / mobile cards): checkbox, score badge (green ≥ 4, amber ≥ 2), name + address + chips (`Instagram only`, `No website`, `Site unreachable`, `N services · M emails`, `uses <Competitor>`, `Page ready`, `Claimed`), type, city/country, provider rating + map link, contact lines (site, @ig, phone, email), stage select (coloured), activity cell (last action · relative time, `N sent · M views · time`, due chip), actions (WhatsApp / IG follow-up quick-send when a page is ready; build page; enrich; open).
-- **Drawer** (right, 680 px, prev/next with arrow keys, Esc closes): header = name, Enrich/Re-enrich, place · rating · type · map, score, due chip, claimed chip; contact row with channel icons (wa.me, ig.me/m, mailto, site) and **Edit** (phone/IG/email + Delete); booking-page row (short claim link, copy, valid-until / claimed-by, or **Build booking page**); tabs **Overview** (4 stats: Sent, Page views, Time on page, Tested booking; Notes; **Messages** composer; **Follow-up** + "They got back to us"; **What we know** enrichment card) and **Activity** (filter all/theirs/ours, add note, timeline with dots: emerald = claimed, brand = their action, grey = ours).
+- **Rows** (desktop table / mobile cards): checkbox, score badge (positive state ≥ 4, warning state ≥ 2, neutral below), name + address + chips (`Instagram only`, `No website`, `Site unreachable`, `N services · M emails`, `uses <Competitor>`, `Page ready`, `Claimed`), type, city/country, provider rating + map link, contact lines (site, @ig, phone, email), stage select (each stage has its own semantic tone from the product's palette), activity cell (last action · relative time, `N sent · M views · time`, due chip), actions (WhatsApp / IG follow-up quick-send when a page is ready; build page; enrich; open).
+- **Drawer** (side panel over the list, roughly half the viewport on desktop and full-screen on phones; prev/next with arrow keys, Esc closes): header = name, Enrich/Re-enrich, place · rating · type · map, score, due chip, claimed chip; contact row with channel icons (wa.me, ig.me/m, mailto, site) and **Edit** (phone/IG/email + Delete); booking-page row (short claim link, copy, valid-until / claimed-by, or **Build booking page**); tabs **Overview** (4 stats: Sent, Page views, Time on page, Tested booking; Notes; **Messages** composer; **Follow-up** + "They got back to us"; **What we know** enrichment card) and **Activity** (filter all/theirs/ours, add note, timeline with a marker per event: three visually distinct states for claimed / the prospect's own action / our action, using the product's tokens).
 - **Messages composer**: step select (First touch / Follow-up / Last chance; default from `touches`), channel toggle (WhatsApp / Instagram / Email / Copy; default = first channel with a contact), language toggle, stage select; textarea pre-filled from the template (edits persist until Reset); one action button: "Send on WhatsApp" (opens `wa.me/<digits>?text=`), "Copy & open Instagram" (clipboard + `ig.me/m/<handle>`), "Copy & open email" (`mailto:`), "Copy & log". Every send logs `sent` with `{channel, step, lang, text}` and sets `next_follow_up_at` (+2 days after first, +3 after follow-up, none after last chance). Disabled until the page is built ("every message needs the claim link").
 - **Quick send** from the row does the same with the defaults, no composer.
 
@@ -107,7 +109,7 @@ Short link: `https://<site>/c/<first 12 hex of token>?c=wa|ig|em|ot`; the site r
 
 ### B.7 Public claim funnel (`apps/marketing`)
 
-- `GET /claim/[token]` (server component, `force-dynamic`, Supabase client with `cache:'no-store'`): validates `^[a-f0-9]{48}$`, loads prospect + tenant + services + location; states `invalid` / `claimed` / `expired` / `ready`. `generateMetadata` sets title "{Biz} — your booking page is ready", `robots: noindex`, OG/Twitter; `opengraph-image.tsx` (edge) renders a 1200×630 brand card with the business name.
+- `GET /claim/[token]` (server component, `force-dynamic`, Supabase client with `cache:'no-store'`): validates `^[a-f0-9]{48}$`, loads prospect + tenant + services + location; states `invalid` / `claimed` / `expired` / `ready`. `generateMetadata` sets title "{Biz} — your booking page is ready", `robots: noindex`, OG/Twitter; `opengraph-image.tsx` (edge) renders a 1200×630 card with the business name in the site's own OG style.
 - `ClaimPage` (client): language toggle (local-first, EN second; persisted in localStorage), optional WhatsApp-support button; sections: **the business** (clean name, full name as secondary, address, rating stars + review count) → **what we did** ("{First},\n{Biz} is now bookable instantly, 24/7. Test it, love it, and activate it for free.") → **two CTAs** ("Test by booking your services / Book now" and "Claim your page — free / Activate now") → "Offer expires on {date}". Tracks `claim_page_view` (with lang, mobile, channel) and `claim_page_leave` (visible seconds via visibilitychange/pagehide, sendBeacon).
 - `ClaimDemo` (bottom sheet, 4 steps + confirmation, **nothing is written**): choose service → pick day (next 7, Sundays closed) → pick time (09–17, 30-min grid, deterministic "taken" slots) → details (name/phone, defaults "Ana", "+382 67 123 456") → confirmation showing "what the customer sees" (confirmed card) and "what your business sees" (a push-notification mock + the appointment card with Approve/Move/Message) → "Claim my business". Fires `claim_demo_opened` / `claim_demo_completed`.
 - `ClaimForm` (sheet): email only (pre-filled; "Signing you in as X (change)"), "Activate my page", disclosure "+ Set name and password now". `POST /api/claim { token, email, owner_name?, password? }` → creates the auth user (`email_confirm:true`), links tenant (`user_id`, `email`, `owner_name`, `status:'active'`), links owner staff (`user_id` where null), prospect `{ claimed_at, claim_email, stage:'claimed' }`, event `claimed`, mints a magic-link `hashed_token` → `login_url = <app>/auth/callback?token_hash=…&type=magiclink&next=/dashboard`, sends a best-effort welcome email (Resend) whose button hits `GET /api/claim/login?token=` to mint a fresh link. Returns `{ login_url, booking_url, business_name }`. Errors: 404 invalid, 409 already claimed / tenant not unclaimed / email already registered, 410 expired.
@@ -141,6 +143,146 @@ On every `growth_events` insert with a `prospect_id`:
 9. **Plan/implementation drift**: the GTM plan describes a `growth_preprovisioned` table; the implementation put the claim columns on `growth_prospects`. Follow the implementation.
 10. **Unclaimed visibility is enforced by convention** (every discovery query adds `status = 'active'`). The port MUST enumerate every public read path of the creator profile (Part C.4) and gate each one, plus gate any money movement.
 
+
+### B.10 Reference screens (greyscale wireframes, `docs/growth/port-assets/`)
+
+These are layout references for the **creator-product version** (names, chips and channels already adapted). They are intentionally unstyled: no colours, fonts or brand elements are implied. Numbered annotations on each image are referenced from D.10/D.11. Source: `port-assets/_source/render.js` (Playwright; regenerate with `node render.js <outdir>`).
+
+| # | File | Screen | What to take from it |
+|---|---|---|---|
+| 01 | `01-prospects-page.png` | Prospects hub, desktop | Header + Generate button; 6-KPI funnel strip; stage tabs incl. "Due today"; filter row + search + sort; bulk bar; table columns (Score · Creator · Niche · Platform · Reach · Contact · Stage · Activity · actions); pagination. |
+| 02 | `02-generate-modal.png` | Generate prospects modal, setup and running states | Four numbered sections (niches, platforms, languages/regions, depth); cost preview; phase progress rows; done summary. |
+| 03 | `03-drawer-overview.png` | Prospect drawer, Overview tab | Header (name, Re-enrich, meta line, score, due chip, prev/next/close); contact row with Edit; page row with short link; 4 stats; Notes; Messages composer (step · channel · stage · textarea · one action); Follow-up + "They got back to us"; What we know. |
+| 04 | `04-drawer-activity.png` | Prospect drawer, Activity tab | Filter (all / theirs / ours); add note; timeline newest-first with two marker states. |
+| 05 | `05-mobile-cards.png` | Prospects hub, phone width | Same data and actions as the table, one card per prospect; horizontally scrolling KPI strip and tabs. |
+| 06 | `06-claim-page.png` | Public claim page, phone width | Header (logo, support, language); **the real creator page component in a preview wrapper**; "what we did" paragraph; two stacked CTAs; expiry line. |
+| 07 | `07-claim-demo.png` | Demo sheet (primary fan action simulated), two states | Step indicator; fake invoice with DEMO watermark; confirmation split into "what the fan sees" and "what you see"; disclaimer + Claim my page + Try again. |
+| 08 | `08-claim-activate-share.png` | Activate sheet and post-claim share screen | Email-only activation with a disclosure for name/password; share screen with page URL, View / Share, channel list, Open my dashboard. |
+
+![Prospects page](port-assets/01-prospects-page.png)
+![Generate modal](port-assets/02-generate-modal.png)
+![Drawer overview](port-assets/03-drawer-overview.png)
+![Drawer activity](port-assets/04-drawer-activity.png)
+![Mobile cards](port-assets/05-mobile-cards.png)
+![Claim page](port-assets/06-claim-page.png)
+![Claim demo](port-assets/07-claim-demo.png)
+![Activate and share](port-assets/08-claim-activate-share.png)
+
+### B.11 Flows
+
+**End-to-end funnel (who calls what).**
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Admin as Admin (browser)
+  participant API as Admin API
+  participant Src as Source adapters
+  participant DB as Supabase
+  participant Site as Public site
+  participant Creator as Creator (prospect)
+
+  Admin->>API: POST growth/generate {niches, platforms, languages}
+  API->>DB: upsert growth_search_targets
+  loop chunks of 2 targets
+    Admin->>API: POST growth/prospector {target_ids}
+    API->>Src: search(target)
+    Src-->>API: CreatorResult[]
+    API->>DB: dedupe (platform, external_id) + external_ids, insert / merge, score
+  end
+  loop rounds of 16 until processed = 0
+    Admin->>API: POST growth/enricher {search_target_ids}
+    API->>API: fetch site + link hub, extract, verify lightning, LLM
+    API->>DB: enrichment, contacts, stage new→enriched, recompute score
+  end
+  Admin->>API: POST growth/preprovision {prospect_ids}
+  API->>DB: insert unclaimed creator row + offerings, claim_token (30d), event page_built
+  Admin->>Admin: composer: copy/open channel, template text
+  Admin->>API: POST prospects/:id/activity {type: sent, channel, step}
+  API->>DB: insert growth_events → trigger: touches+1, stage→contacted, follow-up
+  Creator->>Site: GET /c/<12> → /claim/<token>?c=em
+  Site->>DB: claim_page_view / demo / activate events (trigger: viewed → engaged)
+  Creator->>Site: POST /api/claim {token, email}
+  Site->>DB: create auth user, creator status→active + user_id, prospect claimed, event claimed
+  Site-->>Creator: login_url (magic link) → dashboard
+```
+
+**Prospect stage machine.** Solid arrows are automatic (trigger or job); dashed arrows are hand-set in the admin. Automatic moves never go backwards.
+
+```mermaid
+stateDiagram-v2
+  [*] --> new: prospector insert
+  new --> enriched: enricher
+  new --> preprovisioned: build page
+  enriched --> preprovisioned: build page
+  qualified --> preprovisioned: build page
+  new --> contacted: sent
+  enriched --> contacted: sent
+  qualified --> contacted: sent
+  preprovisioned --> contacted: sent
+  preprovisioned --> viewed: claim_page_view
+  contacted --> viewed: claim_page_view
+  preprovisioned --> engaged: demo / activate opened / clicked
+  contacted --> engaged: demo / activate opened / clicked
+  viewed --> engaged: demo / activate opened / clicked
+  preprovisioned --> replied: replied
+  contacted --> replied: replied
+  viewed --> replied: replied
+  engaged --> replied: replied
+  replied --> claimed: claimed
+  engaged --> claimed: claimed
+  viewed --> claimed: claimed
+  contacted --> claimed: claimed
+  preprovisioned --> claimed: claimed
+  enriched --> qualified: admin
+  enriched --> disqualified: admin
+  claimed --> signed_up: admin
+  signed_up --> customer: admin
+  contacted --> lost: admin
+```
+
+**Generate modal run loop (browser-driven so each request stays inside the serverless time limit).**
+
+```mermaid
+flowchart TD
+  A[Setup: niches × platforms × languages, depth, auto-enrich] -->|Generate| B[POST generate → target ids]
+  B --> C{targets left?}
+  C -->|yes, next 2| D[POST prospector target_ids]
+  D --> E{stopped for a platform?}
+  E -->|yes| F[show inline, skip that platform's remaining targets]
+  E -->|no| C
+  F --> C
+  C -->|no| G{auto-enrich?}
+  G -->|no| K[Done summary]
+  G -->|yes| H[POST enricher search_target_ids, limit 16]
+  H --> I{processed > 0 and rounds < 60?}
+  I -->|yes| H
+  I -->|no| K
+```
+
+**Claim page.**
+
+```mermaid
+flowchart TD
+  L[GET /claim/token] --> V{token valid?}
+  V -->|regex fails or no row| X[Invalid page]
+  V -->|claimed_at set| Y[Already claimed page → login]
+  V -->|expired| Z[Expired page]
+  V -->|ready| P[Claim page: creator preview + what we did + 2 CTAs]
+  P -->|page view| E1[(event claim_page_view, 1h dedupe)]
+  P -->|Try it as a fan| D[Demo sheet, no writes]
+  D -->|complete| E2[(event claim_demo_completed → engaged)]
+  D -->|Claim my page| F
+  P -->|Activate now| F[Activate sheet: email]
+  F -->|submit| C[POST /api/claim]
+  C -->|409 existing email| F
+  C -->|ok| S[Share screen: URL, View, Share, Open dashboard]
+  S -->|Open dashboard| M[POST /api/claim/login → fresh magic link → dashboard callback]
+  P -->|hide / close tab| E3[(event claim_page_leave seconds)]
+```
+
+**Event → prospect data flow.** Every write to `growth_events` (from the public site, the admin composer, or a job) is folded into the prospect row by the DB trigger in D.3; the admin UI never computes stage or counters itself, it re-reads the row the API returns.
+
 ---
 
 ## Part C — Discovery in the target repo (do this first, then write the table)
@@ -163,7 +305,7 @@ Read `CLAUDE.md`, the package/app layout, the creator profile schema, the public
 | `PAYMENT_PATHS` | Every server path that moves money to a creator (Lightning invoice creation, LNURL-pay, Stripe, on-chain). Each must refuse when the creator is unclaimed. | — |
 | `LLM_CLIENT` | The product's existing LLM call helper and provider (Anthropic or OpenAI), its env var. Use it for the enricher's extraction; do not add a second SDK. | REST call to the provider named in `CLAUDE.md` |
 | `EMAIL` | Transactional email provider + from address (welcome email after claim). | skip the welcome email if none |
-| `BRAND` | Product name, public domain, dashboard domain, primary colour token, logo asset path, support contact (email or Telegram/Nostr) for the claim page. | — |
+| `BRAND` | Product name, public domain, dashboard domain, logo asset path, the design-system entry point (tokens/components to reuse), support contact (email or Telegram/Nostr) for the claim page. | — |
 | `SOURCES` | Whether `CLAUDE.md` names the media/platforms where creators are found, or competitor platforms. If it does, they override D.5's default source list and competitor list. | D.5 defaults |
 | `LANGS` | Product languages. | EN only (drop the SR/EN toggle; keep the i18n table shape so a second language is one object away) |
 
@@ -591,7 +733,7 @@ Contract (MUST): the row it creates is a normal `<CREATOR_TABLE>` row rendered b
 
 Implement every route in B.6 with the following renames and no others: `vertical` → `niche`; `country/city` filters stay, add `platform` and `language` filters; `instagram` → `x_handle` in PATCH (also allow `nostr_pubkey`, `telegram`, `lightning_address`, `website`); facets via `rpc('growth_prospect_facets')`; `generate` body `{ segment?, niches:[key] (1–30), platforms:[key] (1–6), languages:[iso] (1–5), regions?:[cc] }` producing targets for niche × platform × language (× region) using the niche's default queries (max 60 combos), skipping platforms whose `needsEnv` is unset (return them in `skipped_platforms`); `prospector` body `{ limit, target_ids?, max_pages 1–3, segment? }`; add `POST /api/admin/growth/import` (D.5 csv); keep `preprovision`, `enricher`, `prospects`, `activity`, `targets` (GET + bulk PATCH). Crons: `POST|GET /api/growth/cron/prospect` and `/enrich` with `GROWTH_CRON_SECRET` (accept `CRON_SECRET` too); register in `vercel.json` if the admin deploys on Vercel; `maxDuration = 300` on the long routes.
 
-UI: rebuild B.6's page, modal, rows, drawer, and CRM one-to-one with these content changes:
+UI: rebuild B.6's page, modal, rows, drawer, and CRM one-to-one, laid out as in screens 01–05 (B.10) and styled entirely with the product's design system (Part A.6), with these content changes:
 
 - Page title "Prospects", description "Creators we found, what we know about them, and where each one is in the funnel."
 - Generate modal sections: **1. Niches** (chips from `GROWTH_NICHES`, presets "Bitcoin only / Bitcoin + crypto / everything / clear"), **2. Platforms** (chips from `GROWTH_PLATFORMS`; disabled with a tooltip when `needsEnv` is unset; `csv` opens the import panel instead), **3. Languages** (chips; default `en`) and optional regions (for YouTube `regionCode` and BTC Map country), **4. Depth** (pages 1–3 → "Top 50/100/150 per search" for YouTube; shows "YouTube quota: ~N units of 10,000/day"), "Enrich automatically" checkbox. Progress rows: Preparing → Searching {platform list} (`found · new · merged · requests`) → Enriching → Done.
@@ -613,9 +755,9 @@ Replace the product name, action verb and any value proposition with what `CLAUD
 
 ### D.11 Public claim funnel (`PUBLIC_SITE`)
 
-Port B.7 one-to-one with these adaptations:
+Port B.7 one-to-one, laid out as in screens 06–08 (B.10) and styled with the public site's own components and tokens (Part A.6), with these adaptations:
 
-- `/claim/[token]` loads prospect + creator row + offerings + links with the service role (`cache:'no-store'`); states invalid / claimed / expired / ready; metadata title "{Name} — your {BRAND} page is ready", `noindex`; OG image = brand card with the creator's name (and the hotlinked avatar if the OG runtime can fetch it; otherwise name only).
+- `/claim/[token]` loads prospect + creator row + offerings + links with the service role (`cache:'no-store'`); states invalid / claimed / expired / ready; metadata title "{Name} — your {BRAND} page is ready", `noindex`; OG image = a 1200×630 card in the product's existing OG style with the creator's name (and the hotlinked avatar if the OG runtime can fetch it; otherwise name only).
 - **Section 1, the creator**: render the **real creator page component** (`CREATOR_PAGE_ROUTE`'s component) in a preview wrapper: a thin top banner "Preview · nothing is live yet", pointer-events disabled on real money actions, the page's own avatar/name/bio/links/offerings exactly as a fan would see them after claiming. If the component cannot be reused without side effects (data fetching hooks that hit RLS-gated tables), extract its presentational part into a component that takes props, use that in both places, and leave the route's behaviour unchanged.
 - **Section 2, what we did**: "{First},\nwe set up {Name} on {BRAND} so your audience can {PRIMARY_FAN_ACTION} in one tap. Test it, like it, and claim it for free."
 - **Section 3, two CTAs**: "Try it as a fan / {action verb}" and "Claim your page — free / Activate now". Then "Offer expires on {date}".
@@ -689,6 +831,9 @@ CRM:
 - [ ] Quick-send Email from a row opens `mailto:` with the first-touch text, logs `sent`, stage → `contacted`, follow-up set 2 days out, row appears under "Due today" when the date is moved to today.
 - [ ] Claim-page view from the token moves the stage to `viewed`; demo completion to `engaged`; "Replied via X" to `replied`.
 - [ ] Drawer prev/next with arrow keys; Esc closes; mobile cards show the same actions.
+
+Visual:
+- [ ] Every new screen uses only components and tokens that already exist in the product (no new colour values, font imports or ad-hoc CSS variables introduced by this work); a reviewer can place each numbered annotation from B.10 on the built screen.
 
 Docs:
 - [ ] `CLAUDE.md` section and `docs/growth/ROUTINES.md` written; commit messages follow the repo's convention.
