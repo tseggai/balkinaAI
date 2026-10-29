@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Carousel } from '@/components/carousel';
 import { Modal } from '@/components/modal';
-import { BTN_DANGER, BTN_PRIMARY, BTN_SECONDARY, SECTION_TITLE } from '@/components/prospect-crm';
+import { BTN_DANGER, BTN_PRIMARY, BTN_SECONDARY } from '@/components/prospect-crm';
+import { CATEGORIES } from '@/lib/ig/categories';
 
 interface Template {
   id: string;
@@ -26,14 +28,14 @@ interface Status {
   templates: Template[];
 }
 
-const EXPECTED = ['card', 'split', 'framed', 'circle', 'column', 'steps', 'cta', 'stat'];
+const EXPECTED = CATEGORIES.length * 2;
 
-/** Canva connection + brand-template registry + test render. */
+/** Compact Canva connection card; the template registry and test renders live in a dialog. */
 export function CanvaCard({ notify }: { notify: (title: string, lines: string[]) => void }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState('');
-  const [preview, setPreview] = useState<{ title: string; sr: string | null; en: string | null } | null>(null);
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<{ title: string; format: 'sq' | 'st'; sr: string | null; en: string | null } | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch('/api/admin/canva/status');
@@ -44,7 +46,7 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
     void load();
     const q = new URLSearchParams(window.location.search).get('canva');
     if (q === 'connected') {
-      notify('Canva connected', ['Templates named "IG · NN layout · square|story" can now be synced.']);
+      notify('Canva connected', ['Publish the category templates as brand templates, then Sync.']);
       window.history.replaceState(null, '', '/dashboard/instagram');
       setOpen(true);
     } else if (q?.startsWith('error')) {
@@ -68,7 +70,7 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
     await load();
   };
 
-  /** Renders the Serbian and English versions (two requests, in parallel) and shows them side by side. */
+  /** Renders the Serbian and English versions (two requests, in parallel) and shows them as a carousel. */
   const test = async (t: Template) => {
     setBusy(t.id);
     const one = async (lang: 'sr' | 'en'): Promise<{ url: string | null; error: string | null }> => {
@@ -82,7 +84,7 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
     if (errors.length === 2) notify('Render failed', errors);
     else {
       if (errors.length) notify('One render failed', errors);
-      setPreview({ title: t.title, sr: sr.url, en: en.url });
+      setPreview({ title: t.title, format: t.format, sr: sr.url, en: en.url });
     }
     await load();
   };
@@ -94,79 +96,84 @@ export function CanvaCard({ notify }: { notify: (title: string, lines: string[])
     await load();
   };
 
-  if (!status) return null;
+  if (!status) return <div className="h-[58px] rounded-xl border border-gray-200 bg-white" />;
   const have = new Set(status.templates.map((t) => `${t.layout}-${t.format}`));
-  const missing = EXPECTED.flatMap((l) => (['sq', 'st'] as const).filter((f) => !have.has(`${l}-${f}`)).map((f) => `${l} ${f === 'sq' ? 'square' : 'story'}`));
+  const missing = CATEGORIES.flatMap((c) => (['sq', 'st'] as const).filter((f) => !have.has(`${c.key}-${f}`)).map((f) => `${c.key} ${f === 'sq' ? 'square' : 'story'}`));
+  const tone = !status.connected ? 'bg-gray-300' : missing.length ? 'bg-amber-500' : 'bg-emerald-500';
+  const byCategory = CATEGORIES.map((c) => ({ c, sq: status.templates.find((t) => t.layout === c.key && t.format === 'sq') ?? null, st: status.templates.find((t) => t.layout === c.key && t.format === 'st') ?? null }));
+  const legacy = status.templates.filter((t) => !CATEGORIES.some((c) => c.key === t.layout));
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className={SECTION_TITLE}>Canva templates</span>
-          {status.connected ? (
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Connected</span>
-          ) : (
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">{status.configured ? 'Not connected' : 'Add CANVA_CLIENT_ID / SECRET in Vercel'}</span>
-          )}
-          <span className="text-xs text-gray-500">{status.templates.length} of {EXPECTED.length * 2} templates</span>
+    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
+      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${tone}`} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-sm font-semibold text-gray-900">Canva</span>
+          <span className="text-xs text-gray-500">
+            {status.connected ? `connected · ${Math.min(status.templates.length, EXPECTED)} of ${EXPECTED} templates${missing.length ? ` · ${missing.length} missing` : ''}` : status.configured ? 'not connected' : 'add CANVA_CLIENT_ID / SECRET in Vercel'}
+          </span>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {status.connected ? (
-            <>
-              <button type="button" className={BTN_SECONDARY} onClick={() => setOpen((o) => !o)}>{open ? 'Hide' : 'Show'} templates</button>
-              <button type="button" className={BTN_PRIMARY} disabled={Boolean(busy)} onClick={sync}>{busy === 'sync' ? 'Syncing…' : 'Sync from Canva'}</button>
-              <button type="button" className={BTN_DANGER} disabled={Boolean(busy)} onClick={disconnect}>Disconnect</button>
-            </>
-          ) : (
-            <a href="/api/admin/canva/connect" className={`${BTN_PRIMARY} ${status.configured ? '' : 'pointer-events-none opacity-50'}`}>Connect Canva</a>
-          )}
-        </div>
+      </div>
+      <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+        {status.connected ? (
+          <>
+            <button type="button" className={BTN_SECONDARY} onClick={() => setOpen(true)}>Templates</button>
+            <button type="button" className={BTN_SECONDARY} disabled={Boolean(busy)} onClick={sync}>{busy === 'sync' ? '…' : 'Sync'}</button>
+            <button type="button" className={BTN_DANGER} disabled={Boolean(busy)} onClick={disconnect}>Disconnect</button>
+          </>
+        ) : (
+          <a href="/api/admin/canva/connect" className={`${BTN_PRIMARY} ${status.configured ? '' : 'pointer-events-none opacity-50'}`}>Connect</a>
+        )}
       </div>
 
       {!status.connected && status.configured && (
-        <div className="mt-3 break-words rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
-          <div>Client ID the server will send: <code>{status.client_id}</code>{status.client_id_raw_length !== status.client_id.length ? <span className="ml-2 font-semibold text-amber-700">(the Vercel value had extra whitespace, now trimmed)</span> : null}</div>
-          <div>Redirect URL to register in Canva: <code>{status.redirect_uri}</code></div>
-          <div>Scopes to enable in Canva: <code>{status.scopes.join(' ')}</code></div>
-        </div>
+        <Modal open={false} onClose={() => undefined} title=""><span /></Modal>
       )}
 
-      {open && status.connected && (
-        <div className="mt-4">
-          {status.templates.length === 0 ? (
-            <p className="text-sm text-gray-500">No templates yet. In Canva, publish each design as a brand template named <code>IG · 01 card · square</code> (see the spec), then click Sync.</p>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {status.templates.map((t) => (
-                <div key={t.id} className="rounded-lg border border-gray-200 p-3">
-                  {(t.last_render_url || t.thumbnail_url) && (
-                    <img src={t.last_render_url ?? t.thumbnail_url ?? ''} alt="" className={`mb-2 w-full rounded-md object-cover ${t.format === 'st' ? 'aspect-[9/16]' : 'aspect-square'}`} />
-                  )}
-                  <div className="text-sm font-semibold text-gray-900">{t.title}</div>
-                  <div className="mt-1 text-xs text-gray-500">{Object.keys(t.fields).join(' · ') || 'no data fields'}</div>
-                  <button type="button" className={`${BTN_SECONDARY} mt-2 w-full`} disabled={Boolean(busy)} onClick={() => test(t)}>
-                    {busy === t.id ? 'Rendering…' : 'Test render'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          {missing.length > 0 && status.templates.length > 0 && <p className="mt-3 text-xs text-gray-500">Still missing: {missing.join(', ')}.</p>}
-        </div>
-      )}
-
-      <Modal open={Boolean(preview)} onClose={() => setPreview(null)} title={preview?.title ?? ''} width="max-w-4xl" footer={<button type="button" className={BTN_PRIMARY} onClick={() => setPreview(null)}>Close</button>}>
-        {preview && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(['sr', 'en'] as const).map((lang) => (
-              <div key={lang}>
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">{lang === 'sr' ? 'Serbian' : 'English'}</div>
-                {preview[lang] ? <img src={preview[lang] ?? ''} alt={lang} className="w-full rounded-lg" /> : <div className="rounded-lg bg-red-50 p-4 text-xs text-red-700">Render failed</div>}
-              </div>
-            ))}
+      <Modal open={open} onClose={() => setOpen(false)} title="Canva templates" width="max-w-4xl" footer={<button type="button" className={BTN_PRIMARY} onClick={() => setOpen(false)}>Close</button>}>
+        {!status.connected && status.configured && (
+          <div className="mb-3 break-words rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            <div>Client ID the server will send: <code>{status.client_id}</code></div>
+            <div>Redirect URL to register in Canva: <code>{status.redirect_uri}</code></div>
+            <div>Scopes to enable in Canva: <code>{status.scopes.join(' ')}</code></div>
           </div>
         )}
-        <p className="mt-2 text-xs text-gray-500">Filled with the category eyebrow, the longest copy the copywriter may write for this layout, and a matching photo. If both fit, the template is ready for the studio.</p>
+        <p className="mb-3 text-xs text-gray-500">One square and one story per business category, named <code>IG · NN category · square|story</code>. Test renders both languages with the longest copy the copywriter may write.</p>
+        <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+          {byCategory.map(({ c, sq, st }) => (
+            <div key={c.key} className="flex flex-wrap items-center gap-2 px-3 py-2">
+              <span className="w-8 text-xs text-gray-400">{String(c.order).padStart(2, '0')}</span>
+              <span className="w-44 text-sm font-medium text-gray-900">{c.name.en}</span>
+              {([['sq', sq, 'Square'], ['st', st, 'Story']] as const).map(([f, t, label]) => (
+                <span key={f} className="flex items-center gap-1">
+                  {t ? (
+                    <button type="button" className={`${BTN_SECONDARY} py-1 text-xs`} disabled={Boolean(busy)} onClick={() => test(t)} title={`Test render ${t.title}`}>{busy === t.id ? 'Rendering…' : `Test ${label.toLowerCase()}`}</button>
+                  ) : (
+                    <span className="rounded-lg border border-dashed border-gray-200 px-2 py-1 text-xs text-gray-400">{label} missing</span>
+                  )}
+                </span>
+              ))}
+              {sq?.last_render_url && <img src={sq.last_render_url} alt="" className="ml-auto h-8 w-8 rounded object-cover" />}
+            </div>
+          ))}
+          {legacy.map((t) => (
+            <div key={t.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-gray-500">
+              <span className="w-8 text-xs text-gray-400">—</span>
+              <span className="w-44 text-sm">{t.title} <span className="text-xs text-gray-400">(legacy)</span></span>
+              <button type="button" className={`${BTN_SECONDARY} py-1 text-xs`} disabled={Boolean(busy)} onClick={() => test(t)}>{busy === t.id ? 'Rendering…' : 'Test'}</button>
+            </div>
+          ))}
+        </div>
+      </Modal>
+
+      <Modal open={Boolean(preview)} onClose={() => setPreview(null)} title={preview?.title ?? ''} width={preview?.format === 'st' ? 'max-w-sm' : 'max-w-xl'} footer={<button type="button" className={BTN_PRIMARY} onClick={() => setPreview(null)}>Close</button>}>
+        {preview && (
+          <Carousel
+            aspect={preview.format === 'st' ? 'aspect-[9/16]' : 'aspect-square'}
+            slides={[{ url: preview.sr, label: 'Serbian · slide 1' }, { url: preview.en, label: 'English · slide 2' }]}
+          />
+        )}
+        <p className="mt-2 text-xs text-gray-500">Swipe or use the arrows, as in the Instagram feed. Filled with the category eyebrow, the longest copy for this layout, and a matching photo.</p>
       </Modal>
     </div>
   );

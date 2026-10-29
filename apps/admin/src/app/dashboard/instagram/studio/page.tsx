@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { Carousel } from '@/components/carousel';
 import { ConfirmDialog, type ConfirmRequest } from '@/components/confirm-dialog';
 import { Modal } from '@/components/modal';
 import { StudioBatchModal, type BatchRequest } from '@/components/studio-batch-modal';
@@ -9,11 +10,11 @@ import { renderProgress, StudioPostCard, type Format, type Kind, type Lang, type
 import { BTN_DANGER, BTN_PRIMARY, BTN_SECONDARY, INPUT, SECTION_TITLE, SELECT } from '@/components/prospect-crm';
 
 interface Catalogue {
-  verticals: { value: string; label: string; category: string }[];
+  verticals: { value: string; label: string; category: string; photo: string[] }[];
   categories: { key: string; order: number; label: string; synced: boolean; story: boolean }[];
   tones: { value: string; label: string; hint: string }[];
   photos: { name: string; url: string; source: 'stock' | 'upload' }[];
-  layouts: { layout: string; sq: boolean; st: boolean; fields: string[]; preview: string | null }[];
+  layouts: { layout: string; sq: boolean; st: boolean; fields: string[]; preview: string | null; previewSq: string | null; previewSt: string | null }[];
   cadence: { post_time: string; days: number[]; timezone: string };
   posts: StudioPostView[];
   canva: boolean;
@@ -26,15 +27,20 @@ type Filter = 'all' | 'draft' | 'scheduled' | 'published' | 'failed';
 
 const LABEL = 'mb-1 block text-xs font-medium text-gray-500';
 const FIELD_LABELS: Record<string, string> = {
-  eyebrow: 'Eyebrow (audience tag)', headline: 'Headline', subline: 'Subline', url: 'URL', button: 'Button', big: 'Big number',
+  eyebrow: 'Eyebrow (category)', headline: 'Headline', subline: 'Subline', url: 'URL', button: 'Button', big: 'Big number',
   step1_title: 'Step 1 title', step1_text: 'Step 1 text', step2_title: 'Step 2 title', step2_text: 'Step 2 text', step3_title: 'Step 3 title', step3_text: 'Step 3 text',
 };
+const FIXED_FIELDS = new Set(['eyebrow', 'url']);
 const STEP_LABEL: Record<Format, string> = { sq: 'square', st: 'story' };
 
 function toLocalInput(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+const RefreshIcon = () => (
+  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
+);
 
 export default function StudioPage() {
   const [cat, setCat] = useState<Catalogue | null>(null);
@@ -43,17 +49,19 @@ export default function StudioPage() {
   const [tone, setTone] = useState('friendly');
   const [lang, setLang] = useState<Lang>('sr');            // primary (first slide / first story)
   const [bilingual, setBilingual] = useState(true);
-  const [layoutPick, setLayoutPick] = useState('');   // '' = follow the audience's category
+  const [layoutPick, setLayoutPick] = useState('');         // '' = follow the audience's category
   const [brief, setBrief] = useState('');
-  const [photo, setPhoto] = useState('');
-  // copy
+  const [kinds, setKinds] = useState<Kind[]>(['feed', 'story']);
+  // copy + photo (the working draft; `post` holds what is rendered)
   const [copy, setCopy] = useState<Partial<Record<Lang, Record<string, string>>>>({});
   const [editLang, setEditLang] = useState<Lang>('sr');
   const [caption, setCaption] = useState('');
   const [fields, setFields] = useState<string[]>([]);
+  const [photo, setPhoto] = useState('');
+  const [photoSeed, setPhotoSeed] = useState(0);
+  const [dirty, setDirty] = useState(false);
   // post + schedule
   const [post, setPost] = useState<StudioPostView | null>(null);
-  const [kinds, setKinds] = useState<Kind[]>(['feed', 'story']);
   const [when, setWhen] = useState(() => toLocalInput(new Date(Date.now() + 3600 * 1000)));
   // ui
   const [busy, setBusy] = useState('');
@@ -62,6 +70,8 @@ export default function StudioPage() {
   const [notice, setNotice] = useState<{ title: string; lines: string[] } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [photoUrlDraft, setPhotoUrlDraft] = useState('');
   const [batchOpen, setBatchOpen] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -74,7 +84,6 @@ export default function StudioPage() {
     if (!res.ok) return null;
     const data = (await res.json()) as Catalogue;
     setCat(data);
-    setPhoto((p) => p || data.photos[0]?.url || '');
     return data;
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -86,6 +95,9 @@ export default function StudioPage() {
     return { ok: res.ok, data };
   };
 
+  /* ---------- derived ---------- */
+
+  const verticalInfo = cat?.verticals.find((x) => x.value === vertical) ?? null;
   const categoryOfVertical = (v: string) => cat?.verticals.find((x) => x.value === v)?.category ?? '';
   const autoLayout = (v: string) => {
     const c = categoryOfVertical(v);
@@ -95,25 +107,32 @@ export default function StudioPage() {
   const layoutInfo = cat?.layouts.find((l) => l.layout === layout) ?? null;
   const hasStory = (l: string) => Boolean(cat?.layouts.find((x) => x.layout === l)?.st);
   const langs: Lang[] = bilingual ? ['sr', 'en'] : [lang];
+  const langOrder: Lang[] = [lang, ...langs.filter((l) => l !== lang)];
   const currentCopy = copy[editLang] ?? {};
   const hasCopy = fields.length > 0 && Boolean(copy[lang]?.headline);
   const ready = Boolean(cat?.canva && cat.openai && cat.layouts.length > 0);
+  const wantStory = kinds.includes('story') && hasStory(layout);
+
+  /** Library photos that fit the audience (by name), falling back to the whole library. */
+  const photoPool = useMemo(() => {
+    const words = verticalInfo?.photo ?? [];
+    const all = cat?.photos ?? [];
+    const matching = all.filter((p) => words.some((w) => p.name.toLowerCase().includes(w)));
+    return matching.length ? matching : all;
+  }, [cat, verticalInfo]);
+  const autoPhoto = photoPool[photoSeed % Math.max(1, photoPool.length)]?.url ?? '';
+  const photoUrl = photo || autoPhoto;
 
   /* ---------- pipeline: render steps, one request each, two at a time ---------- */
 
-  /** Steps a post still needs: formats × languages (primary first) minus what is rendered. */
   const stepsFor = (p: StudioPostView): { format: Format; lang: Lang }[] => {
     const formats: Format[] = hasStory(p.layout) && p.kinds.includes('story') ? ['sq', 'st'] : ['sq'];
-    const langs = [p.lang, ...(p.langs.length ? p.langs : [p.lang]).filter((l) => l !== p.lang)];
+    const order = [p.lang, ...(p.langs.length ? p.langs : [p.lang]).filter((l) => l !== p.lang)];
     const out: { format: Format; lang: Lang }[] = [];
-    for (const format of formats) for (const lang of langs) if (!p.renders[format]?.[lang]) out.push({ format, lang });
+    for (const format of formats) for (const l of order) if (!p.renders[format]?.[l]) out.push({ format, lang: l });
     return out;
   };
 
-  /**
-   * The first render runs alone so the photo is uploaded to Canva once and cached on the post; the
-   * remaining renders run two at a time (each is its own request, so the 60 s cap applies per render).
-   */
   const renderSteps = async (p: StudioPostView, label: string, offset = 0, total = 0): Promise<StudioPostView | null> => {
     let cur = p;
     const want = renderProgress(cur, hasStory(cur.layout)).total;
@@ -124,7 +143,6 @@ export default function StudioPage() {
       return data.post as StudioPostView;
     };
     const merge = (results: (StudioPostView | null)[]) => {
-      // Every response carries the row after its own atomic merge; the union of renders is the truth.
       for (const r of results) {
         if (!r) continue;
         const renders = { ...cur.renders };
@@ -150,21 +168,43 @@ export default function StudioPage() {
     return cur;
   };
 
-  /* ---------- single post ---------- */
+  /* ---------- single post: generate, regenerate a field, apply ---------- */
 
-  const writeCopy = async () => {
-    setBusy('copy');
-    const { ok, data } = await api('/api/admin/studio/copy', { vertical, tone, layout, brief: brief || undefined, langs });
-    setBusy('');
-    if (!ok) return notify('Could not write copy', [String(data.error ?? 'Unknown error')]);
-    setCopy(data.copy as Partial<Record<Lang, Record<string, string>>>);
-    setCaption(String(data.caption ?? ''));
-    setFields(data.fields as string[]);
-    setEditLang(lang);
-    setPost(null);
+  /** Copy → draft (with the matched photo) → every render. One click from brief to filled template. */
+  const generate = async () => {
+    setBusy('generate');
+    stopRef.current = false;
+    setProgress({ title: 'Generating', done: 0, total: 1, detail: 'Writing copy…' });
+    const w = await api('/api/admin/studio/copy', { vertical, tone, layout, brief: brief || undefined, langs });
+    if (!w.ok) { setBusy(''); setProgress(null); return notify('Could not write copy', [String(w.data.error ?? 'Unknown error')]); }
+    const newCopy = w.data.copy as Partial<Record<Lang, Record<string, string>>>;
+    const newCaption = String(w.data.caption ?? '');
+    setCopy(newCopy); setCaption(newCaption); setFields(w.data.fields as string[]); setEditLang(lang);
+    const body = { vertical, tone, lang, langs, layout, brief: brief || undefined, copy: newCopy, caption: newCaption, photo_url: photoUrl || undefined, kinds };
+    const r = await api('/api/admin/studio/posts', body);
+    if (!r.ok) { setBusy(''); setProgress(null); return notify('Could not create the post', [String(r.data.error ?? 'Unknown error')]); }
+    const created = r.data.post as StudioPostView;
+    setPost(created); setPhoto(created.photo_url); setDirty(false);
+    const done = await renderSteps(created, 'Generating');
+    setProgress(null); setBusy('');
+    if (done) setPost(done);
+    await load();
   };
 
-  const setField = (name: string, value: string) => setCopy((c) => ({ ...c, [editLang]: { ...(c[editLang] ?? {}), [name]: value } }));
+  /** New wording for one field (both languages), keeping the rest; marks the design as needing a re-render. */
+  const regenerate = async (field: string) => {
+    setBusy(`field:${field}`);
+    const { ok, data } = await api('/api/admin/studio/copy', { vertical, tone, layout, brief: brief || undefined, langs, only: [field], current: { copy, caption } });
+    setBusy('');
+    if (!ok) return notify('Could not rewrite', [String(data.error ?? 'Unknown error')]);
+    if (field === 'caption') setCaption(String(data.caption ?? ''));
+    else setCopy(data.copy as Partial<Record<Lang, Record<string, string>>>);
+    if (field !== 'caption') setDirty(true);
+  };
+
+  const setField = (name: string, value: string) => { setCopy((c) => ({ ...c, [editLang]: { ...(c[editLang] ?? {}), [name]: value } })); setDirty(true); };
+  const choosePhoto = (url: string) => { setPhoto(url); setDirty(true); setPhotoOpen(false); };
+  const shufflePhoto = () => { setPhoto(''); setPhotoSeed((s) => s + 1); setDirty(true); };
 
   const upload = async (file: File) => {
     setBusy('upload');
@@ -174,22 +214,21 @@ export default function StudioPage() {
     const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
     setBusy('');
     if (!res.ok || !data.url) return notify('Upload failed', [data.error ?? 'Unknown error']);
-    setPhoto(data.url);
+    choosePhoto(data.url);
     await load();
   };
 
-  const render = async () => {
+  /** Push the edited copy / photo into the design: forget the renders and run the steps again. */
+  const apply = async () => {
+    if (!post) return generate();
     setBusy('render');
     stopRef.current = false;
-    const r = post
-      ? await api(`/api/admin/studio/posts/${post.id}`, { action: 'rerender', copy, caption, photo_url: photo, langs, primary: lang }, 'PATCH')
-      : await api('/api/admin/studio/posts', { vertical, tone, lang, langs, layout, brief: brief || undefined, copy, caption, photo_url: photo, kinds });
+    const r = await api(`/api/admin/studio/posts/${post.id}`, { action: 'rerender', copy, caption, photo_url: photoUrl, langs, primary: lang }, 'PATCH');
     if (!r.ok) { setBusy(''); return notify('Could not save the post', [String(r.data.error ?? 'Unknown error')]); }
-    const created = r.data.post as StudioPostView;
-    setPost(created);
-    const done = await renderSteps(created, 'Rendering');
-    setProgress(null);
-    setBusy('');
+    const saved = r.data.post as StudioPostView;
+    setPost(saved); setDirty(false);
+    const done = await renderSteps(saved, 'Rendering');
+    setProgress(null); setBusy('');
     if (done) setPost(done);
     await load();
   };
@@ -225,15 +264,16 @@ export default function StudioPage() {
         setConfirm(null);
         const res = await fetch(`/api/admin/studio/posts/${p.id}`, { method: 'DELETE' });
         if (!res.ok) notify('Delete failed', [String(((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'Unknown error')]);
-        if (post?.id === p.id) setPost(null);
+        if (post?.id === p.id) reset();
         await load();
       },
     });
 
+  const reset = () => { setPost(null); setCopy({}); setFields([]); setCaption(''); setPhoto(''); setDirty(false); };
   const openPost = (p: StudioPostView) => {
     setPost(p);
     setVertical(p.vertical); setTone(p.tone); setLang(p.lang); setBilingual(p.langs.length > 1); setLayoutPick(p.layout); setBrief(p.brief ?? ''); setPhoto(p.photo_url);
-    setCopy(p.copy); setCaption(p.caption ?? ''); setFields(Object.keys(p.copy[p.lang] ?? {})); setEditLang(p.lang); setKinds(p.kinds);
+    setCopy(p.copy); setCaption(p.caption ?? ''); setFields(Object.keys(p.copy[p.lang] ?? {})); setEditLang(p.lang); setKinds(p.kinds); setDirty(false);
     if (p.scheduled_at) setWhen(toLocalInput(new Date(p.scheduled_at)));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -311,15 +351,17 @@ export default function StudioPage() {
 
   if (!cat) return <div className="p-8 text-gray-400">Loading…</div>;
 
-  const rendersOf = (p: StudioPostView | null): { format: Format; lang: Lang; url: string }[] => {
-    if (!p) return [];
-    const out: { format: Format; lang: Lang; url: string }[] = [];
-    for (const f of ['sq', 'st'] as Format[]) for (const l of [p.lang, ...p.langs.filter((x) => x !== p.lang)]) { const u = p.renders[f]?.[l]; if (u) out.push({ format: f, lang: l, url: u }); }
-    return out;
-  };
-  const postRenders = rendersOf(post);
+  /* ---------- preview slides: real renders, or the template preview before the first generate ---------- */
+
+  const slidesFor = (format: Format) =>
+    langOrder.map((l) => {
+      const url = post?.renders[format]?.[l] ?? null;
+      const tpl = format === 'sq' ? layoutInfo?.previewSq : layoutInfo?.previewSt;
+      return { url: url ?? tpl ?? null, label: `${l === 'sr' ? 'Serbian' : 'English'}${url ? '' : ' · template preview'}`, placeholder: 'No template yet' };
+    });
   const postProg = post ? renderProgress(post, hasStory(post.layout)) : null;
   const rendered = Boolean(post?.renders.sq?.[post.lang]);
+  const working = busy === 'generate' || busy === 'render';
 
   return (
     <div className="p-4 md:p-8">
@@ -327,7 +369,7 @@ export default function StudioPage() {
         <div>
           <Link href="/dashboard/instagram" className="text-sm text-gray-500 hover:text-gray-700">← Instagram</Link>
           <h1 className="mt-1 text-2xl font-bold text-gray-900">Studio</h1>
-          <p className="mt-1 text-sm text-gray-500">One post by hand, or a whole batch on a cadence. Feed posts go out as an SR→EN carousel, stories as one per language.</p>
+          <p className="mt-1 text-sm text-gray-500">Pick the audience, generate, then rewrite any line or swap the photo with one click. Feed goes out as an SR→EN carousel, stories one per language.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {unfinished.length > 0 && <button type="button" className={BTN_SECONDARY} disabled={Boolean(busy)} onClick={() => void finish(unfinished, 'Finishing posts')}>Finish unfinished ({unfinished.length})</button>}
@@ -339,7 +381,7 @@ export default function StudioPage() {
         <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {!cat.canva ? 'Connect Canva on the Instagram page first. ' : ''}
           {!cat.openai ? 'OPENAI_API_KEY is missing in the admin project. ' : ''}
-          {cat.canva && cat.layouts.length === 0 ? 'No square templates synced yet — publish one in Canva and click "Sync from Canva". ' : ''}
+          {cat.canva && cat.layouts.length === 0 ? 'No templates synced yet — publish one in Canva and click Sync. ' : ''}
         </div>
       )}
 
@@ -356,18 +398,18 @@ export default function StudioPage() {
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         {/* ── Left: brief + copy ──────────────────────────────────────── */}
         <div className="space-y-4">
           <section className="rounded-xl border border-gray-200 bg-white p-4">
             <div className="flex items-center justify-between">
-              <h2 className={SECTION_TITLE}>1 · Brief</h2>
-              {post && <button type="button" className="text-xs text-gray-500 hover:underline" onClick={() => { setPost(null); setCopy({}); setFields([]); setCaption(''); }}>New post</button>}
+              <h2 className={SECTION_TITLE}>Brief</h2>
+              {post && <button type="button" className="text-xs text-gray-500 hover:underline" onClick={reset}>New post</button>}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <div>
+              <div className="col-span-2">
                 <label className={LABEL}>Audience</label>
-                <select className={`${SELECT} w-full`} value={vertical} onChange={(e) => { setVertical(e.target.value); setPost(null); }}>
+                <select className={`${SELECT} w-full`} value={vertical} onChange={(e) => { setVertical(e.target.value); setPhoto(''); setPhotoSeed(0); if (post) setDirty(true); }}>
                   {cat.categories.map((c) => (
                     <optgroup key={c.key} label={`${c.label}${c.synced ? '' : ' · no template yet'}`}>
                       {cat.verticals.filter((v) => v.category === c.key).map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
@@ -383,8 +425,8 @@ export default function StudioPage() {
               </div>
               <div>
                 <label className={LABEL}>Template</label>
-                <select className={`${SELECT} w-full`} value={layoutPick} onChange={(e) => { setLayoutPick(e.target.value); setPost(null); }}>
-                  <option value="">Auto · {autoLayout(vertical) || 'none synced'}{categoryOfVertical(vertical) && autoLayout(vertical) !== categoryOfVertical(vertical) ? ` (no ${categoryOfVertical(vertical)} template yet)` : ''}</option>
+                <select className={`${SELECT} w-full`} value={layoutPick} onChange={(e) => { setLayoutPick(e.target.value); if (post) setDirty(true); }}>
+                  <option value="">Auto · {autoLayout(vertical) || 'none synced'}</option>
                   {cat.layouts.map((l) => <option key={l.layout} value={l.layout}>{l.layout}{l.st ? '' : ' (square only)'}</option>)}
                 </select>
               </div>
@@ -395,28 +437,32 @@ export default function StudioPage() {
                   <button type="button" onClick={() => { setBilingual(false); setLang('sr'); setEditLang('sr'); }} className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold ${!bilingual && lang === 'sr' ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>SR</button>
                   <button type="button" onClick={() => { setBilingual(false); setLang('en'); setEditLang('en'); }} className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold ${!bilingual && lang === 'en' ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>EN</button>
                 </div>
-                {bilingual && (
-                  <label className="mt-1.5 flex items-center gap-2 text-xs text-gray-500">
-                    First slide
-                    <select className="rounded border border-gray-300 px-1.5 py-0.5 text-xs" value={lang} onChange={(e) => setLang(e.target.value as Lang)}><option value="sr">SR</option><option value="en">EN</option></select>
-                  </label>
-                )}
+              </div>
+              <div>
+                <label className={LABEL}>Post</label>
+                <div className="flex gap-1">
+                  {([['feed', 'story'], ['feed'], ['story']] as Kind[][]).map((k) => (
+                    <button key={k.join('+')} type="button" disabled={k.includes('story') && !hasStory(layout)} onClick={() => setKinds(k)} className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold disabled:opacity-40 ${k.join('+') === kinds.join('+') ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                      {k.length === 2 ? 'Both' : k[0] === 'feed' ? 'Feed' : 'Story'}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="mt-3">
               <label className={LABEL}>Brief (optional)</label>
-              <textarea className={INPUT} rows={2} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="e.g. push the SMS reminder benefit; mention summer season; keep it under two lines" />
+              <textarea className={INPUT} rows={2} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="e.g. push the SMS reminder benefit; autumn promo; keep it short" />
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button type="button" className={BTN_PRIMARY} disabled={!ready || Boolean(busy) || !layout} onClick={writeCopy}>{busy === 'copy' ? 'Writing…' : hasCopy ? 'Write again' : 'Write copy'}</button>
-              {layoutInfo && <span className="text-xs text-gray-500">{layoutInfo.st ? 'Square + story' : 'Square only'} · fields: {layoutInfo.fields.join(', ')}</span>}
+              <button type="button" className={BTN_PRIMARY} disabled={!ready || Boolean(busy) || !layout} onClick={generate}>{busy === 'generate' ? 'Generating…' : post ? 'Generate again' : 'Generate'}</button>
+              <span className="text-xs text-gray-500">{post ? 'Writes new copy and re-renders everything.' : 'Copy, photo and renders in one go.'}</span>
             </div>
           </section>
 
           {hasCopy && (
             <section className="rounded-xl border border-gray-200 bg-white p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className={SECTION_TITLE}>2 · Copy</h2>
+                <h2 className={SECTION_TITLE}>Copy</h2>
                 <div className="flex gap-1">
                   {langs.map((l) => (
                     <button key={l} type="button" onClick={() => setEditLang(l)} className={`rounded-full px-3 py-1 text-xs font-semibold ${editLang === l ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l.toUpperCase()}{l === lang && bilingual ? ' · first' : ''}</button>
@@ -426,99 +472,94 @@ export default function StudioPage() {
               <div className="mt-3 space-y-3">
                 {fields.map((f) => (
                   <div key={f}>
-                    <label className={LABEL}>{FIELD_LABELS[f] ?? f}</label>
+                    <div className="mb-1 flex items-center justify-between">
+                      <label className="text-xs font-medium text-gray-500">{FIELD_LABELS[f] ?? f}</label>
+                      {!FIXED_FIELDS.has(f) && (
+                        <button type="button" className="flex items-center gap-1 text-xs text-brand-600 hover:underline disabled:opacity-40" disabled={Boolean(busy)} onClick={() => regenerate(f)} title="New wording for this line, both languages">
+                          <RefreshIcon />{busy === `field:${f}` ? 'Rewriting…' : 'Rewrite'}
+                        </button>
+                      )}
+                    </div>
                     {f === 'headline' || f === 'subline' ? (
-                      <textarea className={INPUT} rows={2} value={currentCopy[f] ?? ''} onChange={(e) => setField(f, e.target.value)} />
+                      <textarea className={INPUT} rows={2} value={currentCopy[f] ?? ''} onChange={(e) => setField(f, e.target.value)} readOnly={FIXED_FIELDS.has(f)} />
                     ) : (
-                      <input className={INPUT} value={currentCopy[f] ?? ''} onChange={(e) => setField(f, e.target.value)} />
+                      <input className={`${INPUT} ${FIXED_FIELDS.has(f) ? 'bg-gray-50 text-gray-500' : ''}`} value={currentCopy[f] ?? ''} onChange={(e) => setField(f, e.target.value)} readOnly={FIXED_FIELDS.has(f)} />
                     )}
                   </div>
                 ))}
                 <div>
-                  <label className={LABEL}>Feed caption (both languages + hashtags)</label>
-                  <textarea className={INPUT} rows={6} value={caption} onChange={(e) => setCaption(e.target.value)} />
+                  <div className="mb-1 flex items-center justify-between">
+                    <label className="text-xs font-medium text-gray-500">Feed caption (both languages + hashtags)</label>
+                    <button type="button" className="flex items-center gap-1 text-xs text-brand-600 hover:underline disabled:opacity-40" disabled={Boolean(busy)} onClick={() => regenerate('caption')}><RefreshIcon />{busy === 'field:caption' ? 'Rewriting…' : 'Rewrite'}</button>
+                  </div>
+                  <textarea className={INPUT} rows={5} value={caption} onChange={(e) => setCaption(e.target.value)} />
                 </div>
               </div>
             </section>
           )}
         </div>
 
-        {/* ── Right: photo + render + schedule ────────────────────────── */}
+        {/* ── Right: the post as it will look, then schedule ──────────── */}
         <div className="space-y-4">
           <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h2 className={SECTION_TITLE}>3 · Photo</h2>
-            <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
-              {cat.photos.map((p) => (
-                <button key={p.url} type="button" onClick={() => setPhoto(p.url)} className={`overflow-hidden rounded-lg border-2 ${photo === p.url ? 'border-brand-600' : 'border-transparent'}`} title={p.name}>
-                  <img src={p.url} alt={p.name} className="aspect-square w-full object-cover" loading="lazy" />
-                </button>
-              ))}
-              {photo && !cat.photos.some((p) => p.url === photo) && (
-                <div className="overflow-hidden rounded-lg border-2 border-brand-600"><img src={photo} alt="" className="aspect-square w-full object-cover" /></div>
-              )}
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={busy === 'upload'} className="flex aspect-square items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-xs font-medium text-gray-500 hover:border-brand-400 hover:text-brand-600">
-                {busy === 'upload' ? 'Uploading…' : '+ Upload'}
-              </button>
-              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ''; }} />
-            </div>
-            <input className={`${INPUT} mt-3`} value={photo} onChange={(e) => setPhoto(e.target.value)} placeholder="…or paste a public image URL" />
-            <p className="mt-1 text-xs text-gray-400">Uploads join the library and are matched to batches by name (e.g. “barber-shave.jpg” goes to barbers). JPEG, PNG or WebP up to 8 MB.</p>
-          </section>
-
-          <section className="rounded-xl border border-gray-200 bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className={SECTION_TITLE}>4 · Render{postProg ? ` (${postProg.done}/${postProg.total})` : ''}</h2>
-              <button type="button" className={BTN_PRIMARY} disabled={!ready || !hasCopy || !photo || Boolean(busy)} onClick={render}>{busy === 'render' ? 'Rendering…' : rendered ? 'Render again' : 'Render'}</button>
+              <h2 className={SECTION_TITLE}>Preview{postProg ? ` · ${postProg.done}/${postProg.total} rendered` : ''}</h2>
+              {dirty && post && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">Changes not in the design yet</span>}
             </div>
-            {postRenders.length > 0 ? (
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {postRenders.map((r) => (
-                  <button key={`${r.format}-${r.lang}`} type="button" onClick={() => setPreview(r.url)} className="overflow-hidden rounded-lg border border-gray-200 text-left">
-                    <img src={r.url} alt={`${r.format} ${r.lang}`} className="w-full" />
-                    <div className="px-2 py-1 text-[11px] text-gray-500">{STEP_LABEL[r.format]} · {r.lang.toUpperCase()}</div>
-                  </button>
-                ))}
+            <div className={`mt-3 grid gap-4 ${wantStory ? 'grid-cols-[minmax(0,1fr)_minmax(0,0.5625fr)]' : 'grid-cols-1'}`}>
+              <div>
+                <div className="mb-1 text-xs font-medium text-gray-500">Feed{bilingual ? ' · carousel' : ''}</div>
+                <Carousel aspect="aspect-square" slides={slidesFor('sq')} onOpen={(s) => s.url && setPreview(s.url)} />
               </div>
-            ) : (
-              <p className="mt-3 text-sm text-gray-400">Write the copy and pick a photo, then render. Each image takes 20–40 seconds; a bilingual post with a story is four images.</p>
-            )}
-            {post?.designs.sq?.[post.lang] && (
+              {wantStory && (
+                <div>
+                  <div className="mb-1 text-xs font-medium text-gray-500">Stories{bilingual ? ' · two' : ''}</div>
+                  <Carousel aspect="aspect-[9/16]" slides={slidesFor('st')} onOpen={(s) => s.url && setPreview(s.url)} />
+                </div>
+              )}
+            </div>
+
+            {/* Photo + apply */}
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3">
+              {photoUrl && <img src={photoUrl} alt="" className="h-12 w-12 rounded-lg object-cover" />}
+              <div className="min-w-0 flex-1 text-xs text-gray-500">
+                <div className="font-medium text-gray-700">Photo{photo ? '' : ' · matched to the audience'}</div>
+                <div className="truncate">{photoUrl.replace(/^https?:\/\/[^/]+\//, '')}</div>
+              </div>
+              <button type="button" className={BTN_SECONDARY} disabled={Boolean(busy) || photoPool.length < 2} onClick={shufflePhoto} title="Next photo for this audience"><span className="flex items-center gap-1"><RefreshIcon /> Shuffle</span></button>
+              <button type="button" className={BTN_SECONDARY} disabled={Boolean(busy)} onClick={() => { setPhotoUrlDraft(''); setPhotoOpen(true); }}>Change…</button>
+              {post && (
+                <button type="button" className={dirty ? BTN_PRIMARY : BTN_SECONDARY} disabled={!ready || working || Boolean(busy && !dirty)} onClick={apply}>{busy === 'render' ? 'Rendering…' : dirty ? 'Apply to design' : 'Re-render'}</button>
+              )}
+            </div>
+            {post && Object.values(post.designs).some(Boolean) && (
               <p className="mt-2 text-xs text-gray-400">
-                Tweak in Canva: {postRenders.map((r) => {
-                  const id = post.designs[r.format]?.[r.lang];
-                  return id ? <a key={`${r.format}-${r.lang}`} href={`https://www.canva.com/design/${id}/edit`} target="_blank" rel="noreferrer" className="mr-2 text-brand-600 hover:underline">{STEP_LABEL[r.format]} {r.lang.toUpperCase()}</a> : null;
-                })}
-                (edits there are not pulled back; re-render from here instead).
+                Open in Canva: {(['sq', 'st'] as Format[]).flatMap((f) => langOrder.map((l) => { const id = post.designs[f]?.[l]; return id ? <a key={`${f}-${l}`} href={`https://www.canva.com/design/${id}/edit`} target="_blank" rel="noreferrer" className="mr-2 text-brand-600 hover:underline">{STEP_LABEL[f]} {l.toUpperCase()}</a> : null; }))}
+                (edits there are not pulled back; change the copy here and apply).
               </p>
             )}
+            {!post && <p className="mt-2 text-xs text-gray-400">Showing the template as published in Canva. Generate fills it with copy for this audience and a matching photo.</p>}
           </section>
 
           {post && rendered && (
             <section className="rounded-xl border border-gray-200 bg-white p-4">
-              <h2 className={SECTION_TITLE}>5 · Schedule or post</h2>
+              <h2 className={SECTION_TITLE}>Schedule or post</h2>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div>
                   <label className={LABEL}>Post at (your local time)</label>
                   <input type="datetime-local" className={INPUT} value={when} onChange={(e) => setWhen(e.target.value)} />
                 </div>
-                <div>
-                  <label className={LABEL}>What to post</label>
-                  <div className="flex flex-wrap gap-1">
-                    {([['feed', 'story'], ['feed'], ['story']] as Kind[][]).map((k) => (
-                      <button key={k.join('+')} type="button" disabled={k.includes('story') && !hasStory(post.layout)} onClick={() => setKinds(k)} className={`rounded-full px-3 py-1 text-xs font-semibold disabled:opacity-40 ${k.join('+') === kinds.join('+') ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                        {k.length === 2 ? 'Feed + story' : k[0] === 'feed' ? 'Feed only' : 'Story only'}
-                      </button>
-                    ))}
+                <div className="flex items-end">
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" className={BTN_PRIMARY} disabled={Boolean(busy) || !when || dirty} onClick={() => schedule(post)}>{post.status === 'scheduled' ? 'Reschedule' : 'Schedule'}</button>
+                    <button type="button" className={BTN_SECONDARY} disabled={Boolean(busy) || !cat.instagram || dirty} onClick={() => publishNow(post)}>Post now</button>
+                    {post.status === 'scheduled' && <button type="button" className={BTN_SECONDARY} disabled={Boolean(busy)} onClick={() => act(post, { action: 'unschedule' }, 'Unschedule')}>Unschedule</button>}
+                    <button type="button" className={BTN_DANGER} disabled={Boolean(busy)} onClick={() => remove(post)}>Delete</button>
                   </div>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" className={BTN_PRIMARY} disabled={Boolean(busy) || !when} onClick={() => schedule(post)}>{post.status === 'scheduled' ? 'Reschedule' : 'Schedule'}</button>
-                <button type="button" className={BTN_SECONDARY} disabled={Boolean(busy) || !cat.instagram} onClick={() => publishNow(post)}>Post now</button>
-                {post.status === 'scheduled' && <button type="button" className={BTN_SECONDARY} disabled={Boolean(busy)} onClick={() => act(post, { action: 'unschedule' }, 'Unschedule')}>Unschedule</button>}
-                <button type="button" className={`${BTN_DANGER} ml-auto`} disabled={Boolean(busy)} onClick={() => remove(post)}>Delete</button>
-              </div>
               <p className="mt-2 text-xs text-gray-500">
+                {dirty ? 'Apply the changes to the design first. ' : ''}
                 {post.langs.length > 1 ? `Feed: 2-slide carousel (${post.lang.toUpperCase()} first). Stories: ${post.lang.toUpperCase()} then ${post.langs.find((l) => l !== post.lang)?.toUpperCase()}. ` : ''}
                 {post.status === 'scheduled' && post.scheduled_at ? `Scheduled for ${new Date(post.scheduled_at).toLocaleString()} · the publisher picks it up within 15 minutes.` : ''}
               </p>
@@ -531,7 +572,7 @@ export default function StudioPage() {
       <div className="mt-8">
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <h2 className={SECTION_TITLE}>Studio posts</h2>
-          <select className={SELECT} value={filter} onChange={(e) => { setFilter(e.target.value as Filter); }}>
+          <select className={SELECT} value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
             <option value="all">All ({posts.length})</option>
             <option value="scheduled">Scheduled ({posts.filter((p) => p.status === 'scheduled').length})</option>
             <option value="draft">Drafts ({posts.filter((p) => p.status === 'draft').length})</option>
@@ -566,7 +607,7 @@ export default function StudioPage() {
           )}
         </div>
         {visible.length === 0 ? (
-          <p className="text-sm text-gray-400">{posts.length === 0 ? 'Nothing yet. Rendered posts show up here with their status.' : 'Nothing matches this filter.'}</p>
+          <p className="text-sm text-gray-400">{posts.length === 0 ? 'Nothing yet. Generated posts show up here with their status.' : 'Nothing matches this filter.'}</p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {visible.map((p) => (
@@ -589,6 +630,26 @@ export default function StudioPage() {
           </div>
         )}
       </div>
+
+      {/* Photo picker */}
+      <Modal open={photoOpen} onClose={() => setPhotoOpen(false)} title="Choose a photo" width="max-w-2xl" footer={<button type="button" className={BTN_SECONDARY} onClick={() => setPhotoOpen(false)}>Cancel</button>}>
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+          {[...photoPool, ...cat.photos.filter((p) => !photoPool.includes(p))].map((p) => (
+            <button key={p.url} type="button" onClick={() => choosePhoto(p.url)} className={`overflow-hidden rounded-lg border-2 ${photoUrl === p.url ? 'border-brand-600' : 'border-transparent hover:border-gray-300'}`} title={p.name}>
+              <img src={p.url} alt={p.name} className="aspect-square w-full object-cover" loading="lazy" />
+            </button>
+          ))}
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={busy === 'upload'} className="flex aspect-square items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-xs font-medium text-gray-500 hover:border-brand-400 hover:text-brand-600">
+            {busy === 'upload' ? 'Uploading…' : '+ Upload'}
+          </button>
+          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ''; }} />
+        </div>
+        <div className="mt-3 flex gap-2">
+          <input className={INPUT} value={photoUrlDraft} onChange={(e) => setPhotoUrlDraft(e.target.value)} placeholder="…or paste a public image URL" />
+          <button type="button" className={BTN_SECONDARY} disabled={!/^https?:\/\//.test(photoUrlDraft)} onClick={() => choosePhoto(photoUrlDraft.trim())}>Use</button>
+        </div>
+        <p className="mt-2 text-xs text-gray-400">The first {photoPool.length} match this audience by name. Wide scene shots work best; JPEG, PNG or WebP up to 8 MB.</p>
+      </Modal>
 
       <StudioBatchModal open={batchOpen} onClose={() => setBatchOpen(false)} onStart={(req) => void startBatch(req)} verticals={cat.verticals} categories={cat.categories} tones={cat.tones} layouts={cat.layouts} cadence={cat.cadence} />
       <ConfirmDialog request={confirm} busy={busy !== '' && busy !== 'batch'} onClose={() => (busy && busy !== 'batch' ? undefined : setConfirm(null))} />

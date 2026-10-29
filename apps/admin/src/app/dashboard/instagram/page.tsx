@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { CanvaCard } from '@/components/canva-card';
+import { InstagramCard } from '@/components/instagram-card';
 import { ConfirmDialog, type ConfirmRequest } from '@/components/confirm-dialog';
 import { IgRowModal, type RowEdit, type RowEditResult } from '@/components/ig-row-modal';
 import { IgSettingsCard, type IgSettingsValue } from '@/components/ig-settings-card';
@@ -42,6 +43,9 @@ interface Config {
   base: string;
   lang: string;
   credentials: boolean;
+  source: 'db' | 'env' | null;
+  username: string | null;
+  expiresAt: string | null;
   login: 'instagram' | 'facebook';
 }
 
@@ -85,8 +89,6 @@ export default function InstagramPage() {
   const [settings, setSettings] = useState<IgSettingsValue | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
-  const [check, setCheck] = useState<{ ok: boolean; account?: { id: string; user_id?: string; username?: string }; error?: string } | null>(null);
-  const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ title: string; lines: string[] } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
@@ -119,13 +121,6 @@ export default function InstagramPage() {
     const res = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     return { ok: res.ok, data };
-  };
-
-  const runCheck = async () => {
-    setChecking(true);
-    const res = await fetch('/api/admin/ig/check', { method: 'POST' });
-    setCheck((await res.json()) as typeof check);
-    setChecking(false);
   };
 
   const saveSettings = async (next: IgSettingsValue) => {
@@ -225,37 +220,29 @@ export default function InstagramPage() {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Instagram</h1>
-          <p className="mt-1 text-sm text-gray-500">40 feed posts and their matching stories. The publisher checks every 15 minutes and posts whatever is due.</p>
+          <p className="mt-1 text-sm text-gray-500">The publisher checks every 15 minutes and posts whatever is due: the 40-post plan and studio posts.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={BTN_SECONDARY} onClick={runCheck} disabled={checking}>{checking ? 'Checking…' : 'Check connection'}</button>
-          <Link href="/dashboard/instagram/studio" className={BTN_PRIMARY}>+ New post (Studio)</Link>
-        </div>
+        <Link href="/dashboard/instagram/studio" className={BTN_PRIMARY}>+ New post (Studio)</Link>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-2 md:gap-3 lg:grid-cols-4">
-        <Stat label="Connection" value={config ? (config.credentials ? 'Token set' : 'No token') : '…'} sub={config ? `${config.login} login · ${config.lang.toUpperCase()}` : ''} tone={config?.credentials ? 'ok' : 'warn'} />
+      {/* Connections: small, testable, reconnectable */}
+      <div className="mb-5 grid gap-2 lg:grid-cols-2">
+        {config ? <InstagramCard conn={config} onChanged={load} notify={notify} /> : <div className="h-[58px] rounded-xl border border-gray-200 bg-white" />}
+        <CanvaCard notify={notify} />
+      </div>
+
+      {/* Overview (read-only) */}
+      <div className="mb-5 grid grid-cols-3 gap-2 md:gap-3">
         <Stat label="Status" value={settings?.paused ? 'Paused' : settings?.start_date ? 'Running' : 'No start date'} sub={settings ? `${settings.days.length}× a week at ${settings.post_time}` : ''} tone={settings?.paused || !settings?.start_date ? 'warn' : 'ok'} />
-        <Stat label="Published" value={`${stats.published} / ${rows.length || 40}`} sub={stats.failed ? `${stats.failed} failed` : 'feed posts'} tone={stats.failed ? 'warn' : 'ok'} />
+        <Stat label="Published" value={`${stats.published} / ${rows.length || 40}`} sub={stats.failed ? `${stats.failed} failed` : 'plan feed posts'} tone={stats.failed ? 'warn' : 'ok'} />
         <Stat label="Next up" value={stats.next ? fmtWhen(stats.next.scheduledAt).date : '—'} sub={stats.next ? `${fmtWhen(stats.next.scheduledAt).time} · ${stats.next.file}` : ''} />
       </div>
 
-      {check && (
-        <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${check.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
-          {check.ok ? <>Token is valid. Posting as <b>@{check.account?.username ?? check.account?.id}</b>{check.account?.user_id ? <> (account id {check.account.user_id})</> : null}.</> : <>Connection failed: {check.error}</>}
-        </div>
-      )}
-      {config && !config.credentials && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Add <code>META_IG_ACCESS_TOKEN</code> to the admin project in Vercel and redeploy. Until then nothing can be published.
-        </div>
-      )}
-
-      {settings && <div className="mb-4"><IgSettingsCard value={settings} onSave={saveSettings} /></div>}
-      <div className="mb-6"><CanvaCard notify={notify} /></div>
+      {/* Schedule (actionable) */}
+      {settings && <div className="mb-6"><IgSettingsCard value={settings} onSave={saveSettings} /></div>}
 
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <span className={SECTION_TITLE}>Plan</span>

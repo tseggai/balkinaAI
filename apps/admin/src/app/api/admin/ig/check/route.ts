@@ -6,5 +6,5 @@ import { checkAccount } from '@/lib/ig/runner';
 export async function POST() {
   const auth = await requireAdmin();
   if (!auth.admin) return auth.response;
-  return NextResponse.json(await checkAccount());
+  return NextResponse.json(await checkAccount(auth.supabase));
 }

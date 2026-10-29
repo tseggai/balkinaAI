@@ -6,7 +6,8 @@ import { igConfig, planState } from '@/lib/ig/runner';
 export async function GET() {
   const auth = await requireAdmin();
   if (!auth.admin) return auth.response;
-  const cfg = igConfig();
+  const { state: _creds, ...cfg } = await igConfig(auth.supabase);
+  void _creds;
   const state = await planState(auth.supabase, cfg);
   return NextResponse.json({ config: cfg, ...state });
 }

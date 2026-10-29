@@ -142,6 +142,9 @@ export interface CopyRequest {
   fields: string[];
   brief?: string;
   langs: Lang[];
+  /** Regenerate only these fields (plus the caption when 'caption' is listed); the rest of `current` is kept. */
+  only?: string[];
+  current?: { copy?: Partial<Record<Lang, StudioCopy>>; caption?: string | null };
 }
 
 export interface CopyResult {
@@ -165,8 +168,11 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
   const tone = TONES.find((t) => t.value === req.tone);
   const category = categoryOf(req.vertical);
   // The eyebrow is the category name (fixed per template family), never written by the model.
-  const fields = (req.fields.length ? req.fields : ['headline', 'subline', 'url']).filter((f) => f !== 'eyebrow');
+  const allFields = (req.fields.length ? req.fields : ['headline', 'subline', 'url']).filter((f) => f !== 'eyebrow');
+  const partial = Boolean(req.only?.length);
+  const fields = partial ? allFields.filter((f) => req.only?.includes(f)) : allFields;
   const wantsEyebrow = req.fields.length === 0 || req.fields.includes('eyebrow');
+  const wantsCaption = !partial || Boolean(req.only?.includes('caption'));
   const lim = copyLimits(req.layout);
   const fieldSpec = fields.map((f) => `- ${f}: ${(FIELD_HINTS[f] ?? 'short text, max 40 characters').replace('{HEADLINE}', String(lim.headline)).replace('{SUBLINE}', String(lim.subline))}`).join('\n');
   const langNames: Record<Lang, string> = { sr: 'Serbian/Montenegrin, Latin script, ijekavian as spoken in Montenegro (prije, vrijeme, podsjetnik, obavještenje)', en: 'English' };
@@ -181,7 +187,10 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
     'Every field is a complete sentence or phrase, never cut mid-thought. No emojis in the image fields. Respect the character limits strictly; shorter is better. Serbian uses proper diacritics (č ć š ž đ).\n' +
     'Return strict JSON: { "copy": { "<lang>": { <field>: <text>, ... } }, "caption": { "<lang>": <feed caption 1-3 sentences, may use one emoji, no hashtags> } } ' +
     `for these languages: ${langs.map((l) => `"${l}" = ${langNames[l]}`).join('; ')}.\nFields per language:\n${fieldSpec}`;
-  const user = `Template: ${req.layout} (category ${category}).${req.brief ? `\nBrief from the marketer: ${req.brief}` : '\nNo extra brief; pick one concrete benefit and build the post around it.'}`;
+  const keep = partial && req.current?.copy
+    ? `\nKeep these existing fields as they are and make the new text fit them (do not repeat them):\n${LANGS.map((l) => `${l}: ${JSON.stringify(Object.fromEntries(Object.entries(req.current?.copy?.[l] ?? {}).filter(([k]) => !fields.includes(k) && k !== 'eyebrow')))}`).join('\n')}\nWrite a NEW, different version of the requested fields (not a rephrasing of the previous one):\n${LANGS.map((l) => `${l}: ${JSON.stringify(Object.fromEntries(Object.entries(req.current?.copy?.[l] ?? {}).filter(([k]) => fields.includes(k))))}`).join('\n')}`
+    : '';
+  const user = `Template: ${req.layout} (category ${category}).${req.brief ? `\nBrief from the marketer: ${req.brief}` : '\nNo extra brief; pick one concrete benefit and build the post around it.'}${keep}${partial && !wantsCaption ? '\nThe caption is not needed; return an empty caption object.' : ''}`;
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -197,14 +206,16 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
   const copy: Partial<Record<Lang, StudioCopy>> = {};
   for (const lang of langs) {
     const src = parsed.copy?.[lang] ?? {};
-    const out: StudioCopy = {};
+    const out: StudioCopy = { ...(partial ? req.current?.copy?.[lang] ?? {} : {}) };
     for (const f of fields) out[f] = f === 'url' ? 'balkina.ai' : String(src[f] ?? '').trim();
     if (wantsEyebrow) out.eyebrow = eyebrowFor(category, lang);
     copy[lang] = out;
   }
   const order: Lang[] = req.langs.length ? [...req.langs] : langs;
   const captionParts = order.map((l) => String(parsed.caption?.[l] ?? '').trim()).filter(Boolean);
-  const caption = `${captionParts.join('\n—\n')}\n\nLink u biu → balkina.ai\n\n${studioHashtags(req.vertical, Date.now() % 97).join(' ')}`;
+  const caption = wantsCaption || !req.current?.caption
+    ? `${captionParts.join('\n—\n')}\n\nLink u biu → balkina.ai\n\n${studioHashtags(req.vertical, Date.now() % 97).join(' ')}`
+    : req.current.caption;
   return { copy, caption, model };
 }
 
