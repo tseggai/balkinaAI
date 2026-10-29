@@ -13,7 +13,7 @@ Two adaptations are mandatory and are threaded through every section:
 
 ## Part A — How to use this document
 
-1. Read `CLAUDE.md` in the target repo first. It overrides this spec on stack conventions, naming, commit rules, and on **which media the creators are found on** if it names specific sources. This spec supplies defaults where `CLAUDE.md` is silent. **Then read Part G and the four Oxytoshi documents it reconciles** (`MARKETING_STRATEGY.md`, `CREATOR_OUTREACH_KIT.md`, `outreach/PROSPECTS.csv`, `outreach/REACHOUT_SCRIPTS.md`). Part G records the owner's decisions on where those documents apply (voice, channels, targeting signals) and where the page-first flow of this spec deliberately replaces them (the motion). Part G wins over both.
+1. Read `CLAUDE.md` in the target repo first. It overrides this spec on stack conventions, naming, commit rules, and on **which media the creators are found on** if it names specific sources. This spec supplies defaults where `CLAUDE.md` is silent. **The flow being built is Balkina's, end to end** (generate → prospect → enrich → build page → outreach with the page link → claim page → CRM). The four Oxytoshi documents named in Part G (`MARKETING_STRATEGY.md`, `CREATOR_OUTREACH_KIT.md`, `outreach/PROSPECTS.csv`, `outreach/REACHOUT_SCRIPTS.md`) are **market context only**: who the creators are, where they are found, which channels reach them, how they talk. They do not change the flow. Part G says exactly what is taken from them.
 2. Do **Part C (Discovery)** completely before writing any code. Produce the "Resolved names" table in your first message, then build. Do not ask the user to confirm it unless a hard gate in Part C fires.
 3. Build in the order of **Part D**. Each step ends with a build that passes and a commit. Do not reorder; later steps depend on earlier contracts.
 4. Everything here that says **MUST** is a contract. Everything that says **default** is a choice you may change only if `CLAUDE.md` or the codebase gives a concrete reason, and you say so in the commit message.
@@ -377,7 +377,7 @@ CREATE TABLE IF NOT EXISTS growth_prospects (
   icp_score INTEGER NOT NULL DEFAULT 0,
   score_override INTEGER,              -- hand-set; wins over the computed score when not null
   stage TEXT NOT NULL DEFAULT 'new' CHECK (stage IN (
-    'new', 'enriched', 'qualified', 'disqualified', 'preprovisioned', 'warming',
+    'new', 'enriched', 'qualified', 'disqualified', 'preprovisioned',
     'contacted', 'viewed', 'engaged', 'replied', 'claimed', 'signed_up', 'customer', 'lost'
   )),
   enrichment JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -498,9 +498,7 @@ BEGIN
       WHEN NEW.type = 'replied' AND stage IN ('preprovisioned', 'contacted', 'viewed', 'engaged') THEN 'replied'
       WHEN NEW.type IN ('claim_demo_completed', 'claim_activate_opened', 'claim_clicked') AND stage IN ('preprovisioned', 'contacted', 'viewed') THEN 'engaged'
       WHEN NEW.type = 'claim_page_view' AND stage IN ('preprovisioned', 'contacted') THEN 'viewed'
-      WHEN NEW.type = 'cold' AND stage NOT IN ('claimed', 'signed_up', 'customer') THEN 'lost'
-      WHEN NEW.type = 'sent' AND stage IN ('new', 'enriched', 'qualified', 'preprovisioned', 'warming') THEN 'contacted'
-      WHEN NEW.type = 'warmup' AND stage IN ('new', 'enriched', 'qualified', 'preprovisioned') THEN 'warming'
+      WHEN NEW.type = 'sent' AND stage IN ('new', 'enriched', 'qualified', 'preprovisioned') THEN 'contacted'
       ELSE stage
     END,
     updated_at = now()
@@ -842,19 +840,19 @@ Docs:
 
 ---
 
-## Part G — Reconciliation with the Oxytoshi outreach documents (owner decisions, 2026-10-29)
+## Part G — What the Oxytoshi documents contribute (market context, not flow)
 
-Read these four files in the target repo before building: `MARKETING_STRATEGY.md` (§2 positioning, §3 audiences, §6 creator loop, §7 metrics), `CREATOR_OUTREACH_KIT.md` (channels, link discipline, templates), `outreach/PROSPECTS.csv` (76 hand-researched rows), `outreach/REACHOUT_SCRIPTS.md` (per-prospect drafts, owner voices). They were written for a **call-first** motion: no link in the first DM, a demo clip of the product, the founder's own page as proof, and a 15-minute concierge call as the conversion. The owner has decided that this port runs the **page-first** motion from this spec instead, because a link to the creator's **own** pre-built page is more relevant and more effective than an explainer video and makes the call unnecessary. The table says what to take from each source; the sections below are the rules. Where anything here conflicts with Parts B–E or with the four documents, this part wins.
+Read these four files in the target repo before building: `MARKETING_STRATEGY.md` (§2 positioning, §3 audiences, §6.1 target profile), `CREATOR_OUTREACH_KIT.md` (channels, voice), `outreach/PROSPECTS.csv` (76 hand-researched creators), `outreach/REACHOUT_SCRIPTS.md` (how the founder talks to each of them). They were written for a different, call-first motion (no link in the first DM, an explainer clip, a concierge call). **That motion is not being built.** The flow is Balkina's: the first touch sends the creator a link to their own pre-built page, they test it on the claim page and claim it themselves; no clip, no call, no calendar. What the documents give the build is the market: who the creators are, where they are found, which channels reach them, what signals mark a good fit, and the wording they respond to. The table lists exactly what is taken; the sections below are the resulting rules. Where anything here conflicts with Parts B–E, Parts B–E (the Balkina flow) win unless the row below explicitly says "from the docs".
 
-| Topic | Decision | Source |
+| Topic | Decision | From |
 |---|---|---|
-| Motion | Page-first: first touch carries the short link to the creator's own page; they test it and claim it themselves. No concierge call, no calendar link, no `call_booked` stage. | this spec |
-| Voice and message discipline | From the kit and strategy: money kept, "wallet-to-wallet, we structurally can't take a cut", never "platform" for ourselves, never open with scores, never imply we process payments. | Oxytoshi docs |
-| Channels | X DM → Nostr DM → Discord DM → Email → Telegram, plus Stacker News. Never WhatsApp, SMS, LinkedIn, forms, bulk senders. | kit §1 |
-| Audience band | 1,000–250,000 followers (`FOLLOWER_SWEET_SPOT`); over 250k scores −1, no white-glove rule. | this spec (owner) |
-| Targeting signals | Creator types, pitch (tipwall / livestream), wallet evidence, Patreon-style gating as the wedge, freshness windows. | strategy §6.1, CSV |
-| Data schema | This spec's `growth_prospects` plus the columns in G.4, adapted to the product. The hand-made CSV is converted once; it does not define the schema. | this spec (owner) |
-| Personalisation | A specific, recent hook opens every first touch; one message at a time; warm-up before the DM is recommended, not enforced. | kit §1, §4 |
+| Flow, stages, composer steps, cadence, funnel strip, CRM trigger | Balkina's, unchanged (B.6, B.8, D.10). | this spec |
+| Audience band | 1,000–250,000 followers (`FOLLOWER_SWEET_SPOT`); above the band scores −1. | this spec |
+| Data schema and import CSV | This spec's `growth_prospects`, plus the creator-specific columns in G.4; the hand-made CSV is converted once (G.5). | this spec |
+| Where creators are found | Nostr, Stacker News, YouTube, podcasts (Fountain / value blocks), X; Wavlake, zap.stream, Substack, Geyser via CSV for now. | from the docs |
+| Which channels reach them | X DM → Nostr DM → Discord DM → Email → Telegram, plus Stacker News. Never WhatsApp, SMS, LinkedIn, forms, bulk senders. | from the docs |
+| Fit signals | Creator type, pitch (tipwall / livestream), wallet evidence, Patreon-style gating as the wedge, posting freshness. | from the docs |
+| Wording | Money kept, "wallet-to-wallet, we structurally can't take a cut", never "platform" for ourselves, never open with scores, never imply we process payments; one specific personal line opens the first touch. | from the docs |
 
 ### G.1 The message ladder (page-first)
 
@@ -873,7 +871,7 @@ Templates are keyed by `(step, pitch)` (G.4) with two phrasings each; the compos
 - `last_chance`: "{Name}'s page is held until {date}; after that we take it down. Claiming takes 10 seconds and is free.\n{link}"
 - Money objection insert ("what's the catch"): a composer insert with the kit's answer, verbatim from `REACHOUT_SCRIPTS.md` → "The money objection", with the calendar sentence removed and the page link kept.
 
-Rules carried from the kit that still apply: the hook is required for `first` (G.4 `hook` column; Send disabled while empty), never two identical texts to two prospects in the same hour (the composer warns when the text equals the last sent text on any row), no bulk send action anywhere, `no_bump` rows get no `follow_up`/`last_chance`. The kit's warning that X files link-carrying DMs from non-mutuals into message requests still holds; mitigate it with the warm-up (follow and engage first, logged as `warmup`), not by dropping the link.
+The `hook` (G.4) is this product's equivalent of Balkina's first-name personalisation: it is pre-filled by the enricher, shown as the first line of the template, and editable; the admin can send without changing it, exactly as in Balkina. No bulk send action anywhere (as in Balkina). `no_bump` rows show only the `first` step. The kit notes that X files link-carrying DMs from non-mutuals into message requests; following the creator before sending (a note in the drawer) is the mitigation, not dropping the link.
 
 What is **not** ported from the kit: Message 2, the demo clip attachment, the fee-table image step, the founder-page-as-proof link, the calendar link, `call_booked`. The claim page itself is the demo (the creator tests a tip on their own page) and the proof (it is live product).
 
@@ -889,7 +887,7 @@ What is **not** ported from the kit: Message 2, the demo clip attachment, the fe
 
 ### G.4 Schema additions (this spec's schema, adapted)
 
-Add to `growth_prospects` in Migration A: `category TEXT` (creator type: `nostr-creator`, `spaces-host`, `meetup-organizer`, `youtuber`, `youtuber-live`, `podcaster`, `podcaster-live`, `community-owner`, `writer`, `educator`, `dev-educator`, `musician`, `artist`, `builder`, `nostr-streamer`), `pitch TEXT NOT NULL DEFAULT 'tipwall' CHECK (pitch IN ('tipwall','livestream','both'))` (derived at insert: live/streams/spaces/`*-live`/`nostr-streamer` → `livestream`; podcasters with a live show → `both`; else `tipwall`), `owner TEXT` (the admin responsible; Owner filter, "Mine" quick filter, "Set owner" in the bulk bar), `outreach_channel TEXT`, `discord TEXT`, `stackernews TEXT`, `hook TEXT` (one specific recent public thing, ≤ 20 words; filled by the enricher's LLM, editable), `verify_before_send TEXT`, `no_bump BOOLEAN NOT NULL DEFAULT false`. Niche catalogue (topic) is bitcoin-only: `bitcoin`, `lightning_nostr`, `mining`, `sound_money`, `privacy_foss`, `bitcoin_music`, `circular_economy`; drop `crypto`, `defi`, `btc_merchant` from the seeded catalogue and hide BTC Map in the modal (keep the adapter; the map play is Phase 3 in the strategy). Manual event types gain `warmup` (→ stage `warming`, "Warm-up done" button) and `cold` (→ `lost`, "Mark cold" button, follow-up +30 days). Generate modal sections: 1 Creator types · 2 Platforms · 3 Topic + languages · 4 Depth.
+Add to `growth_prospects` in Migration A: `category TEXT` (creator type: `nostr-creator`, `spaces-host`, `meetup-organizer`, `youtuber`, `youtuber-live`, `podcaster`, `podcaster-live`, `community-owner`, `writer`, `educator`, `dev-educator`, `musician`, `artist`, `builder`, `nostr-streamer`), `pitch TEXT NOT NULL DEFAULT 'tipwall' CHECK (pitch IN ('tipwall','livestream','both'))` (derived at insert: live/streams/spaces/`*-live`/`nostr-streamer` → `livestream`; podcasters with a live show → `both`; else `tipwall`), `owner TEXT` (the admin responsible; Owner filter, "Mine" quick filter, "Set owner" in the bulk bar), `outreach_channel TEXT`, `discord TEXT`, `stackernews TEXT`, `hook TEXT` (one specific recent public thing, ≤ 20 words; filled by the enricher's LLM, editable), `verify_before_send TEXT`, `no_bump BOOLEAN NOT NULL DEFAULT false`. Niche catalogue (topic) is bitcoin-only: `bitcoin`, `lightning_nostr`, `mining`, `sound_money`, `privacy_foss`, `bitcoin_music`, `circular_economy`; drop `crypto`, `defi`, `btc_merchant` from the seeded catalogue and hide BTC Map in the modal (keep the adapter; the map play is Phase 3 in the strategy). Manual event types stay Balkina's (`sent`, `replied`, `note`, `call`); "cold" is the existing stage select set to Lost. Generate modal sections: 1 Creator types · 2 Platforms · 3 Topic + languages · 4 Depth.
 
 Discovery adapters for v1: `nostr`, `stackernews` (new: GraphQL at `https://stacker.news/api/graphql`, top items and their `user { name, stacked }`, dedupe key `stackernews:<name>`), `youtube`, `podcast` (Fountain / Podcast Index `value` blocks are a tier-1 signal), `x` (optional, paid), `csv`. CSV-fed for now, adapters later: Wavlake, zap.stream, Substack, Geyser, X Spaces, Rumble (say so in `ROUTINES.md`).
 
@@ -913,7 +911,7 @@ The legacy `outreach/PROSPECTS.csv` is converted once with a script committed at
 | `handle_or_contact` | parsed: `npub1…`→`nostr_pubkey` (hex), `@h`→`x_handle`, `stacker.news/u`→`stackernews`, email→`email`, else appended to `notes` |
 | `est_audience` | `followers` when a number parses ("~5.2k" → 5200), else `notes` |
 | `wallet_evidence`, `monetization_today` | `wallet_evidence`, `monetization` |
-| `state` | `stage`: bench→new, verify→qualified, queued→qualified, stale→disqualified, warming→warming, dm_sent→contacted, replied→replied, call booked→engaged, live→claimed, cold→lost |
+| `state` | `stage`: bench→new, verify→qualified, queued→qualified, stale→disqualified, warming→qualified, dm_sent→contacted, replied→replied, call booked→engaged, live→claimed, cold→lost |
 | `first_touch_date` | same |
 | `last_verified_activity` | `last_published_at` when a date parses, and appended to `notes` |
 | `confidence`, `last_action`, `next_action` | appended to `notes` |
@@ -928,16 +926,15 @@ The page is a founding-creator page: display name, bio, links, hotlinked platfor
 - `tipwall` → **Unlock demo**: pick the seeded locked item → fake invoice → "what the fan sees" = the item unlocked with a one-use code/link mock → "what you see" = earnings row + "1 supporter".
 - `both` → Superchat first, with "Try the tip wall too". Nothing is written in either; events as D.11.
 
-### G.8 Metrics (strategy §7, kit §5)
+### G.8 Metrics
 
-Facets add: `dms_sent_7d`, `reply_rate` (replied ÷ contacted, all time and 7 days), `live` (claimed), `top_objection` (most frequent `payload.objection` on `replied` logs; optional select: fees / wallet / platform-rules / time / not-now / other). The Prospects page shows the funnel strip as Prospects · Pages built · Sent · Viewed page · Tested · Claimed (B.6 shape) and the Monday scorecard numbers in a second, smaller row; `ROUTINES.md` documents the Monday ritual.
+Balkina's facets and funnel strip, unchanged (B.6). The strategy's §7 scorecard is read off the same numbers (Sent, Viewed, Tested, Claimed); nothing extra is built for it.
 
 ### G.9 Acceptance additions (append to Part E)
 
 - [ ] `scripts/growth/convert-legacy-prospects.ts` turns `outreach/PROSPECTS.csv` into `outreach/PROSPECTS.import.csv` with zero unparsed rows reported, and importing it creates 76 prospects with the stages, owners, hooks and pitches per G.5; importing again changes nothing but refreshed facts.
-- [ ] The composer refuses to send a `first` with an empty hook; every step's text ends with the short link on its own line.
+- [ ] Every step's text ends with the short link on its own line, and the hook pre-fills the first line of `first`.
 - [ ] A row with `no_bump = true` shows only the `first` step.
-- [ ] Logging `warmup` moves a new row to `warming`; `cold` moves any non-claimed row to `lost` with a 30-day follow-up.
 - [ ] The claim page for a `tipwall` prospect runs the unlock demo and for a `livestream` prospect the Superchat demo; every built page has at least one seeded tip-wall item.
 - [ ] No WhatsApp, SMS, calendar, or bulk-send code path exists anywhere in the port.
 
