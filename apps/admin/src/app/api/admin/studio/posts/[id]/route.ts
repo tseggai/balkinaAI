@@ -10,7 +10,7 @@ export const maxDuration = 60;
 const Patch = z.object({
   action: z.enum(['write', 'render', 'rerender', 'update', 'schedule', 'unschedule', 'cancel', 'publish']),
   format: z.enum(['sq', 'st']).optional(),
-  lang: z.enum(['sr', 'en']).optional(),
+  lang: z.enum(['sr', 'en', 'base']).optional(),   // 'base' = text-free render of the template with the photo (editable preview)
   langs: z.array(z.enum(['sr', 'en'])).min(1).optional(),
   primary: z.enum(['sr', 'en']).optional(),
   scheduled_at: z.string().datetime().optional(),

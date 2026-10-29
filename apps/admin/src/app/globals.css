@@ -1,6 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Brand font of the Instagram templates, used by the studio's editable preview. */
+.font-quicksand {
+  font-family: 'Quicksand', 'Nunito', ui-sans-serif, system-ui, sans-serif;
+}
 
 @layer base {
   html {
