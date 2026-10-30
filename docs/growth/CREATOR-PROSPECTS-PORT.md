@@ -13,7 +13,7 @@ Two adaptations are mandatory and are threaded through every section:
 
 ## Part A — How to use this document
 
-1. Read `CLAUDE.md` in the target repo first. It overrides this spec on stack conventions, naming, commit rules, and on **which media the creators are found on** if it names specific sources. This spec supplies defaults where `CLAUDE.md` is silent. **The flow being built is Balkina's, end to end** (generate → prospect → enrich → build page → outreach with the page link → claim page → CRM). The four Oxytoshi documents named in Part G (`MARKETING_STRATEGY.md`, `CREATOR_OUTREACH_KIT.md`, `outreach/PROSPECTS.csv`, `outreach/REACHOUT_SCRIPTS.md`) are **market context only**: who the creators are, where they are found, which channels reach them, how they talk. They do not change the flow. Part G says exactly what is taken from them.
+1. Read `CLAUDE.md` in the target repo first. It overrides this spec on stack conventions, naming, commit rules, and on **which media the creators are found on** if it names specific sources. This spec supplies defaults where `CLAUDE.md` is silent. **The flow being built is Balkina's, end to end** (generate → prospect → enrich → build page → outreach with the page link → claim page → CRM). The four Oxytoshi documents named in Part G (`MARKETING_STRATEGY.md`, `CREATOR_OUTREACH_KIT.md`, `outreach/PROSPECTS.csv`, `outreach/REACHOUT_SCRIPTS.md`) are **market context only**: who the creators are, where they are found, which channels reach them, how they talk. They do not change the flow. Part G says exactly what is taken from them. **Part H** records the product facts (identity model, payment mechanics, vocabulary, document precedence) resolved from the Oxytoshi product documents; it answers most of Part C in advance.
 2. Do **Part C (Discovery)** completely before writing any code. Produce the "Resolved names" table in your first message, then build. Do not ask the user to confirm it unless a hard gate in Part C fires.
 3. Build in the order of **Part D**. Each step ends with a build that passes and a commit. Do not reorder; later steps depend on earlier contracts.
 4. Everything here that says **MUST** is a contract. Everything that says **default** is a choice you may change only if `CLAUDE.md` or the codebase gives a concrete reason, and you say so in the commit message.
@@ -296,7 +296,11 @@ Read `CLAUDE.md`, the package/app layout, the creator profile schema, the public
 | `DASHBOARD_APP` | The creator's logged-in dashboard app and its auth callback route (must accept `token_hash` + `type=magiclink`, add it if missing, mirroring B.7). | — |
 | `SHARED_PKG` | The shared types/constants package importable by admin + public site. | create `packages/shared` equivalents inside each app if none |
 | `DB` | Supabase project, migrations folder, naming scheme (sequential number prefix), how RLS is written. **GATE** if the product is not on Supabase/Postgres. | — |
-| `CREATOR_TABLE` | The table that is one row per creator (e.g. `creators`, `profiles`). Its primary key, `user_id`/auth link column, `slug`/handle column, `status`/visibility column, display name, bio, avatar column, and payment columns (Lightning address, wallet, etc.). | — |
+| `CREATOR_TABLE` | The table that is one row per creator (e.g. `creators`, `profiles`). Its primary key, `user_id`/auth link column, `slug`/handle column, `status`/visibility column, display name, bio, avatar column, and payment columns (Lightning address, wallet, etc.). **Oxytoshi: `profiles` (PK = `auth.users.id`) plus `creator_profiles`; see Part H.1.** | — |
+| `HANDLE_COLUMN` | The column the public creator route resolves (`/c/[handle]`). Not in the January docs; read it from `web/app/c/`. | — |
+| `CREATOR_CATEGORY_ENUM` | The product's creator categories (Educator, Guide, Entertainer, Developer, …) and where they are defined; the pre-provisioner maps the prospect `category` onto them. | nearest match, else the product's default |
+| `WEB_TIP_PATH` | What happens when a visitor presses the tip button on the web creator page (deep link into the app, install prompt, or a web wallet flow). The demo mirrors it. | deep link + install prompt |
+| `FEE_CLAIM` | What the product takes from creator earnings today. The July 2026 marketing documents say 0% structurally; the January 2026 product documents plan a 5–6% commission. Read the code (any commission logic on `tip_transactions` or the creator earnings path) and the newest document; the outreach and claim-page copy must state only what is true. | "you keep 100%" only if no commission logic exists |
 | `CREATOR_PAGE_ROUTE` | The public route that renders a creator (e.g. `/[handle]`, `/c/[slug]`) and the component tree it uses. | — |
 | `PRIMARY_FAN_ACTION` | What a fan does on the creator page: tip/zap in sats, subscribe to a tier, buy a product, book, send a message. The demo in D.11 simulates **this**. If several, pick the one the page's main CTA points to. | tip in sats |
 | `OFFERING_TABLE` | The entity a creator page lists (tiers, products, offers, services, links). Needed so the pre-provisioner can seed it. May be none (page is profile + links only). | none → seed only profile + links |
@@ -446,6 +450,8 @@ ALTER TABLE <CREATOR_TABLE> ADD CONSTRAINT <CREATOR_TABLE>_status_check
 -- If the creator table has no status column, add: status TEXT NOT NULL DEFAULT 'active' with that check,
 -- and backfill nothing (existing rows are active).
 -- If user_id is NOT NULL today, relax it: ALTER TABLE <CREATOR_TABLE> ALTER COLUMN user_id DROP NOT NULL;
+-- Oxytoshi: the profile's PK IS the auth user id, so this cannot be relaxed. Use the placeholder-user model in Part H.1 instead;
+-- the column added here is claim_status TEXT NOT NULL DEFAULT 'active' CHECK (claim_status IN ('active','unclaimed')).
 
 ALTER TABLE growth_prospects
   ADD COLUMN IF NOT EXISTS claim_token TEXT UNIQUE,
@@ -720,7 +726,7 @@ Keep B.4's structure (selection, concurrency, timeouts, HTML-to-text, link extra
 
 ### D.9 Pre-provisioner (`lib/growth/preprovision.ts`) — builds the real creator page
 
-Contract (MUST): the row it creates is a normal `<CREATOR_TABLE>` row rendered by `CREATOR_PAGE_ROUTE` with **no special-case component**; the only differences are `status='unclaimed'`, `user_id=null`, and the gates from D.2.
+Contract (MUST): the row it creates is a normal `<CREATOR_TABLE>` row rendered by `CREATOR_PAGE_ROUTE` with **no special-case component**; the only differences are `status='unclaimed'`, `user_id=null`, and the gates from D.2. **Oxytoshi:** the row hangs off a placeholder auth user and carries `claim_status='unclaimed'`; follow Part H.1 for creation, claim and deletion.
 
 - Idempotent per prospect as in B.5 (`creator_id` set → refresh token only; `created:false`).
 - Slug/handle: `toSlug(cleanCreatorName(name))` where `cleanCreatorName` strips trailing descriptors (`podcast`, `channel`, `official`, `tv`, `show`, `news`, `crypto`, `bitcoin` only when not the whole name, emoji, `| …` suffixes) and caps at 4 words; prefer the platform handle when it is clean `[a-z0-9_]{3,30}`; unique with hex suffixes; respect the product's handle rules (reserved words, length) by calling the product's own slug validator if one exists.
@@ -937,6 +943,44 @@ Balkina's facets and funnel strip, unchanged (B.6). The strategy's §7 scorecard
 - [ ] A row with `no_bump = true` shows only the `first` step.
 - [ ] The claim page for a `tipwall` prospect runs the unlock demo and for a `livestream` prospect the Superchat demo; every built page has at least one seeded tip-wall item.
 - [ ] No WhatsApp, SMS, calendar, or bulk-send code path exists anywhere in the port.
+- [ ] (Part H) An unclaimed creator has a placeholder auth user, `claim_status = 'unclaimed'`, `is_discoverable = false`, no Lightning address or node pubkey; it is absent from nearby-users, directory, leaderboard and platform-average results; a tip attempt to it is refused; the preview renders with the service role only. Claiming replaces the placeholder email, and a forced failure after the email update reverts it.
+- [ ] (Part H) The demo has no invoice step; the fee line in templates and on the claim page matches the resolved `FEE_CLAIM`.
+
+---
+
+## Part H — Oxytoshi product facts (from `00_START_HERE.md`, `01`–`05`, `.context`)
+
+These documents date from January–March 2026 and describe the mobile app before the creator feature, the web pages and the outreach work existed. **Precedence when sources disagree: the code first, then the July 2026 outreach documents (`MARKETING_STRATEGY.md`, `CREATOR_OUTREACH_KIT.md`, scripts, CSV), then these product documents.** What follows is what they settle for the build.
+
+### H.1 Identity model and the unclaimed creator
+
+- Stack: React Native + Expo mobile app (`src/`), Next.js web app (`web/`, App Router) serving the public creator page under `web/app/c/`, Supabase (Postgres + PostGIS + RLS + Storage + Realtime). The admin is built inside `web/` (`CLAUDE.md`, "Growth / Prospects build notes").
+- `profiles.id` **is** `auth.users.id` (primary key with a foreign key to `auth.users`, cascade delete). `creator_profiles` links to `profiles`. There is no creator row without an auth user, so Balkina's "tenant with `user_id = null`" has no equivalent. **Decision: the pre-provisioner creates a placeholder auth user.**
+  - Create: `auth.admin.createUser({ email: 'claim-<first 12 hex of token>@claims.<public domain>', email_confirm: false, user_metadata: { unclaimed: true, growth_prospect_id } })`. Never a real inbox; the domain's MX must not deliver. Store the auth user id as `growth_prospects.creator_id`.
+  - Profile row: `display_name`, `bio`, `avatar_url` (hotlinked platform avatar), `job_title` ← creator category label, `is_discoverable = false`, `privacy_level = 'private'`, `claim_status = 'unclaimed'` (column added in Migration B), `lightning_address` and `lightning_node_pubkey` **null** (nothing can be paid to it), `nostr_pubkey` null (that column is for the app's own NWC key, not the creator's public npub; keep the prospect's npub on `growth_prospects` and in the creator links only).
+  - `creator_profiles` row: category (mapped to `CREATOR_CATEGORY_ENUM`), creator bio, links, supporter tiers seeded from enrichment offerings or the pitch defaults (G.6), no tip goal, no cover photo. Mark seeded items as drafts if the product has such a flag.
+  - Claim (`POST /api/claim`): `auth.admin.updateUserById(creator_id, { email, email_confirm: true, ...(password ? { password } : {}), user_metadata: { unclaimed: false } })`, then `claim_status = 'active'`, `is_discoverable` left **false** until the creator turns it on in the app (location-based discovery is their choice, not ours), magic link via `generateLink({ type: 'magiclink', email })` → the web auth callback. On any failure after the email update, revert the email to the placeholder and leave `claim_status` as it was.
+  - Existing account with that email: the admin API refuses the update (email taken) → return 409 and log `claim_blocked_existing_user`, as in D.11.
+  - Expiry cleanup (manual for now): `auth.admin.deleteUser(creator_id)` cascades the profile and creator rows.
+- **Gates for `claim_status = 'unclaimed'` (MUST, each one listed in the Migration B commit message):** the nearby-users function `get_nearby_users_with_privacy` and every map/list query (already excluded by `is_discoverable = false` and the absent `user_locations` row, but add the explicit filter); any creator directory, search, "featured" or Creators-tab query on web and mobile; `platform_trends` / platform-average computation and the weekly `weekly_scores` job (an unclaimed row with zero activity must not drag the platform average down); leaderboards and `gratitude_feed`; the public `/c/[handle]` read (anonymous → not found; service role → preview); sitemaps and OG routes; every tipping path (`paymentFlowService` recipient lookup, recurring-supporter scheduling, Superchat, tip-wall purchase) refuses an unclaimed recipient with a clear error even though no node pubkey exists.
+
+### H.2 Payment mechanics and the demo
+
+- Tips are **keysend over NWC**: no invoice, no QR. The fan picks an amount, optionally a message, confirms, and the sats arrive in the creator's own wallet; the recipient can be offline. Amount chips in the product: 10 / 50 / 100 / 500 / 1,000 sats for peer tips, and creator supporter tiers like 500 / 2,000 / 10,000 sats.
+- The claim-page demo therefore has **no invoice step** (this replaces the fake-invoice step in D.11 and G.7): amount chips → optional message → "Send" → "Sent" confirmation on the fan side → on the creator side a notification mock ("New tip · 2,000 sats · 'love the show'") and the earnings row. Superchat variant: the message lights up on a stream mock. Tip-wall variant: the locked item unlocks with a one-use code/link mock. A "DEMO · nothing is sent" eyebrow replaces the watermark.
+- `WEB_TIP_PATH` decides what the real "Send sats" button on the preview does: it is disabled in preview and the demo stands in for it.
+
+### H.3 Vocabulary (from the product and the July documents)
+
+Creator page = "your page"; fan action = "send sats" / "tip"; live = "Superchat"; gated content = "tip wall" with "unlocks"; supporters, supporter tiers, tip goals; "founding creator" for the outreach offer. Scores (Halo, Aura, OXY) exist in the product and may appear on the creator page preview as the product renders them, but **never in outreach copy or claim-page copy** (strategy §2 message discipline). Never "platform" for ourselves, never imply the product processes payments ("wallet to wallet, we never touch it" is both the pitch and the legal position).
+
+### H.4 The fee line
+
+The outreach templates (G.1) and the claim page say "you keep 100%". That is only true while no commission is taken. `FEE_CLAIM` (Part C) is resolved from the code and the newest document before any template is written; if a commission exists, the line becomes "we take {X}%, the lowest of any platform, and never hold your sats" and the 100% claim is removed everywhere, including the welcome email.
+
+### H.5 Creator categories
+
+The product's creator categories (Educator, Guide, Entertainer, Developer, … per `01_PRODUCT_OVERVIEW.md`; read the real enum in the code) receive the prospect `category` through a fixed map in `lib/growth/categories.ts`: `educator`/`dev-educator`/`writer` → Educator, `podcaster*`/`youtuber*`/`nostr-creator`/`nostr-streamer`/`spaces-host` → Entertainer or the product's media category if one exists, `musician`/`artist` → Entertainer, `builder` → Developer, `meetup-organizer`/`community-owner` → Guide or Organizer if one exists. Unknown → the product's default.
 
 ---
 
