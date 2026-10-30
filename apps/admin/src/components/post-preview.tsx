@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ProgressRing } from '@/components/progress-ring';
 import { boxesFor, TYPE, type Format } from '@/lib/ig/overlay';
+
+export interface PreviewBusy { done: number; total: number; label: string }
 
 type Lang = 'sr' | 'en';
 
@@ -23,7 +26,7 @@ const RefreshIcon = () => (
  * of the template (positions from lib/ig/overlay.ts, approximate); in final mode the Canva render is
  * shown as is. Hover a line → Rewrite; click a line → edit; hover the photo → Shuffle / Change.
  */
-export function PostPreview({ format, layout, slides, baseUrl, templateUrl, draft, busyField, onEdit, onRewrite, onShuffle, onChangePhoto, onOpen }: {
+export function PostPreview({ format, layout, slides, baseUrl, templateUrl, draft, busyField, busy, onEdit, onRewrite, onShuffle, onChangePhoto, onOpen }: {
   format: Format;
   layout: string;
   slides: PreviewSlide[];       // primary language first
@@ -31,6 +34,7 @@ export function PostPreview({ format, layout, slides, baseUrl, templateUrl, draf
   templateUrl: string | null;   // the template as published, before the first generate
   draft: boolean;               // true = show copy over the base (edits pending or not rendered yet)
   busyField: string | null;
+  busy?: PreviewBusy | null;    // a step is running for this image: ring + label over it
   onEdit: (lang: Lang, field: string, value: string) => void;
   onRewrite: (field: string) => void;
   onShuffle?: () => void;
@@ -139,8 +143,21 @@ export function PostPreview({ format, layout, slides, baseUrl, templateUrl, draf
           );
         })}
 
-        {!overlay && !showFinal && image && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-3 pb-2 pt-6 text-[11px] text-white">Template as published · Generate to fill it</div>
+        {!overlay && !showFinal && image && !busy && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/50 to-transparent px-3 pb-2 pt-6 text-[11px] text-white">{format === 'st' && width < 260 ? 'Template' : 'Template as published · Generate to fill it'}</div>
+        )}
+
+        {/* Work in progress on this image */}
+        {busy && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35">
+            <div className="flex flex-col items-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center shadow-lg">
+              <div className="relative text-brand-600">
+                <ProgressRing done={busy.done} total={busy.total} size={format === 'st' ? 48 : 56} />
+                <span className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-gray-800">{busy.done}/{busy.total}</span>
+              </div>
+              <span className="max-w-[9rem] text-[11px] font-medium leading-tight text-gray-700">{busy.label}</span>
+            </div>
+          </div>
         )}
 
         {n > 1 && (
