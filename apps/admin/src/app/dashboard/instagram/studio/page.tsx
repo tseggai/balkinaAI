@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { PostPreview } from '@/components/post-preview';
+import { ProgressRing } from '@/components/progress-ring';
 import { ConfirmDialog, type ConfirmRequest } from '@/components/confirm-dialog';
 import { Modal } from '@/components/modal';
 import { StudioBatchModal, type BatchRequest } from '@/components/studio-batch-modal';
@@ -22,7 +23,8 @@ interface Catalogue {
   instagram: boolean;
 }
 
-interface Progress { title: string; done: number; total: number; detail: string }
+/** `formats` names the preview images a step is working on, with a short label each (ring over the image). */
+interface Progress { title: string; done: number; total: number; detail: string; formats?: Partial<Record<Format, string>> }
 type Filter = 'all' | 'draft' | 'scheduled' | 'published' | 'failed';
 
 const LABEL = 'mb-1 block text-xs font-medium text-gray-500';
@@ -72,6 +74,13 @@ export default function StudioPage() {
   const [bulkShift, setBulkShift] = useState('7');
   const [bulkTime, setBulkTime] = useState('18:00');
   const fileRef = useRef<HTMLInputElement>(null);
+  const previewRef = useRef<HTMLElement>(null);
+  /** On a phone the preview sits below the brief; bring it into view when work starts so the rings are visible. */
+  const focusPreview = () => {
+    if (typeof window === 'undefined' || window.innerWidth >= 1024) return;
+    // After the layout settles (the caption card appears above the preview once the copy is in).
+    window.setTimeout(() => previewRef.current?.scrollIntoView({ block: 'start' }), 80);
+  };
 
   const load = useCallback(async () => {
     const res = await fetch('/api/admin/studio');
@@ -145,13 +154,13 @@ export default function StudioPage() {
     let cur = p;
     const steps = baseSteps(cur);
     if (steps.length === 0) return cur;
-    setProgress({ title: label, done: 0, total: steps.length, detail: `Preparing the preview (${steps.length === 1 ? 'photo in the template' : 'square + story'})…` });
+    setProgress({ title: label, done: 0, total: steps.length, detail: `Preparing the preview (${steps.length === 1 ? 'photo in the template' : 'square + story'})…`, formats: { [steps[0]!.format]: 'Preparing the preview' } });
     const first = await api(`/api/admin/studio/posts/${cur.id}`, { action: 'render', ...steps[0] }, 'PATCH');
     if (!first.ok) { notify('Preview failed', [String(first.data.error ?? 'Unknown error')]); return null; }
     cur = first.data.post as StudioPostView;
     setPost(cur);
     if (steps[1]) {
-      setProgress({ title: label, done: 1, total: steps.length, detail: 'Preparing the story preview…' });
+      setProgress({ title: label, done: 1, total: steps.length, detail: 'Preparing the story preview…', formats: { [steps[1].format]: 'Preparing the preview' } });
       const second = await api(`/api/admin/studio/posts/${cur.id}`, { action: 'render', ...steps[1] }, 'PATCH');
       if (second.ok) { const r = second.data.post as StudioPostView; cur = { ...r, renders: { ...cur.renders, ...r.renders, st: { ...(cur.renders.st ?? {}), ...(r.renders.st ?? {}) }, sq: { ...(cur.renders.sq ?? {}), ...(r.renders.sq ?? {}) } } }; setPost(cur); }
     }
@@ -185,7 +194,9 @@ export default function StudioPage() {
       const batch = first ? pending.slice(0, 1) : pending.slice(0, 2);
       first = false;
       const done = want - pending.length;
-      setProgress({ title: label, done: offset + done, total: base, detail: `Rendering ${batch.map((s) => `${STEP_LABEL[s.format]} ${s.lang.toUpperCase()}`).join(' + ')} (${done + 1}${batch.length > 1 ? `–${done + batch.length}` : ''} of ${want})…` });
+      const formats: Partial<Record<Format, string>> = {};
+      for (const s of batch) formats[s.format] = formats[s.format] ? `Rendering ${formats[s.format]!.replace('Rendering ', '')} + ${s.lang.toUpperCase()}` : `Rendering ${s.lang.toUpperCase()}`;
+      setProgress({ title: label, done: offset + done, total: base, detail: `Rendering ${batch.map((s) => `${STEP_LABEL[s.format]} ${s.lang.toUpperCase()}`).join(' + ')} (${done + 1}${batch.length > 1 ? `–${done + batch.length}` : ''} of ${want})…`, formats });
       const results = await Promise.all(batch.map(runOne));
       merge(results);
       if (results.some((r) => !r)) return null;
@@ -199,12 +210,14 @@ export default function StudioPage() {
   const generate = async () => {
     setBusy('generate');
     stopRef.current = false;
-    setProgress({ title: 'Generating', done: 0, total: 1, detail: 'Writing copy…' });
+    focusPreview();
+    setProgress({ title: 'Generating', done: 0, total: 1, detail: 'Writing copy…', formats: { sq: 'Writing copy', st: 'Writing copy' } });
     const w = await api('/api/admin/studio/copy', { vertical, tone, layout, brief: brief || undefined, langs });
     if (!w.ok) { setBusy(''); setProgress(null); return notify('Could not write copy', [String(w.data.error ?? 'Unknown error')]); }
     const newCopy = w.data.copy as Partial<Record<Lang, Record<string, string>>>;
     const newCaption = String(w.data.caption ?? '');
     setCopy(newCopy); setCaption(newCaption); setFields(w.data.fields as string[]);
+    focusPreview();
     let target = post;
     if (target && target.layout === layout && target.photo_url === photoUrl) {
       // Same template and photo: keep the post (and its base renders), just store the new copy.
@@ -276,6 +289,7 @@ export default function StudioPage() {
     if (!post) return generate();
     setBusy('render');
     stopRef.current = false;
+    focusPreview();
     const r = await api(`/api/admin/studio/posts/${post.id}`, { action: 'rerender', copy, caption, photo_url: photoUrl, langs, primary: lang }, 'PATCH');
     if (!r.ok) { setBusy(''); return notify('Could not save the post', [String(r.data.error ?? 'Unknown error')]); }
     const saved = r.data.post as StudioPostView;
@@ -412,6 +426,15 @@ export default function StudioPage() {
   const working = busy === 'generate' || busy === 'render' || busy === 'photo';
   const draft = dirty || !rendered;
   const busyField = busy.startsWith('field:') ? busy.slice(6) : null;
+  /** Compact live status (ring + step + Stop); sits in the Preview header for single posts, next to the batch buttons for batches. */
+  const progressPill = progress ? (
+    <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-brand-200 bg-brand-50 py-1 pl-1.5 pr-2.5 text-xs text-brand-800">
+      <ProgressRing done={progress.done} total={progress.total} size={22} stroke={3} className="shrink-0 text-brand-600" />
+      <span className="whitespace-nowrap font-semibold">{progress.title} · {progress.done}/{progress.total}</span>
+      <span className="hidden truncate text-brand-700 xl:inline" title={progress.detail}>{progress.detail}</span>
+      <button type="button" className="shrink-0 font-medium text-brand-700 hover:underline" onClick={() => { stopRef.current = true; }} title="Stop after this step">Stop</button>
+    </span>
+  ) : null;
   const previewFor = (format: Format) => (
     <PostPreview
       format={format}
@@ -421,6 +444,7 @@ export default function StudioPage() {
       templateUrl={format === 'sq' ? layoutInfo?.previewSq ?? null : layoutInfo?.previewSt ?? null}
       draft={draft}
       busyField={busyField}
+      busy={working && progress?.formats?.[format] ? { done: progress.done, total: progress.total, label: progress.formats[format] ?? '' } : null}
       onEdit={editField}
       onRewrite={(f) => void regenerate(f)}
       onShuffle={photoPool.length > 1 && !working ? shufflePhoto : undefined}
@@ -437,7 +461,8 @@ export default function StudioPage() {
           <h1 className="mt-1 text-2xl font-bold text-gray-900">Studio</h1>
           <p className="mt-1 text-sm text-gray-500">Pick the audience, generate, then rewrite any line or swap the photo with one click. Feed goes out as an SR→EN carousel, stories one per language.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {busy === 'batch' && progressPill}
           {unfinished.length > 0 && <button type="button" className={BTN_SECONDARY} disabled={Boolean(busy)} onClick={() => void finish(unfinished, 'Finishing posts')}>Finish unfinished ({unfinished.length})</button>}
           <button type="button" className={BTN_PRIMARY} disabled={!ready || Boolean(busy)} onClick={() => setBatchOpen(true)}>Generate batch</button>
         </div>
@@ -448,19 +473,6 @@ export default function StudioPage() {
           {!cat.canva ? 'Connect Canva on the Instagram page first. ' : ''}
           {!cat.openai ? 'OPENAI_API_KEY is missing in the admin project. ' : ''}
           {cat.canva && cat.layouts.length === 0 ? 'No templates synced yet — publish one in Canva and click Sync. ' : ''}
-        </div>
-      )}
-
-      {progress && (
-        <div className="mb-5 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span className="font-semibold text-brand-800">{progress.title} · {progress.done}/{progress.total}</span>
-            <div className="flex items-center gap-3">
-              <span className="text-brand-700">{progress.detail}</span>
-              <button type="button" className="text-xs font-medium text-brand-700 hover:underline" onClick={() => { stopRef.current = true; }}>Stop after this step</button>
-            </div>
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${Math.round((progress.done / Math.max(1, progress.total)) * 100)}%` }} /></div>
         </div>
       )}
 
@@ -544,12 +556,13 @@ export default function StudioPage() {
 
         {/* ── Right: the post as it will look, then schedule ──────────── */}
         <div className="space-y-4">
-          <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <section ref={previewRef} className="scroll-mt-4 rounded-xl border border-gray-200 bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className={SECTION_TITLE}>Preview{postProg ? ` · ${postProg.done}/${postProg.total} rendered` : ''}</h2>
               <div className="flex items-center gap-2">
-                {post && draft && hasCopy && <span className="text-xs text-amber-700">{rendered ? 'Changes not rendered yet' : 'Draft'}</span>}
-                {post && hasCopy && <button type="button" className={draft ? BTN_PRIMARY : BTN_SECONDARY} disabled={!ready || working || Boolean(busyField)} onClick={apply}>{busy === 'render' ? 'Rendering…' : draft ? 'Render' : 'Render again'}</button>}
+                {working && progressPill}
+                {!working && post && draft && hasCopy && <span className="text-xs text-amber-700">{rendered ? 'Changes not rendered yet' : 'Draft'}</span>}
+                {post && hasCopy && !working && <button type="button" className={draft ? BTN_PRIMARY : BTN_SECONDARY} disabled={!ready || Boolean(busyField)} onClick={apply}>{draft ? 'Render' : 'Render again'}</button>}
               </div>
             </div>
             <div className={`mt-3 grid gap-4 ${wantStory ? 'grid-cols-[minmax(0,1fr)_minmax(0,0.5625fr)]' : 'grid-cols-1'}`}>
