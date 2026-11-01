@@ -426,7 +426,7 @@ export default function StudioPage() {
   const working = busy === 'generate' || busy === 'render' || busy === 'photo';
   const draft = dirty || !rendered;
   const busyField = busy.startsWith('field:') ? busy.slice(6) : null;
-  /** Compact live status (ring + step + Stop); sits in the Preview header for single posts, next to the batch buttons for batches. */
+  /** Compact live status (ring + step + Stop) next to the batch buttons while a batch runs; single posts show rings on the images instead. */
   const progressPill = progress ? (
     <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-brand-200 bg-brand-50 py-1 pl-1.5 pr-2.5 text-xs text-brand-800">
       <ProgressRing done={progress.done} total={progress.total} size={22} stroke={3} className="shrink-0 text-brand-600" />
@@ -444,7 +444,7 @@ export default function StudioPage() {
       templateUrl={format === 'sq' ? layoutInfo?.previewSq ?? null : layoutInfo?.previewSt ?? null}
       draft={draft}
       busyField={busyField}
-      busy={working && progress?.formats?.[format] ? { done: progress.done, total: progress.total, label: progress.formats[format] ?? '' } : null}
+      busy={working && progress?.formats?.[format] ? { done: progress.done, total: progress.total, label: progress.formats[format] ?? '', onStop: busy === 'render' ? () => { stopRef.current = true; } : undefined } : null}
       onEdit={editField}
       onRewrite={(f) => void regenerate(f)}
       onShuffle={photoPool.length > 1 && !working ? shufflePhoto : undefined}
@@ -560,7 +560,6 @@ export default function StudioPage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className={SECTION_TITLE}>Preview{postProg ? ` · ${postProg.done}/${postProg.total} rendered` : ''}</h2>
               <div className="flex items-center gap-2">
-                {working && progressPill}
                 {!working && post && draft && hasCopy && <span className="text-xs text-amber-700">{rendered ? 'Changes not rendered yet' : 'Draft'}</span>}
                 {post && hasCopy && !working && <button type="button" className={draft ? BTN_PRIMARY : BTN_SECONDARY} disabled={!ready || Boolean(busyField)} onClick={apply}>{draft ? 'Render' : 'Render again'}</button>}
               </div>
