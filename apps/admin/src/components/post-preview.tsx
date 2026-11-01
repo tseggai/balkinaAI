@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ProgressRing } from '@/components/progress-ring';
 import { boxesFor, TYPE, type Format } from '@/lib/ig/overlay';
 
-export interface PreviewBusy { done: number; total: number; label: string }
+export interface PreviewBusy { done: number; total: number; label: string; onStop?: () => void }
 
 type Lang = 'sr' | 'en';
 
@@ -150,12 +150,13 @@ export function PostPreview({ format, layout, slides, baseUrl, templateUrl, draf
         {/* Work in progress on this image */}
         {busy && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35">
-            <div className="flex flex-col items-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center shadow-lg">
+            <div className="pointer-events-auto flex flex-col items-center gap-1.5 rounded-2xl bg-white/95 px-4 py-3 text-center shadow-lg">
               <div className="relative text-brand-600">
                 <ProgressRing done={busy.done} total={busy.total} size={format === 'st' ? 48 : 56} />
                 <span className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-gray-800">{busy.done}/{busy.total}</span>
               </div>
               <span className="max-w-[9rem] text-[11px] font-medium leading-tight text-gray-700">{busy.label}</span>
+              {busy.onStop && <button type="button" onClick={busy.onStop} className="text-[11px] text-gray-400 hover:text-gray-700 hover:underline">Stop after this step</button>}
             </div>
           </div>
         )}
