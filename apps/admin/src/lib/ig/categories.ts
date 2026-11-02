@@ -79,7 +79,7 @@ export const VERTICALS: StudioVertical[] = [
   { value: 'skincare', label: 'Skincare clinic', sr: 'kozmetički salon', category: 'beauty', photo: ['facial', 'skin'] },
   { value: 'beauty', label: 'Beauty salon', sr: 'salon lepote', category: 'beauty', photo: ['beauty', 'salon'] },
   // fitness
-  { value: 'fitness', label: 'Personal trainer', sr: 'personalni trener', category: 'fitness', photo: ['fit', 'gym', 'train'] },
+  { value: 'fitness', label: 'Personal trainer', sr: 'personalni trener', category: 'fitness', photo: ['gym', 'fitness'] },
   { value: 'gym', label: 'Gym', sr: 'teretana', category: 'fitness', photo: ['gym'] },
   { value: 'tennis', label: 'Tennis coach', sr: 'teniski trener', category: 'fitness', photo: ['tennis'] },
   { value: 'dance', label: 'Dance studio', sr: 'plesni studio', category: 'fitness', photo: ['dance'] },
@@ -95,19 +95,19 @@ export const VERTICALS: StudioVertical[] = [
   { value: 'photographer', label: 'Photographer', sr: 'fotograf', category: 'professional', photo: ['photo', 'camera'] },
   { value: 'realestate', label: 'Real estate agent', sr: 'agent za nekretnine', category: 'professional', photo: ['estate', 'apartment'] },
   // education
-  { value: 'tutor', label: 'Tutor', sr: 'privatni profesor', category: 'education', photo: ['tutor', 'lesson'] },
+  { value: 'tutor', label: 'Tutor', sr: 'privatni profesor', category: 'education', photo: ['tutor'] },
   { value: 'language', label: 'Language school', sr: 'škola jezika', category: 'education', photo: ['language', 'class'] },
   { value: 'music', label: 'Music lessons', sr: 'časovi muzike', category: 'education', photo: ['music', 'piano', 'guitar'] },
   { value: 'driving', label: 'Driving school', sr: 'auto škola', category: 'education', photo: ['driving'] },
   { value: 'swimming', label: 'Swimming coach', sr: 'trener plivanja', category: 'education', photo: ['swim'] },
   // pets
-  { value: 'grooming', label: 'Dog grooming', sr: 'salon za pse', category: 'pets', photo: ['groom', 'dog'] },
+  { value: 'grooming', label: 'Dog grooming', sr: 'salon za pse', category: 'pets', photo: ['groom'] },
   { value: 'vet', label: 'Veterinary clinic', sr: 'veterinarska ambulanta', category: 'pets', photo: ['vet', 'pet'] },
-  { value: 'dogtraining', label: 'Dog training', sr: 'dresura pasa', category: 'pets', photo: ['dog'] },
+  { value: 'dogtraining', label: 'Dog training', sr: 'dresura pasa', category: 'pets', photo: ['dog-training'] },
   // auto
-  { value: 'autorepair', label: 'Auto repair', sr: 'auto servis', category: 'auto', photo: ['auto', 'mechanic', 'car'] },
-  { value: 'carwash', label: 'Car wash', sr: 'autoperionica', category: 'auto', photo: ['wash', 'car'] },
-  { value: 'tires', label: 'Tire shop', sr: 'vulkanizer', category: 'auto', photo: ['tire', 'car'] },
+  { value: 'autorepair', label: 'Auto repair', sr: 'auto servis', category: 'auto', photo: ['mechanic'] },
+  { value: 'carwash', label: 'Car wash', sr: 'autoperionica', category: 'auto', photo: ['wash'] },
+  { value: 'tires', label: 'Tire shop', sr: 'vulkanizer', category: 'auto', photo: ['tire'] },
   // events
   { value: 'eventplanner', label: 'Event planner', sr: 'organizator događaja', category: 'events', photo: ['event', 'wedding'] },
   { value: 'dj', label: 'DJ', sr: 'DJ', category: 'events', photo: ['dj', 'party'] },
@@ -122,13 +122,24 @@ export const VERTICALS: StudioVertical[] = [
   { value: 'rental', label: 'Equipment rental', sr: 'iznajmljivanje opreme', category: 'rentals', photo: ['rental', 'bike', 'scooter'] },
   // hospitality
   { value: 'restaurant', label: 'Restaurant', sr: 'restoran', category: 'hospitality', photo: ['restaurant', 'dining'] },
-  { value: 'cafe', label: 'Café / bar', sr: 'kafić', category: 'hospitality', photo: ['cafe', 'coffee', 'bar'] },
+  { value: 'cafe', label: 'Café / bar', sr: 'kafić', category: 'hospitality', photo: ['cafe', 'coffee', 'barista'] },
   { value: 'hotel', label: 'Hotel / resort', sr: 'hotel', category: 'hospitality', photo: ['hotel', 'resort'] },
   // generic
   { value: 'all', label: 'All businesses', sr: 'mali biznisi', category: 'beauty', photo: [] },
 ];
 
 export const verticalByValue = (value: string): StudioVertical | undefined => VERTICALS.find((v) => v.value === value);
+
+/** Library photos that fit an audience: by its own photo words first, then any audience of the same category, then everything.
+    Names are matched as substrings, so the words in VERTICALS must not collide with other audiences' file names. */
+export function matchPhotos<T extends { name: string }>(pool: T[], vertical: string): T[] {
+  const v = verticalByValue(vertical);
+  const byWords = (words: string[]) => (words.length ? pool.filter((p) => words.some((w) => p.name.toLowerCase().includes(w))) : []);
+  const own = byWords(v?.photo ?? []);
+  if (own.length) return own;
+  const sameCategory = byWords(VERTICALS.filter((x) => x.category === v?.category && x.value !== 'all').flatMap((x) => x.photo));
+  return sameCategory.length ? sameCategory : pool;
+}
 
 /** Template layout word for an audience: its category key. */
 export const categoryOf = (vertical: string): string => verticalByValue(vertical)?.category ?? 'beauty';

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { PostPreview } from '@/components/post-preview';
 import { ProgressRing } from '@/components/progress-ring';
+import { matchPhotos } from '@/lib/ig/categories';
 import { ConfirmDialog, type ConfirmRequest } from '@/components/confirm-dialog';
 import { Modal } from '@/components/modal';
 import { StudioBatchModal, type BatchRequest } from '@/components/studio-batch-modal';
@@ -100,7 +101,6 @@ export default function StudioPage() {
 
   /* ---------- derived ---------- */
 
-  const verticalInfo = cat?.verticals.find((x) => x.value === vertical) ?? null;
   const categoryOfVertical = (v: string) => cat?.verticals.find((x) => x.value === v)?.category ?? '';
   const autoLayout = (v: string) => {
     const c = categoryOfVertical(v);
@@ -125,12 +125,7 @@ export default function StudioPage() {
   const wantStory = kinds.includes('story') && hasStory(layout);
 
   /** Library photos that fit the audience (by name), falling back to the whole library. */
-  const photoPool = useMemo(() => {
-    const words = verticalInfo?.photo ?? [];
-    const all = cat?.photos ?? [];
-    const matching = all.filter((p) => words.some((w) => p.name.toLowerCase().includes(w)));
-    return matching.length ? matching : all;
-  }, [cat, verticalInfo]);
+  const photoPool = useMemo(() => matchPhotos(cat?.photos ?? [], vertical), [cat, vertical]);
   const autoPhoto = photoPool[photoSeed % Math.max(1, photoPool.length)]?.url ?? '';
   const photoUrl = photo || autoPhoto;
 
