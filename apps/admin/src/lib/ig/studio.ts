@@ -234,6 +234,39 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
   return { copy, caption, model };
 }
 
+/** A line the marketer edited in one language, carried over to the other language with the same meaning and limits. */
+export async function translateField(req: { field: string; from: Lang; text: string; to: Lang[]; layout: string; vertical: string; tone: string; current?: Partial<Record<Lang, StudioCopy>> }): Promise<Partial<Record<Lang, string>>> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_API_KEY is not set in this deployment');
+  const model = process.env.GROWTH_LLM_MODEL ?? 'gpt-4o-mini';
+  const targets = req.to.filter((l) => l !== req.from);
+  if (targets.length === 0 || !req.text.trim()) return {};
+  const vertical = verticalByValue(req.vertical);
+  const tone = TONES.find((t) => t.value === req.tone);
+  const lim = copyLimits(req.layout);
+  const limit = req.field === 'headline' ? lim.headline : req.field === 'subline' ? lim.subline : 60;
+  const langNames: Record<Lang, string> = { sr: 'Serbian/Montenegrin, Latin script, ijekavian as spoken in Montenegro (prije, vrijeme, podsjetnik, obavještenje), proper diacritics', en: 'English' };
+  const system =
+    `You localise Instagram ad copy for Balkina AI. ${PRODUCT_FACTS}\n` +
+    `Audience: owners of a ${vertical?.label ?? req.vertical} (${vertical?.sr ?? req.vertical}). Tone: ${tone?.label ?? req.tone} — ${tone?.hint ?? ''}.\n` +
+    'The marketer edited one line of the post in one language. Write the same line in the other language(s) so it says the same thing the way a native marketer would say it: ' +
+    'second person, natural word order, no calques, no emojis, a complete sentence or phrase, and at most the character limit (shorter is fine). Keep the other lines of the post in mind so the voice matches. ' +
+    'Return strict JSON: { "<lang>": "<text>" } for exactly the requested languages.';
+  const context = targets.map((l) => `${l}: ${JSON.stringify(Object.fromEntries(Object.entries(req.current?.[l] ?? {}).filter(([k]) => k !== req.field && k !== 'eyebrow' && k !== 'url')))}`).join('\n');
+  const user = `Field: ${req.field} (max ${limit} characters).\nSource (${langNames[req.from]}): ${JSON.stringify(req.text)}\nWrite it in: ${targets.map((l) => `"${l}" = ${langNames[l]}`).join('; ')}.\nOther lines already on the post:\n${context}`;
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ model, temperature: 0.4, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+  });
+  if (!res.ok) throw new Error(`OpenAI: ${res.status} ${await res.text().catch(() => '')}`.slice(0, 300));
+  const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const parsed = JSON.parse(json.choices?.[0]?.message?.content ?? '{}') as Record<string, unknown>;
+  const out: Partial<Record<Lang, string>> = {};
+  for (const l of targets) { const t = String(parsed[l] ?? '').trim(); if (t) out[l] = t; }
+  return out;
+}
+
 /* ---------- Rendering (one format × language per call, each ~20–40 s) ---------- */
 
 export interface RenderStep { format: Format; lang: RenderKey }
