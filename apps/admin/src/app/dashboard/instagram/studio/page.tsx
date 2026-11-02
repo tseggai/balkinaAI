@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { PostPreview } from '@/components/post-preview';
 import { ProgressRing } from '@/components/progress-ring';
-import { matchPhotos } from '@/lib/ig/categories';
+import { copyLimits, matchPhotos } from '@/lib/ig/categories';
 import { ConfirmDialog, type ConfirmRequest } from '@/components/confirm-dialog';
 import { Modal } from '@/components/modal';
 import { StudioBatchModal, type BatchRequest } from '@/components/studio-batch-modal';
@@ -244,7 +244,18 @@ export default function StudioPage() {
     if (field !== 'caption') setDirty(true);
   };
 
-  const editField = (l: Lang, name: string, value: string) => { setCopy((c) => ({ ...c, [l]: { ...(c[l] ?? {}), [name]: value } })); setDirty(true); };
+  /** A manual edit in one language is carried over to the other selected language (same meaning, native wording). */
+  const editField = async (l: Lang, name: string, value: string) => {
+    setCopy((c) => ({ ...c, [l]: { ...(c[l] ?? {}), [name]: value } })); setDirty(true);
+    const others = langs.filter((x) => x !== l);
+    if (others.length === 0 || !value.trim() || name === 'eyebrow' || name === 'url') return;
+    setBusy(`translate:${name}`);
+    const { ok, data } = await api('/api/admin/studio/translate', { field: name, from: l, text: value, to: others, layout, vertical, tone, current: copy });
+    setBusy('');
+    if (!ok) return notify('Could not translate the line', [String(data.error ?? 'Unknown error')]);
+    const t = (data.text ?? {}) as Partial<Record<Lang, string>>;
+    setCopy((c) => { const next = { ...c }; for (const o of others) { const v = t[o]; if (v) next[o] = { ...(next[o] ?? {}), [name]: v }; } return next; });
+  };
 
   /** A new photo means a new text-free base: store it on the post and re-render the preview. */
   const swapPhoto = async (url: string) => {
@@ -420,7 +431,19 @@ export default function StudioPage() {
   const rendered = Boolean(post?.renders.sq?.[post.lang]);
   const working = busy === 'generate' || busy === 'render' || busy === 'photo';
   const draft = dirty || !rendered;
-  const busyField = busy.startsWith('field:') ? busy.slice(6) : null;
+  const busyField = busy.startsWith('field:') ? busy.slice(6) : busy.startsWith('translate:') ? busy.slice(10) : null;
+  const translating = busy.startsWith('translate:') ? busy.slice(10) : null;
+  /** Lines longer than the template allows wrap into the next box on the real render. */
+  const overLimit = (() => {
+    const lim = copyLimits(layout);
+    const out: string[] = [];
+    for (const l of langOrder) for (const f of ['headline', 'subline'] as const) {
+      const n = (copy[l]?.[f] ?? '').length;
+      const max = lim[f];
+      if (n > max) out.push(`${l.toUpperCase()} ${f} is ${n - max} characters over the ${max} limit`);
+    }
+    return out;
+  })();
   /** Compact live status (ring + step + Stop) next to the batch buttons while a batch runs; single posts show rings on the images instead. */
   const progressPill = progress ? (
     <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-brand-200 bg-brand-50 py-1 pl-1.5 pr-2.5 text-xs text-brand-800">
@@ -440,7 +463,7 @@ export default function StudioPage() {
       draft={draft}
       busyField={busyField}
       busy={working && progress?.formats?.[format] ? { done: progress.done, total: progress.total, label: progress.formats[format] ?? '', onStop: busy === 'render' ? () => { stopRef.current = true; } : undefined } : null}
-      onEdit={editField}
+      onEdit={(l, f, v) => void editField(l, f, v)}
       onRewrite={(f) => void regenerate(f)}
       onShuffle={photoPool.length > 1 && !working ? shufflePhoto : undefined}
       onChangePhoto={!working ? () => { setPhotoUrlDraft(''); setPhotoOpen(true); } : undefined}
@@ -571,8 +594,9 @@ export default function StudioPage() {
                 </div>
               )}
             </div>
+            {overLimit.length > 0 && hasCopy && <p className="mt-3 text-xs text-amber-700">{overLimit.join(' · ')} — long lines wrap into the next box on the render; shorten or Rewrite.</p>}
             <p className="mt-3 text-xs text-gray-400">
-              {!post ? 'Showing the template as published. Generate writes the copy, picks a matching photo and lays the text over the design.' : draft ? 'Click a line to edit it, hover for Rewrite, hover the photo to shuffle. Render when you are happy (20–40 s per image).' : 'Rendered through Canva. Edit a line or change the photo to start a new draft.'}
+              {translating ? `Carrying your ${translating} over to the other language…` : !post ? 'Showing the template as published. Generate writes the copy, picks a matching photo and lays the text over the design.' : draft ? 'Click a line to edit it, hover for Rewrite, hover the photo to shuffle. Render when you are happy (20–40 s per image).' : 'Rendered through Canva. Edit a line or change the photo to start a new draft.'}
               {post && Object.values(post.designs).some(Boolean) && (
                 <> Open in Canva: {(['sq', 'st'] as Format[]).flatMap((f) => langOrder.map((l) => { const id = post.designs[f]?.[l]; return id ? <a key={`${f}-${l}`} href={`https://www.canva.com/design/${id}/edit`} target="_blank" rel="noreferrer" className="mr-1 text-brand-600 hover:underline">{STEP_LABEL[f]} {l.toUpperCase()}</a> : null; }))}</>
               )}
