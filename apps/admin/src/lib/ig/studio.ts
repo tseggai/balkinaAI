@@ -3,7 +3,7 @@
    scheduling, and due-post selection for the cron. Rows live in ig_posts (Migrations 074–075). */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { RENDER_BUCKET, renderTemplate } from '@/lib/canva/client';
-import { categoryOf, copyLimits, eyebrowFor, studioHashtags, verticalByValue, type StudioVertical } from './categories';
+import { categoryOf, copyLimits, eyebrowFor, matchPhotos, studioHashtags, verticalByValue, type StudioVertical } from './categories';
 import { publishCarousel, publishImage, type IgCredentials } from './publish';
 import { zonedToUtc, type Kind } from './schedule';
 
@@ -26,7 +26,22 @@ export const TONES: { value: string; label: string; hint: string }[] = [
 
 export interface Photo { name: string; url: string; source: 'stock' | 'upload' }
 export const STOCK_PHOTOS: Photo[] = [
-  'barber', 'barber-shave-h1', 'barber-shave-h2', 'customer-cafe-h', 'customer-lounge-h', 'facial-plants-h', 'facial-white-v', 'gym-bench-v', 'gym-cable-h', 'gym-coach-h', 'makeup-eyes-h', 'makeup-ringlight-h', 'nails', 'nails-loft-v', 'nails-swatches-v', 'nails-window-h', 'owner-terrace-h', 'pilates-kneel-h', 'pilates-legs-h', 'pilates-window-h', 'reception-card-h', 'salon', 'salon-client-phone-h', 'salon-loft-v', 'salon-mirror-gold-v', 'salon-robe-v', 'spa-couple-h', 'spa-facial-window-h', 'tennis-highfive-h', 'tennis-kid-h', 'tennis-lesson-v', 'yoga', 'yoga-class-h', 'yoga-tree-v',
+  'account-bookkeeper-h', 'account-writing-h', 'barber', 'barber-shave-h1', 'barber-shave-h2', 'bike-rental-phone-h', 'boat-sea-friends-h',
+  'boat-yacht-sunset-h', 'cafe-barista-coffee-h', 'camera-studio-h', 'car-wash-gun-h', 'cater-buffet-h', 'cater-waiter-canape-h', 'chef-plating-h',
+  'chef-restaurant-kitchen-h', 'class-grammar-h', 'clean-home-h', 'clean-kitchen-worktop-h', 'coffee-barista-female-h', 'customer-cafe-h',
+  'customer-lounge-h', 'diet-nutritionist-consult-h', 'dj-deck-club-h', 'dj-female-bar-h', 'dog-training-obstacles-h', 'dog-training-park-h',
+  'driving-instructor-rules-h', 'driving-lesson-dashboard-h', 'electric-basement-h', 'electric-switchboard-h', 'estate-keys-couple-h',
+  'estate-showing-house-h', 'event-wedding-planner-h', 'facial-plants-h', 'facial-white-v', 'groom-black-dog-h', 'groom-dog-salon-h', 'gym-bench-v',
+  'gym-cable-h', 'gym-coach-h', 'handyman-portrait-h', 'handyman-shelf-drill-h', 'hotel-checkin-staff-h', 'hotel-reception-key-h',
+  'language-class-adults-h', 'law-advisor-client-h', 'legal-client-desk-h', 'makeup-eyes-h', 'makeup-ringlight-h', 'massage-deep-tissue-h',
+  'massage-therapist-spa-h', 'meal-prep-containers-h', 'meal-prep-vegetarian-h', 'mechanic-diagnostic-h', 'mechanic-engine-smile-h',
+  'music-piano-lesson-h', 'nails', 'nails-loft-v', 'nails-swatches-v', 'nails-window-h', 'nutrition-doctor-vegetables-h', 'owner-terrace-h',
+  'photo-studio-shoot-h', 'physio-clinic-patient-h', 'physio-therapy-side-h', 'piano-teacher-boy-h', 'pilates-kneel-h', 'pilates-legs-h',
+  'pilates-window-h', 'plumb-client-house-h', 'plumb-sink-h', 'reception-card-h', 'rental-bikes-row-h', 'restaurant-waiter-guests-h',
+  'restaurant-waitress-dining-h', 'salon', 'salon-client-phone-h', 'salon-loft-v', 'salon-mirror-gold-v', 'salon-robe-v', 'spa-couple-h',
+  'spa-facial-window-h', 'swim-coach-pool-h', 'swim-lesson-kid-h', 'tennis-highfive-h', 'tennis-kid-h', 'tennis-lesson-v', 'tire-change-shop-h',
+  'tire-mechanic-h', 'tour-guide-sightseeing-h', 'tour-tablet-street-h', 'tutor-girl-explaining-h', 'tutor-lesson-h', 'vet-dog-check-h',
+  'vet-shepherd-h', 'wash-car-pro-h', 'wedding-table-h', 'yoga', 'yoga-class-h', 'yoga-tree-v',
 ].map((n) => ({ name: n, url: `https://balkina.ai/ig/photos/${n}.jpg`, source: 'stock' as const }));
 
 /** Stock photos plus everything uploaded through the studio (ig-renders/photos/). */
@@ -41,9 +56,7 @@ export async function listPhotos(supabase: SupabaseClient): Promise<Photo[]> {
 /** Pick a photo for an audience from the pool: a name that mentions one of its photo words wins, otherwise round-robin by `seed`. */
 export function pickPhoto(pool: Photo[], vertical: string, seed: number): Photo | null {
   if (pool.length === 0) return null;
-  const words = verticalByValue(vertical)?.photo ?? [];
-  const matching = pool.filter((p) => words.some((w) => p.name.toLowerCase().includes(w)));
-  const list = matching.length ? matching : pool;
+  const list = matchPhotos(pool, vertical);
   return list[seed % list.length] ?? null;
 }
 
