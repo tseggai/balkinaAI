@@ -3,6 +3,9 @@ import { sendNotification } from './send';
 
 interface AppointmentContext {
   id: string;
+  status: string;
+  booking_type: string | null;
+  party_size: number | null;
   start_time: string;
   end_time: string;
   total_price: number;
@@ -15,7 +18,7 @@ interface AppointmentContext {
     phone: string | null;
     requires_approval: boolean;
   } | null;
-  tenants: { id: string; name: string };
+  tenants: { id: string; name: string; business_type: string | null };
   tenant_locations: { address: string; timezone: string } | null;
 }
 
@@ -24,11 +27,11 @@ async function getAppointmentContext(appointmentId: string): Promise<Appointment
   const { data, error } = await supabase
     .from('appointments')
     .select(`
-      id, start_time, end_time, total_price, customer_id,
+      id, status, booking_type, party_size, start_time, end_time, total_price, customer_id,
       customers(id, display_name, phone),
       services(id, name, duration_minutes),
       staff(id, name, phone, requires_approval),
-      tenants(id, name),
+      tenants(id, name, business_type),
       tenant_locations(address, timezone)
     `)
     .eq('id', appointmentId)
@@ -53,6 +56,12 @@ async function getAppointmentContext(appointmentId: string): Promise<Appointment
     }
   }
   return ctx;
+}
+
+/** Reservation fields for the templates: hospitality venues and table/event bookings read as reservations with guests. */
+function reservationData(ctx: AppointmentContext): Record<string, string | number> {
+  const reservation = (ctx.booking_type != null && ctx.booking_type !== 'service') || ctx.tenants?.business_type === 'hospitality';
+  return { reservation: reservation ? 1 : 0, guests: ctx.party_size ?? 0, isEvent: ctx.booking_type === 'event' ? 1 : 0 };
 }
 
 function formatDate(iso: string, timezone: string): string {
@@ -84,6 +93,7 @@ export async function notifyBookingConfirmed(appointmentId: string) {
       customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
+      ...reservationData(ctx),
       staffName: ctx.staff?.name ?? '',
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
@@ -106,6 +116,7 @@ export async function notifyBookingSubmitted(appointmentId: string) {
       customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
+      ...reservationData(ctx),
       staffName: ctx.staff?.name ?? '',
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
@@ -113,22 +124,29 @@ export async function notifyBookingSubmitted(appointmentId: string) {
   });
 }
 
-/** Staff notification when a new booking is assigned to them */
+/** Staff notification when a new booking is assigned to them; bookings without staff (events) go to the owner. */
 export async function notifyStaffNewBooking(appointmentId: string) {
   const ctx = await getAppointmentContext(appointmentId);
-  if (!ctx || !ctx.staff) return;
+  if (!ctx) return;
+  let recipientId = ctx.staff?.id ?? null;
+  if (!recipientId) {
+    const { resolveOwnerStaff } = await import('@/lib/hospitality');
+    recipientId = (await resolveOwnerStaff(createAdminClient(), ctx.tenants.id))?.id ?? null;
+  }
+  if (!recipientId) return;
   const tz = ctx.tenant_locations?.timezone ?? 'UTC';
   await sendNotification({
     type: 'new_booking_assigned',
     appointmentId,
     recipientType: 'staff',
-    recipientId: ctx.staff.id,
+    recipientId,
     data: {
       customerName: ctx.customers?.display_name ?? '',
       serviceName: ctx.services.name,
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
-      requiresApproval: ctx.staff.requires_approval ? 1 : 0,
+      requiresApproval: ctx.status === 'pending' ? 1 : 0,
+      ...reservationData(ctx),
     },
   });
 }
@@ -148,6 +166,7 @@ export async function notifyBookingApproved(appointmentId: string) {
       customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
+      ...reservationData(ctx),
       staffName: ctx.staff?.name ?? '',
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
@@ -177,6 +196,7 @@ export async function notifyBookingDeclined(appointmentId: string, suggestedTime
       customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
+      ...reservationData(ctx),
       staffName: ctx.staff?.name ?? '',
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
@@ -205,6 +225,7 @@ export async function notifyBookingNoShow(appointmentId: string) {
       customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
+      ...reservationData(ctx),
       staffName: ctx.staff?.name ?? '',
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
@@ -228,6 +249,7 @@ export async function notifyBookingCompleted(appointmentId: string) {
       customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
+      ...reservationData(ctx),
       staffName: ctx.staff?.name ?? '',
       staffFirstName,
       date: formatDate(ctx.start_time, tz),
@@ -286,6 +308,7 @@ export async function notifyBookingCancelledByTenant(appointmentId: string) {
       customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
+      ...reservationData(ctx),
       staffName: ctx.staff?.name ?? '',
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),
@@ -323,6 +346,7 @@ export async function notifyDepositPaymentRequired(appointmentId: string, deposi
       customerName: ctx.customers.display_name ?? '',
       serviceName: ctx.services.name,
       businessName: ctx.tenants.name,
+      ...reservationData(ctx),
       staffName: ctx.staff?.name ?? '',
       date: formatDate(ctx.start_time, tz),
       time: formatTime(ctx.start_time, tz),

@@ -109,11 +109,11 @@ export async function PATCH(request: Request) {
     // Get current appointment for staff change detection
     const { data: currentAppt } = await admin
       .from('appointments')
-      .select('staff_id, customer_id, start_time, services(name)')
+      .select('staff_id, customer_id, start_time, status, services(name)')
       .eq('id', body.id)
       .eq('tenant_id', tenantId)
       .single();
-    const current = currentAppt as { staff_id: string | null; customer_id: string | null; start_time: string; services: { name: string } | null } | null;
+    const current = currentAppt as { staff_id: string | null; customer_id: string | null; start_time: string; status: string; services: { name: string } | null } | null;
 
     const updates: Record<string, unknown> = {};
     if (body.status) updates.status = body.status;
@@ -126,6 +126,17 @@ export async function PATCH(request: Request) {
       .eq('tenant_id', tenantId);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: CORS_HEADERS });
+
+    // Tell the customer when a pending request is approved or declined
+    if (body.status && current && current.status === 'pending' && body.status !== current.status) {
+      try {
+        const { notifyBookingApproved, notifyBookingDeclined } = await import('@/lib/notifications/booking-events');
+        if (body.status === 'confirmed' || body.status === 'approved') await notifyBookingApproved(body.id);
+        else if (body.status === 'cancelled') await notifyBookingDeclined(body.id);
+      } catch (e) {
+        console.error('[tenant/appointments] customer notification error:', e);
+      }
+    }
 
     // Notify staff on reassignment
     if (body.staff_id && current && current.staff_id !== body.staff_id) {
