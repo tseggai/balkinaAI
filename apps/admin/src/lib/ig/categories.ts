@@ -68,7 +68,7 @@ export const VERTICALS: StudioVertical[] = [
   { value: 'physio', label: 'Physiotherapist', sr: 'fizioterapeut', category: 'health', photo: ['physio', 'therapy'] },
   { value: 'yoga', label: 'Yoga studio', sr: 'joga studio', category: 'health', photo: ['yoga'] },
   { value: 'pilates', label: 'Pilates', sr: 'pilates studio', category: 'health', photo: ['pilates', 'reformer'] },
-  { value: 'counseling', label: 'Counselling & therapy', sr: 'psihoterapeut', category: 'health', photo: ['counsel', 'therapy'] },
+  { value: 'counseling', label: 'Counselling & therapy', sr: 'psihoterapeut', category: 'health', photo: ['counsel'] },
   // beauty
   { value: 'salon', label: 'Hair salon', sr: 'frizerski salon', category: 'beauty', photo: ['salon', 'hair'] },
   { value: 'barber', label: 'Barbershop', sr: 'barbershop', category: 'beauty', photo: ['barber', 'beard', 'shave'] },
