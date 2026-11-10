@@ -86,6 +86,9 @@ export interface SummaryCardData {
   deposit_required?: number;
   points_to_earn: number;
   currency?: string;
+  /** Hospitality: number of guests + which reservation flow (changes labels and the confirm button). */
+  guests?: number;
+  reservation?: 'table' | 'event';
 }
 
 export interface ConfirmedCardData {
@@ -109,6 +112,8 @@ export interface ConfirmedCardData {
   payment_url?: string;
   payment_required?: boolean;
   currency?: string;
+  guests?: number;
+  reservation?: 'table' | 'event';
 }
 
 export interface ServiceChipData {
@@ -122,6 +127,8 @@ export interface ServiceChipData {
   image_url?: string | null;
   pricing_type?: string;
   currency?: string;
+  service_type?: string | null;
+  capacity?: number | null;
 }
 
 export interface BusinessWithServicesData {

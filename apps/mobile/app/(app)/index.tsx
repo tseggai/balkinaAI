@@ -39,6 +39,15 @@ import { memberTypeLabel, isResidentType } from '@balkina/shared';
 import { Campaign } from '@/components/PropertyCampaignDetail';
 import { BootSplash } from '@/lib/bootSplash';
 import { BookingState, INITIAL_BOOKING_STATE } from '@/lib/chatTypes';
+
+/** Hospitality: tables and events are reservations, not staff appointments. */
+const isReservationType = (t?: string | null): boolean => t === 'table' || t === 'event';
+const MORE_GUESTS = 'More than 8';
+/** "09:00" → "9:00 AM" */
+const formatOpenHour = (t: string): string => {
+  const h = Number(t.slice(0, 2)), m = t.slice(3, 5);
+  return `${h % 12 === 0 ? 12 : h % 12}:${m} ${h >= 12 ? 'PM' : 'AM'}`;
+};
 import { consumePendingDeepLinkTenant, parseTenantFromUrl } from '@/lib/deepLink';
 import { formatPrice, currencySymbol } from '@/lib/currency';
 import {
@@ -825,8 +834,10 @@ const RichSummaryCard = React.memo(function RichSummaryCard({ data, onButtonPres
     <View style={richCardStyles.summaryCard}>
       <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Service:</Text> {displayService}</Text>
       <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Extras:</Text> {data.extras.length > 0 ? data.extras.join(', ') : 'None'}</Text>
-      <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Business:</Text> {data.business}</Text>
-      <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Staff:</Text> {data.staff}</Text>
+      <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>{data.reservation ? 'Venue:' : 'Business:'}</Text> {data.business}</Text>
+      {data.reservation
+        ? <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Guests:</Text> {data.guests ?? 1}</Text>
+        : <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Staff:</Text> {data.staff}</Text>}
       <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Date:</Text> {data.date}</Text>
       <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Time:</Text> {data.time}</Text>
       <Text style={richCardStyles.summaryLabel}><Text style={richCardStyles.summaryBold}>Address:</Text> {data.address}</Text>
@@ -880,7 +891,7 @@ const RichSummaryCard = React.memo(function RichSummaryCard({ data, onButtonPres
         onPress={() => onButtonPress('Confirm Booking')}
         activeOpacity={0.7}
       >
-        <Text style={richCardStyles.confirmBtnText}>Confirm Booking</Text>
+        <Text style={richCardStyles.confirmBtnText}>{data.reservation === 'table' ? 'Request Reservation' : data.reservation === 'event' ? 'Reserve Seats' : 'Confirm Booking'}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -924,16 +935,18 @@ const RichConfirmedCard = React.memo(function RichConfirmedCard({ data, onButton
         <Ionicons name={isCancelled ? 'close' : isPending ? 'time-outline' : 'checkmark'} size={30} color="#fff" />
       </View>
       <Text style={richCardStyles.confirmedTitle}>
-        {isCancelled ? 'Appointment Declined' : isPending ? 'Appointment Request Sent' : 'Appointment Confirmed!'}
+        {data.reservation
+          ? (isCancelled ? 'Reservation Declined' : isPending ? 'Reservation Request Sent' : 'Reservation Confirmed!')
+          : (isCancelled ? 'Appointment Declined' : isPending ? 'Appointment Request Sent' : 'Appointment Confirmed!')}
       </Text>
       {isPending && (
         <Text style={{ fontSize: 13, color: '#92400e', textAlign: 'center', marginBottom: 8, paddingHorizontal: 8 }}>
-          Waiting for confirmation from {data.staff}. You{"'"}ll be notified once approved.
+          Waiting for confirmation from {data.staff}. You{"'"}ll be notified once {data.reservation ? 'the venue confirms' : 'approved'}.
         </Text>
       )}
       {isCancelled && (
         <Text style={{ fontSize: 13, color: '#991b1b', textAlign: 'center', marginBottom: 8, paddingHorizontal: 8 }}>
-          This appointment request was not approved. Please try another time.
+          This {data.reservation ? 'reservation' : 'appointment'} request was not approved. Please try another time.
         </Text>
       )}
 
@@ -949,13 +962,20 @@ const RichConfirmedCard = React.memo(function RichConfirmedCard({ data, onButton
           </View>
         ) : null}
         <View style={richCardStyles.confirmedRow}>
-          <Text style={richCardStyles.confirmedLabel}>Business:</Text>
+          <Text style={richCardStyles.confirmedLabel}>{data.reservation ? 'Venue:' : 'Business:'}</Text>
           <Text style={richCardStyles.confirmedValue}>{data.business}</Text>
         </View>
-        <View style={richCardStyles.confirmedRow}>
-          <Text style={richCardStyles.confirmedLabel}>Staff:</Text>
-          <Text style={richCardStyles.confirmedValue}>{data.staff}</Text>
-        </View>
+        {data.reservation ? (
+          <View style={richCardStyles.confirmedRow}>
+            <Text style={richCardStyles.confirmedLabel}>Guests:</Text>
+            <Text style={richCardStyles.confirmedValue}>{data.guests ?? 1}</Text>
+          </View>
+        ) : (
+          <View style={richCardStyles.confirmedRow}>
+            <Text style={richCardStyles.confirmedLabel}>Staff:</Text>
+            <Text style={richCardStyles.confirmedValue}>{data.staff}</Text>
+          </View>
+        )}
         <View style={richCardStyles.confirmedRow}>
           <Text style={richCardStyles.confirmedLabel}>Date:</Text>
           <Text style={richCardStyles.confirmedValue}>{data.date}</Text>
@@ -1412,7 +1432,7 @@ export default function ChatScreen() {
   const [paymentModal, setPaymentModal] = useState<{ appointmentId: string; depositAmount?: number; pendingCard?: ConfirmedCardData } | null>(null);
   const [galleryModal, setGalleryModal] = useState<{ photos: GalleryPhoto[]; initialIndex: number } | null>(null);
   // Track recently displayed service cards so we can match taps to IDs
-  const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; pricing_type?: string; currency?: string; tenantId?: string; tenantName?: string; locationId?: string }[]>([]);
+  const lastDisplayedServices = useRef<{ id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; pricing_type?: string; service_type?: string | null; capacity?: number | null; currency?: string; tenantId?: string; tenantName?: string; locationId?: string }[]>([]);
   // Stores structured tool data from SSE for deterministic rendering
   const pendingToolData = useRef<{ tool: string; data: Record<string, unknown> } | null>(null);
   // Stores last booking options so we can look up package/extras prices
@@ -1684,11 +1704,12 @@ export default function ChatScreen() {
       const biz = data?.businesses?.[0];
       if (biz) {
         const svcs = biz.all_services ?? [];
-        lastDisplayedServices.current = svcs.map((s: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; deposit_type?: string | null; pricing_type?: string }) => ({
+        lastDisplayedServices.current = svcs.map((s: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; deposit_type?: string | null; pricing_type?: string; service_type?: string | null; capacity?: number | null }) => ({
           id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
           deposit_enabled: s.deposit_enabled ?? false, deposit_amount: s.deposit_amount ?? null,
           deposit_type: (s.deposit_type as 'fixed' | 'percentage' | undefined) ?? undefined,
           pricing_type: s.pricing_type ?? 'per_service',
+          service_type: s.service_type ?? 'standard', capacity: s.capacity ?? null,
           currency: biz.currency ?? 'USD',
           tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id,
         }));
@@ -1699,9 +1720,9 @@ export default function ChatScreen() {
             distance_mi: biz.distance_mi, drive_minutes: biz.estimated_drive_minutes,
             category: biz.category, subcategory: biz.subcategory, description: biz.description, avg_rating: biz.avg_rating, review_count: biz.review_count,
             closest_location_id: biz.closest_location_id, currency: biz.currency ?? 'USD', gallery_photos: biz.gallery_photos ?? [],
-            services: svcs.map((s: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; image_url?: string | null; pricing_type?: string }) => ({
+            services: svcs.map((s: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; deposit_type?: 'fixed' | 'percentage'; image_url?: string | null; pricing_type?: string; service_type?: string | null; capacity?: number | null }) => ({
               id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
-              deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, deposit_type: s.deposit_type, image_url: s.image_url, pricing_type: s.pricing_type, currency: biz.currency ?? 'USD',
+              deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount ?? undefined, deposit_type: s.deposit_type, image_url: s.image_url, pricing_type: s.pricing_type, service_type: s.service_type ?? 'standard', capacity: s.capacity ?? null, currency: biz.currency ?? 'USD',
             })),
           }],
         };
@@ -1744,11 +1765,49 @@ export default function ChatScreen() {
   }, []);
 
   // Show date picker buttons locally
-  const showDatePicker = useCallback(() => {
+  const showDatePicker = useCallback((prompt?: string) => {
     const buttons = getDateButtons();
     const buttonMarkup = buttons.map((b) => `[[button:${b}]]`).join('');
-    addAssistantMessage(`When would you like your appointment?\n\n${buttonMarkup}`);
+    addAssistantMessage(`${prompt ?? 'When would you like your appointment?'}\n\n${buttonMarkup}`);
   }, [addAssistantMessage]);
+
+  // ── Hospitality (tables / events): guest count, then open-hour times or seatings ──
+  const lastSeatings = useRef<{ label: string; date: string; time: string; iso: string; seats_left: number }[]>([]);
+
+  const showPartySizePicker = useCallback((state: BookingState) => {
+    const max = state.serviceType === 'event' && state.capacity ? Math.max(1, Math.min(8, state.capacity)) : 8;
+    const buttons = Array.from({ length: max }, (_, i) => `[[button:${i + 1} ${i === 0 ? 'guest' : 'guests'}]]`).join('');
+    const more = max === 8 ? `[[button:${MORE_GUESTS}]]` : '';
+    const what = state.serviceType === 'event' ? 'seats' : 'a table';
+    addAssistantMessage(`How many guests should I reserve ${what} for?\n\n${buttons}${more}`);
+  }, [addAssistantMessage]);
+
+  const showEventSeatings = useCallback(async (state: BookingState) => {
+    setIsLoading(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const res = await fetch(`${API_BASE}/api/booking/staff-availability`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId: state.tenantId, serviceId: state.serviceId, date: today, locationId: state.locationId ?? undefined, userId }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { seatings?: { date: string; time: string; iso: string; seats_left: number }[]; address?: string | null; currency?: string };
+      const seatings = (data.seatings ?? []).map((x) => ({ ...x, label: `${formatHumanDate(x.date)} · ${x.time}` }));
+      lastSeatings.current = seatings;
+      setBookingState((prev) => ({ ...prev, ...(data.address ? { address: data.address } : {}), currency: data.currency ?? prev.currency, staffSelectionEnabled: false }));
+      if (seatings.length === 0) {
+        addAssistantMessage('This event has no upcoming seatings. Would you like to look at something else?');
+      } else {
+        const guests = state.partySize ?? 1;
+        const lines = seatings.map((x) => `• ${x.label} — ${x.seats_left <= 0 ? 'sold out' : x.seats_left < guests ? `only ${x.seats_left} left` : `${x.seats_left} seats left`}`).join('\n');
+        const buttons = seatings.filter((x) => x.seats_left >= guests).map((x) => `[[button:${x.label}]]`).join('');
+        addAssistantMessage(`Here are the upcoming seatings for ${state.serviceName}:\n${lines}\n\n${buttons || 'None of them has room for your party. Try fewer guests.'}`);
+      }
+    } catch {
+      addAssistantMessage('Connection error while loading seatings. Please try again.');
+    }
+    setIsLoading(false);
+  }, [userId, addAssistantMessage]);
 
   // Fetch staff + availability from direct API
   const fetchStaffAvailability = useCallback(async (tenantId: string, serviceId: string, date: string, locationId?: string | null) => {
@@ -1769,10 +1828,13 @@ export default function ChatScreen() {
         anyone_slots: { time: string; iso: string; available: boolean }[];
         staff_selection_enabled?: boolean;
         address?: string | null;
+        currency?: string;
         message?: string;
+        booking_mode?: 'table' | 'event';
+        open_hours?: { start: string; end: string } | null;
       };
 
-      if (data.message || data.staff.length === 0) {
+      if (data.message || (data.staff.length === 0 && !data.booking_mode)) {
         addAssistantMessage(data.message || 'No availability found for this date. Please try another date.');
         setIsLoading(false);
         return;
@@ -1811,7 +1873,10 @@ export default function ChatScreen() {
         staff_selection_enabled: staffSelEnabled,
       };
 
-      addAssistantMessage(`${staffSelEnabled ? 'Here are the available staff and time slots' : 'Here are the available time slots'}:\n\n[[CARD:${JSON.stringify(card)}]]`);
+      const intro = data.booking_mode === 'table'
+        ? `Here are the reservation times${data.open_hours ? ` (open ${formatOpenHour(data.open_hours.start)} – ${formatOpenHour(data.open_hours.end)})` : ''}. The venue confirms your request`
+        : staffSelEnabled ? 'Here are the available staff and time slots' : 'Here are the available time slots';
+      addAssistantMessage(`${intro}:\n\n[[CARD:${JSON.stringify(card)}]]`);
     } catch {
       addAssistantMessage('Connection error while checking availability. Please try again.');
     }
@@ -1891,7 +1956,9 @@ export default function ChatScreen() {
 
   // Build and show summary card locally
   const showSummaryCard = useCallback((state: BookingState) => {
-    const serviceSubtotal = state.servicePrice ?? 0;
+    const reservation = isReservationType(state.serviceType) ? (state.serviceType as 'table' | 'event') : undefined;
+    const guests = reservation ? (state.partySize ?? 1) : 1;
+    const serviceSubtotal = state.pricingType === 'per_person' ? (state.servicePrice ?? 0) * guests : (state.servicePrice ?? 0);
     const extrasTotal = state.extrasTotal;
     const packagePrice = state.packagePrice;
     // If a package is selected, the package replaces the service price
@@ -1911,7 +1978,9 @@ export default function ChatScreen() {
       package: state.selectedPackage ? `${state.selectedPackage} (${formatPrice(packagePrice, state.currency)})` : undefined,
       extras: extrasDisplay,
       business: state.tenantName ?? 'Unknown',
-      staff: state.staffName ?? (state.staffSelectionEnabled ? 'Anyone' : 'To be assigned'),
+      staff: reservation ? `${guests} ${guests === 1 ? 'guest' : 'guests'}` : (state.staffName ?? (state.staffSelectionEnabled ? 'Anyone' : 'To be assigned')),
+      guests: reservation ? guests : undefined,
+      reservation,
       date: formatHumanDate(state.date ?? ''),
       time: (state.pricingType === 'per_day' || state.pricingType === 'per_week') ? 'Full day' : (state.timeSlot ?? ''),
       address: state.address ?? '',
@@ -1929,7 +1998,7 @@ export default function ChatScreen() {
       points_to_earn: 0,
       currency: state.currency,
     };
-    addAssistantMessage(`Here's your booking summary:\n\n[[CARD:${JSON.stringify(card)}]]`);
+    addAssistantMessage(`Here's your ${reservation ? 'reservation' : 'booking'} summary:\n\n[[CARD:${JSON.stringify(card)}]]`);
   }, [addAssistantMessage]);
 
   // ── Client-side flow interceptor ──────────────────────────────────────────
@@ -1961,7 +2030,7 @@ export default function ChatScreen() {
             return true;
           }
           const data = (await res.json()) as {
-            businesses: { id: string; name: string; image_url?: string; category?: string; avg_rating?: number; review_count?: number; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; deposit_type?: string | null; image_url?: string | null }[]; closest_location_id?: string; distance_mi?: number; estimated_drive_minutes?: number }[];
+            businesses: { id: string; name: string; image_url?: string; category?: string; subcategory?: string; description?: string; currency?: string; avg_rating?: number; review_count?: number; gallery_photos?: { id: string; image_url: string; caption?: string | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; deposit_type?: string | null; image_url?: string | null; pricing_type?: string; service_type?: string | null; capacity?: number | null }[]; closest_location_id?: string; distance_mi?: number; estimated_drive_minutes?: number }[];
             total_count: number;
             has_more: boolean;
           };
@@ -1974,14 +2043,14 @@ export default function ChatScreen() {
           const allSvcs: typeof lastDisplayedServices.current = [];
           for (const biz of data.businesses) {
             for (const svc of biz.all_services ?? []) {
-              allSvcs.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled ?? false, deposit_amount: svc.deposit_amount ?? null, deposit_type: (svc.deposit_type as 'fixed' | 'percentage' | undefined) ?? undefined, pricing_type: svc.pricing_type ?? 'per_service', currency: biz.currency ?? 'USD', tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id });
+              allSvcs.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled ?? false, deposit_amount: svc.deposit_amount ?? undefined, deposit_type: (svc.deposit_type as 'fixed' | 'percentage' | undefined) ?? undefined, pricing_type: svc.pricing_type ?? 'per_service', service_type: svc.service_type ?? 'standard', capacity: svc.capacity ?? null, currency: biz.currency ?? 'USD', tenantId: biz.id, tenantName: biz.name, locationId: biz.closest_location_id });
             }
           }
           lastDisplayedServices.current = allSvcs;
           // Build business_with_services card
           const card = {
             type: 'business_with_services',
-            items: data.businesses.map((b: { id: string; name: string; image_url?: string; distance_mi?: number; estimated_drive_minutes?: number; category?: string; subcategory?: string; description?: string; currency?: string; avg_rating?: number; review_count?: number; closest_location_id?: string; gallery_photos?: { id: string; image_url: string; caption?: string | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number | null; image_url?: string | null; pricing_type?: string }[] }) => ({
+            items: data.businesses.map((b) => ({
               id: b.id,
               name: b.name,
               image_url: b.image_url,
@@ -1997,7 +2066,7 @@ export default function ChatScreen() {
               gallery_photos: b.gallery_photos ?? [],
               services: (b.all_services ?? []).map((s) => ({
                 id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes,
-                deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, deposit_type: s.deposit_type, image_url: s.image_url, pricing_type: s.pricing_type, currency: b.currency ?? 'USD',
+                deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount ?? undefined, deposit_type: (s.deposit_type as 'fixed' | 'percentage' | undefined) ?? undefined, image_url: s.image_url, pricing_type: s.pricing_type, service_type: s.service_type ?? 'standard', capacity: s.capacity ?? null, currency: b.currency ?? 'USD',
               })),
             })),
           };
@@ -2041,10 +2110,55 @@ export default function ChatScreen() {
             depositType: matchedService.deposit_type ?? null,
             pricingType: matchedService.pricing_type ?? 'per_service',
             currency: matchedService.currency ?? bookingState.currency ?? 'USD',
+            serviceType: matchedService.service_type ?? 'standard',
+            capacity: matchedService.capacity ?? null,
+            partySize: null,
           };
           setBookingState(newState);
-          // Show date picker locally — no GPT call needed
-          showDatePicker();
+          // Reservations (tables / events) start with the guest count; everything else with the date.
+          if (isReservationType(newState.serviceType)) showPartySizePicker(newState);
+          else showDatePicker();
+          return true;
+        }
+      }
+
+      // Reservations: guest count comes first (buttons "2 guests", a typed number, or "More than 8").
+      if (bookingState.serviceId && isReservationType(bookingState.serviceType) && !bookingState.partySize) {
+        if (userText === MORE_GUESTS) {
+          addUserMessage(userText);
+          addAssistantMessage('How many guests? Type a number.');
+          return true;
+        }
+        const guestsMatch = userText.match(/^(\d{1,3})(?:\s*guests?)?$/i);
+        if (guestsMatch) {
+          const guests = Number(guestsMatch[1]);
+          if (guests < 1 || guests > 200) {
+            addAssistantMessage('Please enter a guest count between 1 and 200.');
+            return true;
+          }
+          if (bookingState.serviceType === 'event' && bookingState.capacity && guests > bookingState.capacity) {
+            addUserMessage(userText);
+            addAssistantMessage(`This event seats at most ${bookingState.capacity} guests per reservation. How many should I reserve?`);
+            return true;
+          }
+          addUserMessage(userText);
+          const newState: BookingState = { ...bookingState, partySize: guests };
+          setBookingState(newState);
+          if (newState.serviceType === 'event') await showEventSeatings(newState);
+          else showDatePicker('When would you like to reserve?');
+          return true;
+        }
+      }
+
+      // Events: the user picks a seating (date + time) from the list.
+      if (bookingState.serviceType === 'event' && bookingState.partySize && !bookingState.timeSlot) {
+        const seating = lastSeatings.current.find((x) => x.label === userText);
+        if (seating) {
+          addUserMessage(userText);
+          const newState: BookingState = { ...bookingState, date: seating.date, timeSlot: seating.time, timeSlotIso: seating.iso, staffId: null, staffName: null };
+          setBookingState(newState);
+          const result = await fetchBookingOptions(newState.tenantId!, newState.serviceId!, newState.currency);
+          if (result === 'skip') showSummaryCard(newState);
           return true;
         }
       }
@@ -2260,6 +2374,8 @@ export default function ChatScreen() {
               timeSlotIso: bookingState.timeSlotIso,
               packageName: bookingState.selectedPackage,
               extras: bookingState.selectedExtras,
+              partySize: isReservationType(bookingState.serviceType) ? bookingState.partySize ?? undefined : undefined,
+              bookingType: isReservationType(bookingState.serviceType) ? bookingState.serviceType : undefined,
               userId,
               customerName,
               customerPhone,
@@ -2290,7 +2406,10 @@ export default function ChatScreen() {
             payment_url?: string;
             payment_client_secret?: string;
             payment_required?: boolean;
+            currency?: string;
           };
+          const confirmedReservation = isReservationType(bookingState.serviceType) ? (bookingState.serviceType as 'table' | 'event') : undefined;
+          const confirmedGuests = confirmedReservation ? (bookingState.partySize ?? 1) : undefined;
 
           // Build extras display with prices for confirmation
           const confirmedExtras = bookingState.selectedExtras.map((name) => {
@@ -2309,7 +2428,9 @@ export default function ChatScreen() {
             package: confirmedPkgLabel,
             extras: confirmedExtras,
             business: result.business_name,
-            staff: result.staff_name ?? bookingState.staffName ?? (bookingState.staffSelectionEnabled ? 'Anyone' : 'To be assigned'),
+            staff: confirmedReservation ? (result.business_name || bookingState.tenantName || 'the venue') : (result.staff_name ?? bookingState.staffName ?? (bookingState.staffSelectionEnabled ? 'Anyone' : 'To be assigned')),
+            guests: confirmedGuests,
+            reservation: confirmedReservation,
             date: result.date,
             time: result.time,
             address: result.address,
@@ -2372,7 +2493,7 @@ export default function ChatScreen() {
 
       return false;
     },
-    [bookingState, addUserMessage, addAssistantMessage, removeStaleBookingCards, fetchStaffAvailability, fetchBookingOptions, showSummaryCard, userId, customerName, customerPhone, customerEmail],
+    [bookingState, addUserMessage, addAssistantMessage, removeStaleBookingCards, fetchStaffAvailability, fetchBookingOptions, showSummaryCard, showDatePicker, showPartySizePicker, showEventSeatings, userId, customerName, customerPhone, customerEmail],
   );
 
   const sendMessage = useCallback(
@@ -2546,7 +2667,7 @@ export default function ChatScreen() {
               category?: string;
               avg_rating?: number;
               review_count?: number;
-              all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; image_url?: string }[];
+              all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; image_url?: string; pricing_type?: string; service_type?: string | null; capacity?: number | null }[];
             }[];
           };
           const businesses = toolData.businesses ?? [];
@@ -2571,6 +2692,9 @@ export default function ChatScreen() {
                   deposit_enabled: s.deposit_enabled,
                   deposit_amount: s.deposit_amount,
                   deposit_type: s.deposit_type,
+                  pricing_type: s.pricing_type,
+                  service_type: s.service_type ?? 'standard',
+                  capacity: s.capacity ?? null,
                 })),
               })),
             };
@@ -2652,7 +2776,7 @@ export default function ChatScreen() {
             }
 
             if (cardData.type === 'business_with_services') {
-              const items = cardData.items as { id: string; name: string; services: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage' }[] }[];
+              const items = cardData.items as { id: string; name: string; services: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled?: boolean; deposit_amount?: number; deposit_type?: 'fixed' | 'percentage'; pricing_type?: string; service_type?: string | null; capacity?: number | null }[] }[];
               if (items?.length) {
                 const allSvcs: typeof lastDisplayedServices.current = [];
                 for (const biz of items) {
@@ -3055,11 +3179,13 @@ export default function ChatScreen() {
                   />
                 </View>
                 <Text style={fullScreenConfirmStyles.title}>
-                  {confirmationModal.status === 'pending' ? 'Appointment Request Sent' : 'Appointment Confirmed!'}
+                  {confirmationModal.reservation
+                    ? (confirmationModal.status === 'pending' ? 'Reservation Request Sent' : 'Reservation Confirmed!')
+                    : (confirmationModal.status === 'pending' ? 'Appointment Request Sent' : 'Appointment Confirmed!')}
                 </Text>
                 {confirmationModal.status === 'pending' && (
                   <Text style={fullScreenConfirmStyles.subtitle}>
-                    Waiting for confirmation from {confirmationModal.staff}. You{"'"}ll be notified once approved.
+                    Waiting for confirmation from {confirmationModal.staff}. You{"'"}ll be notified once {confirmationModal.reservation ? 'the venue confirms' : 'approved'}.
                   </Text>
                 )}
 
@@ -3081,11 +3207,19 @@ export default function ChatScreen() {
                     <Text style={fullScreenConfirmStyles.detailLabel}>Business</Text>
                     <Text style={fullScreenConfirmStyles.detailValue}>{confirmationModal.business}</Text>
                   </View>
-                  <View style={fullScreenConfirmStyles.detailRow}>
-                    <Ionicons name="person-outline" size={18} color="#6B7FC4" />
-                    <Text style={fullScreenConfirmStyles.detailLabel}>Staff</Text>
-                    <Text style={fullScreenConfirmStyles.detailValue}>{confirmationModal.staff}</Text>
-                  </View>
+                  {confirmationModal.reservation ? (
+                    <View style={fullScreenConfirmStyles.detailRow}>
+                      <Ionicons name="people-outline" size={18} color="#6B7FC4" />
+                      <Text style={fullScreenConfirmStyles.detailLabel}>Guests</Text>
+                      <Text style={fullScreenConfirmStyles.detailValue}>{confirmationModal.guests ?? 1}</Text>
+                    </View>
+                  ) : (
+                    <View style={fullScreenConfirmStyles.detailRow}>
+                      <Ionicons name="person-outline" size={18} color="#6B7FC4" />
+                      <Text style={fullScreenConfirmStyles.detailLabel}>Staff</Text>
+                      <Text style={fullScreenConfirmStyles.detailValue}>{confirmationModal.staff}</Text>
+                    </View>
+                  )}
                   <View style={fullScreenConfirmStyles.detailRow}>
                     <Ionicons name="calendar-outline" size={18} color="#6B7FC4" />
                     <Text style={fullScreenConfirmStyles.detailLabel}>Date</Text>
