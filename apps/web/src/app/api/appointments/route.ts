@@ -3,6 +3,8 @@ import { createClient, createAdminClient } from '@/lib/supabase/server';
 import {
   notifyBookingConfirmed,
   notifyStaffNewBooking,
+  notifyBookingApproved,
+  notifyBookingDeclined,
   notifyBookingCancelledByTenant,
 } from '@/lib/notifications/booking-events';
 
@@ -257,17 +259,19 @@ export async function PATCH(request: Request) {
 
   const supabase = createAdminClient();
 
-  // Check if status is changing to 'completed' so we can decrement inventory
+  // Current status: inventory is decremented on completion, and the customer is
+  // told when a pending request is approved or declined from the dashboard.
   let shouldDecrementInventory = false;
-  if (updateFields.status === 'completed') {
-    // Fetch the current appointment to check if status is actually changing
+  let previousStatus: string | null = null;
+  if (typeof updateFields.status === 'string') {
     const { data: current } = await supabase
       .from('appointments')
       .select('status, service_id')
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .single();
-    if (current && (current as { status: string }).status !== 'completed') {
+    previousStatus = (current as { status: string } | null)?.status ?? null;
+    if (updateFields.status === 'completed' && current && previousStatus !== 'completed') {
       shouldDecrementInventory = true;
     }
   }
@@ -371,11 +375,16 @@ export async function PATCH(request: Request) {
     }
   }
 
-  // Fire cancellation notifications — await so they complete before Vercel terminates the function
-  if (updateFields.status === 'cancelled' && data) {
+  // Fire status notifications — await so they complete before Vercel terminates the function
+  if (typeof updateFields.status === 'string' && data && previousStatus !== updateFields.status) {
     const apptData = data as { id: string };
     try {
-      await notifyBookingCancelledByTenant(apptData.id);
+      if (updateFields.status === 'cancelled') {
+        if (previousStatus === 'pending') await notifyBookingDeclined(apptData.id);
+        else await notifyBookingCancelledByTenant(apptData.id);
+      } else if (previousStatus === 'pending' && (updateFields.status === 'confirmed' || updateFields.status === 'approved')) {
+        await notifyBookingApproved(apptData.id);
+      }
     } catch (e) {
       console.error('[appointments PATCH] notification error:', e);
     }

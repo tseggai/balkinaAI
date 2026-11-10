@@ -38,22 +38,34 @@ interface NotificationPayload {
   data: Record<string, string | number>;
 }
 
+/** "for 4 guests" / "" — reservations carry a party size. */
+const guests = (d: Record<string, string | number>): string => (Number(d.guests) > 0 ? ` for ${d.guests} guest${Number(d.guests) === 1 ? '' : 's'}` : '');
+const isRes = (d: Record<string, string | number>): boolean => Number(d.reservation) === 1;
+
 const TEMPLATES: Record<NotificationType, {
   sms: (d: Record<string, string | number>) => string;
   push: { title: (d: Record<string, string | number>) => string; body: (d: Record<string, string | number>) => string };
 }> = {
   booking_confirmed: {
-    sms: (d) => `Hi ${d.customerName}, your ${d.serviceName} appointment at ${d.businessName} with ${d.staffName} for ${d.date} at ${d.time} is confirmed. See you then!`,
+    sms: (d) => isRes(d)
+      ? `Hi ${d.customerName}, your reservation at ${d.businessName} (${d.serviceName}${guests(d)}) for ${d.date} at ${d.time} is confirmed. See you then!`
+      : `Hi ${d.customerName}, your ${d.serviceName} appointment at ${d.businessName} with ${d.staffName} for ${d.date} at ${d.time} is confirmed. See you then!`,
     push: {
-      title: () => 'Booking Confirmed',
-      body: (d) => `Your ${d.serviceName} appointment at ${d.businessName} with ${d.staffName} for ${d.date} at ${d.time} is confirmed.`,
+      title: (d) => isRes(d) ? 'Reservation Confirmed' : 'Booking Confirmed',
+      body: (d) => isRes(d)
+        ? `Your reservation at ${d.businessName} (${d.serviceName}${guests(d)}) for ${d.date} at ${d.time} is confirmed.`
+        : `Your ${d.serviceName} appointment at ${d.businessName} with ${d.staffName} for ${d.date} at ${d.time} is confirmed.`,
     },
   },
   booking_submitted: {
-    sms: (d) => `Your appointment request for a ${d.serviceName} at ${d.businessName} with ${d.staffName} for ${d.date} at ${d.time} has been submitted.`,
+    sms: (d) => isRes(d)
+      ? `Your reservation request at ${d.businessName} (${d.serviceName}${guests(d)}) for ${d.date} at ${d.time} has been sent. The venue will confirm shortly.`
+      : `Your appointment request for a ${d.serviceName} at ${d.businessName} with ${d.staffName} for ${d.date} at ${d.time} has been submitted.`,
     push: {
-      title: () => 'Appointment Request Submitted',
-      body: (d) => `Your appointment request for a ${d.serviceName} at ${d.businessName} with ${d.staffName} for ${d.date} at ${d.time} has been submitted.`,
+      title: (d) => isRes(d) ? 'Reservation Request Sent' : 'Appointment Request Submitted',
+      body: (d) => isRes(d)
+        ? `Your reservation request at ${d.businessName}${guests(d)} for ${d.date} at ${d.time} has been sent. The venue will confirm shortly.`
+        : `Your appointment request for a ${d.serviceName} at ${d.businessName} with ${d.staffName} for ${d.date} at ${d.time} has been submitted.`,
     },
   },
   booking_cancelled_by_customer: {
@@ -64,9 +76,9 @@ const TEMPLATES: Record<NotificationType, {
     },
   },
   booking_cancelled_by_tenant: {
-    sms: (d) => `Hi ${d.customerName}, unfortunately ${d.businessName} has cancelled your ${d.serviceName} on ${d.date} at ${d.time}. Please rebook at your convenience.`,
+    sms: (d) => `Hi ${d.customerName}, unfortunately ${d.businessName} has cancelled your ${isRes(d) ? 'reservation' : d.serviceName} on ${d.date} at ${d.time}. Please rebook at your convenience.`,
     push: {
-      title: () => 'Appointment Cancelled',
+      title: (d) => isRes(d) ? 'Reservation Cancelled' : 'Appointment Cancelled',
       body: (d) => `${d.businessName} cancelled your ${d.serviceName} on ${d.date}.`,
     },
   },
@@ -85,21 +97,33 @@ const TEMPLATES: Record<NotificationType, {
     },
   },
   booking_approved: {
-    sms: (d) => `Appointment Approved: ${d.staffName} has approved your appointment request for a ${d.serviceName} at ${d.businessName} for ${d.date} at ${d.time}.`,
+    sms: (d) => isRes(d)
+      ? `Reservation Confirmed: ${d.businessName} has confirmed your reservation${guests(d)} for ${d.date} at ${d.time}. See you then!`
+      : `Appointment Approved: ${d.staffName} has approved your appointment request for a ${d.serviceName} at ${d.businessName} for ${d.date} at ${d.time}.`,
     push: {
-      title: () => 'Appointment Approved',
-      body: (d) => `${d.staffName} has approved your appointment request for a ${d.serviceName} at ${d.businessName} for ${d.date} at ${d.time}.`,
+      title: (d) => isRes(d) ? 'Reservation Confirmed' : 'Appointment Approved',
+      body: (d) => isRes(d)
+        ? `${d.businessName} confirmed your reservation${guests(d)} for ${d.date} at ${d.time}.`
+        : `${d.staffName} has approved your appointment request for a ${d.serviceName} at ${d.businessName} for ${d.date} at ${d.time}.`,
     },
   },
   booking_declined: {
-    sms: (d) => d.suggestedTime
-      ? `Appointment Reschedule: ${d.staffName} at ${d.businessName} can accommodate your ${d.serviceName} appointment for ${d.suggestedDate} at ${d.suggestedTime} instead of your requested ${d.date} at ${d.time}.`
-      : `Appointment Update: ${d.staffName} at ${d.businessName} was unable to accommodate your ${d.serviceName} appointment for ${d.date} at ${d.time}. Please try another time.`,
+    sms: (d) => isRes(d)
+      ? (d.suggestedTime
+        ? `Reservation Update: ${d.businessName} can seat you${guests(d)} on ${d.suggestedDate} at ${d.suggestedTime} instead of ${d.date} at ${d.time}.`
+        : `Reservation Update: ${d.businessName} could not take your reservation${guests(d)} for ${d.date} at ${d.time}. Please try another time.`)
+      : (d.suggestedTime
+        ? `Appointment Reschedule: ${d.staffName} at ${d.businessName} can accommodate your ${d.serviceName} appointment for ${d.suggestedDate} at ${d.suggestedTime} instead of your requested ${d.date} at ${d.time}.`
+        : `Appointment Update: ${d.staffName} at ${d.businessName} was unable to accommodate your ${d.serviceName} appointment for ${d.date} at ${d.time}. Please try another time.`),
     push: {
-      title: (d) => d.suggestedTime ? 'Appointment Reschedule' : 'Appointment Update',
-      body: (d) => d.suggestedTime
-        ? `${d.staffName} at ${d.businessName} can accommodate your ${d.serviceName} appointment for ${d.suggestedDate} at ${d.suggestedTime} instead of your requested ${d.date} at ${d.time}.`
-        : `${d.staffName} at ${d.businessName} was unable to accommodate your ${d.serviceName} appointment for ${d.date} at ${d.time}.`,
+      title: (d) => isRes(d) ? 'Reservation Update' : (d.suggestedTime ? 'Appointment Reschedule' : 'Appointment Update'),
+      body: (d) => isRes(d)
+        ? (d.suggestedTime
+          ? `${d.businessName} can seat you${guests(d)} on ${d.suggestedDate} at ${d.suggestedTime} instead of ${d.date} at ${d.time}.`
+          : `${d.businessName} could not take your reservation${guests(d)} for ${d.date} at ${d.time}.`)
+        : (d.suggestedTime
+          ? `${d.staffName} at ${d.businessName} can accommodate your ${d.serviceName} appointment for ${d.suggestedDate} at ${d.suggestedTime} instead of your requested ${d.date} at ${d.time}.`
+          : `${d.staffName} at ${d.businessName} was unable to accommodate your ${d.serviceName} appointment for ${d.date} at ${d.time}.`),
     },
   },
   booking_no_show: {
@@ -117,10 +141,14 @@ const TEMPLATES: Record<NotificationType, {
     },
   },
   new_booking_assigned: {
-    sms: (d) => `New Appointment: ${d.customerName} requested to book a ${d.serviceName} appointment for ${d.date} at ${d.time}.${d.requiresApproval ? ' Tap to approve or decline.' : ''}`,
+    sms: (d) => isRes(d)
+      ? `${Number(d.isEvent) ? 'New Event Booking' : 'New Reservation Request'}: ${d.customerName}${guests(d)}, ${d.serviceName}, ${d.date} at ${d.time}.${d.requiresApproval ? ' Tap to confirm or decline.' : ''}`
+      : `New Appointment: ${d.customerName} requested to book a ${d.serviceName} appointment for ${d.date} at ${d.time}.${d.requiresApproval ? ' Tap to approve or decline.' : ''}`,
     push: {
-      title: () => 'New Appointment',
-      body: (d) => `${d.customerName} requested to book a ${d.serviceName} appointment for ${d.date} at ${d.time}.`,
+      title: (d) => isRes(d) ? (Number(d.isEvent) ? 'New Event Booking' : 'New Reservation Request') : 'New Appointment',
+      body: (d) => isRes(d)
+        ? `${d.customerName}${guests(d)} · ${d.serviceName} · ${d.date} at ${d.time}${d.requiresApproval ? ' — tap to confirm' : ''}`
+        : `${d.customerName} requested to book a ${d.serviceName} appointment for ${d.date} at ${d.time}.`,
     },
   },
   booking_cancelled_staff_notify: {

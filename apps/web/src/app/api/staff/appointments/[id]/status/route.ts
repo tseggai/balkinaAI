@@ -26,11 +26,11 @@ async function getStaffRecord(request: Request) {
 
   const { data: staff } = await admin
     .from('staff')
-    .select('id, tenant_id, name')
+    .select('id, tenant_id, name, role, user_id')
     .eq('user_id', user.id)
     .single();
 
-  return staff as { id: string; tenant_id: string; name: string } | null;
+  return staff as { id: string; tenant_id: string; name: string; role: string | null; user_id: string | null } | null;
 }
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -57,12 +57,14 @@ export async function PATCH(
 
   const admin = createAdminClient();
 
-  // Verify appointment belongs to this staff
+  // The appointment must belong to this staff member's tenant. The assigned
+  // staff may act on it; so may the owner / an admin (reservations are approved
+  // by the venue owner, and events carry no staff at all).
   const { data: appt, error: fetchErr } = await admin
     .from('appointments')
-    .select('id, status, customer_id, service_id, tenant_id, start_time, end_time, deposit_paid, deposit_amount_paid, stripe_payment_intent_id, services(deposit_enabled, deposit_amount, deposit_type, price)')
+    .select('id, status, customer_id, service_id, tenant_id, staff_id, start_time, end_time, booking_type, total_price, deposit_paid, deposit_amount_paid, stripe_payment_intent_id, services(deposit_enabled, deposit_amount, deposit_type, price), tenants(user_id)')
     .eq('id', params.id)
-    .eq('staff_id', staff.id)
+    .eq('tenant_id', staff.tenant_id)
     .single();
 
   if (fetchErr || !appt) {
@@ -75,13 +77,22 @@ export async function PATCH(
     customer_id: string;
     service_id: string;
     tenant_id: string;
+    staff_id: string | null;
     start_time: string;
     end_time: string;
+    booking_type: string | null;
+    total_price: number | null;
     deposit_paid: boolean | null;
     deposit_amount_paid: number | null;
     stripe_payment_intent_id: string | null;
     services: { deposit_enabled: boolean | null; deposit_amount: number | null; deposit_type: string | null; price: number | null } | null;
+    tenants: { user_id: string | null } | null;
   };
+  const isOwner = (staff.user_id && appointment.tenants?.user_id === staff.user_id) || staff.role === 'owner' || staff.role === 'admin';
+  if (appointment.staff_id !== staff.id && !isOwner && appointment.staff_id !== null) {
+    return NextResponse.json({ data: null, error: { message: 'Appointment not found' } }, { status: 404 });
+  }
+  const isReservation = appointment.booking_type != null && appointment.booking_type !== 'service';
 
   // Validate status transition
   const allowed = VALID_TRANSITIONS[appointment.status];
@@ -108,12 +119,13 @@ export async function PATCH(
     effectiveStatus = 'approved';
   }
 
-  // Block confirming/approving if another appointment is already booked for this slot
-  if ((effectiveStatus === 'confirmed' || effectiveStatus === 'approved') && appointment.status === 'pending') {
+  // Block confirming/approving if another appointment is already booked for this
+  // slot. Reservations (tables, events) may overlap — the venue decides.
+  if (!isReservation && appointment.staff_id && (effectiveStatus === 'confirmed' || effectiveStatus === 'approved') && appointment.status === 'pending') {
     const { data: conflicts } = await admin
       .from('appointments')
       .select('id')
-      .eq('staff_id', staff.id)
+      .eq('staff_id', appointment.staff_id)
       .in('status', ['confirmed', 'approved'])
       .neq('id', params.id)
       .lt('start_time', appointment.end_time)
@@ -157,8 +169,10 @@ export async function PATCH(
       await notifyBookingApproved(params.id);
 
       const svc = appointment.services!;
+      // Percentage deposits apply to the booking total (per-guest for events), not the base price.
+      const depositBase = appointment.total_price ?? svc.price ?? 0;
       const depositAmount = svc.deposit_type === 'percentage'
-        ? Math.round((svc.price ?? 0) * (svc.deposit_amount ?? 0) / 100 * 100) / 100
+        ? Math.round(depositBase * (svc.deposit_amount ?? 0) / 100 * 100) / 100
         : (svc.deposit_amount ?? 0);
       await notifyDepositPaymentRequired(params.id, depositAmount);
     } else if (effectiveStatus === 'confirmed' && appointment.status === 'pending') {

@@ -4,6 +4,7 @@
  * that gets sent back to the AI as a tool_result.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { eventSeatings, isReservationType, resolveOwnerStaff, tableTimesForDate, tenantTimezone, type Seating } from '@/lib/hospitality';
 
 type AdminClient = SupabaseClient;
 
@@ -130,7 +131,24 @@ function estimateDriveMinutes(distanceKm: number): number {
   return Math.max(1, Math.round((distanceKm / avgSpeedKmh) * 60));
 }
 
-type ServiceRow = { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null; service_type?: string | null; pricing_type?: string | null; capacity?: number | null };
+type ServiceRow = { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null; service_type?: string | null; pricing_type?: string | null; capacity?: number | null; seatings?: Seating[] };
+
+/** Hospitality venues are bookable through tables/events, not staff hours. */
+const hasReservable = (svcs?: ServiceRow[] | null): boolean => (svcs ?? []).some((s) => isReservationType(s.service_type));
+
+/** Attach upcoming seatings (with seats left) to every event service in a find_businesses result. */
+async function attachSeatings(supabase: AdminClient, result: ToolResult): Promise<ToolResult> {
+  const businesses = (result.data as { businesses?: { id: string; all_services?: ServiceRow[] }[] } | undefined)?.businesses;
+  if (!result.success || !businesses?.length) return result;
+  for (const b of businesses) {
+    const events = (b.all_services ?? []).filter((s) => s.service_type === 'event');
+    if (events.length === 0) continue;
+    const tz = await getTenantTimezone(supabase, b.id);
+    const map = await eventSeatings(supabase, events.map((e) => ({ id: e.id, capacity: e.capacity ?? null })), tz);
+    for (const e of events) e.seatings = map.get(e.id) ?? [];
+  }
+  return result;
+}
 
 /**
  * Filter services to only those available at a specific location.
@@ -225,9 +243,9 @@ export async function handleFindBusinesses(
     // We scope the query itself (not a post-filter) so pagination/limits apply
     // within the property's set instead of the global tenant pool.
     if (propertyTenantIds && propertyTenantIds.length) {
-      return await handlePropertyFindBusinesses(supabase, propertyTenantIds, input);
+      return await attachSeatings(supabase, await handlePropertyFindBusinesses(supabase, propertyTenantIds, input));
     }
-    return await handleFindBusinessesInner(supabase, input);
+    return await attachSeatings(supabase, await handleFindBusinessesInner(supabase, input));
   } catch (err) {
     console.error('[find_businesses] CRASHED:', err);
     return { success: false, error: `find_businesses failed: ${err instanceof Error ? err.message : String(err)}` };
@@ -256,20 +274,20 @@ async function handlePropertyFindBusinesses(
 
   let tq = supabase
     .from('tenants')
-    .select('id, name, logo_url, avg_rating, review_count, category_id, categories!category_id(name)')
+    .select('id, name, logo_url, avg_rating, review_count, business_type, category_id, categories!category_id(name)')
     .in('id', ids)
     .eq('status', 'active');
   if (categoryId) tq = tq.eq('category_id', categoryId);
   const { data: tRows, error: tErr } = await tq;
   if (tErr) return { success: false, error: tErr.message };
 
-  type T = { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; category_id: string | null; categories: { name: string } | { name: string }[] | null };
+  type T = { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; category_id: string | null; business_type?: string | null; categories: { name: string } | { name: string }[] | null };
   const tenants = (tRows ?? []) as unknown as T[];
   const tenantIds = tenants.map((t) => t.id);
 
   const [{ data: svcRows }, { data: locRows }] = tenantIds.length
     ? await Promise.all([
-        supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url').in('tenant_id', tenantIds).eq('visibility', 'public'),
+        supabase.from('services').select('tenant_id, id, name, price, duration_minutes, deposit_enabled, deposit_amount, deposit_type, image_url, service_type, pricing_type, capacity').in('tenant_id', tenantIds).eq('visibility', 'public'),
         supabase.from('tenant_locations').select('id, tenant_id, name, address, latitude, longitude').in('tenant_id', tenantIds),
       ])
     : [{ data: [] }, { data: [] }];
@@ -277,7 +295,7 @@ async function handlePropertyFindBusinesses(
   const svcByTenant = new Map<string, PortalService[]>();
   for (const s of (svcRows ?? []) as (PortalService & { tenant_id: string })[]) {
     const arr = svcByTenant.get(s.tenant_id) ?? [];
-    arr.push({ id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes, deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, deposit_type: s.deposit_type, image_url: s.image_url });
+    arr.push({ id: s.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes, deposit_enabled: s.deposit_enabled, deposit_amount: s.deposit_amount, deposit_type: s.deposit_type, image_url: s.image_url, service_type: s.service_type ?? 'standard', pricing_type: s.pricing_type ?? null, capacity: s.capacity ?? null });
     svcByTenant.set(s.tenant_id, arr);
   }
   const locByTenant = new Map<string, PortalLocation[]>();
@@ -293,7 +311,7 @@ async function handlePropertyFindBusinesses(
     const locs = locByTenant.get(t.id) ?? [];
     return {
       id: t.id, name: t.name, image_url: t.logo_url ?? undefined,
-      category: cat, business_category: cat,
+      category: cat, business_category: cat, business_type: t.business_type ?? 'service',
       avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0,
       all_services: svcs, locations: locs, closest_location_id: locs[0]?.id,
     };
@@ -354,20 +372,17 @@ async function handleFindBusinessesInner(
   if (categoryId) {
     const { data: catTenants, error: catError } = await supabase
       .from('tenants')
-      .select('id, name, logo_url, avg_rating, review_count, categories!category_id(name)')
+      .select('id, name, logo_url, avg_rating, review_count, business_type, categories!category_id(name)')
       .eq('status', 'active')
-      // Hospitality businesses are discoverable only inside their property's
-      // white-label portal — never in the global Balkina discovery pool.
-      .neq('business_type', 'hospitality')
       .eq('category_id', categoryId);
 
     if (catError) return { success: false, error: catError.message };
 
     let businesses = (catTenants ?? []).map((t: unknown) => {
-      const row = t as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; categories: { name: string } | { name: string }[] | null };
+      const row = t as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; business_type?: string | null; categories: { name: string } | { name: string }[] | null };
       const cat = Array.isArray(row.categories) ? row.categories[0]?.name ?? null : row.categories?.name ?? null;
-      return { id: row.id, name: row.name, image_url: row.logo_url ?? undefined, category: cat, business_category: cat, avg_rating: row.avg_rating ?? undefined, review_count: row.review_count ?? 0 };
-    }) as { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null; service_type?: string | null; pricing_type?: string | null; capacity?: number | null }[] }[];
+      return { id: row.id, name: row.name, image_url: row.logo_url ?? undefined, category: cat, business_category: cat, business_type: row.business_type ?? 'service', avg_rating: row.avg_rating ?? undefined, review_count: row.review_count ?? 0 };
+    }) as { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; business_type?: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; all_services?: { id: string; name: string; price: number; duration_minutes: number; deposit_enabled: boolean; deposit_amount: number | null; deposit_type: string | null; image_url: string | null; service_type?: string | null; pricing_type?: string | null; capacity?: number | null }[] }[];
 
     console.log(`[find_businesses] ⏱ category tenant query: ${Date.now() - t0}ms (${businesses.length} tenants)`);
     // Fetch locations and services in parallel (both depend on catBizIds only)
@@ -512,7 +527,6 @@ async function handleFindBusinessesInner(
       .from('tenants')
       .select('id, name, logo_url, category_id, categories!category_id(name)')
       .eq('status', 'active')
-      .neq('business_type', 'hospitality')
       .not('category_id', 'is', null);
 
     // Filter tenants whose category name matches the service type (case-insensitive)
@@ -546,7 +560,6 @@ async function handleFindBusinessesInner(
         .from('tenants')
         .select('id, name')
         .eq('status', 'active')
-        .neq('business_type', 'hospitality')
         .or(namePatterns.map(p => `name.ilike.${p}`).join(','));
       for (const nt of (nameTenants ?? []) as { id: string; name: string }[]) {
         nameMatchTenantIds.add(nt.id);
@@ -554,7 +567,7 @@ async function handleFindBusinessesInner(
     }
     console.log('[find_businesses] name-matched tenant IDs:', nameMatchTenantIds.size);
 
-    let serviceTenantMap: Map<string, { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; matched_services: string[] }>;
+    let serviceTenantMap: Map<string, { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; business_type?: string | null; matched_services: string[] }>;
 
     // Collect matching tenant IDs from service name search
     const svcByTenant = new Map<string, string[]>();
@@ -632,17 +645,16 @@ async function handleFindBusinessesInner(
       // Step 2: Fetch those tenants with their details
       const { data: tenants, error: tenantError } = await supabase
         .from('tenants')
-        .select('id, name, logo_url, avg_rating, review_count, categories!category_id(name)')
+        .select('id, name, logo_url, avg_rating, review_count, business_type, categories!category_id(name)')
         .in('id', matchingTenantIds)
-        .eq('status', 'active')
-        .neq('business_type', 'hospitality');
+        .eq('status', 'active');
 
       console.log('[find_businesses] tenants fetched:', tenants?.length, 'error:', tenantError?.message);
 
       serviceTenantMap = new Map();
-      for (const t of (tenants ?? []) as unknown as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; categories: { name: string } | { name: string }[] | null }[]) {
+      for (const t of (tenants ?? []) as unknown as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; business_type?: string | null; categories: { name: string } | { name: string }[] | null }[]) {
         const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
-        serviceTenantMap.set(t.id, { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: cat, business_category: cat, avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0, matched_services: svcByTenant.get(t.id) ?? [] });
+        serviceTenantMap.set(t.id, { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: cat, business_category: cat, business_type: t.business_type ?? 'service', avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0, matched_services: svcByTenant.get(t.id) ?? [] });
       }
     }
 
@@ -744,7 +756,7 @@ async function handleFindBusinessesInner(
           tenantsWithStaffSet.add(s.tenant_id);
         }
       }
-      businesses = businesses.map((b) => ({ ...b, has_availability: tenantsWithStaffSet.has(b.id) }));
+      businesses = businesses.map((b) => ({ ...b, has_availability: tenantsWithStaffSet.has(b.id) || hasReservable(b.all_services) }));
 
       const totalCount = businesses.length;
       const paged = businesses.slice(offset, offset + limit);
@@ -773,9 +785,8 @@ async function handleFindBusinessesInner(
     // Return all active businesses when no query is provided
     const { data, error } = await supabase
       .from('tenants')
-      .select('id, name, logo_url, avg_rating, review_count, categories!category_id(name)')
+      .select('id, name, logo_url, avg_rating, review_count, business_type, categories!category_id(name)')
       .eq('status', 'active')
-      .neq('business_type', 'hospitality')
       .limit(200);
 
     console.log('[find_businesses] no-query result:', { count: data?.length, error: error?.message });
@@ -783,10 +794,10 @@ async function handleFindBusinessesInner(
     if (error) return { success: false, error: error.message };
 
     let businesses = (data ?? []).map((t: unknown) => {
-      const row = t as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; categories: { name: string } | { name: string }[] | null };
+      const row = t as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; business_type?: string | null; categories: { name: string } | { name: string }[] | null };
       const cat = Array.isArray(row.categories) ? row.categories[0]?.name ?? null : row.categories?.name ?? null;
-      return { id: row.id, name: row.name, image_url: row.logo_url ?? undefined, category: cat, business_category: cat, avg_rating: row.avg_rating ?? undefined, review_count: row.review_count ?? 0 };
-    }) as { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[];
+      return { id: row.id, name: row.name, image_url: row.logo_url ?? undefined, category: cat, business_category: cat, business_type: row.business_type ?? 'service', avg_rating: row.avg_rating ?? undefined, review_count: row.review_count ?? 0 };
+    }) as { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; business_type?: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[]; has_availability?: boolean }[];
     let locationNote: string | undefined;
 
     // Fetch locations, services, and service_locations in parallel
@@ -879,7 +890,7 @@ async function handleFindBusinessesInner(
 
     businesses = businesses.map((b) => ({
       ...b,
-      has_availability: tenantsWithStaff.has(b.id),
+      has_availability: tenantsWithStaff.has(b.id) || hasReservable((b as { all_services?: ServiceRow[] }).all_services),
     })) as typeof businesses;
 
     const totalCount = businesses.length;
@@ -898,9 +909,8 @@ async function handleFindBusinessesInner(
   // 1. Search tenants by name
   const { data: tenantsByName } = await supabase
     .from('tenants')
-    .select('id, name, logo_url, avg_rating, review_count, categories!category_id(name)')
+    .select('id, name, logo_url, avg_rating, review_count, business_type, categories!category_id(name)')
     .eq('status', 'active')
-    .neq('business_type', 'hospitality')
     .ilike('name', `%${sanitized}%`)
     .limit(50);
 
@@ -937,46 +947,44 @@ async function handleFindBusinessesInner(
 
   const { data: serviceMatches } = await supabase
     .from('services')
-    .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name, logo_url, categories!category_id(name))')
+    .select('tenant_id, name, price, duration_minutes, tenants!inner(id, name, logo_url, business_type, categories!category_id(name))')
     .or(uniquePatterns.join(','))
     .eq('tenants.status', 'active')
-    .neq('tenants.business_type', 'hospitality')
     .limit(20);
 
   // 3. Search tenants by category (e.g. "beauty" matches "Beauty & Personal Care")
   const { data: tenantsByCategory } = await supabase
     .from('tenants')
-    .select('id, name, logo_url, avg_rating, review_count, categories!inner(name)')
+    .select('id, name, logo_url, avg_rating, review_count, business_type, categories!inner(name)')
     .eq('status', 'active')
-    .neq('business_type', 'hospitality')
     .ilike('categories.name', `%${sanitized}%`)
     .limit(50);
 
   // Merge all found tenants (deduplicate by id) and track matched services per business
-  const tenantMap = new Map<string, { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number }>();
+  const tenantMap = new Map<string, { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; business_type?: string | null }>();
   const tenantMatchedServices = new Map<string, string[]>();
 
   // Track which tenants came from category match vs service-name match
   const categoryMatchedIds = new Set<string>();
   const nameMatchedIds = new Set<string>();
 
-  for (const t of (tenantsByName ?? []) as unknown as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; categories: { name: string } | { name: string }[] | null }[]) {
+  for (const t of (tenantsByName ?? []) as unknown as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; business_type?: string | null; categories: { name: string } | { name: string }[] | null }[]) {
     const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
-    tenantMap.set(t.id, { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: cat, business_category: cat, avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0 });
+    tenantMap.set(t.id, { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: cat, business_category: cat, business_type: t.business_type ?? 'service', avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0 });
     nameMatchedIds.add(t.id);
   }
-  for (const s of (serviceMatches ?? []) as unknown as { tenant_id: string; name: string; price: number; tenants: { id: string; name: string; logo_url: string | null; categories: { name: string } | { name: string }[] | null } }[]) {
+  for (const s of (serviceMatches ?? []) as unknown as { tenant_id: string; name: string; price: number; tenants: { id: string; name: string; logo_url: string | null; business_type?: string | null; categories: { name: string } | { name: string }[] | null } }[]) {
     if (s.tenants) {
       const sCat = Array.isArray(s.tenants.categories) ? s.tenants.categories[0]?.name ?? null : s.tenants.categories?.name ?? null;
-      tenantMap.set(s.tenants.id, { id: s.tenants.id, name: s.tenants.name, image_url: s.tenants.logo_url ?? undefined, category: sCat, business_category: sCat });
+      tenantMap.set(s.tenants.id, { id: s.tenants.id, name: s.tenants.name, image_url: s.tenants.logo_url ?? undefined, category: sCat, business_category: sCat, business_type: s.tenants.business_type ?? 'service' });
       const existing = tenantMatchedServices.get(s.tenants.id) ?? [];
       existing.push(s.name);
       tenantMatchedServices.set(s.tenants.id, existing);
     }
   }
-  for (const t of (tenantsByCategory ?? []) as unknown as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; categories: { name: string } | { name: string }[] | null }[]) {
+  for (const t of (tenantsByCategory ?? []) as unknown as { id: string; name: string; logo_url: string | null; avg_rating: number | null; review_count: number | null; business_type?: string | null; categories: { name: string } | { name: string }[] | null }[]) {
     const cat = Array.isArray(t.categories) ? t.categories[0]?.name ?? null : t.categories?.name ?? null;
-    if (!tenantMap.has(t.id)) tenantMap.set(t.id, { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: cat, business_category: cat, avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0 });
+    if (!tenantMap.has(t.id)) tenantMap.set(t.id, { id: t.id, name: t.name, image_url: t.logo_url ?? undefined, category: cat, business_category: cat, business_type: t.business_type ?? 'service', avg_rating: t.avg_rating ?? undefined, review_count: t.review_count ?? 0 });
     categoryMatchedIds.add(t.id);
   }
 
@@ -993,7 +1001,7 @@ async function handleFindBusinessesInner(
     console.log('[find_businesses] query path: after category-priority filter:', tenantMap.size, 'tenants');
   }
 
-  let businesses: { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; matched_services?: string[]; all_services?: ServiceRow[]; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[] }[] = Array.from(tenantMap.values()).map((t) => ({
+  let businesses: { id: string; name: string; image_url?: string; category?: string | null; business_category?: string | null; avg_rating?: number; review_count?: number; business_type?: string | null; distance_km?: number; distance_mi?: number; estimated_drive_minutes?: number; matched_services?: string[]; all_services?: ServiceRow[]; locations?: { name: string; address: string; latitude: number | null; longitude: number | null }[] }[] = Array.from(tenantMap.values()).map((t) => ({
     ...t,
     matched_services: tenantMatchedServices.get(t.id),
   }));
@@ -1021,7 +1029,7 @@ async function handleFindBusinessesInner(
   const querySvcMap = new Map<string, ServiceRow[]>();
   for (const svc of (queryBizServices ?? []) as (ServiceRow & { tenant_id: string })[]) {
     const existing = querySvcMap.get(svc.tenant_id) ?? [];
-    existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url });
+    existing.push({ id: svc.id, name: svc.name, price: svc.price, duration_minutes: svc.duration_minutes, deposit_enabled: svc.deposit_enabled, deposit_amount: svc.deposit_amount, deposit_type: svc.deposit_type, image_url: svc.image_url, service_type: svc.service_type ?? 'standard', pricing_type: svc.pricing_type ?? null, capacity: svc.capacity ?? null });
     querySvcMap.set(svc.tenant_id, existing);
   }
   businesses = businesses.map((b) => ({ ...b, all_services: querySvcMap.get(b.id) ?? [] }));
@@ -1079,7 +1087,7 @@ async function handleFindBusinessesInner(
 
   businesses = businesses.map((b) => ({
     ...b,
-    has_availability: tenantsWithStaffQuery.has(b.id),
+    has_availability: tenantsWithStaffQuery.has(b.id) || hasReservable(b.all_services),
   }));
 
   const totalCount = businesses.length;
@@ -1369,12 +1377,28 @@ export async function handleCheckAvailability(
   // 1. Get service details including buffer times
   const { data: service, error: svcErr } = await supabase
     .from('services')
-    .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after')
+    .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after, service_type, timesheet, capacity')
     .eq('id', serviceId)
     .single();
 
   if (svcErr || !service) return { success: false, error: 'Service not found' };
-  const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null };
+  const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null; service_type?: string | null; timesheet?: Record<string, { enabled?: boolean; start?: string; end?: string }> | null; capacity?: number | null };
+
+  // Hospitality: tables use the service's open hours, events their seatings — never staff hours.
+  if (isReservationType(svc.service_type)) {
+    const tz = await tenantTimezone(supabase, tenantId, locationId);
+    if (svc.service_type === 'event') {
+      const seatings = (await eventSeatings(supabase, [{ id: serviceId, capacity: svc.capacity ?? null }], tz)).get(serviceId) ?? [];
+      const onDate = seatings.filter((x) => x.date === date);
+      const list = onDate.length ? onDate : seatings;
+      return { success: true, data: { date, booking_mode: 'event', service_duration_minutes: svc.duration_minutes, available_slots: list.map((x) => ({ time: x.time, iso: x.iso, date: x.date, seats_left: x.seats_left })), message: onDate.length ? 'Seatings for this event on that date.' : (list.length ? 'No seating on that date; these are the upcoming seatings.' : 'No upcoming seatings for this event.') } };
+    }
+    const { data: specialRows } = await supabase.from('service_special_days').select('is_day_off, start_time, end_time').eq('service_id', serviceId).eq('date', date);
+    const special = ((specialRows ?? []) as { is_day_off: boolean | null; start_time: string | null; end_time: string | null }[])[0] ?? null;
+    const t = tableTimesForDate({ date, timesheet: svc.timesheet ?? null, special, durationMinutes: svc.duration_minutes, timezone: tz });
+    if (t.closed) return { success: true, data: { date, booking_mode: 'table', available_slots: [], message: 'The venue is closed on that day. Offer another day.' } };
+    return { success: true, data: { date, booking_mode: 'table', service_duration_minutes: svc.duration_minutes, open_hours: t.open, available_slots: t.slots.slice(offset, offset + 12), total_slots: t.slots.length, message: 'Reservation times within open hours. The venue confirms the request; overlapping requests are allowed.' } };
+  }
   const bufferBefore = svc.buffer_time_before ?? 0;
   const bufferAfter = svc.buffer_time_after ?? 0;
   const totalSlotMinutes = bufferBefore + svc.duration_minutes + bufferAfter;
@@ -1736,9 +1760,9 @@ export async function handleBookAppointment(
         const s = data as { id: string; name: string; requires_approval: boolean } | null;
         return { id: s?.id ?? staffId, name: s?.name ?? null, requiresApproval: s?.requires_approval ?? false };
       }
-      const { data } = await supabase.from('staff').select('id, name, requires_approval').eq('tenant_id', tenantId).limit(1);
-      const s = (data as { id: string; name: string; requires_approval: boolean }[] | null)?.[0];
-      return { id: s?.id ?? null, name: s?.name ?? null, requiresApproval: s?.requires_approval ?? false };
+      // No staff chosen: the owner staff record approves and is notified.
+      const owner = await resolveOwnerStaff(supabase, tenantId);
+      return { id: owner?.id ?? null, name: owner?.name ?? null, requiresApproval: owner?.requires_approval ?? false };
     })(),
 
     // 7. Tenant payments_enabled flag + stripe_account_id
@@ -1761,6 +1785,9 @@ export async function handleBookAppointment(
   if (svc.service_type === 'event') bookingType = 'event';
   else if (svc.service_type === 'table') bookingType = 'table';
   const isPerPerson = svc.pricing_type === 'per_person';
+  if ((isEvent || isTable) && !(partySize && partySize > 0)) {
+    return { success: false, error: 'party_size is required for a reservation. Ask the customer how many guests and call create_booking again with party_size.' };
+  }
   const guests = partySize && partySize > 0 ? partySize : 1;
   // Per-guest pricing (events): per-person price × party size.
   const eventBase = isPerPerson ? svc.price * guests : svc.price;
@@ -1805,6 +1832,16 @@ export async function handleBookAppointment(
   if (isTable && svc.timesheet) {
     const oh = checkServiceOpenHours(start, svc.timesheet, bookingTimezone);
     if (!oh.ok) return { success: false, error: oh.message };
+  }
+
+  // Events: the start time must be one of the event's seatings.
+  if (isEvent) {
+    const seatings = (await eventSeatings(supabase, [{ id: serviceId, capacity: svc.capacity ?? null }], bookingTimezone)).get(serviceId) ?? [];
+    const match = seatings.find((x) => Math.abs(new Date(x.iso).getTime() - start.getTime()) < 60000);
+    if (!match) {
+      return { success: false, error: seatings.length ? `That is not a seating of this event. Upcoming seatings: ${seatings.map((x) => `${x.date} ${x.time} (${x.seats_left} seats left)`).join(', ')}.` : 'This event has no upcoming seatings.' };
+    }
+    start = new Date(match.iso);
   }
 
   const end = new Date(start.getTime() + svc.duration_minutes * 60000);
@@ -1987,9 +2024,9 @@ export async function handleBookAppointment(
       (c.usage_limit === null || c.usage_count < c.usage_limit);
     if (isValid) {
       couponDiscount = c.discount_type === 'percentage'
-        ? (svc.price * c.discount_value) / 100
+        ? (eventBase * c.discount_value) / 100
         : c.discount_value;
-      couponDiscount = Math.min(couponDiscount, svc.price);
+      couponDiscount = Math.min(couponDiscount, eventBase);
       // Record usage, increment count, store on appointment — all in parallel
       await Promise.all([
         supabase.from('coupon_usage').insert({
@@ -2008,7 +2045,7 @@ export async function handleBookAppointment(
     if (lp.is_active) {
       loyaltyDiscount = Math.min(
         loyaltyPointsToRedeem * lp.points_to_currency_rate,
-        svc.price + extrasTotal - couponDiscount,
+        eventBase + extrasTotal - couponDiscount,
       );
       // Insert redeem transaction + fetch current balance in parallel
       const [, { data: currentPts }] = await Promise.all([
@@ -2033,7 +2070,7 @@ export async function handleBookAppointment(
   if (customerId && loyaltyProgram.data) {
     const lp = loyaltyProgram.data as { points_per_booking: number; points_per_dollar: number | null; is_active: boolean };
     if (lp.is_active) {
-      pointsEarned = (lp.points_per_booking ?? 0) + Math.floor((lp.points_per_dollar ?? 0) * svc.price);
+      pointsEarned = (lp.points_per_booking ?? 0) + Math.floor((lp.points_per_dollar ?? 0) * eventBase);
       if (pointsEarned > 0) {
         await supabase.from('loyalty_transactions').insert({
           customer_id: customerId, tenant_id: tenantId, appointment_id: appointmentId,

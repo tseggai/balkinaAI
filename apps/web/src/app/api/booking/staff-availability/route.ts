@@ -6,6 +6,7 @@
  * Body: { tenantId, serviceId, date, staffId?, customerId?, userId?, locationId?, userLatitude?, userLongitude? }
  */
 import { NextResponse } from 'next/server';
+import { eventSeatings, isReservationType, tableTimesForDate } from '@/lib/hospitality';
 import { createAdminClient } from '@/lib/supabase/server';
 
 const CORS_HEADERS = {
@@ -120,7 +121,7 @@ export async function POST(request: Request) {
     // 1. Get service details including buffer times
     const { data: service, error: svcErr } = await supabase
       .from('services')
-      .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after, staff_selection_enabled, pricing_type, timesheet')
+      .select('duration_minutes, tenant_id, buffer_time_before, buffer_time_after, staff_selection_enabled, pricing_type, timesheet, service_type, capacity')
       .eq('id', serviceId)
       .single();
 
@@ -129,7 +130,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Service not found' }, { status: 404, headers: CORS_HEADERS });
     }
 
-    const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null; staff_selection_enabled: boolean; pricing_type: string; timesheet: Record<string, { enabled: boolean; start: string; end: string }> | null };
+    const svc = service as { duration_minutes: number; tenant_id: string; buffer_time_before: number | null; buffer_time_after: number | null; staff_selection_enabled: boolean; pricing_type: string; timesheet: Record<string, { enabled: boolean; start: string; end: string }> | null; service_type?: string | null; capacity?: number | null };
     const bufferBefore = svc.buffer_time_before ?? 0;
     const bufferAfter = svc.buffer_time_after ?? 0;
 
@@ -166,6 +167,20 @@ export async function POST(request: Request) {
     ]);
 
     const serviceSpecialDay = (specialDaysResult.data ?? [])[0] as { is_day_off: boolean; start_time: string | null; end_time: string | null; breaks: unknown } | undefined;
+
+    // Hospitality: tables use the service's open hours, events their seatings — never staff hours.
+    if (isReservationType(svc.service_type)) {
+      const locRow = timezoneResult.data as { timezone: string | null; address: string | null; currency: string | null } | null;
+      const tz = locRow?.timezone || 'UTC';
+      const base = { date, service_duration_minutes: svc.duration_minutes, staff_selection_enabled: false, pricing_type: svc.pricing_type ?? 'per_service', staff: [], address: locRow?.address ?? null, currency: locRow?.currency ?? 'USD' };
+      if (svc.service_type === 'event') {
+        const seatings = (await eventSeatings(supabase, [{ id: serviceId, capacity: svc.capacity ?? null }], tz)).get(serviceId) ?? [];
+        const onDate = seatings.filter((x) => x.date === date);
+        return NextResponse.json({ ...base, booking_mode: 'event', seatings, anyone_slots: onDate.map((x) => ({ time: x.time, iso: x.iso, available: x.seats_left > 0, seats_left: x.seats_left })), message: onDate.length ? undefined : 'No seating on this date.' }, { headers: CORS_HEADERS });
+      }
+      const t = tableTimesForDate({ date, timesheet: svc.timesheet, special: serviceSpecialDay ?? null, durationMinutes: svc.duration_minutes, timezone: tz });
+      return NextResponse.json({ ...base, booking_mode: 'table', open_hours: t.open, anyone_slots: t.slots.map((x) => ({ ...x, available: true })), message: t.closed ? 'The venue is closed on this day.' : undefined }, { headers: CORS_HEADERS });
+    }
 
     if (serviceSpecialDay?.is_day_off) {
       return NextResponse.json({

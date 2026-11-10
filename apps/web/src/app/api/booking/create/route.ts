@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { notifyBookingConfirmed, notifyBookingSubmitted, notifyStaffNewBooking } from '@/lib/notifications/booking-events';
+import { eventSeatings, resolveOwnerStaff } from '@/lib/hospitality';
 import { pushEventToGoogleCalendar } from '@/lib/google-calendar';
 
 const CORS_HEADERS = {
@@ -221,10 +222,9 @@ export async function POST(request: Request) {
         if (allAssigned && allAssigned.length > 0) {
           return { id: allAssigned[0]!.id, name: body.staffName || allAssigned[0]!.name, requiresApproval: allAssigned[0]!.requires_approval };
         }
-        // Fallback: any staff from the tenant
-        const { data } = await supabase.from('staff').select('id, name, requires_approval').eq('tenant_id', tenantId).limit(1);
-        const s = (data as { id: string; name: string; requires_approval: boolean }[] | null)?.[0];
-        return { id: s?.id ?? null, name: body.staffName || s?.name || null, requiresApproval: s?.requires_approval ?? false };
+        // Fallback: the owner staff record (approver + notification target for reservations)
+        const owner = await resolveOwnerStaff(supabase, tenantId);
+        return { id: owner?.id ?? null, name: body.staffName || owner?.name || null, requiresApproval: owner?.requires_approval ?? false };
       })(),
 
       // 8. Tenant name + payments flag
@@ -248,6 +248,9 @@ export async function POST(request: Request) {
     if (svc.service_type === 'event') bookingType = 'event';
     else if (svc.service_type === 'table') bookingType = 'table';
     const isPerPerson = svc.pricing_type === 'per_person';
+    if ((isEvent || isTable) && !(partySize && partySize > 0)) {
+      return NextResponse.json({ error: 'partySize is required for a reservation (how many guests).' }, { status: 400, headers: CORS_HEADERS });
+    }
     const guests = partySize && partySize > 0 ? partySize : 1;
     // Per-guest pricing (events): the per-person price is multiplied by party size.
     const perGuestBase = isPerPerson ? svc.price * guests : svc.price;
@@ -299,6 +302,16 @@ export async function POST(request: Request) {
       if (!oh.ok) {
         return NextResponse.json({ error: oh.message }, { status: 400, headers: CORS_HEADERS });
       }
+    }
+
+    // Events: the start time must be one of the event's seatings.
+    if (isEvent) {
+      const seatings = (await eventSeatings(supabase, [{ id: serviceId, capacity: svc.capacity ?? null }], tz)).get(serviceId) ?? [];
+      const match = seatings.find((x) => Math.abs(new Date(x.iso).getTime() - start.getTime()) < 60000);
+      if (!match) {
+        return NextResponse.json({ error: seatings.length ? 'That time is not a seating of this event.' : 'This event has no upcoming seatings.', seatings }, { status: 400, headers: CORS_HEADERS });
+      }
+      start = new Date(match.iso);
     }
 
     const end = new Date(start.getTime() + svc.duration_minutes * 60000);
