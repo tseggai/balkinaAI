@@ -18,6 +18,7 @@ interface TenantData {
   review_count: number | null;
   owner_name: string | null;
   phone: string | null;
+  business_type: string | null;
 }
 
 interface ServiceData {
@@ -27,6 +28,9 @@ interface ServiceData {
   duration_minutes: number;
   image_url: string | null;
   pricing_type: string | null;
+  service_type: string | null;
+  capacity: number | null;
+  description: string | null;
 }
 
 interface LocationData {
@@ -45,7 +49,7 @@ async function getTenantBySlug(slug: string) {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('id, name, logo_url, avg_rating, review_count, owner_name, phone')
+    .select('id, name, logo_url, avg_rating, review_count, owner_name, phone, business_type')
     .eq('slug', slug)
     .eq('status', 'active')
     .single();
@@ -55,7 +59,7 @@ async function getTenantBySlug(slug: string) {
   const t = tenant as TenantData;
 
   const [{ data: services }, { data: locations }, { data: catLinks }, { data: gallery }] = await Promise.all([
-    supabase.from('services').select('id, name, price, duration_minutes, image_url, pricing_type').eq('tenant_id', t.id).eq('visibility', 'public').order('name'),
+    supabase.from('services').select('id, name, price, duration_minutes, image_url, pricing_type, service_type, capacity, description').eq('tenant_id', t.id).eq('visibility', 'public').order('name'),
     supabase.from('tenant_locations').select('id, name, address, currency').eq('tenant_id', t.id),
     supabase.from('tenant_category_links').select('category_id, categories(name)').eq('tenant_id', t.id),
     supabase.from('location_gallery').select('image_url').eq('tenant_id', t.id).order('sort_order').limit(6),
@@ -93,12 +97,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const data = await getTenantBySlug(slug);
   if (!data) return { title: 'Business Not Found' };
 
+  const hospitality = data.tenant.business_type === 'hospitality';
+  const title = hospitality ? `${data.tenant.name} — Reserve on Balkina AI` : `${data.tenant.name} — Book on Balkina AI`;
   return {
-    title: `${data.tenant.name} — Book on Balkina AI`,
-    description: `Book appointments with ${data.tenant.name}. ${data.services.length} services available. Powered by Balkina AI.`,
+    title,
+    description: hospitality
+      ? `Reserve a table or seats at ${data.tenant.name}. Powered by Balkina AI.`
+      : `Book appointments with ${data.tenant.name}. ${data.services.length} services available. Powered by Balkina AI.`,
     openGraph: {
-      title: `${data.tenant.name} — Book on Balkina AI`,
-      description: `Book appointments with ${data.tenant.name}`,
+      title,
+      description: hospitality ? `Reserve at ${data.tenant.name}` : `Book appointments with ${data.tenant.name}`,
       images: data.tenant.logo_url ? [{ url: data.tenant.logo_url }] : undefined,
     },
   };
@@ -165,9 +173,10 @@ export default async function TenantPage({ params }: { params: Promise<{ slug: s
           locations={locations}
           currency={currency}
           serviceLocationMap={serviceLocationMap}
+          businessType={tenant.business_type}
         />
       ) : (
-        <p className="mt-8 text-center text-sm text-gray-400">No services available at this time.</p>
+        <p className="mt-8 text-center text-sm text-gray-400">{tenant.business_type === 'hospitality' ? 'No reservations available at this time.' : 'No services available at this time.'}</p>
       )}
 
       {/* Footer */}
