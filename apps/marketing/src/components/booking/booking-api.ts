@@ -14,15 +14,30 @@ export interface StaffData {
   all_slots?: { time: string; iso: string; available: boolean }[];
 }
 
+/** An event seating (hospitality): one date + start time with the seats still free. */
+export interface Seating {
+  date: string;
+  start_time: string | null;
+  time: string;
+  iso: string;
+  seats_left: number;
+  capacity: number;
+}
+
 export interface AvailabilityResponse {
   date: string;
   service_duration_minutes: number;
   staff_selection_enabled: boolean;
   pricing_type?: string;
   staff: StaffData[];
-  anyone_slots: { time: string; iso: string; available: boolean }[];
+  anyone_slots: { time: string; iso: string; available: boolean; seats_left?: number }[];
   address?: string;
   currency?: string;
+  /** Hospitality: 'table' = request within open hours, 'event' = pick a seating. */
+  booking_mode?: 'table' | 'event';
+  open_hours?: { start: string; end: string } | null;
+  seatings?: Seating[];
+  message?: string;
 }
 
 export interface CreateBookingResponse {
@@ -80,6 +95,9 @@ export async function createBooking(params: {
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
+  /** Hospitality: number of guests (required for tables and events). */
+  partySize?: number;
+  bookingType?: 'service' | 'table' | 'event';
 }): Promise<CreateBookingResponse> {
   try {
     const res = await fetch(`${API_BASE}/api/booking/create`, {

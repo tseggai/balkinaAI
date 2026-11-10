@@ -12,8 +12,27 @@ export function formatPrice(price: number, currency?: string): string {
 }
 
 export function formatPriceWithType(price: number, pricingType: string | null, currency?: string): string {
-  const suffix = pricingType === 'per_day' ? '/day' : pricingType === 'per_week' ? '/week' : '';
+  const suffix = pricingType === 'per_day' ? '/day' : pricingType === 'per_week' ? '/week' : pricingType === 'per_person' ? '/person' : '';
   return `${formatPrice(price, currency)}${suffix}`;
+}
+
+export const isReservationService = (serviceType?: string | null): boolean => serviceType === 'table' || serviceType === 'event';
+
+/** Total for a booking: per-person services multiply by the party size. */
+export function bookingTotal(price: number, pricingType: string | null | undefined, guests: number): number {
+  return pricingType === 'per_person' ? price * Math.max(1, guests) : price;
+}
+
+/** "Open 9:00 AM – 10:00 PM" from a 24h "HH:MM" pair. */
+export function formatOpenHours(open?: { start: string; end: string } | null): string {
+  if (!open) return '';
+  const fmt = (t: string) => {
+    const h = Number(t.slice(0, 2)), m = t.slice(3, 5);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const hh = h % 12 === 0 ? 12 : h % 12;
+    return `${hh}:${m} ${ampm}`;
+  };
+  return `Open ${fmt(open.start)} – ${fmt(open.end)}`;
 }
 
 export function formatDuration(minutes: number, pricingType?: string | null): string {
