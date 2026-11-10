@@ -24,6 +24,10 @@ export interface BookingState {
   packagePrice: number;
   address: string | null;
   currency: string;
+  /** Hospitality: 'standard' | 'table' | 'event' */
+  serviceType: string | null;
+  capacity: number | null;
+  partySize: number | null;
 }
 
 export const INITIAL_BOOKING_STATE: BookingState = {
@@ -50,4 +54,7 @@ export const INITIAL_BOOKING_STATE: BookingState = {
   packagePrice: 0,
   address: null,
   currency: 'USD',
+  serviceType: null,
+  capacity: null,
+  partySize: null,
 };
