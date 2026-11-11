@@ -74,3 +74,73 @@ export function boxesFor(layout: string, format: Format): LayoutBoxes {
   if (format === 'st') return STORY[layout] ?? STORY.auto!;
   return SQUARE[layout] ?? SQUARE.auto!;
 }
+
+/* ---------- Does a line of copy fit its box? ---------- */
+
+// Quicksand advance widths in em (measured in the browser, bold; semibold is within 2%).
+const ADVANCE: Record<string, number> = {
+  a: 0.63, b: 0.63, c: 0.52, d: 0.63, e: 0.59, f: 0.44, g: 0.64, h: 0.59, i: 0.24, j: 0.28, k: 0.57, l: 0.27, m: 0.92, n: 0.6, o: 0.62,
+  p: 0.63, q: 0.63, r: 0.43, s: 0.48, t: 0.41, u: 0.59, v: 0.56, w: 0.77, x: 0.49, y: 0.59, z: 0.48, ' ': 0.28,
+};
+const BASE: Record<string, string> = { č: 'c', ć: 'c', š: 's', ž: 'z', đ: 'd' };
+
+/** Rendered width of a string in em. */
+export function textWidthEm(text: string): number {
+  let w = 0;
+  for (const ch of text) {
+    const lower = BASE[ch] ?? ch;
+    if (ADVANCE[lower] !== undefined) w += ADVANCE[lower]!;
+    else if (/[A-ZČĆŠŽĐ]/.test(ch)) w += ch === 'I' ? 0.28 : ch === 'M' || ch === 'W' ? 0.88 : 0.67;
+    else if (/[0-9]/.test(ch)) w += ch === '1' ? 0.39 : 0.57;
+    else if (/[.,:;!'’"„“”]/.test(ch)) w += 0.26;
+    else w += 0.55;
+  }
+  return w;
+}
+
+/** Greedy word wrap, as the browser and Canva do it: number of lines, and the first word too wide for a line. */
+export function wrapLines(text: string, widthEm: number): { lines: number; tooWide: string | null } {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  let lines = words.length ? 1 : 0;
+  let used = 0;
+  let tooWide: string | null = null;
+  for (const word of words) {
+    const w = textWidthEm(word);
+    if (w > widthEm && !tooWide) tooWide = word;
+    if (used === 0) used = w;
+    else if (used + ADVANCE[' ']! + w <= widthEm) used += ADVANCE[' ']! + w;
+    else { lines += 1; used = w; }
+  }
+  return { lines, tooWide };
+}
+
+/** Lines that only just fit in this estimate wrap in the real render; keep 3% in hand. */
+const FIT_MARGIN = 0.97;
+
+export interface FieldBudget { widthEm: number; maxLines: number; charsPerLine: number }
+
+/** Room a text field has on a template: line width in em and how many lines fit before the next element. */
+export function fieldBudget(layout: string, format: Format, field: 'headline' | 'subline'): FieldBudget {
+  const box = boxesFor(layout, format);
+  const type = TYPE[format][field];
+  const ratio = format === 'st' ? 1920 / 1080 : 1;   // y fractions are of the height, sizes of the width
+  const widthEm = box[field].w / type.size;
+  const narrow = box.headline.w < 0.5;
+  const maxLines = field === 'headline'
+    ? Math.max(1, Math.floor(((box.subline.y - box.headline.y) * ratio) / (type.size * type.lineHeight)))
+    : format === 'sq' && narrow ? 4 : 2;
+  return { widthEm, maxLines, charsPerLine: Math.floor(widthEm / 0.47) };
+}
+
+/** Problems a line of copy has on a template, in words the copywriter can act on (empty = fits). */
+export function fitProblems(layout: string, field: 'headline' | 'subline', text: string, formats: Format[] = ['sq', 'st']): string[] {
+  const out: string[] = [];
+  for (const format of formats) {
+    const b = fieldBudget(layout, format, field);
+    const r = wrapLines(text, b.widthEm * FIT_MARGIN);
+    const where = format === 'sq' ? 'square' : 'story';
+    if (r.tooWide) out.push(`the word "${r.tooWide}" is wider than a line of the ${where} (about ${b.charsPerLine} characters); use a shorter word`);
+    else if (r.lines > b.maxLines) out.push(`it wraps to ${r.lines} lines in the ${where}, where ${b.maxLines} lines of about ${b.charsPerLine} characters fit; make it shorter`);
+  }
+  return out;
+}

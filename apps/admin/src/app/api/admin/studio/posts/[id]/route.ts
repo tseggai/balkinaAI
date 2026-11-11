@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin-auth';
 import { resolveIgCredentials } from '@/lib/ig/publish';
-import { clearRenders, generateCopy, pendingRenders, publishPost, renderOne, templatesFor, textFieldsOf, type StudioPost } from '@/lib/ig/studio';
+import { clearRenders, generateCopy, recentHeadlines, pendingRenders, publishPost, renderOne, templatesFor, textFieldsOf, type StudioPost } from '@/lib/ig/studio';
 
 export const maxDuration = 60;
 
@@ -50,7 +50,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       case 'write': {
         const { sq, st } = await templatesFor(auth.supabase, post.layout);
         if (!sq) return NextResponse.json({ error: `No square template synced for layout "${post.layout}"` }, { status: 400 });
-        const r = await generateCopy({ vertical: post.vertical, tone: post.tone, layout: post.layout, fields: textFieldsOf(sq, st), brief: post.brief ?? undefined, langs: post.langs });
+        const r = await generateCopy({ vertical: post.vertical, tone: post.tone, layout: post.layout, fields: textFieldsOf(sq, st), brief: post.brief ?? undefined, langs: post.langs, avoid: await recentHeadlines(auth.supabase, post.vertical, post.id) });
         const next = await clearRenders(auth.supabase, post, { copy: r.copy, caption: r.caption });
         return NextResponse.json({ post: next, pending: pendingRenders(next, { sq: true, st: Boolean(st) }) });
       }

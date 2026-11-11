@@ -1,9 +1,11 @@
-/* Instagram studio: write copy with GPT-4o-mini, render it through Canva brand templates (per format and
+/* Instagram studio: write copy (audience playbook in ./audience, model from STUDIO_LLM_MODEL), render it through Canva brand templates (per format and
    language, one render per request), publish (feed = SR→EN carousel, stories = one per language), batch
    scheduling, and due-post selection for the cron. Rows live in ig_posts (Migrations 074–075). */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { RENDER_BUCKET, renderTemplate } from '@/lib/canva/client';
+import { ANGLES, EXAMPLES, angleByKey, audienceFor } from './audience';
 import { categoryOf, copyLimits, eyebrowFor, matchPhotos, studioHashtags, verticalByValue, type StudioVertical } from './categories';
+import { fieldBudget, fitProblems } from './overlay';
 import { publishCarousel, publishImage, type IgCredentials } from './publish';
 import { zonedToUtc, type Kind } from './schedule';
 
@@ -66,7 +68,7 @@ export function pickPhoto(pool: Photo[], vertical: string, seed: number): Photo 
 /** Every text field a template may ask for, with a hint for the copywriter. */
 const FIELD_HINTS: Record<string, string> = {
   headline: 'the hook, max {HEADLINE} characters, two short sentences at most',
-  subline: 'one supporting sentence, max {SUBLINE} characters, says what Balkina gives them',
+  subline: 'one supporting sentence, max {SUBLINE} characters, the product fact that answers the headline, said as what the owner gets',
   url: 'always exactly "balkina.ai"',
   button: 'call-to-action button label with an arrow, max 24 characters (e.g. "Napravite stranicu →")',
   big: 'one big number or very short stat, max 6 characters (e.g. "24/7", "20 s", "0 €")',
@@ -163,12 +165,17 @@ export interface CopyRequest {
   /** Regenerate only these fields (plus the caption when 'caption' is listed); the rest of `current` is kept. */
   only?: string[];
   current?: { copy?: Partial<Record<Lang, StudioCopy>>; caption?: string | null };
+  /** Angle key from ANGLES (lib/ig/audience.ts); one is picked at random when omitted. */
+  angle?: string;
+  /** Headlines already used for this audience: the new post must carry a different idea. */
+  avoid?: string[];
 }
 
 export interface CopyResult {
   copy: Partial<Record<Lang, StudioCopy>>;
   caption: string;
   model: string;
+  angle: string | null;
 }
 
 const PRODUCT_FACTS =
@@ -177,12 +184,83 @@ const PRODUCT_FACTS =
   'one link works in the Instagram bio, on the Google profile and on WhatsApp; activation is free, no card, about 10 seconds. ' +
   'Primary market: Montenegro and Serbia. Never invent prices, numbers or features beyond these.';
 
-/** Ask GPT-4o-mini for on-brand copy in both languages plus a bilingual feed caption. */
-export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
+const LANG_NAMES: Record<Lang, string> = {
+  sr: 'Serbian/Montenegrin, Latin script, ijekavian as spoken in Montenegro (prije, vrijeme, podsjetnik, obavještenje, sjutra), proper diacritics (č ć š ž đ)',
+  en: 'English',
+};
+
+/** The studio's copy model: STUDIO_LLM_MODEL, else the shared GROWTH_LLM_MODEL, else gpt-4o-mini. */
+const copyModel = (): string => process.env.STUDIO_LLM_MODEL ?? process.env.GROWTH_LLM_MODEL ?? 'gpt-4o-mini';
+
+type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
+
+/** One JSON-mode chat completion; returns the raw JSON text. */
+async function chatJson(messages: ChatMessage[], temperature: number): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY is not set in this deployment');
-  const model = process.env.GROWTH_LLM_MODEL ?? 'gpt-4o-mini';
-  const vertical = verticalByValue(req.vertical);
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ model: copyModel(), temperature, response_format: { type: 'json_object' }, messages }),
+  });
+  if (!res.ok) throw new Error(`OpenAI: ${res.status} ${await res.text().catch(() => '')}`.slice(0, 300));
+  const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const content = json.choices?.[0]?.message?.content;
+  if (!content) throw new Error('OpenAI returned no content');
+  return content;
+}
+
+/** What the copywriter is told about the audience: their words and their day, not just the trade's name. */
+function audienceBrief(verticalValue: string): string {
+  const v = verticalByValue(verticalValue);
+  const a = audienceFor(verticalValue);
+  return (
+    `Audience: the owner of a ${v?.label ?? verticalValue} (${v?.sr ?? verticalValue}).\n` +
+    `- The people who book with them: ${a.customer.en} (sr: ${a.customer.sr}). Use this word, never a generic "users".\n` +
+    `- What gets booked: ${a.books.en} (sr: ${a.books.sr}).\n` +
+    `- When the phone rings they are: ${a.busy}.\n` +
+    `- Their ${a.customer.en} decide to book: ${a.when}.\n` +
+    `- What a forgotten booking costs them: ${a.noshow}.\n` +
+    `- The message they answer all day: "${a.ask}"\n` +
+    `- Trade words that sound native in Serbian: ${a.words}.`
+  );
+}
+
+// Lines that say nothing about the trade (what the studio produced before the audience playbook).
+const GENERIC: RegExp[] = [
+  /book (by )?themselves/i, /zakazuju sami/i, /sami zakazuju/i, /\bsave time\b/i, /uštedite vr/i, /quick and easy/i, /brz[oe] i lak[oe]/i,
+  /without calling\.?$/i, /bez telefona\.?$/i, /book right away/i, /zakazuju odmah/i, /waste time/i, /gubite vr/i, /free yourself/i, /oslobodite se/i,
+];
+// Ekavian forms the model slips into; the copy is ijekavian.
+const EKAVIAN: [RegExp, string][] = [
+  [/\bvreme\b/i, 'vrijeme'], [/\bpre\b/i, 'prije'], [/\bposle\b/i, 'poslije'], [/\bgde\b/i, 'gdje'], [/\buvek\b/i, 'uvijek'], [/\bmesto\b/i, 'mjesto'],
+  [/\bpodsetni/i, 'podsjetnik'], [/\bobavešten/i, 'obavještenje'], [/\bnedelj/i, 'nedjelja'], [/\bdete\b/i, 'dijete'], [/\bvežb/i, 'vježbe'], [/\bmenja/i, 'mijenja'],
+];
+
+/** Everything wrong with a draft that the copywriter can fix: lines that do not fit, generic lines, ekavian forms. */
+export function copyProblems(copy: Partial<Record<Lang, StudioCopy>>, fields: string[], layout: string): string[] {
+  const out: string[] = [];
+  const lim = copyLimits(layout);
+  for (const lang of LANGS) {
+    for (const field of fields) {
+      if (field !== 'headline' && field !== 'subline') continue;
+      const text = (copy[lang]?.[field] ?? '').trim();
+      const where = `${lang}.${field} ${JSON.stringify(text)}`;
+      if (!text) { out.push(`${lang}.${field} is empty`); continue; }
+      const max = field === 'headline' ? lim.headline : lim.subline;
+      if (text.length > max) out.push(`${where}: ${text.length} characters, the limit is ${max}`);
+      for (const p of fitProblems(layout, field, text)) out.push(`${where}: ${p}`);
+      if (field === 'headline' && GENERIC.some((g) => g.test(text))) out.push(`${where}: generic, it would fit any business; rebuild it on the scene from this trade's day`);
+      if (field === 'subline' && /^balkina/i.test(text)) out.push(`${where}: do not start with the brand name; say what the owner gets`);
+      if (lang === 'sr') for (const [re, fix] of EKAVIAN) if (re.test(text)) out.push(`${where}: ekavian form, write the ijekavian one ("${fix}")`);
+    }
+  }
+  return out;
+}
+
+/** Ask the model for on-brand copy in both languages plus a bilingual feed caption, built on one scene from the audience's day. */
+export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
+  const model = copyModel();
   const tone = TONES.find((t) => t.value === req.tone);
   const category = categoryOf(req.vertical);
   // The eyebrow is the category name (fixed per template family), never written by the model.
@@ -192,79 +270,114 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
   const wantsEyebrow = req.fields.length === 0 || req.fields.includes('eyebrow');
   const wantsCaption = !partial || Boolean(req.only?.includes('caption'));
   const lim = copyLimits(req.layout);
-  const fieldSpec = fields.map((f) => `- ${f}: ${(FIELD_HINTS[f] ?? 'short text, max 40 characters').replace('{HEADLINE}', String(lim.headline)).replace('{SUBLINE}', String(lim.subline))}`).join('\n');
-  const langNames: Record<Lang, string> = { sr: 'Serbian/Montenegrin, Latin script, ijekavian as spoken in Montenegro (prije, vrijeme, podsjetnik, obavještenje)', en: 'English' };
+  const room = (field: 'headline' | 'subline'): string => {
+    const sq = fieldBudget(req.layout, 'sq', field);
+    const st = fieldBudget(req.layout, 'st', field);
+    return `it must fit both formats when word-wrapped: square = up to ${sq.maxLines} lines of about ${sq.charsPerLine} characters, story = up to ${st.maxLines} lines of about ${st.charsPerLine} characters; no single word longer than ${Math.min(sq.charsPerLine, st.charsPerLine) - 1} characters`;
+  };
+  const fieldSpec = fields.map((f) => {
+    const hint = (FIELD_HINTS[f] ?? 'short text, max 40 characters').replace('{HEADLINE}', String(lim.headline)).replace('{SUBLINE}', String(lim.subline));
+    return `- ${f}: ${hint}${f === 'headline' || f === 'subline' ? `; ${room(f)}` : ''}`;
+  }).join('\n');
   const langs = LANGS; // always write both so the caption and a later language switch need no second call
 
+  const profile = audienceFor(req.vertical);
+  // A fresh headline gets an angle (one scene + one product fact); a rewrite of another field follows the headline it keeps.
+  const angle = fields.includes('headline') ? angleByKey(req.angle) ?? ANGLES[Math.floor(Math.random() * ANGLES.length)]! : null;
+  const examples = EXAMPLES.filter((e) => e.vertical !== req.vertical).slice(0, 3)
+    .map((e) => `- ${verticalByValue(e.vertical)?.label ?? e.vertical}: sr "${e.sr[0]}" / "${e.sr[1]}" · en "${e.en[0]}" / "${e.en[1]}"`).join('\n');
+
   const system =
-    `You write Instagram ad copy for Balkina AI. ${PRODUCT_FACTS}\n` +
-    `Audience: owners of a ${vertical?.label ?? req.vertical} (${vertical?.sr ?? req.vertical}). Tone: ${tone?.label ?? req.tone} — ${tone?.hint ?? ''}.\n` +
-    'Speak to the owner directly, in the second person (you / your; vi / vaš): tell them what they get or what to do, never describe what happens. ' +
-    'Good: "Get your tables booked while you cook." / "Neka vam klijenti zakazuju sami." Bad: "Tables booked." / "Termini zakazani." Concrete, specific to their day, one benefit per post. ' +
-    'Write the Serbian FIRST, as a native Montenegrin marketer would say it (natural word order, no calques from English), then the English with the same meaning (it is the second slide of the same post), never a word-for-word translation in either direction. ' +
-    'Every field is a complete sentence or phrase, never cut mid-thought. No emojis in the image fields. Respect the character limits strictly; shorter is better. Serbian uses proper diacritics (č ć š ž đ).\n' +
-    'Return strict JSON: { "copy": { "<lang>": { <field>: <text>, ... } }, "caption": { "<lang>": <feed caption 1-3 sentences, may use one emoji, no hashtags> } } ' +
-    `for these languages: ${langs.map((l) => `"${l}" = ${langNames[l]}`).join('; ')}.\nFields per language:\n${fieldSpec}`;
+    `You write Instagram ad copy for Balkina AI. ${PRODUCT_FACTS}\n\n` +
+    `${audienceBrief(req.vertical)}\n\n` +
+    `Tone: ${tone?.label ?? req.tone} (${tone?.hint ?? ''}).\n\n` +
+    'How a post is built:\n' +
+    "- One idea per post. The headline is a scene from THIS trade's working day; the subline is the single Balkina fact that answers it.\n" +
+    '- Test every headline: cover the photo and the category label. A stranger must still be able to tell which trade the post is for. ' +
+    'If the line would work unchanged for a dentist, a plumber and a yoga studio, it is too generic: rebuild it with their word for the customer, the thing that gets booked, or the moment itself.\n' +
+    '- Speak to the owner (you / your; vi / vaš) or show their customer in action. Short, concrete, present tense; fragments are fine in the headline.\n' +
+    '- Never write lines like "Let your clients book themselves", "Save time", "quick and easy", "Why waste time on calls?". Do not name Balkina in the image fields (the logo and the URL are already on the image).\n' +
+    '- Only claim what the product facts say.\n\n' +
+    'Write the Serbian FIRST, as a native Montenegrin marketer would say it (natural word order, no calques from English), then the English with the same idea (it is the second slide of the same post), never a word-for-word translation in either direction. ' +
+    'Every field is a complete sentence or phrase, never cut mid-thought. No emojis in the image fields. Respect the limits strictly; shorter is better.\n' +
+    'Return strict JSON: { "copy": { "<lang>": { <field>: <text>, ... } }, "caption": { "<lang>": <feed caption, 1-3 sentences that continue the same scene and name the trade, may use one emoji, no hashtags> } } ' +
+    `for these languages: ${langs.map((l) => `"${l}" = ${LANG_NAMES[l]}`).join('; ')}.\nFields per language:\n${fieldSpec}\n\n` +
+    `Finished posts for OTHER trades, as the bar for how specific a line must be (never reuse their wording or scenes):\n${examples}`;
+
   const keep = partial && req.current?.copy
     ? `\nKeep these existing fields as they are and make the new text fit them (do not repeat them):\n${LANGS.map((l) => `${l}: ${JSON.stringify(Object.fromEntries(Object.entries(req.current?.copy?.[l] ?? {}).filter(([k]) => !fields.includes(k) && k !== 'eyebrow')))}`).join('\n')}\nWrite a NEW, different version of the requested fields (not a rephrasing of the previous one):\n${LANGS.map((l) => `${l}: ${JSON.stringify(Object.fromEntries(Object.entries(req.current?.copy?.[l] ?? {}).filter(([k]) => fields.includes(k))))}`).join('\n')}`
     : '';
-  const user = `Template: ${req.layout} (category ${category}).${req.brief ? `\nBrief from the marketer: ${req.brief}` : '\nNo extra brief; pick one concrete benefit and build the post around it.'}${keep}${partial && !wantsCaption ? '\nThe caption is not needed; return an empty caption object.' : ''}`;
+  const scene = angle ? `\nBuild this post on this scene: ${angle.scene === 'ask' ? `"${profile.ask}"` : angle.scene === 'books' ? `${profile.books.en} (sr: ${profile.books.sr})` : profile[angle.scene]}. The headline should ${angle.hook}. The subline lands on this fact: ${angle.fact}.` : '';
+  const avoid = (req.avoid ?? []).filter(Boolean).slice(0, 24);
+  const used = avoid.length ? `\nHeadlines already posted for this audience; this post must carry a different idea and different words:\n${avoid.map((h) => `- ${h}`).join('\n')}` : '';
+  const user =
+    `Template: ${req.layout} (category ${category}).${scene}` +
+    `${req.brief ? `\nBrief from the marketer (it wins where it conflicts with the scene): ${req.brief}` : ''}${used}${keep}` +
+    `${partial && !wantsCaption ? '\nThe caption is not needed; return an empty caption object.' : ''}`;
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, temperature: 0.8, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
-  });
-  if (!res.ok) throw new Error(`OpenAI: ${res.status} ${await res.text().catch(() => '')}`.slice(0, 300));
-  const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const content = json.choices?.[0]?.message?.content;
-  if (!content) throw new Error('OpenAI returned no content');
-  const parsed = JSON.parse(content) as { copy?: Partial<Record<Lang, Record<string, unknown>>>; caption?: Partial<Record<Lang, unknown>> };
+  type Parsed = { copy?: Partial<Record<Lang, Record<string, unknown>>>; caption?: Partial<Record<Lang, unknown>> };
+  const build = (parsed: Parsed): Partial<Record<Lang, StudioCopy>> => {
+    const copy: Partial<Record<Lang, StudioCopy>> = {};
+    for (const lang of langs) {
+      const src = parsed.copy?.[lang] ?? {};
+      const out: StudioCopy = { ...(partial ? req.current?.copy?.[lang] ?? {} : {}) };
+      for (const f of fields) out[f] = f === 'url' ? 'balkina.ai' : String(src[f] ?? '').trim();
+      if (wantsEyebrow) out.eyebrow = eyebrowFor(category, lang);
+      copy[lang] = out;
+    }
+    return copy;
+  };
 
-  const copy: Partial<Record<Lang, StudioCopy>> = {};
-  for (const lang of langs) {
-    const src = parsed.copy?.[lang] ?? {};
-    const out: StudioCopy = { ...(partial ? req.current?.copy?.[lang] ?? {} : {}) };
-    for (const f of fields) out[f] = f === 'url' ? 'balkina.ai' : String(src[f] ?? '').trim();
-    if (wantsEyebrow) out.eyebrow = eyebrowFor(category, lang);
-    copy[lang] = out;
+  const messages: ChatMessage[] = [{ role: 'system', content: system }, { role: 'user', content: user }];
+  const first = await chatJson(messages, 0.8);
+  let parsed = JSON.parse(first) as Parsed;
+  let copy = build(parsed);
+  const problems = copyProblems(copy, fields, req.layout);
+  if (problems.length) {
+    // One repair round: the model gets its own draft back with the exact lines to fix.
+    const fix = `Some lines need another pass. Fix only these and return the full JSON again in the same shape, keeping the same scene:\n${problems.map((p) => `- ${p}`).join('\n')}`;
+    try {
+      const second = JSON.parse(await chatJson([...messages, { role: 'assistant', content: first }, { role: 'user', content: fix }], 0.6)) as Parsed;
+      const repaired = build(second);
+      if (copyProblems(repaired, fields, req.layout).length < problems.length) { parsed = second; copy = repaired; }
+    } catch { /* keep the first draft */ }
   }
+
   const order: Lang[] = req.langs.length ? [...req.langs] : langs;
   const captionParts = order.map((l) => String(parsed.caption?.[l] ?? '').trim()).filter(Boolean);
   const caption = wantsCaption || !req.current?.caption
     ? `${captionParts.join('\n—\n')}\n\nLink u biu → balkina.ai\n\n${studioHashtags(req.vertical, Date.now() % 97).join(' ')}`
     : req.current.caption;
-  return { copy, caption, model };
+  return { copy, caption, model, angle: angle?.key ?? null };
+}
+
+/** Headlines of the latest posts for an audience (both languages), so a new post does not repeat them. */
+export async function recentHeadlines(supabase: SupabaseClient, vertical: string, excludeId?: string): Promise<string[]> {
+  const { data } = await supabase.from('ig_posts').select('id, copy').eq('vertical', vertical).order('created_at', { ascending: false }).limit(12);
+  const out = new Set<string>();
+  for (const row of (data ?? []) as { id: string; copy: Partial<Record<Lang, StudioCopy>> | null }[]) {
+    if (row.id === excludeId) continue;
+    for (const lang of LANGS) { const h = row.copy?.[lang]?.headline?.trim(); if (h) out.add(h); }
+  }
+  return Array.from(out);
 }
 
 /** A line the marketer edited in one language, carried over to the other language with the same meaning and limits. */
 export async function translateField(req: { field: string; from: Lang; text: string; to: Lang[]; layout: string; vertical: string; tone: string; current?: Partial<Record<Lang, StudioCopy>> }): Promise<Partial<Record<Lang, string>>> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY is not set in this deployment');
-  const model = process.env.GROWTH_LLM_MODEL ?? 'gpt-4o-mini';
   const targets = req.to.filter((l) => l !== req.from);
   if (targets.length === 0 || !req.text.trim()) return {};
-  const vertical = verticalByValue(req.vertical);
   const tone = TONES.find((t) => t.value === req.tone);
   const lim = copyLimits(req.layout);
   const limit = req.field === 'headline' ? lim.headline : req.field === 'subline' ? lim.subline : 60;
-  const langNames: Record<Lang, string> = { sr: 'Serbian/Montenegrin, Latin script, ijekavian as spoken in Montenegro (prije, vrijeme, podsjetnik, obavještenje), proper diacritics', en: 'English' };
   const system =
     `You localise Instagram ad copy for Balkina AI. ${PRODUCT_FACTS}\n` +
-    `Audience: owners of a ${vertical?.label ?? req.vertical} (${vertical?.sr ?? req.vertical}). Tone: ${tone?.label ?? req.tone} — ${tone?.hint ?? ''}.\n` +
+    `${audienceBrief(req.vertical)}\nTone: ${tone?.label ?? req.tone} (${tone?.hint ?? ''}).\n` +
     'The marketer edited one line of the post in one language. Write the same line in the other language(s) so it says the same thing the way a native marketer would say it: ' +
-    'second person, natural word order, no calques, no emojis, a complete sentence or phrase, and at most the character limit (shorter is fine). Keep the other lines of the post in mind so the voice matches. ' +
+    "the trade's own words, natural word order, no calques, no emojis, a complete sentence or phrase, and at most the character limit (shorter is fine). Keep the other lines of the post in mind so the voice matches. " +
     'Return strict JSON: { "<lang>": "<text>" } for exactly the requested languages.';
   const context = targets.map((l) => `${l}: ${JSON.stringify(Object.fromEntries(Object.entries(req.current?.[l] ?? {}).filter(([k]) => k !== req.field && k !== 'eyebrow' && k !== 'url')))}`).join('\n');
-  const user = `Field: ${req.field} (max ${limit} characters).\nSource (${langNames[req.from]}): ${JSON.stringify(req.text)}\nWrite it in: ${targets.map((l) => `"${l}" = ${langNames[l]}`).join('; ')}.\nOther lines already on the post:\n${context}`;
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, temperature: 0.4, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
-  });
-  if (!res.ok) throw new Error(`OpenAI: ${res.status} ${await res.text().catch(() => '')}`.slice(0, 300));
-  const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const parsed = JSON.parse(json.choices?.[0]?.message?.content ?? '{}') as Record<string, unknown>;
+  const user = `Field: ${req.field} (max ${limit} characters).\nSource (${LANG_NAMES[req.from]}): ${JSON.stringify(req.text)}\nWrite it in: ${targets.map((l) => `"${l}" = ${LANG_NAMES[l]}`).join('; ')}.\nOther lines already on the post:\n${context}`;
+  const parsed = JSON.parse(await chatJson([{ role: 'system', content: system }, { role: 'user', content: user }], 0.4)) as Record<string, unknown>;
   const out: Partial<Record<Lang, string>> = {};
   for (const l of targets) { const t = String(parsed[l] ?? '').trim(); if (t) out[l] = t; }
   return out;

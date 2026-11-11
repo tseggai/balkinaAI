@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin-auth';
-import { generateCopy, templatesFor, textFieldsOf } from '@/lib/ig/studio';
+import { generateCopy, recentHeadlines, templatesFor, textFieldsOf } from '@/lib/ig/studio';
 
 export const maxDuration = 60;
 
@@ -12,6 +12,7 @@ const Body = z.object({
   brief: z.string().max(1000).optional(),
   langs: z.array(z.enum(['sr', 'en'])).min(1).default(['sr', 'en']),
   only: z.array(z.string()).optional(),
+  angle: z.string().max(40).optional(),
   current: z.object({ copy: z.record(z.enum(['sr', 'en']), z.record(z.string(), z.string())).optional(), caption: z.string().nullable().optional() }).optional(),
 });
 
@@ -25,7 +26,10 @@ export async function POST(request: Request) {
     const { sq, st } = await templatesFor(auth.supabase, parsed.data.layout);
     if (!sq) return NextResponse.json({ error: `No square template synced for layout "${parsed.data.layout}"` }, { status: 400 });
     const fields = textFieldsOf(sq, st);
-    const result = await generateCopy({ ...parsed.data, fields });
+    // Headlines already posted for this audience, minus the one being rewritten, so the new one says something else.
+    const mine = Object.values(parsed.data.current?.copy ?? {}).map((c) => c?.headline).filter(Boolean);
+    const avoid = (await recentHeadlines(auth.supabase, parsed.data.vertical)).filter((h) => !mine.includes(h));
+    const result = await generateCopy({ ...parsed.data, fields, avoid });
     return NextResponse.json({ ...result, fields });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
