@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin-auth';
 import { resolveIgCredentials } from '@/lib/ig/publish';
-import { clearRenders, generateCopy, recentHeadlines, pendingRenders, publishPost, renderOne, templatesFor, textFieldsOf, type StudioPost } from '@/lib/ig/studio';
+import { clearRenders, generateCopy, recentPosts, pendingRenders, publishPost, renderOne, templatesFor, textFieldsOf, type StudioPost } from '@/lib/ig/studio';
 
 export const maxDuration = 60;
 
@@ -18,6 +18,7 @@ const Patch = z.object({
   caption: z.string().max(2200).optional(),
   copy: z.record(z.enum(['sr', 'en']), z.record(z.string(), z.string())).optional(),
   photo_url: z.string().url().optional(),
+  angle: z.string().max(40).nullable().optional(),
 });
 
 async function load(supabase: SupabaseClient, id: string): Promise<StudioPost | null> {
@@ -50,8 +51,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       case 'write': {
         const { sq, st } = await templatesFor(auth.supabase, post.layout);
         if (!sq) return NextResponse.json({ error: `No square template synced for layout "${post.layout}"` }, { status: 400 });
-        const r = await generateCopy({ vertical: post.vertical, tone: post.tone, layout: post.layout, fields: textFieldsOf(sq, st), brief: post.brief ?? undefined, langs: post.langs, avoid: await recentHeadlines(auth.supabase, post.vertical, post.id) });
-        const next = await clearRenders(auth.supabase, post, { copy: r.copy, caption: r.caption });
+        const recent = await recentPosts(auth.supabase, post.id);
+        const r = await generateCopy({ vertical: post.vertical, tone: post.tone, layout: post.layout, fields: textFieldsOf(sq, st), brief: post.brief ?? undefined, langs: post.langs, avoid: recent.headlines, recentAngles: recent.angles, current: { angle: post.angle } });
+        const next = await clearRenders(auth.supabase, post, { copy: r.copy, caption: r.caption, angle: r.angle });
         return NextResponse.json({ post: next, pending: pendingRenders(next, { sq: true, st: Boolean(st) }) });
       }
       case 'render': {
@@ -64,7 +66,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         return NextResponse.json({ post: next, step, pending: pendingRenders(next, has) });
       }
       case 'rerender': {
-        const next = await clearRenders(auth.supabase, post, { copy: b.copy ?? post.copy, photo_url: b.photo_url ?? post.photo_url, caption: b.caption ?? post.caption, ...(b.langs ? { langs: b.langs } : {}), ...(b.primary ? { lang: b.primary } : {}) });
+        const next = await clearRenders(auth.supabase, post, { copy: b.copy ?? post.copy, photo_url: b.photo_url ?? post.photo_url, caption: b.caption ?? post.caption, ...(b.angle !== undefined ? { angle: b.angle } : {}), ...(b.langs ? { langs: b.langs } : {}), ...(b.primary ? { lang: b.primary } : {}) });
         const { sq, st } = await templatesFor(auth.supabase, post.layout);
         return NextResponse.json({ post: next, pending: pendingRenders(next, { sq: Boolean(sq), st: Boolean(st) }) });
       }

@@ -1,7 +1,7 @@
-/* What the studio copywriter knows about each audience: who books with them, what gets booked, and the
-   moments of their working day where booking hurts. A post is built on ONE of those moments (an "angle")
-   so the copy speaks to that trade instead of to "businesses" in general. Scenes are written in English
-   (the model localises them); `ask` and `words` are Montenegrin, as the owner hears them every day. */
+/* What the studio copywriter knows: (1) each audience — who books with them, what gets booked, and moments
+   of their working day; (2) every Balkina capability worth an ad (OPPORTUNITIES). A post promises the OWNER
+   one capability, worded for their trade. Scenes are written in English (the model localises them); `ask`
+   and `words` are Montenegrin, as the owner hears them every day. */
 import type { Lang } from './categories';
 
 export interface AudienceProfile {
@@ -92,31 +92,69 @@ export const AUDIENCES: Record<string, AudienceProfile> = {
 
 export const audienceFor = (vertical: string): AudienceProfile => AUDIENCES[vertical] ?? AUDIENCES.all!;
 
-/** One idea per post: the scene the hook is built on and the single product fact that answers it. */
-export interface Angle {
+/* ---------- What a post is about: one Balkina capability, promised to the owner ---------- */
+
+/** One idea per post: a capability, the promise it makes to the owner, and how it works. */
+export interface Opportunity {
   key: string;
-  /** Which part of the profile carries the hook. */
-  scene: 'busy' | 'when' | 'noshow' | 'ask' | 'books';
-  /** What the headline does. */
-  hook: string;
-  /** The one product fact the subline lands on. */
-  fact: string;
+  /** Short name for the admin UI. */
+  label: string;
+  /** What the headline promises the owner. */
+  claim: string;
+  /** How it works: the fact the subline carries. Nothing beyond this may be claimed. */
+  detail: string;
+  /** A part of the audience profile that makes the subline or caption concrete for the trade. */
+  scene?: 'busy' | 'when' | 'noshow' | 'ask';
+  /** Category keys it applies to (all when omitted). */
+  only?: string[];
+  /** Category keys it does not apply to. */
+  not?: string[];
 }
 
-export const ANGLES: Angle[] = [
-  { key: 'calls', scene: 'busy', hook: 'put the owner in that moment: hands busy, phone ringing, a booking about to be lost', fact: 'bookings come in online while they work, and the owner only gets a notification on the phone' },
-  { key: 'afterhours', scene: 'when', hook: 'show the customer wanting to book at that moment, when nobody answers', fact: 'the booking page is open 24/7 and a booking takes 20 seconds' },
-  { key: 'noshow', scene: 'noshow', hook: 'name that exact loss', fact: 'an SMS confirmation right away and an SMS reminder the day before, so people show up' },
-  { key: 'link', scene: 'ask', hook: 'quote or echo that message they answer ten times a day', fact: 'one link in the Instagram bio, on the Google profile and on WhatsApp answers it, and the customer picks the time alone' },
-  { key: 'free', scene: 'books', hook: 'promise that exact thing booked online, starting today', fact: 'the page is free, needs no card and is ready in about 10 seconds' },
+export const OPPORTUNITIES: Opportunity[] = [
+  { key: 'ai_discovery', label: 'Found through AI', claim: 'new customers find and book the business through AI', detail: 'in the Balkina app people tell the AI what they need ("a haircut tomorrow after 5"), and the AI finds the business, checks its free times and books', scene: 'when' },
+  { key: 'always_open', label: 'Bookings 24/7', claim: 'bookings come in around the clock, also when the business is closed', detail: 'the booking page is open day and night and a booking takes about 20 seconds', scene: 'when' },
+  { key: 'no_calls', label: 'No phone calls', claim: 'no more stopping work to answer the phone for bookings', detail: 'customers pick a free time on their own and the owner only gets a notification on the phone', scene: 'busy' },
+  { key: 'reminders', label: 'Fewer no-shows', claim: 'fewer no-shows', detail: 'every booking gets an automatic confirmation and a reminder the day before', scene: 'noshow' },
+  { key: 'one_link', label: 'One booking link', claim: 'one booking link that works everywhere the business already is', detail: 'the same link goes in the Instagram bio, on the Google profile and in WhatsApp, and customers book straight from it', scene: 'ask' },
+  { key: 'free_start', label: 'Free in 10 seconds', claim: 'an online booking page for the business, free, today', detail: 'activation takes about 10 seconds, with no card and nothing to install' },
+  { key: 'rebooking', label: 'Regulars come back', claim: 'AI brings regular customers back', detail: "Balkina learns each customer's rhythm and reminds them when it is time to book again" },
+  { key: 'approval', label: 'You approve requests', claim: 'the owner stays in control of the calendar', detail: 'with approval turned on, every booking arrives as a request and is confirmed or declined with one tap' },
+  { key: 'team', label: 'Team calendars', claim: "the whole team's schedule in one place", detail: 'each team member has their own working hours, days off and services, and customers can choose who they book with', not: ['hospitality'] },
+  { key: 'reviews', label: 'Reviews', claim: 'more reviews without asking for them', detail: 'customers are invited to leave a review after their visit, and a better rating ranks the business higher in AI search' },
+  { key: 'coupons', label: 'Promo codes', claim: 'quiet days filled with a promo code', detail: 'discount codes with a usage limit and an expiry date, as a percentage or a fixed amount' },
+  { key: 'loyalty', label: 'Loyalty points', claim: 'regulars rewarded automatically', detail: 'customers collect points with every booking and spend them on the next one' },
+  { key: 'packages', label: 'Packages', claim: 'packages sold, not just single visits', detail: 'several services or sessions bundled at one price and booked in a few taps', not: ['hospitality'] },
+  { key: 'extras', label: 'Add-ons', claim: 'more earned from every booking', detail: 'customers add extras to their booking while they book' },
+  { key: 'customers', label: 'Customer history', claim: 'every customer remembered', detail: 'each customer has a profile with their past visits and bookings' },
+  { key: 'analytics', label: 'Numbers at a glance', claim: 'a clear view of what the business earns', detail: 'bookings, revenue and the most popular services in one dashboard' },
+  { key: 'phone', label: 'Run it from the phone', claim: 'the whole day run from the phone', detail: 'new bookings, approvals and the calendar are in the Balkina app' },
+  { key: 'tables', label: 'Table requests', claim: 'table requests without phone calls', detail: 'guests choose the time and the number of guests, and the venue confirms the request with one tap', only: ['hospitality'] },
+  { key: 'events', label: 'Seats for events', claim: 'seats sold for brunches, tastings and special evenings', detail: 'an event has seatings with a set number of seats and a price per guest, and guests reserve their seats themselves', only: ['hospitality', 'events', 'food'] },
 ];
 
-export const angleByKey = (key?: string): Angle | undefined => ANGLES.find((a) => a.key === key);
+export const opportunityByKey = (key?: string | null): Opportunity | undefined => OPPORTUNITIES.find((o) => o.key === key);
 
-/** Finished lines for other trades, as a bar for specificity (never reused: the copywriter gets only the ones for other audiences). */
-export const EXAMPLES: { vertical: string; angle: string; en: [string, string]; sr: [string, string] }[] = [
-  { vertical: 'barber', angle: 'calls', en: ['Mid-fade. Phone ringing.', 'Customers book online. You keep cutting.'], sr: ['Usred fejda. Telefon zvoni.', 'Mušterije zakazuju online. Vi šišate.'] },
-  { vertical: 'restaurant', angle: 'noshow', en: ['Table for six. Nobody came.', 'An SMS reminder the day before fixes that.'], sr: ['Sto za šest. Niko nije došao.', 'SMS podsjetnik dan ranije to rješava.'] },
-  { vertical: 'pilates', angle: 'afterhours', en: ['She wants a reformer at 11 pm.', 'Your booking page is open while you sleep.'], sr: ['Želi reformer u 23h.', 'Vaša stranica prima termine dok spavate.'] },
-  { vertical: 'tires', angle: 'link', en: ['"When can I change my tyres?"', 'One link in your bio. They pick the slot.'], sr: ['„Kad mogu da zamijenim gume?“', 'Jedan link u biu. Sami biraju termin.'] },
+/** Ideas that make sense for an audience's category. */
+export const opportunitiesFor = (category: string): Opportunity[] =>
+  OPPORTUNITIES.filter((o) => (!o.only || o.only.includes(category)) && !o.not?.includes(category));
+
+/**
+ * The idea for the next post: one that has not been used yet (at random), otherwise the one used longest ago.
+ * `recent` lists the ideas of the latest posts, newest first; `exclude` is never picked (the idea being replaced).
+ */
+export function pickOpportunity(category: string, recent: string[], exclude?: string | null): Opportunity {
+  const pool = opportunitiesFor(category).filter((o) => o.key !== exclude);
+  const unused = pool.filter((o) => !recent.includes(o.key));
+  if (unused.length) return unused[Math.floor(Math.random() * unused.length)]!;
+  return [...pool].sort((a, b) => recent.indexOf(b.key) - recent.indexOf(a.key))[0] ?? OPPORTUNITIES[0]!;
+}
+
+/** Finished posts as a bar for voice and length (the copywriter never sees the one for its own idea or audience). */
+export const EXAMPLES: { vertical: string; idea: string; en: [string, string]; sr: [string, string] }[] = [
+  { vertical: 'salon', idea: 'ai_discovery', en: ['Let clients find and book you with AI.', 'They ask the Balkina app for a cut, it books your free slot.'], sr: ['Neka vas klijentkinje nađu uz AI.', 'Pitaju Balkina aplikaciju za šišanje, a ona zakaže kod vas.'] },
+  { vertical: 'barber', idea: 'reminders', en: ['Fewer empty chairs on Saturday.', 'Every customer gets a reminder the day before.'], sr: ['Manje praznih stolica subotom.', 'Svaka mušterija dobija podsjetnik dan ranije.'] },
+  { vertical: 'restaurant', idea: 'tables', en: ['Table requests, without the phone.', 'Guests pick the time. You confirm with a tap.'], sr: ['Rezervacije stolova bez telefona.', 'Gosti biraju vrijeme. Vi potvrdite dodirom.'] },
+  { vertical: 'pilates', idea: 'rebooking', en: ['AI brings your regulars back.', 'Each client gets a nudge when the next class is due.'], sr: ['AI vraća vaše stalne klijente.', 'Svaki klijent dobija podsjetnik za novi čas.'] },
+  { vertical: 'tires', idea: 'coupons', en: ['Fill the quiet weeks with a code.', 'A promo code with a limit and an end date, ready in a minute.'], sr: ['Popunite mirne sedmice promo kodom.', 'Kod sa limitom i rokom trajanja, gotov za minut.'] },
 ];
