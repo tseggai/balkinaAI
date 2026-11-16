@@ -12,6 +12,7 @@ const Body = z.object({
   brief: z.string().max(1000).optional(),
   copy: z.record(z.enum(['sr', 'en']), z.record(z.string(), z.string())),
   caption: z.string().max(2200).optional(),
+  angle: z.string().max(40).nullable().optional(),   // the idea the copy is about (OPPORTUNITIES key)
   photo_url: z.string().url().optional(),   // omitted = a library photo matched to the audience
   kinds: z.array(z.enum(['feed', 'story'])).min(1).default(['feed', 'story']),
 });
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await auth.supabase
     .from('ig_posts')
-    .insert({ vertical: b.vertical, tone: b.tone, lang: b.lang, langs, layout: b.layout, brief: b.brief ?? null, copy: b.copy, caption: b.caption ?? null, photo_url, kinds: b.kinds })
+    .insert({ vertical: b.vertical, tone: b.tone, lang: b.lang, langs, layout: b.layout, brief: b.brief ?? null, copy: b.copy, caption: b.caption ?? null, angle: b.angle ?? null, photo_url, kinds: b.kinds })
     .select('*')
     .single();
   if (error || !data) return NextResponse.json({ error: error?.message ?? 'Insert failed' }, { status: 500 });

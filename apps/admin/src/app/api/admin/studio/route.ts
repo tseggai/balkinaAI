@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { igConfig } from '@/lib/ig/runner';
 import { loadSettings } from '@/lib/ig/schedule';
-import { CATEGORIES, listPhotos, TONES, VERTICALS } from '@/lib/ig/studio';
+import { CATEGORIES, listPhotos, OPPORTUNITIES, TONES, VERTICALS } from '@/lib/ig/studio';
 import { refreshThumbnails, type TemplateThumbRow } from '@/lib/canva/thumbnails';
 
 // GET /api/admin/studio — catalogue (verticals, tones, photo library), synced layouts, plan cadence defaults and the latest posts.
@@ -31,6 +31,7 @@ export async function GET() {
     verticals: VERTICALS.map((v) => ({ value: v.value, label: v.label, category: v.category, photo: v.photo })),
     categories: CATEGORIES.map((c) => ({ key: c.key, order: c.order, label: c.name.en, synced: layouts.some((l) => l.layout === c.key), story: layouts.some((l) => l.layout === c.key && l.st) })),
     tones: TONES,
+    ideas: OPPORTUNITIES.map((o) => ({ key: o.key, label: o.label, only: o.only ?? null, not: o.not ?? null })),
     photos,
     layouts,
     cadence: { post_time: settings.post_time, days: settings.days, timezone: settings.timezone },

@@ -15,6 +15,7 @@ export interface StudioPostView {
   status: 'draft' | 'scheduled' | 'published' | 'failed' | 'cancelled';
   vertical: string;
   tone: string;
+  angle?: string | null;
   lang: Lang;
   langs: Lang[];
   layout: string;

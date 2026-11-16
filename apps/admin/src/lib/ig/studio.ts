@@ -3,7 +3,7 @@
    scheduling, and due-post selection for the cron. Rows live in ig_posts (Migrations 074–075). */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { RENDER_BUCKET, renderTemplate } from '@/lib/canva/client';
-import { ANGLES, EXAMPLES, angleByKey, audienceFor } from './audience';
+import { EXAMPLES, OPPORTUNITIES, audienceFor, opportunityByKey, pickOpportunity } from './audience';
 import { categoryOf, copyLimits, eyebrowFor, matchPhotos, studioHashtags, verticalByValue, type StudioVertical } from './categories';
 import { fieldBudget, fitProblems } from './overlay';
 import { publishCarousel, publishImage, type IgCredentials } from './publish';
@@ -16,6 +16,7 @@ export type StudioCopy = Record<string, string>;
 export const LANGS: Lang[] = ['sr', 'en'];
 
 export { CATEGORIES, VERTICALS, categoryOf, eyebrowFor } from './categories';
+export { OPPORTUNITIES };
 export type { StudioVertical };
 
 export const TONES: { value: string; label: string; hint: string }[] = [
@@ -67,8 +68,8 @@ export function pickPhoto(pool: Photo[], vertical: string, seed: number): Photo 
 
 /** Every text field a template may ask for, with a hint for the copywriter. */
 const FIELD_HINTS: Record<string, string> = {
-  headline: 'the hook, max {HEADLINE} characters, two short sentences at most',
-  subline: 'one supporting sentence, max {SUBLINE} characters, the product fact that answers the headline, said as what the owner gets',
+  headline: 'the promise to the owner, max {HEADLINE} characters, one short sentence (two very short ones at most)',
+  subline: 'one supporting sentence, max {SUBLINE} characters, how it works for this trade',
   url: 'always exactly "balkina.ai"',
   button: 'call-to-action button label with an arrow, max 24 characters (e.g. "Napravite stranicu →")',
   big: 'one big number or very short stat, max 6 characters (e.g. "24/7", "20 s", "0 €")',
@@ -120,6 +121,7 @@ export interface StudioPost {
   attempted_at: string | null;
   canva_asset_id: string | null;      // the photo uploaded to Canva once per post…
   canva_asset_photo: string | null;   // …for this photo_url
+  angle: string | null;               // the idea the post is about (OPPORTUNITIES key)
 }
 
 interface TemplateRow {
@@ -162,12 +164,15 @@ export interface CopyRequest {
   fields: string[];
   brief?: string;
   langs: Lang[];
-  /** Regenerate only these fields (plus the caption when 'caption' is listed); the rest of `current` is kept. */
+  /** Regenerate only these fields (plus the caption when 'caption' is listed); the rest of `current` is kept.
+      A headline is never rewritten alone: it brings a new idea, so the subline and the caption are rewritten with it. */
   only?: string[];
-  current?: { copy?: Partial<Record<Lang, StudioCopy>>; caption?: string | null };
-  /** Angle key from ANGLES (lib/ig/audience.ts); one is picked at random when omitted. */
+  current?: { copy?: Partial<Record<Lang, StudioCopy>>; caption?: string | null; angle?: string | null };
+  /** Idea key from OPPORTUNITIES (lib/ig/audience.ts) to write about; otherwise one is picked by rotation. */
   angle?: string;
-  /** Headlines already used for this audience: the new post must carry a different idea. */
+  /** Ideas of the latest posts, newest first: the next post takes one that has not been used lately. */
+  recentAngles?: string[];
+  /** Headlines already used for this audience: the new post must not repeat them. */
   avoid?: string[];
 }
 
@@ -175,14 +180,14 @@ export interface CopyResult {
   copy: Partial<Record<Lang, StudioCopy>>;
   caption: string;
   model: string;
+  /** The idea the post is about (OPPORTUNITIES key). */
   angle: string | null;
 }
 
-const PRODUCT_FACTS =
-  'Balkina AI (balkina.ai) gives small service businesses a free online booking page: customers book in 20 seconds, 24/7, ' +
-  'without calling; the owner gets a notification on the phone; SMS confirmation right away and a reminder the day before cut no-shows; ' +
-  'one link works in the Instagram bio, on the Google profile and on WhatsApp; activation is free, no card, about 10 seconds. ' +
-  'Primary market: Montenegro and Serbia. Never invent prices, numbers or features beyond these.';
+const PRODUCT_INTRO =
+  'Balkina AI (balkina.ai) is an AI booking assistant and a booking system for small service businesses in Montenegro and Serbia. ' +
+  'Customers book through the Balkina app (they tell the AI what they need) or through the business\'s own booking page; ' +
+  'the owner manages everything from a panel and the phone. Activating the booking page is free, takes about 10 seconds and needs no card.';
 
 const LANG_NAMES: Record<Lang, string> = {
   sr: 'Serbian/Montenegrin, Latin script, ijekavian as spoken in Montenegro (prije, vrijeme, podsjetnik, obavještenje, sjutra), proper diacritics (č ć š ž đ)',
@@ -215,29 +220,29 @@ function audienceBrief(verticalValue: string): string {
   const v = verticalByValue(verticalValue);
   const a = audienceFor(verticalValue);
   return (
-    `Audience: the owner of a ${v?.label ?? verticalValue} (${v?.sr ?? verticalValue}).\n` +
-    `- The people who book with them: ${a.customer.en} (sr: ${a.customer.sr}). Use this word, never a generic "users".\n` +
+    `The reader: the owner of a ${v?.label ?? verticalValue} (${v?.sr ?? verticalValue}).\n` +
+    `- They call the people who book with them: ${a.customer.en} (sr: ${a.customer.sr}). Use this word.\n` +
     `- What gets booked: ${a.books.en} (sr: ${a.books.sr}).\n` +
-    `- When the phone rings they are: ${a.busy}.\n` +
-    `- Their ${a.customer.en} decide to book: ${a.when}.\n` +
-    `- What a forgotten booking costs them: ${a.noshow}.\n` +
-    `- The message they answer all day: "${a.ask}"\n` +
+    `- A typical moment of their day: ${a.busy}.\n` +
     `- Trade words that sound native in Serbian: ${a.words}.`
   );
 }
 
-// Lines that say nothing about the trade (what the studio produced before the audience playbook).
-const GENERIC: RegExp[] = [
-  /book (by )?themselves/i, /zakazuju sami/i, /sami zakazuju/i, /\bsave time\b/i, /uštedite vr/i, /quick and easy/i, /brz[oe] i lak[oe]/i,
-  /without calling\.?$/i, /bez telefona\.?$/i, /book right away/i, /zakazuju odmah/i, /waste time/i, /gubite vr/i, /free yourself/i, /oslobodite se/i,
+// Filler that says nothing.
+const GENERIC: RegExp[] = [/\bsave time\b/i, /uštedite vr/i, /quick and easy/i, /brz[oe] i lak[oe]/i, /waste time/i, /gubite vr/i, /made easy/i];
+// Lines addressed to the business's customer instead of its owner.
+const CUSTOMER_VOICE: RegExp[] = [
+  /\b(book|reserve) (now|today)\b/i, /zakaži(te)?\s+(odmah|sada?|danas)\b/i, /rezerviši(te)?\s+(odmah|sada?|danas)\b/i, /^["„“”'«]/, /^(want|need|fancy) an? /i,
+  /^(do you have|can i|when can i|is there)\b.*\?$/i, /^(imate li|imaš li|ima li|kad mogu|može li|mogu li)\b.*\?$/i,
 ];
 // Ekavian forms the model slips into; the copy is ijekavian.
 const EKAVIAN: [RegExp, string][] = [
   [/\bvreme\b/i, 'vrijeme'], [/\bpre\b/i, 'prije'], [/\bposle\b/i, 'poslije'], [/\bgde\b/i, 'gdje'], [/\buvek\b/i, 'uvijek'], [/\bmesto\b/i, 'mjesto'],
   [/\bpodsetni/i, 'podsjetnik'], [/\bobavešten/i, 'obavještenje'], [/\bnedelj/i, 'nedjelja'], [/\bdete\b/i, 'dijete'], [/\bvežb/i, 'vježbe'], [/\bmenja/i, 'mijenja'],
 ];
+const HEADLINE_WORDS = 7;
 
-/** Everything wrong with a draft that the copywriter can fix: lines that do not fit, generic lines, ekavian forms. */
+/** Everything wrong with a draft that the copywriter can fix: too long, off-voice, does not fit, ekavian. */
 export function copyProblems(copy: Partial<Record<Lang, StudioCopy>>, fields: string[], layout: string): string[] {
   const out: string[] = [];
   const lim = copyLimits(layout);
@@ -250,15 +255,23 @@ export function copyProblems(copy: Partial<Record<Lang, StudioCopy>>, fields: st
       const max = field === 'headline' ? lim.headline : lim.subline;
       if (text.length > max) out.push(`${where}: ${text.length} characters, the limit is ${max}`);
       for (const p of fitProblems(layout, field, text)) out.push(`${where}: ${p}`);
-      if (field === 'headline' && GENERIC.some((g) => g.test(text))) out.push(`${where}: generic, it would fit any business; rebuild it on the scene from this trade's day`);
-      if (field === 'subline' && /^balkina/i.test(text)) out.push(`${where}: do not start with the brand name; say what the owner gets`);
+      if (field === 'headline') {
+        const words = text.split(/\s+/).filter(Boolean).length;
+        if (words > HEADLINE_WORDS + 1) out.push(`${where}: ${words} words, a headline has ${HEADLINE_WORDS} at most`);
+        if (CUSTOMER_VOICE.some((g) => g.test(text))) out.push(`${where}: this talks to the business's customer; the reader is the owner, so promise the owner what Balkina does for the business`);
+      }
+      if (GENERIC.some((g) => g.test(text))) out.push(`${where}: filler; say the concrete thing instead`);
+      if (field === 'subline' && /^balkina/i.test(text)) out.push(`${where}: do not start with the brand name; say how it works for the owner`);
       if (lang === 'sr') for (const [re, fix] of EKAVIAN) if (re.test(text)) out.push(`${where}: ekavian form, write the ijekavian one ("${fix}")`);
     }
   }
   return out;
 }
 
-/** Ask the model for on-brand copy in both languages plus a bilingual feed caption, built on one scene from the audience's day. */
+/**
+ * Copy in both languages plus a bilingual feed caption. Each post promises the OWNER one Balkina capability
+ * (an idea from OPPORTUNITIES, rotated so the feed covers all of them), worded for the audience's trade.
+ */
 export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
   const model = copyModel();
   const tone = TONES.find((t) => t.value === req.tone);
@@ -266,9 +279,11 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
   // The eyebrow is the category name (fixed per template family), never written by the model.
   const allFields = (req.fields.length ? req.fields : ['headline', 'subline', 'url']).filter((f) => f !== 'eyebrow');
   const partial = Boolean(req.only?.length);
-  const fields = partial ? allFields.filter((f) => req.only?.includes(f)) : allFields;
+  // A new headline is a new idea, so its subline and the caption are written with it.
+  const only = req.only?.includes('headline') ? [...req.only, 'subline', 'caption'] : req.only ?? [];
+  const fields = partial ? allFields.filter((f) => only.includes(f)) : allFields;
   const wantsEyebrow = req.fields.length === 0 || req.fields.includes('eyebrow');
-  const wantsCaption = !partial || Boolean(req.only?.includes('caption'));
+  const wantsCaption = !partial || only.includes('caption');
   const lim = copyLimits(req.layout);
   const room = (field: 'headline' | 'subline'): string => {
     const sq = fieldBudget(req.layout, 'sq', field);
@@ -282,37 +297,46 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
   const langs = LANGS; // always write both so the caption and a later language switch need no second call
 
   const profile = audienceFor(req.vertical);
-  // A fresh headline gets an angle (one scene + one product fact); a rewrite of another field follows the headline it keeps.
-  const angle = fields.includes('headline') ? angleByKey(req.angle) ?? ANGLES[Math.floor(Math.random() * ANGLES.length)]! : null;
-  const examples = EXAMPLES.filter((e) => e.vertical !== req.vertical).slice(0, 3)
+  // The idea: forced by the request, else a fresh one when the headline is written, else the one the kept headline is about.
+  const idea = opportunityByKey(req.angle)
+    ?? (fields.includes('headline') ? pickOpportunity(category, req.recentAngles ?? [], req.current?.angle) : opportunityByKey(req.current?.angle) ?? null);
+  const examples = EXAMPLES.filter((e) => e.vertical !== req.vertical && e.idea !== idea?.key).slice(0, 3)
     .map((e) => `- ${verticalByValue(e.vertical)?.label ?? e.vertical}: sr "${e.sr[0]}" / "${e.sr[1]}" · en "${e.en[0]}" / "${e.en[1]}"`).join('\n');
 
   const system =
-    `You write Instagram ad copy for Balkina AI. ${PRODUCT_FACTS}\n\n` +
+    `You write Instagram ads for Balkina AI. ${PRODUCT_INTRO}\n` +
+    'The reader of every ad is the OWNER or operator of a small business, never that business\'s customers. The ad wants the owner to activate their Balkina page.\n\n' +
     `${audienceBrief(req.vertical)}\n\n` +
     `Tone: ${tone?.label ?? req.tone} (${tone?.hint ?? ''}).\n\n` +
     'How a post is built:\n' +
-    "- One idea per post. The headline is a scene from THIS trade's working day; the subline is the single Balkina fact that answers it.\n" +
-    '- Test every headline: cover the photo and the category label. A stranger must still be able to tell which trade the post is for. ' +
-    'If the line would work unchanged for a dentist, a plumber and a yoga studio, it is too generic: rebuild it with their word for the customer, the thing that gets booked, or the moment itself.\n' +
-    '- Speak to the owner (you / your; vi / vaš) or show their customer in action. Short, concrete, present tense; fragments are fine in the headline.\n' +
-    '- Never write lines like "Let your clients book themselves", "Save time", "quick and easy", "Why waste time on calls?". Do not name Balkina in the image fields (the logo and the URL are already on the image).\n' +
-    '- Only claim what the product facts say.\n\n' +
+    `- Headline: a very short promise to the owner about the ONE thing this post is about. ${HEADLINE_WORDS} words at most, plain and confident, in the spirit of "Let clients find and book you with AI." Start with a verb or with the benefit.\n` +
+    '- Subline: one sentence that says how it works, concretely, in this trade\'s own words (their word for the customer, what gets booked, a moment of their day).\n' +
+    '- Always talk to the owner ("you", "your clients"; vi / vaš). Never write in the customer\'s voice or to the customer: no "Book now", no "Want a haircut?", no quoted customer questions.\n' +
+    '- Make it theirs: the same capability must read differently for a barber, a restaurant and a tyre shop. Use the trade\'s nouns, not "business", "services" or "users".\n' +
+    '- One idea only. Claim exactly what is stated for this post; never add other features, prices or numbers. No filler ("save time", "quick and easy").\n' +
+    '- Do not name Balkina in the headline (the logo and the URL are already on the image).\n\n' +
     'Write the Serbian FIRST, as a native Montenegrin marketer would say it (natural word order, no calques from English), then the English with the same idea (it is the second slide of the same post), never a word-for-word translation in either direction. ' +
     'Every field is a complete sentence or phrase, never cut mid-thought. No emojis in the image fields. Respect the limits strictly; shorter is better.\n' +
-    'Return strict JSON: { "copy": { "<lang>": { <field>: <text>, ... } }, "caption": { "<lang>": <feed caption, 1-3 sentences that continue the same scene and name the trade, may use one emoji, no hashtags> } } ' +
+    'Return strict JSON: { "copy": { "<lang>": { <field>: <text>, ... } }, "caption": { "<lang>": <feed caption for the owner, 1-3 sentences that expand the same idea for this trade and invite them to activate their free page, may use one emoji, no hashtags> } } ' +
     `for these languages: ${langs.map((l) => `"${l}" = ${LANG_NAMES[l]}`).join('; ')}.\nFields per language:\n${fieldSpec}\n\n` +
-    `Finished posts for OTHER trades, as the bar for how specific a line must be (never reuse their wording or scenes):\n${examples}`;
+    `Finished posts about OTHER ideas for OTHER trades, as the bar for voice and length (never reuse their wording):\n${examples}`;
 
+  const kept = (l: Lang): string => JSON.stringify(Object.fromEntries(Object.entries(req.current?.copy?.[l] ?? {}).filter(([k]) => !fields.includes(k) && k !== 'eyebrow' && k !== 'url')));
+  const replaced = (l: Lang): string => JSON.stringify(Object.fromEntries(Object.entries(req.current?.copy?.[l] ?? {}).filter(([k]) => fields.includes(k) && k !== 'url')));
+  const keepsLines = partial && LANGS.some((l) => kept(l) !== '{}');
   const keep = partial && req.current?.copy
-    ? `\nKeep these existing fields as they are and make the new text fit them (do not repeat them):\n${LANGS.map((l) => `${l}: ${JSON.stringify(Object.fromEntries(Object.entries(req.current?.copy?.[l] ?? {}).filter(([k]) => !fields.includes(k) && k !== 'eyebrow')))}`).join('\n')}\nWrite a NEW, different version of the requested fields (not a rephrasing of the previous one):\n${LANGS.map((l) => `${l}: ${JSON.stringify(Object.fromEntries(Object.entries(req.current?.copy?.[l] ?? {}).filter(([k]) => fields.includes(k))))}`).join('\n')}`
+    ? `${keepsLines ? `\nKeep these lines as they are and make the new text fit them (do not repeat them):\n${LANGS.map((l) => `${l}: ${kept(l)}`).join('\n')}` : ''}` +
+      `\nThe lines being replaced (write something clearly different, not a rephrasing):\n${LANGS.map((l) => `${l}: ${replaced(l)}`).join('\n')}`
     : '';
-  const scene = angle ? `\nBuild this post on this scene: ${angle.scene === 'ask' ? `"${profile.ask}"` : angle.scene === 'books' ? `${profile.books.en} (sr: ${profile.books.sr})` : profile[angle.scene]}. The headline should ${angle.hook}. The subline lands on this fact: ${angle.fact}.` : '';
-  const avoid = (req.avoid ?? []).filter(Boolean).slice(0, 24);
-  const used = avoid.length ? `\nHeadlines already posted for this audience; this post must carry a different idea and different words:\n${avoid.map((h) => `- ${h}`).join('\n')}` : '';
+  const sceneText = idea?.scene ? (idea.scene === 'ask' ? `a question they answer all day: "${profile.ask}" (background only, never quote it)` : idea.scene === 'when' ? `their ${profile.customer.en} decide to book ${profile.when}` : idea.scene === 'noshow' ? `what a forgotten booking costs them: ${profile.noshow}` : `in the middle of work they are ${profile.busy}`) : '';
+  const about = idea
+    ? `\nThis post is about: ${idea.claim}.\nHow it works (the only facts you may use): ${idea.detail}.${sceneText ? `\nTrade detail for the subline or the caption: ${sceneText}.` : ''}`
+    : '';
+  const avoid = (req.avoid ?? []).filter(Boolean).slice(0, 30);
+  const used = avoid.length && fields.includes('headline') ? `\nHeadlines already posted; do not reuse their wording or their sentence pattern:\n${avoid.map((h) => `- ${h}`).join('\n')}` : '';
   const user =
-    `Template: ${req.layout} (category ${category}).${scene}` +
-    `${req.brief ? `\nBrief from the marketer (it wins where it conflicts with the scene): ${req.brief}` : ''}${used}${keep}` +
+    `Template: ${req.layout} (category ${category}).${about}` +
+    `${req.brief ? `\nBrief from the marketer (it wins where it conflicts with the above): ${req.brief}` : ''}${used}${keep}` +
     `${partial && !wantsCaption ? '\nThe caption is not needed; return an empty caption object.' : ''}`;
 
   type Parsed = { copy?: Partial<Record<Lang, Record<string, unknown>>>; caption?: Partial<Record<Lang, unknown>> };
@@ -329,13 +353,13 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
   };
 
   const messages: ChatMessage[] = [{ role: 'system', content: system }, { role: 'user', content: user }];
-  const first = await chatJson(messages, 0.8);
+  const first = await chatJson(messages, 0.9);
   let parsed = JSON.parse(first) as Parsed;
   let copy = build(parsed);
   const problems = copyProblems(copy, fields, req.layout);
   if (problems.length) {
     // One repair round: the model gets its own draft back with the exact lines to fix.
-    const fix = `Some lines need another pass. Fix only these and return the full JSON again in the same shape, keeping the same scene:\n${problems.map((p) => `- ${p}`).join('\n')}`;
+    const fix = `Some lines need another pass. Fix only these and return the full JSON again in the same shape, about the same idea:\n${problems.map((p) => `- ${p}`).join('\n')}`;
     try {
       const second = JSON.parse(await chatJson([...messages, { role: 'assistant', content: first }, { role: 'user', content: fix }], 0.6)) as Parsed;
       const repaired = build(second);
@@ -348,18 +372,20 @@ export async function generateCopy(req: CopyRequest): Promise<CopyResult> {
   const caption = wantsCaption || !req.current?.caption
     ? `${captionParts.join('\n—\n')}\n\nLink u biu → balkina.ai\n\n${studioHashtags(req.vertical, Date.now() % 97).join(' ')}`
     : req.current.caption;
-  return { copy, caption, model, angle: angle?.key ?? null };
+  return { copy, caption, model, angle: idea?.key ?? null };
 }
 
-/** Headlines of the latest posts for an audience (both languages), so a new post does not repeat them. */
-export async function recentHeadlines(supabase: SupabaseClient, vertical: string, excludeId?: string): Promise<string[]> {
-  const { data } = await supabase.from('ig_posts').select('id, copy').eq('vertical', vertical).order('created_at', { ascending: false }).limit(12);
-  const out = new Set<string>();
-  for (const row of (data ?? []) as { id: string; copy: Partial<Record<Lang, StudioCopy>> | null }[]) {
+/** What the latest posts said, so the next one says something else: every headline (both languages) and the ideas, newest first. */
+export async function recentPosts(supabase: SupabaseClient, excludeId?: string): Promise<{ headlines: string[]; angles: string[] }> {
+  const { data } = await supabase.from('ig_posts').select('id, copy, angle').neq('status', 'cancelled').order('created_at', { ascending: false }).limit(30);
+  const headlines = new Set<string>();
+  const angles: string[] = [];
+  for (const row of (data ?? []) as { id: string; copy: Partial<Record<Lang, StudioCopy>> | null; angle: string | null }[]) {
     if (row.id === excludeId) continue;
-    for (const lang of LANGS) { const h = row.copy?.[lang]?.headline?.trim(); if (h) out.add(h); }
+    if (row.angle) angles.push(row.angle);
+    for (const lang of LANGS) { const h = row.copy?.[lang]?.headline?.trim(); if (h) headlines.add(h); }
   }
-  return Array.from(out);
+  return { headlines: Array.from(headlines), angles };
 }
 
 /** A line the marketer edited in one language, carried over to the other language with the same meaning and limits. */
@@ -370,7 +396,7 @@ export async function translateField(req: { field: string; from: Lang; text: str
   const lim = copyLimits(req.layout);
   const limit = req.field === 'headline' ? lim.headline : req.field === 'subline' ? lim.subline : 60;
   const system =
-    `You localise Instagram ad copy for Balkina AI. ${PRODUCT_FACTS}\n` +
+    `You localise Instagram ad copy for Balkina AI. ${PRODUCT_INTRO} The reader is the owner of the business.\n` +
     `${audienceBrief(req.vertical)}\nTone: ${tone?.label ?? req.tone} (${tone?.hint ?? ''}).\n` +
     'The marketer edited one line of the post in one language. Write the same line in the other language(s) so it says the same thing the way a native marketer would say it: ' +
     "the trade's own words, natural word order, no calques, no emojis, a complete sentence or phrase, and at most the character limit (shorter is fine). Keep the other lines of the post in mind so the voice matches. " +

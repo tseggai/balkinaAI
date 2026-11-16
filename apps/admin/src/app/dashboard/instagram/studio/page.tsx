@@ -15,6 +15,7 @@ interface Catalogue {
   verticals: { value: string; label: string; category: string; photo: string[] }[];
   categories: { key: string; order: number; label: string; synced: boolean; story: boolean }[];
   tones: { value: string; label: string; hint: string }[];
+  ideas: { key: string; label: string; only: string[] | null; not: string[] | null }[];
   photos: { name: string; url: string; source: 'stock' | 'upload' }[];
   layouts: { layout: string; sq: boolean; st: boolean; fields: string[]; preview: string | null; previewSq: string | null; previewSt: string | null }[];
   cadence: { post_time: string; days: number[]; timezone: string };
@@ -45,6 +46,8 @@ export default function StudioPage() {
   // brief
   const [vertical, setVertical] = useState('salon');
   const [tone, setTone] = useState('friendly');
+  const [ideaPick, setIdeaPick] = useState('');             // '' = rotate through Balkina's capabilities
+  const [angle, setAngle] = useState<string | null>(null);   // the idea the current copy is about
   const [lang, setLang] = useState<Lang>('sr');            // primary (first slide / first story)
   const [langs, setLangs] = useState<Lang[]>(['sr', 'en']); // multi-select, at least one
   const [layoutPick, setLayoutPick] = useState('');         // '' = follow the audience's category
@@ -107,6 +110,10 @@ export default function StudioPage() {
     return cat?.layouts.some((l) => l.layout === c) ? c : cat?.layouts[0]?.layout ?? '';
   };
   const layout = layoutPick || autoLayout(vertical);
+  // Ideas (Balkina capabilities) that make sense for the audience's category.
+  const audienceCategory = cat?.verticals.find((v) => v.value === vertical)?.category ?? '';
+  const ideas = useMemo(() => (cat?.ideas ?? []).filter((i) => (!i.only || i.only.includes(audienceCategory)) && !i.not?.includes(audienceCategory)), [cat, audienceCategory]);
+  useEffect(() => { if (ideaPick && cat && !ideas.some((i) => i.key === ideaPick)) setIdeaPick(''); }, [ideas, ideaPick, cat]);
   const layoutInfo = cat?.layouts.find((l) => l.layout === layout) ?? null;
   const hasStory = (l: string) => Boolean(cat?.layouts.find((x) => x.layout === l)?.st);
   const langOrder: Lang[] = [lang, ...langs.filter((l) => l !== lang)];
@@ -207,20 +214,21 @@ export default function StudioPage() {
     stopRef.current = false;
     focusPreview();
     setProgress({ title: 'Generating', done: 0, total: 1, detail: 'Writing copy…', formats: { sq: 'Writing copy', st: 'Writing copy' } });
-    const w = await api('/api/admin/studio/copy', { vertical, tone, layout, brief: brief || undefined, langs });
+    const w = await api('/api/admin/studio/copy', { vertical, tone, layout, brief: brief || undefined, langs, angle: ideaPick || undefined, current: { angle } });
     if (!w.ok) { setBusy(''); setProgress(null); return notify('Could not write copy', [String(w.data.error ?? 'Unknown error')]); }
     const newCopy = w.data.copy as Partial<Record<Lang, Record<string, string>>>;
     const newCaption = String(w.data.caption ?? '');
-    setCopy(newCopy); setCaption(newCaption); setFields(w.data.fields as string[]);
+    const newAngle = (w.data.angle as string | null) ?? null;
+    setCopy(newCopy); setCaption(newCaption); setAngle(newAngle); setFields(w.data.fields as string[]);
     focusPreview();
     let target = post;
     if (target && target.layout === layout && target.photo_url === photoUrl) {
       // Same template and photo: keep the post (and its base renders), just store the new copy.
-      const r = await api(`/api/admin/studio/posts/${target.id}`, { action: 'rerender', copy: newCopy, caption: newCaption, langs, primary: lang }, 'PATCH');
+      const r = await api(`/api/admin/studio/posts/${target.id}`, { action: 'rerender', copy: newCopy, caption: newCaption, angle: newAngle, langs, primary: lang }, 'PATCH');
       if (!r.ok) { setBusy(''); setProgress(null); return notify('Could not save the post', [String(r.data.error ?? 'Unknown error')]); }
       target = r.data.post as StudioPostView;
     } else {
-      const body = { vertical, tone, lang, langs, layout, brief: brief || undefined, copy: newCopy, caption: newCaption, photo_url: photoUrl || undefined, kinds };
+      const body = { vertical, tone, lang, langs, layout, brief: brief || undefined, copy: newCopy, caption: newCaption, angle: newAngle, photo_url: photoUrl || undefined, kinds };
       const r = await api('/api/admin/studio/posts', body);
       if (!r.ok) { setBusy(''); setProgress(null); return notify('Could not create the post', [String(r.data.error ?? 'Unknown error')]); }
       target = r.data.post as StudioPostView;
@@ -233,14 +241,15 @@ export default function StudioPage() {
     await load();
   };
 
-  /** New wording for one field (both languages), keeping the rest; marks the design as needing a re-render. */
+  /** New wording for one field (both languages), keeping the rest; a new headline is a new idea, so its subline follows. Marks the design as needing a re-render. */
   const regenerate = async (field: string) => {
     setBusy(`field:${field}`);
-    const { ok, data } = await api('/api/admin/studio/copy', { vertical, tone, layout, brief: brief || undefined, langs, only: [field], current: { copy, caption } });
+    const { ok, data } = await api('/api/admin/studio/copy', { vertical, tone, layout, brief: brief || undefined, langs, only: [field], current: { copy, caption, angle } });
     setBusy('');
     if (!ok) return notify('Could not rewrite', [String(data.error ?? 'Unknown error')]);
     if (field === 'caption') setCaption(String(data.caption ?? ''));
-    else setCopy(data.copy as Partial<Record<Lang, Record<string, string>>>);
+    else { setCopy(data.copy as Partial<Record<Lang, Record<string, string>>>); setAngle((data.angle as string | null) ?? angle); }
+    if (field === 'headline' && data.caption) setCaption(String(data.caption));   // a new headline is a new idea: subline and caption follow
     if (field !== 'caption') setDirty(true);
   };
 
@@ -262,7 +271,7 @@ export default function StudioPage() {
     setPhoto(url); setDirty(true); setPhotoOpen(false);
     if (!post) return;
     setBusy('photo');
-    const r = await api(`/api/admin/studio/posts/${post.id}`, { action: 'rerender', copy, caption, photo_url: url, langs, primary: lang }, 'PATCH');
+    const r = await api(`/api/admin/studio/posts/${post.id}`, { action: 'rerender', copy, caption, angle, photo_url: url, langs, primary: lang }, 'PATCH');
     if (!r.ok) { setBusy(''); return notify('Could not change the photo', [String(r.data.error ?? 'Unknown error')]); }
     const saved = r.data.post as StudioPostView;
     setPost(saved);
@@ -296,7 +305,7 @@ export default function StudioPage() {
     setBusy('render');
     stopRef.current = false;
     focusPreview();
-    const r = await api(`/api/admin/studio/posts/${post.id}`, { action: 'rerender', copy, caption, photo_url: photoUrl, langs, primary: lang }, 'PATCH');
+    const r = await api(`/api/admin/studio/posts/${post.id}`, { action: 'rerender', copy, caption, angle, photo_url: photoUrl, langs, primary: lang }, 'PATCH');
     if (!r.ok) { setBusy(''); return notify('Could not save the post', [String(r.data.error ?? 'Unknown error')]); }
     const saved = r.data.post as StudioPostView;
     setPost(saved); setDirty(false);
@@ -342,11 +351,11 @@ export default function StudioPage() {
       },
     });
 
-  const reset = () => { setPost(null); setCopy({}); setFields([]); setCaption(''); setPhoto(''); setDirty(false); };
+  const reset = () => { setPost(null); setCopy({}); setFields([]); setCaption(''); setAngle(null); setPhoto(''); setDirty(false); };
   const openPost = (p: StudioPostView) => {
     setPost(p);
     setVertical(p.vertical); setTone(p.tone); setLang(p.lang); setLangs(p.langs.length ? p.langs : [p.lang]); setLayoutPick(p.layout); setBrief(p.brief ?? ''); setPhoto(p.photo_url);
-    setCopy(p.copy); setCaption(p.caption ?? ''); setFields(Object.keys(p.copy[p.lang] ?? {})); setKinds(p.kinds); setDirty(false);
+    setCopy(p.copy); setCaption(p.caption ?? ''); setAngle(p.angle ?? null); setFields(Object.keys(p.copy[p.lang] ?? {})); setKinds(p.kinds); setDirty(false);
     if (p.scheduled_at) setWhen(toLocalInput(new Date(p.scheduled_at)));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -524,6 +533,13 @@ export default function StudioPage() {
                 <label className={LABEL}>Tone</label>
                 <select className={`${SELECT} w-full`} value={tone} onChange={(e) => setTone(e.target.value)} title={cat.tones.find((t) => t.value === tone)?.hint}>
                   {cat.tones.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2 md:col-span-1">
+                <label className={LABEL}>Idea</label>
+                <select className={`${SELECT} w-full`} value={ideaPick} onChange={(e) => setIdeaPick(e.target.value)} title="What the post promises the owner. Auto rotates through everything Balkina does, so the feed does not repeat itself.">
+                  <option value="">Auto (rotate){angle && !ideaPick ? ` · now: ${ideas.find((i) => i.key === angle)?.label ?? angle}` : ''}</option>
+                  {ideas.map((i) => <option key={i.key} value={i.key}>{i.label}</option>)}
                 </select>
               </div>
             </div>
