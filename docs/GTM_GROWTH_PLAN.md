@@ -36,6 +36,8 @@ Disqualifiers: chains already on an enterprise system, businesses with no phone/
 
 ### 2.2 White-label ICP (account-based funnel)
 
+> **Update 2026-11-23:** the white label now starts bottom-up. Businesses inside a property sign up on their own, a "place" groups them inside Balkina once it is dense enough, and the owner is pitched second, with usage numbers. See [PLACES.md](PLACES.md). The account-based funnel below remains the second step.
+
 A property with 5–50 bookable businesses on site plus a resident or member community. Ranked by fit:
 
 1. Marina resorts and branded residences on the Adriatic and Mediterranean (direct Portonovi analogues)
