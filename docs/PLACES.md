@@ -1,6 +1,6 @@
 # Places: booking a whole destination without the owner
 
-Decided 2026-11-23. Status: plan and density watch are in place; nothing is built yet.
+Decided 2026-11-23, naming updated 2026-11-23. Status: plan and density watch are in place; nothing is built yet.
 
 This replaces "pitch the property owner first" as the way the white-label product gets off the ground. The owner
 pitch (docs/GTM_GROWTH_PLAN.md §2.2, §4.2, §5.2) stays, but it becomes the **second** step, made with usage numbers
@@ -53,8 +53,13 @@ at tenant prices against €899+ per month for one property contract.
 
 1. **Consent.** Only businesses that claimed their page (owner login) appear and can be booked. Unclaimed
    businesses are never shown as bookable. This is what separates us from the DoorDash / ClassPass failures.
-2. **No owner brand.** Plain text only. No logo, no look-alike design, no domain or app named after the property.
-   Every place page carries a line: independent businesses, not affiliated with the property owner.
+2. **No owner branding.** A place name is plain text that says where the businesses are. No logo, no look-alike
+   design, no domain or app named after the property. Every place page carries a line: independent businesses,
+   not affiliated with the property owner.
+   - **Decision 2026-11-23 (Portonovi):** the Portonovi place keeps the name "Portonovi", because that is the name
+     tourists know and they are the main users. "Kumbor" means nothing to them. If the owner objects, the place is
+     renamed then. To keep that cheap, the display name of a place must be a single setting, never hard-coded in
+     copy, images, URLs or store listings.
 3. **Same function, own look.** "Mimics the white label" means the same flow, never their identity.
 4. **Legal check once** with Montenegrin counsel on trademark and unfair-competition limits before the first
    place row goes live. Apple requires permission for third-party trademarks in app names and metadata
@@ -66,7 +71,7 @@ at tenant prices against €899+ per month for one property contract.
 |---|---|---|---|---|
 | **Porto** | Porto Montenegro, Tivat | 42.4354, 18.6935 | 0.7 km | Local shorthand, not the registered name. Still derived from the brand, so include it in the legal check. Purely geographic fallback: "Tivat Marina". |
 | **Luštica** | Luštica Bay | 42.3912, 18.6679 | 1.5 km | The peninsula's own name. The safest of the three. |
-| **(open)** | Portonovi, Kumbor | 42.4343, 18.6011 | 1.0 km | Not named yet. Candidate: **Kumbor**, the village it sits in, which is real geography. To decide before the row appears. |
+| **Portonovi** | Portonovi, Kumbor | 42.4343, 18.6011 | 1.0 km | Keeps its own name until the owner objects (decided 2026-11-23). This is the registered name, so it carries the most naming risk of the three. Rename fallback: "Kumbor". |
 
 Centres come from prospect records already in the database; radii are first estimates to tighten after a census
 walk of each place.
@@ -197,10 +202,11 @@ If thresholds, centres or radii change, change them here and in the scheduled ta
 
 ## 11. Open questions
 
-1. The name for the Portonovi place (candidate: Kumbor).
-2. Where the Portonovi relationship stands, and whether its portal businesses are real and consented.
-3. At each place, which outlets are independent tenants and which are run by the owner.
-4. The legal check on "Porto" as a name.
+1. Where the Portonovi relationship stands, and whether its portal businesses are real and consented.
+2. At each place, which outlets are independent tenants and which are run by the owner.
+3. The legal check on the place names, "Portonovi" first, then "Porto".
+
+Settled: the Portonovi place is called "Portonovi" until the owner objects (2026-11-23).
 
 ## Sources
 
