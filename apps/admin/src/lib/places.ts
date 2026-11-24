@@ -54,6 +54,7 @@ export async function refreshPlaces(supabase: AdminClient): Promise<PlacesReport
   const now = new Date().toISOString();
   const reached: PlacesReport['reached'] = [];
   const places: PlaceView[] = [];
+  const writes: { id: string; values: Record<string, unknown> }[] = [];
   for (const p of rows) {
     const members = perPlace.get(p.id) ?? [];
     const fresh = measurePlace(p, members, bookings);
@@ -63,7 +64,7 @@ export async function refreshPlaces(supabase: AdminClient): Promise<PlacesReport
     const level2_at = p.level2_at ?? (fresh.level2 ? now : null);
     if (fresh.level1 && !p.level1_at) reached.push({ name: p.name, level: 1 });
     if (fresh.level2 && !p.level2_at) reached.push({ name: p.name, level: 2 });
-    await supabase.from('places').update({ stats: fresh, stats_at: now, hidden, level1_at, level2_at }).eq('id', p.id);
+    writes.push({ id: p.id, values: { stats: fresh, stats_at: now, hidden, level1_at, level2_at } });
     const next: PlaceRow = { ...p, stats: fresh, stats_at: now, hidden, level1_at, level2_at };
     places.push({
       ...next,
@@ -73,6 +74,11 @@ export async function refreshPlaces(supabase: AdminClient): Promise<PlacesReport
         .sort((a, b) => a.family.localeCompare(b.family) || a.name.localeCompare(b.name)),
       visible: isPlaceVisible(next),
     });
+  }
+
+  // Store the measurements twenty at a time, so a long list does not wait on one write per place.
+  for (let i = 0; i < writes.length; i += 20) {
+    await Promise.all(writes.slice(i, i + 20).map((w) => supabase.from('places').update(w.values).eq('id', w.id)));
   }
 
   // Where a new place could be drawn: claimed businesses that sit in no place at all.

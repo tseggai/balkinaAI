@@ -264,12 +264,20 @@ Nothing changes for customers until a place is published in the admin. The piece
   colours with a back button, the notice line and a chat box scoped to the place. Reaches users with the
   next store build.
 - **Web**: `balkina.ai/places/<slug>` lists the businesses by category, each linking to its booking page.
-- **Admin**: `/dashboard/places` shows every place measured from live data (bars against the four minimums,
-  30-day bookings, levels reached, member list), with create, edit, publish, unpublish, mark official and
-  delete, and the candidate clusters with "Draw a place here". Publishing below Level 1 asks for an explicit
-  "Publish anyway". A daily job (`/api/growth/cron/places`) refreshes the stored numbers and the hide flag.
-- **Not built**: a map to draw boundaries (centre and radius are typed in), photo upload for a place
-  (a URL is pasted), and the owner's self-serve claim of a place (marking a place official is a manual step).
+- **Admin**: `/dashboard/places` is a list built for many places: four summary tiles (places, shown to
+  customers, ready to publish, bookings in 30 days), status tabs with counts, search by place or by a
+  business inside it (diacritics ignored), a density filter (ready to publish, Level 1, Level 2, below
+  Level 1, hidden), sorting from the column titles or the sort menu, and 20 places per page. A row opens a
+  side panel with the density bars, what is still missing for Level 1, the boundary on a map, the member
+  businesses by family and the actions (edit, start watching, publish, unpublish, mark official, delete).
+  Publishing below Level 1 asks for an explicit "Publish anyway". Candidate clusters keep their "Draw a
+  place here". A daily job (`/api/growth/cron/places`) refreshes the stored numbers and the hide flag.
+- **Drawing a place (2026-11-24)**: the form finds the location with a Google search by name or address,
+  shows the circle on a map, moves the centre with a click on the map and sets the radius with a slider.
+  The photo is uploaded (shrunk in the browser to 1600 px, stored in the public `place-photos` bucket, which
+  the first upload creates); no URL is pasted and no coordinates are typed.
+- **Not built**: boundaries of any other shape than a circle, and the owner's self-serve claim of a place
+  (marking a place official is a manual step).
 
 ## Sources
 
