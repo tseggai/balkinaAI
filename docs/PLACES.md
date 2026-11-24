@@ -1,6 +1,6 @@
 # Places: booking a whole destination without the owner
 
-Decided 2026-11-23, naming updated 2026-11-23. Status: plan and density watch are in place; nothing is built yet.
+Decided 2026-11-23, naming updated 2026-11-23, home-screen and growth plan added 2026-11-24. Status: plan and density watch are in place; nothing is built yet.
 
 This replaces "pitch the property owner first" as the way the white-label product gets off the ground. The owner
 pitch (docs/GTM_GROWTH_PLAN.md §2.2, §4.2, §5.2) stays, but it becomes the **second** step, made with usage numbers
@@ -207,6 +207,45 @@ If thresholds, centres or radii change, change them here and in the scheduled ta
 3. The legal check on the place names, "Portonovi" first, then "Porto".
 
 Settled: the Portonovi place is called "Portonovi" until the owner objects (2026-11-23).
+
+## 12. How places appear on the home screen (plan, 2026-11-24)
+
+The home screen today is the Balkina logo, "What would you like to book today?" and a grid of category chips.
+Places add **one optional strip**, nothing else:
+
+- **Where:** a horizontally scrolling strip of place cards between the headline and the category chips. Each card
+  is a photo with the place name ("Porto", "Luštica", "Portonovi"). The strip has a fixed height, so the
+  category chips stay on the first screen.
+- **When it shows:** only places that reached Level 1 and were published. With no published place the home
+  screen is exactly as it is today, which is Phase 0.
+- **Who sees which place:** places within about 50 km of the user, nearest first, at most six. A user standing
+  inside a place sees that place first with the line "You're in <place>. Book anything here." Without location
+  permission the strip shows the published places of the user's country.
+- **What a tap opens:** the place section, built on the existing white-label storefront (businesses by category,
+  then services and booking), in Balkina's own colours with a back arrow to the home screen and the
+  "not affiliated" line.
+- **Chat first stays true:** the strip is a shortcut, like the category chips. Typing or saying "book a massage
+  in Porto" scopes the chat to the place without touching the strip.
+- **Website:** the balkina.ai landing page does not change. Each place gets its own page for search and QR codes.
+
+## 13. How places are added: curated boundaries, automatic everything else (plan, 2026-11-24)
+
+The three places are a starting set, not a fixed list. The split:
+
+| Step | Manual or automatic | Why |
+|---|---|---|
+| Create a place: name, centre, radius, thresholds | **Manual**, a minute in an admin "Places" page | A name carries legal weight and a boundary needs local knowledge. Pure clustering would invent places nobody recognises. |
+| Which businesses belong | **Automatic** | Any claimed business whose location falls inside the boundary is in. No per-business work. A business inside two places belongs to the smaller one. |
+| Measuring density | **Automatic** | The weekly check, reading thresholds from the place record. |
+| Publishing the row | **Automatic proposal, one-click approval** | Reaching Level 1 raises the reminder; a person confirms the name and the legal check, then publishes. Can become fully automatic once a few places are live. |
+| Hiding a place that thins out | **Automatic** | The row hides below 70% of its threshold and returns at 100%, so it does not flicker. |
+| Finding new candidates | **Automatic suggestion, manual decision** | A weekly scan looks for clusters of claimed businesses that are in no place (for example eight or more within 500 m) and proposes them. A person names and approves, or dismisses. |
+
+Data model when built: a `places` table with `name` (the single display-name setting), `slug`, `centre`,
+`radius_km` (a polygon later if a circle proves too crude), the Level 1 thresholds, `status`
+(`draft` → `watching` → `live` → `official` once an owner signs) and `published_at`. Threshold defaults by size:
+small 8 businesses, medium 10, large 15, editable per place. The weekly reminder then reads this table instead of
+the values hard-coded in §6.
 
 ## Sources
 

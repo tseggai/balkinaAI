@@ -32,6 +32,7 @@ import PaymentWebViewModal from '@/components/PaymentWebViewModal';
 import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
 import PropertyStorefront, { StorefrontTenant } from '@/components/PropertyStorefront';
 import PropertyBookingFlow, { BookingService } from '@/components/PropertyBookingFlow';
+import VoiceInputButton from '@/components/VoiceInputButton';
 import PropertyBusinessPage, { BusinessSummary } from '@/components/PropertyBusinessPage';
 import PropertyAccountDrawer from '@/components/PropertyAccountDrawer';
 import PropertyMemberVerifyModal from '@/components/PropertyMemberVerifyModal';
@@ -1416,6 +1417,8 @@ export default function ChatScreen() {
   const kbPadding = Platform.OS === 'ios' && keyboardHeight > 0 ? keyboardHeight - tabBarHeight : 0;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
+  // Voice input: the transcript waits in the box for the user to review and send.
+  const addVoiceText = useCallback((text: string) => setInput((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text)), []);
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState(() => generateId());
   const [customerName, setCustomerName] = useState<string | null>(null);
@@ -2958,6 +2961,7 @@ export default function ChatScreen() {
                   editable={!isLoading}
                   blurOnSubmit={false}
                 />
+                {userId ? <VoiceInputButton onTranscript={addVoiceText} disabled={isLoading} accent={propertyData.primary_color} /> : null}
                 <TouchableOpacity
                   style={[styles.sendBtn, { backgroundColor: propertyData.primary_color }, (!input.trim() || isLoading) && styles.sendBtnDisabled]}
                   onPress={() => sendMessage()}
@@ -3075,6 +3079,7 @@ export default function ChatScreen() {
               editable={!isLoading}
               blurOnSubmit={false}
             />
+            {userId ? <VoiceInputButton onTranscript={addVoiceText} disabled={isLoading} /> : null}
             <TouchableOpacity
               style={[styles.sendBtn, (!input.trim() || isLoading) && styles.sendBtnDisabled]}
               onPress={() => sendMessage()}
@@ -3138,6 +3143,7 @@ export default function ChatScreen() {
               editable={!isLoading}
               blurOnSubmit={false}
             />
+            {userId ? <VoiceInputButton onTranscript={addVoiceText} disabled={isLoading} accent={propertyData?.primary_color} /> : null}
             <TouchableOpacity
               style={[styles.sendBtn, propertyData ? { backgroundColor: propertyData.primary_color } : null, (!input.trim() || isLoading) && styles.sendBtnDisabled]}
               onPress={() => sendMessage()}
@@ -3405,7 +3411,7 @@ const styles = StyleSheet.create({
   chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   messagesList: { paddingVertical: 4 },
   inputBar: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f3f4f6' },
-  textInput: { minHeight: 48, maxHeight: 140, backgroundColor: '#f3f4f6', borderRadius: 22, paddingHorizontal: 18, paddingTop: 13, paddingBottom: 13, paddingRight: 50, fontSize: 16, color: '#111827' },
+  textInput: { minHeight: 48, maxHeight: 140, backgroundColor: '#f3f4f6', borderRadius: 22, paddingHorizontal: 18, paddingTop: 13, paddingBottom: 13, paddingRight: 90, fontSize: 16, color: '#111827' },
   sendBtn: { position: 'absolute' as const, right: 8, bottom: 8, width: 34, height: 34, borderRadius: 17, backgroundColor: '#6B7FC4', justifyContent: 'center' as const, alignItems: 'center' as const },
   sendBtnDisabled: { opacity: 0.5 },
   chatHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },

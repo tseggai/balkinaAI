@@ -106,6 +106,12 @@
           "merchantIdentifier": "merchant.ai.balkina.app",
           "enableGooglePay": true
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Balkina AI uses the microphone so you can speak your booking request instead of typing it."
+        }
       ]
     ],
     "experiments": {
