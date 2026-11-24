@@ -96,6 +96,10 @@ interface Props {
   customer?: { userId: string | null; name: string | null; phone: string | null; email: string | null };
   onSelectBusiness: (tenant: StorefrontTenant) => void;
   onSelectEvent: (event: EventService, tenantName: string) => void;
+  /** Shows a back button in the header (places: back to the Balkina home screen). */
+  onBack?: () => void;
+  /** A line under the last section (places: the businesses are independent of the property owner). */
+  footerNote?: string;
 }
 
 function coverFor(t: StorefrontTenant): string | null {
@@ -122,7 +126,7 @@ function Rating({ avg, count }: { avg: number | null; count: number | null }) {
 
 type SectionTarget = { title: string; mode: 'business' | 'event'; tenants?: StorefrontTenant[]; events?: EventService[] };
 
-export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAccountPress, customer, onSelectBusiness, onSelectEvent }: Props) {
+export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAccountPress, customer, onSelectBusiness, onSelectEvent, onBack, footerNote }: Props) {
   const accent = property.primary_color || '#1a365d';
   const [allServices, setAllServices] = useState<EventService[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
@@ -366,6 +370,7 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
         <BizSection title="Popular" list={popular} />
         <BizSection title="Trending" list={trending} />
         {sections.map(([title, tenants]) => <BizSection key={title} title={title} list={tenants} />)}
+        {footerNote ? <Text style={styles.footerNote}>{footerNote}</Text> : null}
       </Animated.ScrollView>
 
       {/* Sticky nav bar */}
@@ -384,6 +389,11 @@ export default function PropertyStorefront({ property, apiBase, isLoggedIn, onAc
       {/* Compact header + account */}
       <View style={[styles.miniHeader, { height: MINI_H, paddingTop: TOP_INSET }]} pointerEvents="box-none">
         <Animated.View style={[StyleSheet.absoluteFill, styles.miniBgFill, { opacity: miniBg }]} pointerEvents="none" />
+        {onBack ? (
+          <TouchableOpacity style={[styles.accountBtn, styles.backBtn]} onPress={onBack} activeOpacity={0.8} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
+            <Ionicons name="chevron-back" size={18} color={INK} />
+          </TouchableOpacity>
+        ) : null}
         <Animated.View style={[styles.miniBrand, { opacity: miniBg }]} pointerEvents="none">
           {property.logo_url ? <Image source={{ uri: property.logo_url }} style={styles.miniLogo} /> : null}
           <Text style={styles.miniName} numberOfLines={1}>{property.name}</Text>
@@ -472,6 +482,8 @@ const styles = StyleSheet.create({
   miniLogo: { width: 26, height: 26, borderRadius: 7 },
   miniName: { fontSize: 16, fontWeight: '500', color: INK, fontFamily: DISPLAY, letterSpacing: 0.3 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  backBtn: { marginRight: 10 },
+  footerNote: { fontSize: 12, color: MUTED, textAlign: 'center', marginTop: 36, paddingHorizontal: 28, lineHeight: 17 },
   accountBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: HAIRLINE, backgroundColor: 'rgba(255,255,255,0.92)' },
 
   tabsBar: { position: 'absolute', top: 0, left: 0, right: 0, height: TABS_H, zIndex: 20, backgroundColor: IVORY, justifyContent: 'center' },

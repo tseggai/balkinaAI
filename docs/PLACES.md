@@ -1,6 +1,6 @@
 # Places: booking a whole destination without the owner
 
-Decided 2026-11-23, naming updated 2026-11-23, home-screen and growth plan added 2026-11-24. Status: plan and density watch are in place; nothing is built yet.
+Decided 2026-11-23. Built 2026-11-24 (see §14). Status: the feature is in the code; **Migration 080 must be applied** before it does anything, and no place is published, so customers see no change yet.
 
 This replaces "pitch the property owner first" as the way the white-label product gets off the ground. The owner
 pitch (docs/GTM_GROWTH_PLAN.md §2.2, §4.2, §5.2) stays, but it becomes the **second** step, made with usage numbers
@@ -181,15 +181,9 @@ If thresholds, centres or radii change, change them here and in the scheduled ta
   boundary, so none counts toward density. Either their locations need coordinates or they are not independently
   claimed businesses.
 
-## 9. Build scope when a place reaches Level 1
+## 9. Build scope
 
-1. Generalise `properties` into places: an open place has no owner, no billing and no admin; membership comes
-   from the boundary, not from `property_tenants`.
-2. A row on the Balkina home screen, shown to users near the place or asking about it, that opens the storefront
-   flow scoped to the place.
-3. Chat scoping to a place.
-4. A public web page per place.
-5. The upgrade path: an owner claims the place and it becomes an official white-label property.
+Built on 2026-11-24, ahead of density, so publishing is a click when a place gets there. See §14.
 
 ## 10. Other routes kept open
 
@@ -241,11 +235,41 @@ The three places are a starting set, not a fixed list. The split:
 | Hiding a place that thins out | **Automatic** | The row hides below 70% of its threshold and returns at 100%, so it does not flicker. |
 | Finding new candidates | **Automatic suggestion, manual decision** | A weekly scan looks for clusters of claimed businesses that are in no place (for example eight or more within 500 m) and proposes them. A person names and approves, or dismisses. |
 
-Data model when built: a `places` table with `name` (the single display-name setting), `slug`, `centre`,
+Data model: the `places` table (Migration 080), with `name` (the single display-name setting), `slug`, centre,
 `radius_km` (a polygon later if a circle proves too crude), the Level 1 thresholds, `status`
 (`draft` → `watching` → `live` → `official` once an owner signs) and `published_at`. Threshold defaults by size:
-small 8 businesses, medium 10, large 15, editable per place. The weekly reminder then reads this table instead of
-the values hard-coded in §6.
+small 8 businesses, medium 10, large 15, editable per place. Once the table exists it is the source of truth
+for thresholds and boundaries; the values in §6 are the seed.
+
+## 14. What is built (2026-11-24)
+
+Nothing changes for customers until a place is published in the admin. The pieces:
+
+- **Data**: `places` (Migration 080) holds the name (the single display-name setting), slug, an internal
+  "refers to" note, tagline, photo, centre, radius, the four Level 1 minimums, `status`
+  (`draft` → `watching` → `live` → `official`), the automatic `hidden` flag, the last measurement and the
+  first time each level was reached. The three places are seeded as `watching`. Membership is never stored.
+- **Shared logic** (`packages/shared/src/places.ts`): who belongs where (`assignToPlaces`: each location of a
+  business goes to the smallest place that holds it, so a business with branches in two places belongs to
+  both), density (`measurePlace`), the hide rule (`nextHidden`: hidden below 70%, back at 100%),
+  candidate clusters (`suggestPlaceCandidates`) and the loaders for claimed businesses and 30-day bookings.
+- **Customer APIs** (`apps/web`): `GET /api/places?lat=&lng=` returns the published places within 50 km,
+  nearest first, six at most (all published ones when the position is unknown); `GET /api/places/:slug`
+  returns the place with its businesses in the storefront shape, plus the "not affiliated" notice.
+- **Chat**: `/api/chat` scopes discovery to a place when the app sends `placeId` or the message names a
+  published place, including Serbian case forms ("u Luštici", "u Portu"). It reuses the property scope of
+  `find_businesses` and tells the assistant the businesses are independent.
+- **App**: `PlaceStrip` on the home screen between the headline and the category chips (nothing renders
+  without a published place nearby); a tap opens `PlaceSection`, the white-label storefront in Balkina's
+  colours with a back button, the notice line and a chat box scoped to the place. Reaches users with the
+  next store build.
+- **Web**: `balkina.ai/places/<slug>` lists the businesses by category, each linking to its booking page.
+- **Admin**: `/dashboard/places` shows every place measured from live data (bars against the four minimums,
+  30-day bookings, levels reached, member list), with create, edit, publish, unpublish, mark official and
+  delete, and the candidate clusters with "Draw a place here". Publishing below Level 1 asks for an explicit
+  "Publish anyway". A daily job (`/api/growth/cron/places`) refreshes the stored numbers and the hide flag.
+- **Not built**: a map to draw boundaries (centre and radius are typed in), photo upload for a place
+  (a URL is pasted), and the owner's self-serve claim of a place (marking a place official is a manual step).
 
 ## Sources
 

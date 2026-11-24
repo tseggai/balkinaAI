@@ -4,3 +4,4 @@ export * from './utils/index.js';
 export * from './constants/index.js';
 export * from './labels.js';
 export * from './property-members.js';
+export * from './places.js';
