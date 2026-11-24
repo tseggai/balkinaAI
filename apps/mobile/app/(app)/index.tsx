@@ -33,6 +33,8 @@ import BalkinaLogo, { BalkinaLogoInline } from '@/components/BalkinaLogo';
 import PropertyStorefront, { StorefrontTenant } from '@/components/PropertyStorefront';
 import PropertyBookingFlow, { BookingService } from '@/components/PropertyBookingFlow';
 import VoiceInputButton from '@/components/VoiceInputButton';
+import PlaceStrip, { type NearbyPlace } from '@/components/PlaceStrip';
+import PlaceSection from '@/components/PlaceSection';
 import PropertyBusinessPage, { BusinessSummary } from '@/components/PropertyBusinessPage';
 import PropertyAccountDrawer from '@/components/PropertyAccountDrawer';
 import PropertyMemberVerifyModal from '@/components/PropertyMemberVerifyModal';
@@ -1484,6 +1486,9 @@ export default function ChatScreen() {
     campaigns?: Campaign[];
   } | null>(null);
   const [conciergeOpen, setConciergeOpen] = useState(false);
+  // Places (docs/PLACES.md): published places near the user, and the one being browsed.
+  const [places, setPlaces] = useState<NearbyPlace[]>([]);
+  const [activePlace, setActivePlace] = useState<NearbyPlace | null>(null);
   const conciergeInputRef = useRef<TextInput>(null);
   const [bookingTarget, setBookingTarget] = useState<{ tenantId: string; businessName: string; service: BookingService | null; extras?: string[]; packageName?: string; addOnTotal?: number } | null>(null);
   const [businessTarget, setBusinessTarget] = useState<{ summary: BusinessSummary; initialServiceId?: string } | null>(null);
@@ -1541,6 +1546,22 @@ export default function ChatScreen() {
       }
     })();
   }, [propertySlug]);
+
+  // Places near the user for the home strip. White-label builds have their own storefront and skip this.
+  useEffect(() => {
+    if (propertySlug) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const q = userCoords ? `?lat=${userCoords.latitude}&lng=${userCoords.longitude}` : '';
+        const res = await fetch(`${API_BASE}/api/places${q}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { places?: NearbyPlace[] };
+        if (!cancelled) setPlaces(data.places ?? []);
+      } catch { /* the home screen works without the strip */ }
+    })();
+    return () => { cancelled = true; };
+  }, [propertySlug, userCoords?.latitude, userCoords?.longitude]);
 
   // Live-refresh campaigns when the property owner creates/edits one — no app reload.
   useEffect(() => {
@@ -2536,6 +2557,7 @@ export default function ChatScreen() {
       try {
         const body: Record<string, string | number> = { message: trimmed, sessionId };
         if (propertyData?.id) body.propertyId = propertyData.id;
+        else if (activePlace) body.placeId = activePlace.id;   // discovery scoped to the place being browsed
         if (customerName) body.customerName = customerName;
         if (customerPhone) body.customerPhone = customerPhone;
         if (customerEmail) body.customerEmail = customerEmail;
@@ -2813,7 +2835,7 @@ export default function ChatScreen() {
 
       setIsLoading(false);
     },
-    [input, isLoading, sessionId, customerName, customerPhone, customerEmail, userId, userCoords, handleClientSideFlow],
+    [input, isLoading, sessionId, customerName, customerPhone, customerEmail, userId, userCoords, handleClientSideFlow, activePlace],
   );
 
   const handleButtonPress = useCallback(
@@ -2996,6 +3018,48 @@ export default function ChatScreen() {
     );
   }
 
+  // ── A place ("Book anything in Porto"): the storefront flow scoped by location ──
+  // Like the property storefront, it shows until a message is sent; "Back" in the chat returns here.
+  if (activePlace && !hasMessages) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: '#F7F4EF' }]}>
+        <View style={[styles.flex, { paddingBottom: kbPadding }]}>
+          <PlaceSection
+            place={activePlace}
+            apiBase={API_BASE}
+            customer={{ userId, name: customerName, phone: customerPhone, email: customerEmail }}
+            onBack={() => { setActivePlace(null); setInput(''); }}
+            inputBar={
+              <View style={styles.inputBar}>
+                <View style={{ position: 'relative' }}>
+                  <TextInput
+                    style={styles.textInput}
+                    value={input}
+                    onChangeText={setInput}
+                    placeholder={`Ask anything in ${activePlace.name}...`}
+                    placeholderTextColor="#9ca3af"
+                    multiline
+                    maxLength={2000}
+                    editable={!isLoading}
+                    blurOnSubmit={false}
+                  />
+                  {userId ? <VoiceInputButton onTranscript={addVoiceText} disabled={isLoading} /> : null}
+                  <TouchableOpacity
+                    style={[styles.sendBtn, (!input.trim() || isLoading) && styles.sendBtnDisabled]}
+                    onPress={() => sendMessage()}
+                    disabled={!input.trim() || isLoading}
+                  >
+                    <Ionicons name="send" size={18} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            }
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (!hasMessages) {
     return (
       <SafeAreaView style={styles.container}>
@@ -3047,6 +3111,7 @@ export default function ChatScreen() {
                   <BalkinaLogo size="large" />
                   <Text style={styles.subtitle}>What would you like to book today?</Text>
                 </View>
+                <PlaceStrip places={places} onSelect={setActivePlace} />
                 {categoriesLoading ? (
                   <ActivityIndicator size="small" color="#6B7FC4" style={{ marginTop: 20 }} />
                 ) : (
@@ -3102,11 +3167,11 @@ export default function ChatScreen() {
             <TouchableOpacity style={styles.resetBtn} onPress={resetConversation} activeOpacity={0.7}>
               <Ionicons name="arrow-back" size={18} color={propertyData ? propertyData.primary_color : '#6B7FC4'} />
               <Text style={[styles.resetBtnText, propertyData ? { color: propertyData.primary_color } : null]}>
-                {propertyData ? 'Back' : 'Start over'}
+                {propertyData || activePlace ? 'Back' : 'Start over'}
               </Text>
             </TouchableOpacity>
-            {propertyData ? (
-              <Text style={styles.chatHeaderTitle} numberOfLines={1}>{propertyData.name}</Text>
+            {propertyData || activePlace ? (
+              <Text style={styles.chatHeaderTitle} numberOfLines={1}>{propertyData?.name ?? activePlace?.name}</Text>
             ) : (
               <BalkinaLogoInline />
             )}

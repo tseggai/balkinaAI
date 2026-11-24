@@ -9,6 +9,7 @@
  * discover businesses first via the find_businesses tool.
  */
 import OpenAI from 'openai';
+import { placeMembers, placeNamedIn, visiblePlaces } from '@/lib/places';
 import { getLabels, normalizeBusinessType, memberTypeLabel } from '@balkina/shared';
 import { createAdminClient } from '@/lib/supabase/server';
 import { executeTool } from './tool-handlers';
@@ -515,6 +516,7 @@ interface ChatRequestBody {
   message: string;
   tenantId?: string;
   propertyId?: string;
+  placeId?: string;
   sessionId: string;
   customerName?: string;
   customerPhone?: string;
@@ -527,7 +529,7 @@ interface ChatRequestBody {
 export async function POST(request: Request) {
   try {
   const body = (await request.json()) as ChatRequestBody;
-  const { message, tenantId, propertyId, sessionId, customerName, customerPhone, customerEmail, userId, userLatitude, userLongitude } = body;
+  const { message, tenantId, propertyId, placeId, sessionId, customerName, customerPhone, customerEmail, userId, userLatitude, userLongitude } = body;
 
   if (!message || !sessionId) {
     return new Response(JSON.stringify({ error: 'message and sessionId are required' }), {
@@ -615,6 +617,21 @@ export async function POST(request: Request) {
           const typeLabel = memberTypeLabel(member.member_type);
           propertyContext += `\n\nThis customer is a verified ${typeLabel}${member.unit ? ` (unit ${member.unit})` : ''} at ${prop.name}. Acknowledge their residency warmly when relevant, and prioritise resident perks/availability where applicable.`;
         }
+      }
+    }
+  }
+
+  // 1c. Place scoping (docs/PLACES.md). A place is a location, not an owner: when the app sends a
+  // placeId, or the message names a published place ("a massage in Porto"), discovery is restricted
+  // to the claimed businesses located there. Reuses the property scope of find_businesses.
+  if (!tenantId && propertyTenantIds.length === 0) {
+    const places = await visiblePlaces(supabase);
+    const place = (placeId ? places.find((p) => p.id === placeId) : null) ?? (places.length ? placeNamedIn(message, places) : null);
+    if (place) {
+      const members = await placeMembers(supabase, place);
+      if (members.length > 0) {
+        propertyTenantIds = members.map((m) => m.id);
+        propertyContext = `\n\n## Place Context\nThe customer is looking in ${place.name}. find_businesses is already restricted to the businesses located there, so only recommend and book those. They are independent businesses: never present ${place.name} as a partner, an owner or the provider of a service. The businesses here are: ${members.slice(0, 40).map((m) => m.name).join(', ')}.`;
       }
     }
   }
