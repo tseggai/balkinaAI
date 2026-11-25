@@ -6,7 +6,6 @@ import { PlaceDrawer } from '@/components/place-drawer';
 import { EMPTY_PLACE, PlaceFormModal, type PlaceFormValues } from '@/components/place-form-modal';
 import { PlaceListHeader } from '@/components/place-list-header';
 import { PlaceRow } from '@/components/place-row';
-import { PlaceSummary } from '@/components/place-summary';
 import { PlaceToolbar } from '@/components/place-toolbar';
 import { BTN_PRIMARY, BTN_SECONDARY, SECTION_TITLE } from '@/components/prospect-crm';
 import { DEFAULT_PLACE_QUERY, PLACE_PAGE_SIZE, queryPlaces, statusCounts, type PlaceQuery } from '@/lib/place-list';
@@ -126,11 +125,8 @@ export default function PlacesPage() {
 
   return (
     <div className="space-y-5 p-4 md:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Places</h1>
-          <p className="mt-1 text-sm text-gray-500">Destinations grouped from the businesses that signed up on their own. A place shows to customers once you publish it.</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-gray-900">Places</h1>
         <button type="button" className={BTN_PRIMARY} onClick={() => openForm({ id: null, title: 'New place', initial: EMPTY_PLACE })}>New place</button>
       </div>
 
@@ -159,7 +155,6 @@ export default function PlacesPage() {
             </div>
           ) : (
             <>
-              <PlaceSummary places={all} onFilter={change} />
               <PlaceToolbar query={query} counts={counts} shown={rows.length} total={all.length} onChange={change} onReset={() => { setQuery((q) => ({ ...DEFAULT_PLACE_QUERY, sort: q.sort, dir: q.dir })); setPage(1); }} />
 
               <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">

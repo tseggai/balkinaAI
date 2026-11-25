@@ -264,9 +264,8 @@ Nothing changes for customers until a place is published in the admin. The piece
   colours with a back button, the notice line and a chat box scoped to the place. Reaches users with the
   next store build.
 - **Web**: `balkina.ai/places/<slug>` lists the businesses by category, each linking to its booking page.
-- **Admin**: `/dashboard/places` is a list built for many places: four summary tiles (places, shown to
-  customers, ready to publish, bookings in 30 days), status tabs with counts, search by place or by a
-  business inside it (diacritics ignored), a density filter (ready to publish, Level 1, Level 2, below
+- **Admin**: `/dashboard/places` is a list built for many places: one filter line with search by place or by a
+  business inside it (diacritics ignored), a status dropdown with counts, a density filter (ready to publish, Level 1, Level 2, below
   Level 1, hidden), sorting from the column titles or the sort menu, and 20 places per page. A row opens a
   side panel with the density bars, what is still missing for Level 1, the boundary on a map, the member
   businesses by family and the actions (edit, start watching, publish, unpublish, mark official, delete).
